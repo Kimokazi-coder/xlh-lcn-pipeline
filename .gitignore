@@ -1,0 +1,44 @@
+# --- Project data and outputs (never commit) -------------------------------
+# Raw and derived image data: large, often not redistributable.
+data/
+# Generated masks, overlays, CSVs, figures - reproducible from data/ + code.
+results/
+
+# --- Blinding key ----------------------------------------------------------
+# Maps coded specimen IDs to experimental groups. Committing this would
+# unblind the analysis for anyone with repo access.
+code_key
+code_key.*
+*code_key*
+
+# --- Python environments ---------------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+.Python
+
+# --- Python bytecode / caches ----------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# --- Editors and OS junk ---------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- Local, machine-specific overrides -------------------------------------
+# Personal paths / secrets that shadow config.py on a single machine.
+config_local.py
+.env
+# Claude Code project/tooling config stays local, out of version control.
+.claude/
+
+# --- Stray installers / downloads (never belong in the repo) ---------------
+*-installer.exe
