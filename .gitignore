@@ -2,7 +2,11 @@
 # Raw and derived image data: large, often not redistributable.
 data/
 # Generated masks, overlays, CSVs, figures - reproducible from data/ + code.
-results/
+# Exception: results/count/ (v2 outputs) is deliberately committed for now,
+# while v2 is under active review -- see git log.
+results/*
+!results/count/
+!results/count/**
 
 # --- Blinding key ----------------------------------------------------------
 # Maps coded specimen IDs to experimental groups. Committing this would
