@@ -39,10 +39,19 @@ number without looking at that distribution first.
 Outputs, per image, under results/count/<image_stem_with_underscores>/:
     overlay.png        original image with kept objects outlined in green
     measurements.xlsx   "summary" sheet (image, lacuna_count, border_count,
-                         interior_count) + "per_lacuna" sheet (one row per
-                         kept object, including on_border)
-    measurements.json   same per-lacuna measurements + counts + the
-                         parameters used for this run
+                         interior_count, then mean/median/SD over INTERIOR
+                         objects only for area/axis lengths/aspect_ratio/
+                         eccentricity/solidity) + "per_lacuna" sheet (one
+                         row per kept object, including on_border)
+    measurements.json   same per-lacuna measurements + counts + a "summary"
+                         block (same interior-only stats) + the parameters
+                         used for this run
+
+Summary stats are computed over on_border=False objects only -- border
+objects are truncated by the field of view, so their size/shape would bias
+the stats. Still v2-RAW / pre-validation: PIXEL_SIZE_UM is None, so
+everything here is in pixels, and none of this has been checked against
+Mahmoud's ImageJ ground truth yet.
 
 Usage:
     python src/segment_lacunae_v2.py --dir data/WT
@@ -218,6 +227,38 @@ def measurements_for(kept: list[tuple], precision: int = 4) -> list[dict]:
     ]
 
 
+# --- Per-image summary (interior lacunae only) -------------------------
+
+SUMMARY_METRICS = [
+    ("area", "px"),
+    ("major_axis_length", "px"),
+    ("minor_axis_length", "px"),
+    ("aspect_ratio", "unitless"),
+    ("eccentricity", "unitless"),
+    ("solidity", "unitless"),
+]
+
+
+def summarize_interior(measurements: list[dict], precision: int) -> dict:
+    """Mean/median/SD over on_border=False measurements only, for area,
+    axis lengths, aspect_ratio, eccentricity, solidity. SD is sample SD
+    (ddof=1); None when fewer than 2 interior objects (undefined)."""
+    interior = [m for m in measurements if not m["on_border"]]
+    n = len(interior)
+
+    stats = {"interior_lacuna_count": n, "units": "px"}
+    for field, _ in SUMMARY_METRICS:
+        values = np.array([m[field] for m in interior], dtype=float)
+        if n == 0:
+            mean = median = sd = None
+        else:
+            mean = round(float(values.mean()), precision)
+            median = round(float(np.median(values)), precision)
+            sd = round(float(values.std(ddof=1)), precision) if n >= 2 else None
+        stats[field] = {"mean": mean, "median": median, "sd": sd}
+    return stats
+
+
 # --- Output -------------------------------------------------------------
 
 def image_output_dir(image_path: Path) -> Path:
@@ -236,7 +277,14 @@ def save_overlay(display_uint8: np.ndarray, label_image: np.ndarray, kept: list[
     imsave(out_path, overlay, check_contrast=False)
 
 
-def save_xlsx(image_name: str, measurements: list[dict], border_count: int, interior_count: int, out_path: Path) -> None:
+def save_xlsx(
+    image_name: str,
+    measurements: list[dict],
+    border_count: int,
+    interior_count: int,
+    stats: dict,
+    out_path: Path,
+) -> None:
     from openpyxl import Workbook
 
     wb = Workbook()
@@ -245,6 +293,12 @@ def save_xlsx(image_name: str, measurements: list[dict], border_count: int, inte
     summary.title = "summary"
     summary.append(["image", "lacuna_count", "border_count", "interior_count"])
     summary.append([image_name, len(measurements), border_count, interior_count])
+    summary.append([])
+    summary.append(["v2-raw / pre-validation -- stats below over interior (on_border=False) lacunae only"])
+    summary.append(["metric", "mean", "median", "sd", "units", "n"])
+    for field, unit in SUMMARY_METRICS:
+        s = stats[field]
+        summary.append([field, s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
 
     per_lacuna = wb.create_sheet("per_lacuna")
     per_lacuna.append(MEASUREMENT_FIELDS)
@@ -261,6 +315,7 @@ def save_json(
     t_hi: float,
     border_count: int,
     interior_count: int,
+    stats: dict,
     out_path: Path,
 ) -> None:
     payload = {
@@ -268,13 +323,15 @@ def save_json(
         "note": (
             "Not yet size/shape-filtered or validated against ground truth. "
             "Still includes small mesh specks and some elongated/fused objects. "
-            "Border objects are kept (on_border=true), not dropped."
+            "Border objects are kept (on_border=true), not dropped. Summary "
+            "stats below are over interior (on_border=false) lacunae only."
         ),
         "image": str(image_path),
         "units": "px",
         "lacuna_count": len(measurements),
         "border_count": border_count,
         "interior_count": interior_count,
+        "summary": stats,
         "parameters": {
             "channel": config.CHANNEL,
             "channel_axis": config.CHANNEL_AXIS,
@@ -297,6 +354,16 @@ def save_json(
         json.dump(payload, f, indent=2)
 
 
+def print_summary(stats: dict) -> None:
+    print(f"  summary (interior n={stats['interior_lacuna_count']}, units=px):")
+    for field, unit in SUMMARY_METRICS:
+        s = stats[field]
+        mean = "n/a" if s["mean"] is None else f"{s['mean']:.2f}"
+        median = "n/a" if s["median"] is None else f"{s['median']:.2f}"
+        sd = "n/a" if s["sd"] is None else f"{s['sd']:.2f}"
+        print(f"    {field:20s} mean={mean:>10s}  median={median:>10s}  sd={sd:>10s}  ({unit})")
+
+
 def process(image_path: Path) -> tuple[int, int, int, list]:
     """Segment one image, write its outputs, and return
     (total_count, border_count, interior_count, interior_areas)."""
@@ -306,16 +373,18 @@ def process(image_path: Path) -> tuple[int, int, int, list]:
     border_count = sum(1 for _, on_border in kept if on_border)
     interior_count = len(kept) - border_count
     interior_areas = [float(region.area) for region, on_border in kept if not on_border]
+    stats = summarize_interior(measurements, precision=config.CSV_FLOAT_PRECISION)
 
     out_dir = image_output_dir(image_path)
     save_overlay(display, labels, kept, out_dir / "overlay.png")
-    save_xlsx(image_path.name, measurements, border_count, interior_count, out_dir / "measurements.xlsx")
-    save_json(image_path, measurements, t_hi, border_count, interior_count, out_dir / "measurements.json")
+    save_xlsx(image_path.name, measurements, border_count, interior_count, stats, out_dir / "measurements.xlsx")
+    save_json(image_path, measurements, t_hi, border_count, interior_count, stats, out_dir / "measurements.json")
 
     print(
         f"{image_path.name}: total={len(kept)}  border={border_count}  "
         f"interior={interior_count}  t_hi={t_hi:.4f}  -> {out_dir}"
     )
+    print_summary(stats)
     return len(kept), border_count, interior_count, interior_areas
 
 

@@ -1,11 +1,45 @@
 {
   "status": "v2-raw",
-  "note": "Not yet size/shape-filtered or validated against ground truth. Still includes small mesh specks and some elongated/fused objects. Border objects are kept (on_border=true), not dropped.",
+  "note": "Not yet size/shape-filtered or validated against ground truth. Still includes small mesh specks and some elongated/fused objects. Border objects are kept (on_border=true), not dropped. Summary stats below are over interior (on_border=false) lacunae only.",
   "image": "F:\\lcn-quant\\data\\WT\\542 WT  2_z18c1-2.tif",
   "units": "px",
   "lacuna_count": 13,
   "border_count": 1,
   "interior_count": 12,
+  "summary": {
+    "interior_lacuna_count": 12,
+    "units": "px",
+    "area": {
+      "mean": 3380.9167,
+      "median": 3413.0,
+      "sd": 1553.2119
+    },
+    "major_axis_length": {
+      "mean": 122.9919,
+      "median": 126.1987,
+      "sd": 36.6366
+    },
+    "minor_axis_length": {
+      "mean": 35.2191,
+      "median": 35.1867,
+      "sd": 8.7157
+    },
+    "aspect_ratio": {
+      "mean": 3.464,
+      "median": 3.4157,
+      "sd": 0.5351
+    },
+    "eccentricity": {
+      "mean": 0.9545,
+      "median": 0.9561,
+      "sd": 0.0136
+    },
+    "solidity": {
+      "mean": 0.8622,
+      "median": 0.8944,
+      "sd": 0.077
+    }
+  },
   "parameters": {
     "channel": 0,
     "channel_axis": -1,
