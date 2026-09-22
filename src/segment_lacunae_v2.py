@@ -173,29 +173,57 @@ def _sample_line_min(distance: np.ndarray, r0: float, c0: float, r1: float, c1: 
 
 
 def merge_shallow_splits(labels: np.ndarray, mask: np.ndarray, distance: np.ndarray) -> np.ndarray:
-    """Undo a watershed split that isn't a real two-lobe separation: for
-    each pre-watershed component that came out as exactly two pieces,
-    re-merge them if the saddle between their two distance-transform peaks
-    is shallow relative to both peaks (see MERGE_SADDLE_RATIO_MIN)."""
+    """Undo watershed splits that aren't a real multi-lobe separation.
+    Within each pre-watershed component, consider only SUBSTANTIAL pieces
+    (ignoring tiny watershed crumbs well below real lacuna scale -- those
+    are handled by TEST_MIN_AREA_PX2 filtering later, not here) -- there
+    can be more than 2 (e.g. one real lacuna oversplit into 3, with only
+    2 of the 3 pieces individually passing the later shape filters). Any
+    two substantial pieces whose saddle is shallow relative to both peaks
+    (see MERGE_SADDLE_RATIO_MIN) are unioned via union-find, so a chain of
+    shallow links (A-B shallow, B-C shallow) merges all three even if A-C
+    wasn't checked directly."""
     components = measure.label(mask, connectivity=2)
     merged = labels.copy()
     for comp_id in range(1, components.max() + 1):
         comp_mask = components == comp_id
         piece_labels = np.unique(merged[comp_mask])
         piece_labels = piece_labels[piece_labels != 0]
-        if len(piece_labels) != 2:
-            continue  # only the common 2-piece case is handled for now
-        label_a, label_b = piece_labels
-        mask_a = merged == label_a
-        mask_b = merged == label_b
-        peak_a = distance[mask_a].max()
-        peak_b = distance[mask_b].max()
-        ra, ca = np.unravel_index(np.argmax(np.where(mask_a, distance, -1)), distance.shape)
-        rb, cb = np.unravel_index(np.argmax(np.where(mask_b, distance, -1)), distance.shape)
-        saddle = _sample_line_min(distance, ra, ca, rb, cb)
-        ratio = saddle / min(peak_a, peak_b)
-        if ratio >= MERGE_SADDLE_RATIO_MIN:
-            merged[mask_b] = label_a
+        substantial = [lbl for lbl in piece_labels if (merged == lbl).sum() >= TEST_MIN_AREA_PX2]
+        if len(substantial) < 2:
+            continue
+
+        peaks = {}
+        peak_locs = {}
+        for lbl in substantial:
+            piece_mask = merged == lbl
+            peaks[lbl] = distance[piece_mask].max()
+            r, c = np.unravel_index(np.argmax(np.where(piece_mask, distance, -1)), distance.shape)
+            peak_locs[lbl] = (r, c)
+
+        parent = {lbl: lbl for lbl in substantial}
+
+        def find(x):
+            while parent[x] != x:
+                x = parent[x]
+            return x
+
+        for i in range(len(substantial)):
+            for j in range(i + 1, len(substantial)):
+                a, b = substantial[i], substantial[j]
+                ra, ca = peak_locs[a]
+                rb, cb = peak_locs[b]
+                saddle = _sample_line_min(distance, ra, ca, rb, cb)
+                ratio = saddle / min(peaks[a], peaks[b])
+                if ratio >= MERGE_SADDLE_RATIO_MIN:
+                    ra_root, rb_root = find(a), find(b)
+                    if ra_root != rb_root:
+                        parent[ra_root] = rb_root
+
+        for lbl in substantial:
+            root = find(lbl)
+            if root != lbl:
+                merged[merged == lbl] = root
     return merged
 
 

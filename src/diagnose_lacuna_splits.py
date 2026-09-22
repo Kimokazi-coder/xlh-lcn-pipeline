@@ -10,17 +10,11 @@ saddle value relative to the peaks. A single smoothly elongated lacuna
 that merely has two comparable-height ends -> shallow saddle -> saddle
 value close to the peak heights -> ratio close to 1.
 
-(Earlier attempt used the minimum distance over the *entire* shared
-boundary between the two watershed regions; that always came out ~1.0
-because that boundary line's two ends necessarily touch the mask's outer
-edge, an artifact unrelated to the real neck depth. This version instead
-samples along the straight line between the two peaks, which is what
-watershed's flood-front collision point actually depends on.)
-
 Does not modify anything -- prints a table only.
 
 Usage:
     python src/diagnose_lacuna_splits.py --dir data/WT
+    python src/diagnose_lacuna_splits.py --dir data/WT --debug-component "542 WT  2_z06c1-2.tif" 121
 """
 
 from __future__ import annotations
@@ -84,10 +78,42 @@ def find_splits(image_path: Path) -> list[tuple]:
     return rows
 
 
+def debug_component(image_path: Path, comp_id: int) -> None:
+    _display, channel = load_channel(image_path)
+    mask, t_hi = seg2.multiotsu_lacuna_mask(channel)
+    distance = ndi.distance_transform_edt(mask)
+    components = measure.label(mask, connectivity=2)
+    comp_mask = components == comp_id
+    print(f"component {comp_id}: area={comp_mask.sum()}")
+
+    labels_pre_merge = seg2.watershed_split(mask)
+    raw_pieces = np.unique(labels_pre_merge[comp_mask])
+    raw_pieces = raw_pieces[raw_pieces != 0]
+    print(f"raw watershed pieces (pre-merge): {len(raw_pieces)}")
+    for lbl in raw_pieces:
+        area = int((labels_pre_merge == lbl).sum())
+        substantial = area >= seg2.TEST_MIN_AREA_PX2
+        print(f"  label={lbl} area={area} substantial(>= {seg2.TEST_MIN_AREA_PX2})={substantial}")
+
+    labels_post_merge = seg2.merge_shallow_splits(labels_pre_merge, mask, distance)
+    post_pieces = np.unique(labels_post_merge[comp_mask])
+    post_pieces = post_pieces[post_pieces != 0]
+    print(f"post-merge pieces: {len(post_pieces)} -> labels {post_pieces.tolist()}")
+    for lbl in post_pieces:
+        area = int((labels_post_merge == lbl).sum())
+        print(f"  label={lbl} area={area}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Diagnose lacunae over-split by watershed.")
     parser.add_argument("--dir", type=Path, required=True)
+    parser.add_argument("--debug-component", nargs=2, metavar=("IMAGE_NAME", "COMP_ID"), default=None)
     args = parser.parse_args()
+
+    if args.debug_component:
+        image_name, comp_id = args.debug_component
+        debug_component(args.dir / image_name, int(comp_id))
+        return
 
     all_rows = []
     for image_path in sorted(args.dir.glob("*.tif")):

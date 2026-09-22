@@ -54,20 +54,26 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
 
 ## Known issues
 
-1. **Watershed over-splits some elongated lacunae** (user-reported, seen in
-   542 WT 2_z06c1-2 — 3 lacunae each rendered as two colors/territories).
-   Root cause: a single smoothly elongated lacuna can have two
-   comparable-height distance-transform peaks with no real neck between
-   them, so watershed still cuts it in two. Fix just implemented in v2:
-   `merge_shallow_splits()` re-merges a 2-piece split when the saddle
-   between the two peaks is shallow (`MERGE_SADDLE_RATIO_MIN=0.35`,
-   calibrated so all 3 user-confirmed-bad cases (ratio >= 0.364) get merged
+1. **RESOLVED (as of this update): watershed over-splitting some elongated
+   lacunae** (user-reported, seen in 542 WT 2_z06c1-2 — 3 lacunae each
+   rendered as two colors/territories). Root cause: a single smoothly
+   elongated lacuna can have two comparable-height distance-transform
+   peaks with no real neck between them, so watershed still cuts it in
+   two. Fix in v2: `merge_shallow_splits()` re-merges any group of
+   substantial pieces from the same pre-watershed component whose pairwise
+   saddle is shallow relative to both peaks (union-find over pairwise
+   links, not just a simple pair check -- one of the 3 bad cases actually
+   had 3 raw pieces, only 2 of which passed the later shape filters, which
+   the first version of this fix missed). `MERGE_SADDLE_RATIO_MIN=0.35`,
+   calibrated so all 3 user-confirmed-bad cases (ratio >= 0.364) merge
    while the one case that looks like a genuine two-lobe separation (ratio
-   0.000) stays split). **Verification of this fix across all 8 images was
-   in progress when this note was written** — rerun
-   `src/diagnose_lacuna_splits.py --dir data/WT` and the full
-   `segment_lacunae_v2.py --dir data/WT` to confirm before trusting new
-   counts, and re-check `results/count/` outputs are regenerated.
+   0.000, 682_z29c1-3 component 174) stays split. Verified via
+   `src/diagnose_lacuna_splits.py --dir data/WT` (down to that single
+   expected remaining split) and visually on `results/count/542_WT__2_z06c1-2/overlay.png`
+   (every lacuna now one clean outline). `results/count/` and
+   `results/canaliculi/` both regenerated against the fix. Net effect:
+   542_z06c1-2 total count 20 -> 16 (4 fewer -- 3 confirmed pairs plus the
+   3-piece case counted as an extra merge).
 2. **Canaliculi per-lacuna assignment is approximate in dense fields** —
    nearest-lacuna-by-Euclidean-distance (Voronoi) doesn't necessarily match
    true tissue ownership where lacunae are close together. Accepted
