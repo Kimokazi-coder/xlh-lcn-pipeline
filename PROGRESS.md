@@ -27,19 +27,32 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
 
 ### Canaliculi (per-lacuna)
 - **`src/canaliculi_v1.py` (v1-raw)** — builds on v2's lacuna segmentation
-  (imported, not modified). Canalicular network = red signal above the
-  *lower* multi-Otsu cut, minus a buffer around lacuna bodies, despeckled
-  by pixel count (not erosion), skeletonized. Every skeleton pixel assigned
-  to its nearest lacuna via Euclidean distance transform (Voronoi
-  partition). Per lacuna, uses `skan` to trace root-to-tip paths through
-  that lacuna's owned skeleton subset; each path = one canaliculus, path
-  length = canaliculus length (no fixed search radius). Parameters:
-  `LACUNA_DILATION_PX=2`, `MIN_THREAD_OBJECT_PX2=8`, `MAX_ROOT_GAP_PX=15`.
+  (imported, not modified). Canalicular network = red signal strictly
+  above the *lower* multi-Otsu cut, minus a buffer around lacuna bodies,
+  despeckled by pixel count (not erosion), skeletonized.
+  **Two assignment methods, `ASSIGNMENT_METHOD` ("graph" = default,
+  "euclidean" = old, kept for comparison via `--method euclidean`):**
+  - `"graph"` (OCY-style, Kollmannsberger et al.): the whole skeleton is
+    one weighted graph; each lacuna is a virtual source node attached to
+    skeleton nodes within `LACUNA_ATTACH_GAP_PX=10` of its body; a single
+    multi-source shortest-path assigns every reachable node to whichever
+    cell it's graph-connected to (not spatially nearest). Terminal spurs
+    shorter than `PRUNE_SPUR_LEN_PX=4` are pruned first. Per cell,
+    single-source Dijkstra finds every reachable, owned, degree-1 tip =
+    one canaliculus; length = path distance from the root (first real
+    node) to the tip.
+  - `"euclidean"`: every skeleton pixel assigned to its nearest lacuna by
+    Euclidean distance transform (Voronoi), no spur pruning; per-lacuna
+    root-to-tip tree search (root = closest point to the lacuna;
+    `MAX_ROOT_GAP_PX=15` cutoff).
+  Other parameters: `LACUNA_DILATION_PX=2`, `MIN_THREAD_OBJECT_PX2=8`.
   Outputs per image under `results/canaliculi/<image>/`: `verification.png`
   (all lacunae + canaliculi, one random-but-reproducible color per lacuna,
   drawn over the full-brightness original — `VIS_DIM_FACTOR=1.0`),
-  `measurements.xlsx`, `measurements.json`. Border lacunae kept in the
-  per-lacuna table but excluded from summary stats.
+  `measurements.xlsx`, `measurements.json` (all suffixed `_<method>` when
+  `--method` overrides the default, so comparison runs never clobber the
+  default outputs). Border lacunae kept in the per-lacuna table but
+  excluded from summary stats.
 
 ### Diagnostics (read-only, no pipeline effect)
 - **`src/inspect_tif_metadata.py`** — checked all 8 WT `.tif` files for
@@ -47,10 +60,13 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
   no resolution tags at all; the 1 that does has a generic 300 DPI /
   ~84.7 µm/px value that's implausible for confocal and almost certainly a
   software default, not a real calibration). `PIXEL_SIZE_UM` stays `None`.
-- **`src/diagnose_lacuna_splits.py`** — finds lacunae watershed split into
-  two pieces and scores how real the split is (saddle depth between the
-  two distance-transform peaks vs. the peaks themselves). Built to
-  investigate the over-split issue below.
+- **`src/diagnose_lacuna_splits.py`** — (a) finds lacunae watershed split
+  into two pieces and scores how real the split is (saddle depth between
+  the two distance-transform peaks vs. the peaks themselves); (b)
+  `--attach-gaps`: for canaliculi_v1's graph method, the minimum
+  node-to-lacuna gap actually available per lacuna, vs.
+  `LACUNA_ATTACH_GAP_PX` -- used to find and size-fix the attachment-gap
+  bug above.
 
 ## Known issues
 
@@ -74,14 +90,34 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    `results/canaliculi/` both regenerated against the fix. Net effect:
    542_z06c1-2 total count 20 -> 16 (4 fewer -- 3 confirmed pairs plus the
    3-piece case counted as an extra merge).
-2. **Canaliculi per-lacuna assignment is approximate in dense fields** —
-   nearest-lacuna-by-Euclidean-distance (Voronoi) doesn't necessarily match
-   true tissue ownership where lacunae are close together. Accepted
-   approximation per spec, not fixed.
-3. **Canaliculi counts look too high** (30–160/cell across the 8 images) —
-   likely includes thresholding-noise spurs (short branches from mask edge
-   roughness) counted as real canaliculi, since no spur-length pruning
-   exists yet. Flagged, not yet addressed.
+2. **RESOLVED (as of this update): canaliculi per-lacuna assignment was
+   Euclidean-nearest (straight-line Voronoi), not real network ownership**
+   — reworked to graph-connectivity (OCY-style) assignment; see above.
+   Visually confirmed on 542_WT__2_z06c1-2 and 543-2 (both methods run,
+   overlays compared side by side): the euclidean overlay fills the whole
+   field edge-to-edge with straight-boundary territories; the graph
+   overlay shows each cell's color following a real branching/dendritic
+   pattern with visible unclaimed gaps between neighbors — the qualitative
+   signature the fix was meant to produce.
+   Found and fixed a real bug along the way: the initial
+   `LACUNA_ATTACH_GAP_PX=5` guess left 28/98 lacunae (29%) across all 8
+   images with no attachment point at all (0 canaliculi silently), while
+   a few well-attached neighbors absorbed tips that should have been
+   unreachable. The min-gap distribution across all 98 lacunae was smooth
+   (2.24–11.18px, no natural break), so `LACUNA_ATTACH_GAP_PX=10` was
+   chosen as a coverage target (97/98 attached) rather than a gap-based
+   cutoff — see `src/diagnose_lacuna_splits.py --attach-gaps`.
+   Also fixed: `total_signal_mask` now uses strict `>` instead of `>=`.
+3. **Canaliculi counts are lower but still not in the hoped-for range.**
+   Graph + spur-pruning (`PRUNE_SPUR_LEN_PX=4`) reduced mean
+   canaliculi/cell from 30–160 (euclidean) to 26–73 (graph) across the 8
+   images — a real reduction, and the bimodal/attachment-failure artifact
+   is gone — but this is still well above "single digits to low tens,"
+   which was the expected sanity-check range going into this fix. Not
+   pushed further: `PRUNE_SPUR_LEN_PX` is per the original spec, and
+   raising it further wasn't something I did unilaterally -- flagged for
+   the user to decide (e.g. a larger prune length, chosen the same
+   data-driven way as `LACUNA_ATTACH_GAP_PX`, would be the next lever).
 4. **v1 (`count_lacunae.py`) and v2 disagree** and v1 is not being kept in
    sync with v2's fixes. Not deleted yet: v2's own loader function is
    imported from v1's file (`from count_lacunae import load_channel`), so

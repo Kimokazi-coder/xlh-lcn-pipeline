@@ -1,20 +1,18 @@
-"""Read-only diagnostic: find lacunae that segment_lacunae_v2's watershed
-step split into two pieces, and score how "real" that split is.
+"""Read-only diagnostics for segment_lacunae_v2 / canaliculi_v1.
 
-For every pre-watershed connected component that ends up as exactly two
-kept lacunae, this measures the saddle depth between the two pieces: the
-minimum distance-transform value along the straight line connecting their
-two distance-transform peaks (the two watershed seed locations). A true
-two-lobe "dumbbell" (two touching cells) has a deep, narrow neck -> low
-saddle value relative to the peaks. A single smoothly elongated lacuna
-that merely has two comparable-height ends -> shallow saddle -> saddle
-value close to the peak heights -> ratio close to 1.
+1. find_splits / debug_component: watershed over-split investigation
+   (saddle depth between distance-transform peaks).
+2. attach_gaps: for canaliculi_v1's "graph" assignment method, the
+   minimum node-to-lacuna gap distance actually available per lacuna --
+   i.e. whether LACUNA_ATTACH_GAP_PX is tight enough to leave some
+   lacunae with no attachment point in the skeleton graph.
 
-Does not modify anything -- prints a table only.
+Does not modify anything -- prints tables only.
 
 Usage:
     python src/diagnose_lacuna_splits.py --dir data/WT
     python src/diagnose_lacuna_splits.py --dir data/WT --debug-component "542 WT  2_z06c1-2.tif" 121
+    python src/diagnose_lacuna_splits.py --dir data/WT --attach-gaps
 """
 
 from __future__ import annotations
@@ -26,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy import ndimage as ndi
-from skimage import measure
+from skimage import measure, morphology
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
@@ -34,6 +32,7 @@ import config  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from count_lacunae import load_channel  # noqa: E402
 import segment_lacunae_v2 as seg2  # noqa: E402
+import canaliculi_v1 as can1  # noqa: E402
 
 
 def sample_line_min(distance: np.ndarray, r0: float, c0: float, r1: float, c1: float, n: int = 50) -> float:
@@ -45,8 +44,6 @@ def sample_line_min(distance: np.ndarray, r0: float, c0: float, r1: float, c1: f
 
 
 def find_splits(image_path: Path) -> list[tuple]:
-    # Use segment_image (not watershed_split directly) so this reflects
-    # merge_shallow_splits too, not just the raw pre-merge watershed output.
     _display, channel = load_channel(image_path)
     mask, _t_hi = seg2.multiotsu_lacuna_mask(channel)
     distance = ndi.distance_transform_edt(mask)
@@ -104,15 +101,71 @@ def debug_component(image_path: Path, comp_id: int) -> None:
         print(f"  label={lbl} area={area}")
 
 
+def attach_gaps_for_image(image_path: Path) -> list[tuple]:
+    """For each lacuna, the minimum dist_to_lacuna value among all graph
+    nodes (post-prune) whose nearest_id is that lacuna -- i.e. the
+    closest attachment point actually available, vs. LACUNA_ATTACH_GAP_PX."""
+    display, channel = load_channel(image_path)
+    _display2, labels, kept, _t_hi = seg2.segment_image(image_path)
+
+    lacuna_mask, lacuna_id_map = can1.build_lacuna_maps(labels, kept)
+    candidate, _t_lo = can1.canaliculi_candidate_mask(channel, lacuna_mask)
+    skeleton = morphology.skeletonize(candidate)
+    dist_to_lacuna, nearest_id = can1.nearest_lacuna_map(lacuna_id_map)
+
+    G, _skel_obj, _edge_branch_index = can1.build_network_graph(skeleton)
+    can1.prune_spurs(G)
+
+    rows = []
+    for lacuna_id in range(1, len(kept) + 1):
+        gaps = [
+            float(dist_to_lacuna[r, c])
+            for (r, c) in G.nodes()
+            if int(nearest_id[r, c]) == lacuna_id
+        ]
+        min_gap = min(gaps) if gaps else None
+        n_candidate_nodes = len(gaps)
+        attachable = min_gap is not None and min_gap <= can1.LACUNA_ATTACH_GAP_PX
+        rows.append((image_path.name, lacuna_id, n_candidate_nodes, min_gap, attachable))
+    return rows
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Diagnose lacunae over-split by watershed.")
+    parser = argparse.ArgumentParser(description="Diagnose lacunae over-split / canaliculi attachment gaps.")
     parser.add_argument("--dir", type=Path, required=True)
     parser.add_argument("--debug-component", nargs=2, metavar=("IMAGE_NAME", "COMP_ID"), default=None)
+    parser.add_argument("--attach-gaps", action="store_true")
     args = parser.parse_args()
 
     if args.debug_component:
         image_name, comp_id = args.debug_component
         debug_component(args.dir / image_name, int(comp_id))
+        return
+
+    if args.attach_gaps:
+        print(f"LACUNA_ATTACH_GAP_PX = {can1.LACUNA_ATTACH_GAP_PX}")
+        print(f"{'image':30s} {'lacuna_id':>9s} {'n_nodes':>7s} {'min_gap':>8s} {'attachable':>10s}")
+        n_total = 0
+        n_unattachable = 0
+        all_gaps = []
+        for image_path in sorted(args.dir.glob("*.tif")):
+            for row in attach_gaps_for_image(image_path):
+                image, lacuna_id, n_nodes, min_gap, attachable = row
+                n_total += 1
+                if not attachable:
+                    n_unattachable += 1
+                if min_gap is not None:
+                    all_gaps.append(min_gap)
+                mg = "n/a" if min_gap is None else f"{min_gap:.2f}"
+                print(f"{image:30s} {lacuna_id:9d} {n_nodes:7d} {mg:>8s} {str(attachable):>10s}")
+        print(f"\n{n_unattachable}/{n_total} lacunae have NO attachment point within {can1.LACUNA_ATTACH_GAP_PX}px")
+
+        arr = np.array(all_gaps)
+        print(f"\nmin_gap distribution (n={arr.size}): min={arr.min():.2f} max={arr.max():.2f} "
+              f"mean={arr.mean():.2f} median={np.median(arr):.2f}")
+        for p in (50, 75, 90, 95, 99, 100):
+            print(f"  p{p:02d} = {np.percentile(arr, p):.2f} px")
+        print("  sorted: " + ", ".join(f"{g:.2f}" for g in sorted(all_gaps)))
         return
 
     all_rows = []
