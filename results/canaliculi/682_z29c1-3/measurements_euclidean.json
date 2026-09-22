@@ -1,0 +1,151 @@
+{
+  "status": "v1-raw",
+  "note": "Not yet validated against ground truth. Canaliculus count/length come from a per-lacuna Euclidean-nearest skeleton assignment, an approximation in dense fields, with no spur pruning; always path-based, count_mode does not apply. Border lacunae are kept (on_border=true) but excluded from summary stats.",
+  "image": "data\\WT\\682_z29c1-3.tif",
+  "units": "px",
+  "lacuna_count": 13,
+  "summary": {
+    "interior_lacuna_count": 11,
+    "units": "px",
+    "canaliculi_count": {
+      "mean": 15.5455,
+      "median": 13.0,
+      "sd": 12.4045
+    },
+    "total_length_px": {
+      "mean": 1261.9576,
+      "median": 542.6173,
+      "sd": 1860.4141
+    },
+    "mean_canaliculus_length_px": {
+      "mean": 60.1533,
+      "median": 46.8856,
+      "sd": 34.5246
+    }
+  },
+  "parameters": {
+    "assignment_method": "euclidean",
+    "count_mode": "path (euclidean is always path-based)",
+    "preprocess_mode": "tophat",
+    "tophat_radius_px": 5,
+    "smooth_sigma_px": 0.8,
+    "background_mode_subtract": true,
+    "pixel_size_um": null,
+    "lacuna_segmentation": "segment_lacunae_v2 (multi-Otsu 3-class + watershed; see that module)",
+    "total_signal_threshold_t_lo": 0.068359375,
+    "lacuna_top_class_threshold_t_hi": 0.5234375,
+    "lacuna_dilation_px": 2,
+    "min_thread_object_px2": 8,
+    "lacuna_attach_gap_px": 10,
+    "prune_spur_len_px": 4,
+    "min_internal_edge_len_px": 6,
+    "graph_cleanup_max_iter": 20,
+    "max_root_gap_px": 15
+  },
+  "lacunae": [
+    {
+      "lacuna_id": 1,
+      "canaliculi_count": 10,
+      "total_length_px": 243.5097,
+      "mean_canaliculus_length_px": 24.351,
+      "on_border": true,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 2,
+      "canaliculi_count": 47,
+      "total_length_px": 6471.8342,
+      "mean_canaliculus_length_px": 137.6986,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 3,
+      "canaliculi_count": 17,
+      "total_length_px": 797.0559,
+      "mean_canaliculus_length_px": 46.8856,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 4,
+      "canaliculi_count": 27,
+      "total_length_px": 2555.6997,
+      "mean_canaliculus_length_px": 94.6555,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 5,
+      "canaliculi_count": 7,
+      "total_length_px": 271.7107,
+      "mean_canaliculus_length_px": 38.8158,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 6,
+      "canaliculi_count": 19,
+      "total_length_px": 1197.7321,
+      "mean_canaliculus_length_px": 63.0385,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 7,
+      "canaliculi_count": 23,
+      "total_length_px": 1518.7809,
+      "mean_canaliculus_length_px": 66.034,
+      "on_border": true,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 8,
+      "canaliculi_count": 13,
+      "total_length_px": 947.6955,
+      "mean_canaliculus_length_px": 72.8997,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 9,
+      "canaliculi_count": 7,
+      "total_length_px": 297.6224,
+      "mean_canaliculus_length_px": 42.5175,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 10,
+      "canaliculi_count": 6,
+      "total_length_px": 475.4752,
+      "mean_canaliculus_length_px": 79.2459,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 11,
+      "canaliculi_count": 4,
+      "total_length_px": 92.5685,
+      "mean_canaliculus_length_px": 23.1421,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 12,
+      "canaliculi_count": 13,
+      "total_length_px": 542.6173,
+      "mean_canaliculus_length_px": 41.7398,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 13,
+      "canaliculi_count": 11,
+      "total_length_px": 231.5219,
+      "mean_canaliculus_length_px": 21.0474,
+      "on_border": false,
+      "units": "px"
+    }
+  ]
+}

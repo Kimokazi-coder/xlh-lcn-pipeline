@@ -10,13 +10,26 @@ PIXEL_SIZE_UM is None, so nothing is converted to microns.
 Method:
     1. Segment lacunae with segment_lacunae_v2's multi-Otsu + watershed
        approach (imported as-is).
-    2. Segment the canalicular network: red signal above background (the
-       LOWER of the two multi-Otsu cuts -- background vs. everything else,
-       computed per-image, same idea as v2's threshold but one level down;
-       strict ">" so a pixel exactly at the cut is never included), minus
-       a small buffer around the lacuna bodies, despeckled by size (not by
-       erosion, which would erase 1px-wide threads), then skeletonized to
-       1px centerlines.
+    2. Segment the canalicular network. PREPROCESS_MODE selects how:
+       - "tophat" (default, OCY-style -- see OCY_thr_stack.m and
+         OCY_main.m in Kollmannsberger et al., "The small world of
+         osteocytes"): light Gaussian smoothing (sigma below canaliculus
+         width), then a white top-hat with a disk structuring element to
+         flatten the diffuse background haze, then the histogram-mode
+         offset subtraction OCY applies after its top-hat, then normalize
+         and threshold. Without this, a plain global cut on the raw
+         channel renders ~3-5px threads as ~6-10px fused ribbons whose
+         skeletons branch everywhere -- a main reason counts ran high.
+       - "none" (old behaviour, kept for comparison): threshold the raw
+         channel directly.
+       Either way the cut is the LOWER of the two multi-Otsu (3-class)
+       cuts on the (pre-processed) image -- background vs. everything
+       else, computed per-image, same idea as v2's threshold but one
+       level down; strict ">" so a pixel exactly at the cut is never
+       included. The lacuna bodies plus a small buffer are then
+       subtracted, the result despeckled by size (not by erosion, which
+       would erase 1px-wide threads), then skeletonized to 1px
+       centerlines.
     3. Assign every skeleton branch to a lacuna. Two methods, chosen by
        ASSIGNMENT_METHOD:
        - "graph" (default): the whole skeleton is one weighted graph
@@ -31,24 +44,35 @@ Method:
          not by which cell is spatially closest in a straight line. This
          fixes the old method's straight-edged territories in dense
          fields, which could hand half of a canaliculus to the wrong
-         neighbor. Terminal spurs shorter than PRUNE_SPUR_LEN_PX are
-         pruned from the graph first -- these are thresholding-noise
-         branches, not real canaliculi, and were inflating counts into
-         the tens-to-hundreds per cell.
+         neighbor. The graph is cleaned up first (clean_network_graph,
+         OCY's Skel2Graph3D THR_BRANCH idea): terminal spurs shorter than
+         PRUNE_SPUR_LEN_PX pruned, internal edges shorter than
+         MIN_INTERNAL_EDGE_LEN_PX collapsed as thread-crossing artifacts,
+         degree-2 chains re-simplified into single edges so one thread is
+         one edge of its true length, all iterated to a fixed point.
        - "euclidean" (old behaviour, kept for comparison): every skeleton
          pixel assigned to its nearest lacuna by a Euclidean distance
          transform (a Voronoi split), with no spur pruning.
-    4. Per lacuna, count path-based canaliculi and their lengths:
-       - "graph": single-source Dijkstra from that lacuna's virtual node;
-         every reachable, cell-owned, degree-1 real node is a tip: one
-         canaliculus. Length = path distance from the tip back to the
-         root (the first real node on the path), i.e. the full path minus
-         the virtual attachment edge -- so length is measured from the
-         lacuna boundary outward, not from its centroid.
-       - "euclidean": per-component root-to-tip tree search within that
-         lacuna's owned skeleton subset (root = point closest to the
-         lacuna body; a fragment farther than MAX_ROOT_GAP_PX from the
-         lacuna is treated as unreachable, not one long canaliculus).
+    4. Per lacuna, count canaliculi and their lengths. For the "graph"
+       method, COUNT_MODE decides what "one canaliculus" means:
+       - "edge" (default, OCY-style): one canaliculus = one graph edge
+         between two nodes, the way OCY counts `link` structs -- every
+         per-network number in OCY_get_network_params.m is derived from
+         them. Every real edge is assigned to the cell that reaches it
+         first through the network (see assign_edges). Reported per cell:
+         edges owned, total length, mean edge length.
+       - "path" (old behaviour, kept for comparison): single-source
+         Dijkstra from that lacuna's virtual node; every reachable,
+         cell-owned, degree-1 real node is a tip: one canaliculus.
+         Length = path distance from the tip back to the root (the first
+         real node on the path), i.e. the full path minus the virtual
+         attachment edge. This re-counts the shared trunk once per tip,
+         inflating both count and mean length.
+       The "euclidean" method is always path-based (per-component
+       root-to-tip tree search within that lacuna's owned skeleton
+       subset; root = point closest to the lacuna body; a fragment
+       farther than MAX_ROOT_GAP_PX from the lacuna is treated as
+       unreachable, not one long canaliculus) and ignores COUNT_MODE.
 
 Border lacunae (on_border=True, from v2) are kept in the per-lacuna table
 and drawn in the verification image, but excluded from the per-image
@@ -78,6 +102,8 @@ outputs.
 Usage:
     python src/canaliculi_v1.py --dir data/WT
     python src/canaliculi_v1.py --dir data/WT --method euclidean
+    python src/canaliculi_v1.py --dir data/WT --preprocess none
+    python src/canaliculi_v1.py --dir data/WT --count-mode path
     python src/canaliculi_v1.py --image data/WT/example.tif
 """
 
@@ -111,6 +137,56 @@ import segment_lacunae_v2 as seg2  # noqa: E402
 # comparison -- see the module docstring and README section above.
 ASSIGNMENT_METHOD = "graph"
 
+# What counts as ONE canaliculus. Applies to the "graph" method only --
+# the legacy "euclidean" method is inherently path-based and ignores this.
+#   "edge" (default, OCY-style): one canaliculus = one graph edge between
+#       two nodes (branch points / endpoints), which is how OCY counts --
+#       its `link` structs are the canaliculi, and OCY_get_network_params.m
+#       derives every per-network number from them. Reported per cell:
+#       number of edges owned, total length, mean edge length.
+#   "path" (old behaviour, kept for comparison): one canaliculus = one
+#       cell-to-tip path. This double-counts the shared trunk of every
+#       branching thread -- a stem that forks into 4 tips is reported as 4
+#       canaliculi, each carrying the whole stem length again -- so it
+#       inflates both count and mean length.
+COUNT_MODE = "edge"
+
+# --- Canalicular-mask preprocessing (OCY-style; see module docstring) ---
+# "tophat" = smooth + white top-hat + histogram-mode offset subtraction
+# before thresholding (default). "none" = threshold the raw channel, the
+# old behaviour, kept behind this switch for before/after comparison.
+PREPROCESS_MODE = "tophat"
+
+# Radius (px) of the disk structuring element for the white top-hat.
+# Adapted from OCY_thr_stack.m, which uses strel('disk',25) at 0.2 um/voxel.
+# A white top-hat keeps what is NARROWER than its structuring element and
+# flattens what is broader, so the radius has to sit just above the widest
+# real canaliculus and well below the diffuse halo around each lacuna.
+# Measured with diagnose_canaliculi_mask.py: after top-hatting, canalicular
+# half-widths are p50~3.0 / p99~4.2 px, i.e. real threads are at most ~8px
+# across, so a disk of radius 5 (diameter 11) cannot fit inside one and
+# every thread survives intact. Checked visually at r=4/5/6 on 542_z06 and
+# 543-2: r=4 starts breaking threads into fragments, r=6 starts fusing
+# neighbouring threads back into ribbons, r=5 does neither.
+TOPHAT_RADIUS_PX = 5
+
+# Sigma (px) of the Gaussian applied before the top-hat, to suppress shot
+# noise without erasing threads. OCY_main.m does the same with
+# smooth3(img,'gaussian',5). Must stay BELOW the canaliculus width (~5px
+# here). Set to 0 to disable.
+SMOOTH_SIGMA_PX = 0.8
+
+# OCY_thr_stack.m, after its top-hat, builds a 256-bin histogram of the
+# image, zeroes the first bin and everything from bin 200 up, and subtracts
+# the modal intensity, clipping at 0 -- a residual-background offset
+# removal. Reproduced here. Set to False to skip it.
+BACKGROUND_MODE_SUBTRACT = True
+
+# Write the raw binary network mask and its skeleton as PNGs next to the
+# verification overlay, so the segmentation itself can be inspected
+# directly instead of only through the colored per-cell tracing.
+SAVE_MASK_PNG = True
+
 # A skeleton node within this many px of a lacuna body is treated as
 # attached to it (a graph-method "root"). This is a gap-closing tolerance
 # for the LACUNA_DILATION_PX buffer already carved out around each lacuna,
@@ -119,10 +195,15 @@ ASSIGNMENT_METHOD = "graph"
 # point at all (see --attach-gaps in diagnose_lacuna_splits.py), which
 # silently gave them 0 canaliculi while a few well-attached neighbors
 # absorbed tips that should have been unreachable/theirs instead. The
-# min-gap distribution across all 98 lacunae is smooth (2.24 up to 11.18
-# px, no natural break to split on), so 10 is a coverage choice, not a
-# gap-based one: it leaves only 1/98 lacunae unattached (the 11.18 outlier)
-# instead of 28. Revisit if that single case, or the dataset changes.
+# min-gap distribution across all 98 lacunae was smooth (2.24 up to 11.18
+# px, no natural break to split on), so 10 was a coverage choice, not a
+# gap-based one: it left 1/98 lacunae unattached instead of 28.
+# Since the top-hat preprocessing went in, thread signal survives right up
+# against the lacuna boundaries and the gaps have collapsed: max min-gap is
+# now 7.00 px (p50 2.24, p95 5.00) and 0/98 lacunae are unattached, so 10
+# now clears the worst case with room to spare rather than sitting inside
+# the distribution. Re-check with diagnose_lacuna_splits.py --attach-gaps
+# if the dataset or the preprocessing changes.
 LACUNA_ATTACH_GAP_PX = 10
 
 # Terminal branches (graph method) shorter than this are treated as
@@ -131,6 +212,27 @@ LACUNA_ATTACH_GAP_PX = 10
 # with the Euclidean method to a plausible range. Iteratively applied
 # (pruning one spur can expose another).
 PRUNE_SPUR_LEN_PX = 4
+
+# Internal edges (both ends a real junction) shorter than this are treated
+# as crossing artifacts and collapsed -- see collapse_short_internal_edges.
+# OCY's equivalent is Skel2Graph3D's THR_BRANCH, called with 5 voxels in
+# OCY_run_Skel2Graph3D.m; that is ~2.5x their canaliculus diameter, which
+# scaled to our threads would be ~15px and would take out half of all
+# internal edges, so the value here is anchored on our own geometry
+# instead: a false junction where two threads cross spans at most one
+# thread width, and the measured thread width here is ~6px (post-top-hat
+# half-width p50 = 3.0px, see TOPHAT_RADIUS_PX). An edge shorter than that
+# cannot be a real canalicular segment between two real branch points.
+# The pooled internal-edge length distribution across all 8 WT images is
+# smooth with no natural break (p10=3.4, p25=7.8, p50=16.7px), so this is
+# a geometry-based cutoff, not a gap-based one; it removes 18% of internal
+# edges. Set to 0 to disable.
+MIN_INTERNAL_EDGE_LEN_PX = 6
+
+# Safety stop for the prune/collapse/simplify loop in clean_network_graph.
+# It normally converges in a handful of passes; this only bounds the
+# pathological case.
+GRAPH_CLEANUP_MAX_ITER = 20
 
 # Buffer (px) eroded away from the canaliculi candidate mask around each
 # lacuna body, so the lacuna's own bright rim isn't mistaken for a stub of
@@ -171,6 +273,46 @@ CANALICULI_DIR = config.RESULTS_DIR / "canaliculi"
 
 # --- Canalicular network segmentation -----------------------------------
 
+def _subtract_background_mode(img: np.ndarray) -> np.ndarray:
+    """Residual-background offset removal, adapted from OCY_thr_stack.m:
+    256-bin histogram of img/max(img), zero out bin 1 and bins 200+, take
+    the modal bin as the background level, subtract it and clip at 0.
+    (OCY subtracts the bin INDEX from an 8-bit image, which comes to the
+    same thing as subtracting the modal intensity; written out explicitly
+    here because our channel is float in [0, 1].)"""
+    peak = float(img.max())
+    if peak <= 0:
+        return img
+    counts, edges = np.histogram(img / peak, bins=256, range=(0.0, 1.0))
+    counts[0] = 0
+    counts[199:] = 0
+    if counts.max() == 0:
+        return img
+    background = float(edges[int(np.argmax(counts))]) * peak
+    return np.clip(img - background, 0.0, None)
+
+
+def preprocess_channel(channel: np.ndarray, mode: str) -> np.ndarray:
+    """Flatten the background before thresholding, so thin threads
+    threshold as thin threads instead of fusing into ribbons. OCY-style:
+    smooth3 gaussian (OCY_main.m) then imtophat + mode subtraction
+    (OCY_thr_stack.m). Returns an image renormalized to [0, 1]; "none"
+    returns the channel unchanged."""
+    if mode == "none":
+        return channel
+    if mode != "tophat":
+        raise ValueError(f"Unknown preprocess mode: {mode!r} (expected 'tophat' or 'none')")
+
+    img = channel
+    if SMOOTH_SIGMA_PX > 0:
+        img = ndi.gaussian_filter(img, SMOOTH_SIGMA_PX)
+    img = morphology.white_tophat(img, morphology.disk(TOPHAT_RADIUS_PX))
+    if BACKGROUND_MODE_SUBTRACT:
+        img = _subtract_background_mode(img)
+    peak = float(img.max())
+    return img / peak if peak > 0 else img
+
+
 def total_signal_mask(channel: np.ndarray) -> tuple[np.ndarray, float]:
     """Lower of the two multi-Otsu (3-class) cuts on this image's own
     histogram: background vs. everything else (mesh + lacunae). Same
@@ -194,8 +336,10 @@ def build_lacuna_maps(labels: np.ndarray, kept: list[tuple]) -> tuple[np.ndarray
     return lacuna_id_map > 0, lacuna_id_map
 
 
-def canaliculi_candidate_mask(channel: np.ndarray, lacuna_mask: np.ndarray) -> tuple[np.ndarray, float]:
-    signal, t_lo = total_signal_mask(channel)
+def canaliculi_candidate_mask(
+    channel: np.ndarray, lacuna_mask: np.ndarray, mode: str
+) -> tuple[np.ndarray, float]:
+    signal, t_lo = total_signal_mask(preprocess_channel(channel, mode))
     buffered_lacunae = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
     candidate = signal & ~buffered_lacunae
     candidate = morphology.remove_small_objects(candidate, min_size=MIN_THREAD_OBJECT_PX2)
@@ -214,6 +358,12 @@ def nearest_lacuna_map(lacuna_id_map: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 def _node_key(row: float, col: float) -> tuple[int, int]:
     return (int(round(row)), int(round(col)))
+
+
+def _is_cell_node(node) -> bool:
+    """True for the virtual ("cell", id) source nodes, False for real
+    skeleton pixel-coordinate nodes."""
+    return isinstance(node, tuple) and len(node) == 2 and node[0] == "cell"
 
 
 # --- "euclidean" assignment (old method, kept for comparison) -----------
@@ -288,16 +438,23 @@ def canaliculi_measurements_euclidean(
 def build_network_graph(skeleton: np.ndarray):
     """One weighted graph of the whole canalicular skeleton. Nodes are
     junction/endpoint pixel coords, edges are branches weighted by branch
-    length in px. Also returns the skan Skeleton object and a
-    {frozenset({u, v}): branch_index} lookup, both needed later to recover
-    pixel paths for visualization."""
+    length in px. Each edge carries `branches`, the list of skan branch
+    indices whose pixels it covers, so the graph can be simplified later
+    (short internal edges collapsed, degree-2 chains merged) without
+    losing the pixel paths the verification image is drawn from.
+
+    nx.Graph holds no parallel edges, so where two separate branches join
+    the same pair of nodes (a small loop) the weight kept is the shorter
+    one, though both branches' pixels are recorded. That affects 1.3% of
+    branches across the 8 WT images -- noted rather than fixed, since a
+    MultiGraph would complicate every shortest-path step downstream for a
+    ~1% effect."""
     G = nx.Graph()
     if not skeleton.any():
-        return G, None, {}
+        return G, None
 
     skel_obj = Skeleton(skeleton)
     branches = summarize(skel_obj, separator="-")
-    edge_branch_index: dict[frozenset, int] = {}
 
     for idx, b in branches.iterrows():
         if b["branch-type"] == 3:  # isolated loop, no tip
@@ -307,23 +464,29 @@ def build_network_graph(skeleton: np.ndarray):
         w = float(b["branch-distance"])
         if src == dst:
             continue
-        key = frozenset((src, dst))
         if G.has_edge(src, dst):
-            if w < G[src][dst]["weight"]:
-                G[src][dst]["weight"] = w
-                edge_branch_index[key] = idx
+            G[src][dst]["branches"].append(idx)
+            G[src][dst]["weight"] = min(w, G[src][dst]["weight"])
         else:
-            G.add_edge(src, dst, weight=w)
-            edge_branch_index[key] = idx
+            G.add_edge(src, dst, weight=w, branches=[idx])
 
-    return G, skel_obj, edge_branch_index
+    return G, skel_obj
 
 
-def prune_spurs(G: nx.Graph) -> nx.Graph:
-    """Iteratively remove terminal branches shorter than PRUNE_SPUR_LEN_PX
-    -- thresholding-noise spurs, not real canaliculi. Removing one spur
-    can expose another (its former neighbor may now be a short spur too),
-    so this repeats until nothing more qualifies."""
+def _node_absorbed(G: nx.Graph, node) -> list:
+    """Branch indices whose pixels were folded into `node` when a short
+    internal edge or a degree-2 chain was collapsed onto it. Kept so the
+    verification image still paints every pixel the cell owns."""
+    return G.nodes[node].setdefault("absorbed", [])
+
+
+def prune_spurs(G: nx.Graph) -> bool:
+    """Remove terminal branches shorter than PRUNE_SPUR_LEN_PX --
+    thresholding-noise spurs, not real canaliculi. Removing one spur can
+    expose another (its former neighbor may now be a short spur too), so
+    this repeats until nothing more qualifies. Returns True if anything
+    changed."""
+    any_change = False
     changed = True
     while changed:
         changed = False
@@ -332,7 +495,111 @@ def prune_spurs(G: nx.Graph) -> nx.Graph:
                 neighbor = next(iter(G.neighbors(node)))
                 if G[node][neighbor]["weight"] < PRUNE_SPUR_LEN_PX:
                     G.remove_node(node)
-                    changed = True
+                    changed = any_change = True
+    G.remove_nodes_from([n for n in list(G.nodes()) if G.degree(n) == 0])
+    return any_change
+
+
+def _merge_nodes(G: nx.Graph, keep, drop) -> None:
+    """Fold `drop` into `keep`: the edge between them disappears (its
+    pixels are absorbed by `keep`), and every other edge of `drop` is
+    re-pointed at `keep`. A re-pointed edge that duplicates one `keep`
+    already has is merged into it, keeping the shorter weight and the
+    union of the pixel paths."""
+    absorbed = _node_absorbed(G, keep)
+    absorbed.extend(G[keep][drop]["branches"])
+    absorbed.extend(_node_absorbed(G, drop))
+
+    for neighbor in list(G.neighbors(drop)):
+        if neighbor == keep:
+            continue
+        data = G[drop][neighbor]
+        if G.has_edge(keep, neighbor):
+            existing = G[keep][neighbor]
+            existing["branches"].extend(data["branches"])
+            existing["weight"] = min(existing["weight"], data["weight"])
+        else:
+            G.add_edge(keep, neighbor, weight=data["weight"], branches=list(data["branches"]))
+    G.remove_node(drop)
+
+
+def collapse_short_internal_edges(G: nx.Graph, dist_to_lacuna: np.ndarray) -> bool:
+    """Remove INTERNAL edges (both ends a real junction) shorter than
+    MIN_INTERNAL_EDGE_LEN_PX by merging their two endpoints into one node.
+
+    This is the 2D version of what OCY handles with Skel2Graph3D's
+    THR_BRANCH parameter (OCY_run_Skel2Graph3D.m calls it with THR=5):
+    "all branches shorter than THR are removed", not only terminal ones.
+    In a dense 2D projection, two threads that merely cross produce two
+    junction nodes about one thread-width apart joined by a stub edge.
+    That stub is not a canaliculus, it is the crossing itself -- left in,
+    every crossing adds a spurious edge to the count and chops the two
+    real threads into four fragments.
+
+    The surviving node is whichever endpoint is closer to a lacuna body,
+    so a node that was within LACUNA_ATTACH_GAP_PX of a cell cannot lose
+    its attachment to the merge. Returns True if anything changed."""
+    changed = False
+    for u, v in list(G.edges()):
+        if not G.has_edge(u, v):
+            continue  # already consumed by an earlier merge in this pass
+        if G.degree(u) < 3 or G.degree(v) < 3:
+            continue  # terminal edge -- prune_spurs' business, not ours
+        if G[u][v]["weight"] >= MIN_INTERNAL_EDGE_LEN_PX:
+            continue
+        keep, drop = (u, v) if dist_to_lacuna[u] <= dist_to_lacuna[v] else (v, u)
+        _merge_nodes(G, keep, drop)
+        changed = True
+    return changed
+
+
+def simplify_degree2_chains(G: nx.Graph) -> bool:
+    """Dissolve every degree-2 node into its two neighbours, summing the
+    weights, so one uninterrupted thread is ONE edge of its true length
+    instead of several fragments.
+
+    A degree-2 node is not a branch point and should not exist in a
+    junction-to-junction graph, but pruning a spur off a degree-3 node
+    leaves one behind, and so does collapsing a short internal edge. OCY
+    never sees these because Skel2Graph3D rebuilds the graph from the
+    voxel skeleton each round (Graph2Skel3D -> Skeleton3D -> Skel2Graph3D
+    in OCY_run_Skel2Graph3D.m); simplifying in place is the cheaper 2D
+    equivalent. Without it, edge counts are inflated and edge lengths are
+    fragmented across several rows of the same real thread.
+
+    A degree-2 node whose two neighbours are the same node, or already
+    share an edge, is left alone: dissolving it would need a parallel edge
+    that nx.Graph cannot hold, and dropping it would lose real length.
+    Returns True if anything changed."""
+    changed = False
+    for node in list(G.nodes()):
+        if not G.has_node(node) or G.degree(node) != 2:
+            continue
+        a, b = list(G.neighbors(node))
+        if a == b or G.has_edge(a, b):
+            continue
+        weight = G[node][a]["weight"] + G[node][b]["weight"]
+        branches = list(G[node][a]["branches"]) + list(G[node][b]["branches"]) + _node_absorbed(G, node)
+        G.remove_node(node)
+        G.add_edge(a, b, weight=weight, branches=branches)
+        changed = True
+    return changed
+
+
+def clean_network_graph(G: nx.Graph, dist_to_lacuna: np.ndarray) -> nx.Graph:
+    """Prune spurs, collapse short internal edges, re-simplify degree-2
+    chains -- and repeat, because each step creates work for the others
+    (collapsing an internal edge can leave a degree-2 node; dissolving
+    that node can leave a short terminal edge). OCY does the equivalent by
+    re-running its whole condense/skeletonize/re-graph cycle until the
+    total network length stops changing (OCY_run_Skel2Graph3D.m);
+    GRAPH_CLEANUP_MAX_ITER is a safety stop, not the intended exit."""
+    for _ in range(GRAPH_CLEANUP_MAX_ITER):
+        changed = prune_spurs(G)
+        changed |= collapse_short_internal_edges(G, dist_to_lacuna)
+        changed |= simplify_degree2_chains(G)
+        if not changed:
+            break
     G.remove_nodes_from([n for n in list(G.nodes()) if G.degree(n) == 0])
     return G
 
@@ -361,27 +628,75 @@ def assign_by_connectivity(G: nx.Graph, cell_ids: list[int]) -> tuple[dict, dict
     """Multi-source Dijkstra from all cell nodes at once. Every reachable
     skeleton node is owned by the cell whose shortest graph path reaches
     it -- network connectivity, not straight-line distance. Returns
-    (owner: {node_coord: cell_id}, edge_owner: {frozenset({u,v}): cell_id}
-    for every edge along some node's shortest path, used to color the
-    verification image by the same ownership used for measurement)."""
+    (owner: {node_coord: cell_id}, node_dist: {node_coord: graph distance
+    to that owning cell}); node_dist is what assign_edges uses to decide
+    which end of an edge is the upstream one."""
     sources = [("cell", i) for i in cell_ids if G.has_node(("cell", i))]
     if not sources:
         return {}, {}
 
-    _dist, paths = nx.multi_source_dijkstra(G, sources, weight="weight")
+    dist, paths = nx.multi_source_dijkstra(G, sources, weight="weight")
     owner: dict = {}
-    edge_owner: dict = {}
+    node_dist: dict = {}
     for target, path in paths.items():
-        if isinstance(target, tuple) and target and target[0] == "cell":
+        if _is_cell_node(target):
             continue
         source = path[0]
-        if not (isinstance(source, tuple) and source and source[0] == "cell"):
+        if not _is_cell_node(source):
             continue
-        cell_id = source[1]
-        owner[target] = cell_id
-        for k in range(1, len(path) - 1):  # skip the virtual cell->root edge
-            edge_owner.setdefault(frozenset((path[k], path[k + 1])), cell_id)
-    return owner, edge_owner
+        owner[target] = source[1]
+        node_dist[target] = dist[target]
+    return owner, node_dist
+
+
+def assign_edges(G: nx.Graph, owner: dict, node_dist: dict) -> dict:
+    """Give EVERY real (non-virtual) edge an owning cell, not just the
+    edges that happen to lie on some node's shortest path. An edge belongs
+    to the cell that reaches it first, i.e. the owner of whichever endpoint
+    is closer to a cell through the network -- the same rule OCY uses in
+    OCY_assign_dist.m, where each link voxel takes min(node.dist + offset)
+    over the link's two ends, so a link is reached through the end nearer
+    a cell. Ties (equal distance, different cells) go to the lower cell id
+    so a rerun is reproducible.
+
+    Returns {frozenset({u, v}): cell_id}. Edges with no owned endpoint
+    (a skeleton fragment not graph-connected to any lacuna) are left out."""
+    edge_owner: dict = {}
+    for u, v in G.edges():
+        if _is_cell_node(u) or _is_cell_node(v):
+            continue  # virtual lacuna attachment edge, not a canaliculus
+        cu, cv = owner.get(u), owner.get(v)
+        if cu is None and cv is None:
+            continue
+        if cu is None:
+            winner = cv
+        elif cv is None:
+            winner = cu
+        else:
+            du, dv = node_dist.get(u, np.inf), node_dist.get(v, np.inf)
+            if du < dv:
+                winner = cu
+            elif dv < du:
+                winner = cv
+            else:
+                winner = min(cu, cv)
+        edge_owner[frozenset((u, v))] = winner
+    return edge_owner
+
+
+def cell_edge_lengths(G: nx.Graph, edge_owner: dict, cell_id: int) -> list[float]:
+    """Edge-based canaliculi for one cell (OCY-style): one canaliculus =
+    one graph edge between two nodes/branch points, exactly as OCY counts
+    `link` structs in OCY_get_network_params.m. Returns the length of each
+    edge this cell owns, so len() is the count, sum() the total length and
+    mean() the mean edge length."""
+    lengths = []
+    for edge, owner_id in edge_owner.items():
+        if owner_id != cell_id:
+            continue
+        u, v = tuple(edge)
+        lengths.append(float(G[u][v]["weight"]))
+    return lengths
 
 
 def trace_cell_canaliculi(G: nx.Graph, cell_id: int, owner: dict) -> list[float]:
@@ -397,7 +712,7 @@ def trace_cell_canaliculi(G: nx.Graph, cell_id: int, owner: dict) -> list[float]
     dist, paths = nx.single_source_dijkstra(G, src, weight="weight")
     lengths = []
     for node, path in paths.items():
-        if isinstance(node, tuple) and node and node[0] == "cell":
+        if _is_cell_node(node):
             continue
         if owner.get(node) != cell_id:
             continue  # reachable from this cell, but globally owned by another
@@ -412,23 +727,35 @@ def trace_cell_canaliculi(G: nx.Graph, cell_id: int, owner: dict) -> list[float]
 def build_owner_pixel_map(
     shape: tuple[int, int],
     skel_obj,
-    edge_branch_index: dict,
+    G: nx.Graph,
     edge_owner: dict,
+    owner: dict,
 ) -> np.ndarray:
     """Paint every owned branch's real pixel path with its cell id, for
     reuse by save_verification (same drawing code as the euclidean
-    method's nearest_id map)."""
+    method's nearest_id map). Each graph edge may cover several skan
+    branches after simplification, and each node may have absorbed a few
+    more when short edges were collapsed onto it -- both are painted, so
+    the overlay still shows every pixel the cell owns."""
     owner_map = np.zeros(shape, dtype=np.int32)
     if skel_obj is None:
         return owner_map
+
+    def paint(branch_indices, cell_id):
+        for branch_index in branch_indices:
+            coords = skel_obj.path_coordinates(branch_index)
+            rows = np.clip(coords[:, 0].astype(int), 0, shape[0] - 1)
+            cols = np.clip(coords[:, 1].astype(int), 0, shape[1] - 1)
+            owner_map[rows, cols] = cell_id
+
     for edge, cell_id in edge_owner.items():
-        branch_index = edge_branch_index.get(edge)
-        if branch_index is None:
-            continue  # a virtual cell<->root attachment edge, no pixels
-        coords = skel_obj.path_coordinates(branch_index)
-        rows = np.clip(coords[:, 0].astype(int), 0, shape[0] - 1)
-        cols = np.clip(coords[:, 1].astype(int), 0, shape[1] - 1)
-        owner_map[rows, cols] = cell_id
+        u, v = tuple(edge)
+        if not G.has_edge(u, v):
+            continue
+        paint(G[u][v]["branches"], cell_id)
+    for node, cell_id in owner.items():
+        if G.has_node(node):
+            paint(G.nodes[node].get("absorbed", ()), cell_id)
     return owner_map
 
 
@@ -438,26 +765,43 @@ def canaliculi_measurements_graph(
     dist_to_lacuna: np.ndarray,
     nearest_id: np.ndarray,
     precision: int,
-) -> tuple[list[dict], np.ndarray]:
+    count_mode: str,
+) -> tuple[list[dict], np.ndarray, nx.Graph, dict]:
+    """Assignment is identical in both count modes (network connectivity,
+    multi-source shortest path); only what gets COUNTED differs -- see
+    COUNT_MODE. Also returns the final graph and its edge ownership, for
+    the sanity report."""
     cell_ids = list(range(1, len(kept) + 1))
 
-    G, skel_obj, edge_branch_index = build_network_graph(skeleton)
-    prune_spurs(G)
+    G, skel_obj = build_network_graph(skeleton)
+    clean_network_graph(G, dist_to_lacuna)
     attach_lacunae(G, dist_to_lacuna, nearest_id, cell_ids)
-    owner, edge_owner = assign_by_connectivity(G, cell_ids)
+    owner, node_dist = assign_by_connectivity(G, cell_ids)
+    edge_owner = assign_edges(G, owner, node_dist)
 
     measurements = []
     for lacuna_id, (_region, on_border) in enumerate(kept, start=1):
-        lengths = trace_cell_canaliculi(G, lacuna_id, owner)
+        if count_mode == "edge":
+            lengths = cell_edge_lengths(G, edge_owner, lacuna_id)
+        elif count_mode == "path":
+            lengths = trace_cell_canaliculi(G, lacuna_id, owner)
+        else:
+            raise ValueError(f"Unknown count mode: {count_mode!r} (expected 'edge' or 'path')")
         measurements.append(_measurement_row(lacuna_id, lengths, on_border, precision))
 
-    owner_map = build_owner_pixel_map(skeleton.shape, skel_obj, edge_branch_index, edge_owner)
-    return measurements, owner_map
+    owner_map = build_owner_pixel_map(skeleton.shape, skel_obj, G, edge_owner, owner)
+    return measurements, owner_map, G, edge_owner
 
 
 # --- Shared measurement row / summary ------------------------------------
 
 def _measurement_row(lacuna_id: int, lengths: list[float], on_border: bool, precision: int) -> dict:
+    """`lengths` is one length per canaliculus, whatever COUNT_MODE says a
+    canaliculus is: one owned graph EDGE ("edge", default) or one
+    cell-to-tip PATH ("path"). The three reported numbers are the same
+    either way -- count, total length, mean length -- so "canaliculi_count"
+    is the edge count and "mean_canaliculus_length_px" the mean edge length
+    under "edge". The mode used is recorded in the summary sheet and JSON."""
     count = len(lengths)
     total_length = float(sum(lengths))
     mean_length = total_length / count if count else 0.0
@@ -473,6 +817,7 @@ def _measurement_row(lacuna_id: int, lengths: list[float], on_border: bool, prec
 
 SUMMARY_METRICS = [
     ("canaliculi_count", "unitless"),
+    ("total_length_px", "px"),
     ("mean_canaliculus_length_px", "px"),
 ]
 
@@ -543,16 +888,34 @@ def save_verification(
     imsave(out_path, vis, check_contrast=False)
 
 
-def save_xlsx(image_name: str, measurements: list[dict], stats: dict, method: str, out_path: Path) -> None:
+def save_xlsx(
+    image_name: str,
+    measurements: list[dict],
+    stats: dict,
+    method: str,
+    count_mode: str,
+    preprocess: str,
+    out_path: Path,
+) -> None:
     from openpyxl import Workbook
 
     wb = Workbook()
 
     summary = wb.active
     summary.title = "summary"
-    summary.append(["image", "lacuna_count", "interior_lacuna_count", "assignment_method"])
-    summary.append([image_name, len(measurements), stats["interior_lacuna_count"], method])
+    summary.append(
+        ["image", "lacuna_count", "interior_lacuna_count", "assignment_method", "count_mode", "preprocess_mode"]
+    )
+    summary.append(
+        [image_name, len(measurements), stats["interior_lacuna_count"], method, count_mode, preprocess]
+    )
     summary.append([])
+    summary.append(
+        [
+            "count_mode='edge': one canaliculus = one graph edge (OCY-style); "
+            "'path': one canaliculus = one cell-to-tip path (re-counts shared trunks)"
+        ]
+    )
     summary.append(["v1-raw / pre-validation -- stats below over interior (on_border=False) lacunae only"])
     summary.append(["metric", "mean", "median", "sd", "units", "n"])
     for field, unit in SUMMARY_METRICS:
@@ -576,6 +939,8 @@ def save_json(
     t_lo: float,
     t_hi: float,
     method: str,
+    preprocess: str,
+    count_mode: str,
     out_path: Path,
 ) -> None:
     payload = {
@@ -583,13 +948,24 @@ def save_json(
         "note": (
             "Not yet validated against ground truth. "
             + (
-                "Canaliculus count/length come from network-connectivity "
-                "assignment (multi-source shortest path over the skeleton "
-                "graph, OCY-style) with short noise spurs pruned first."
+                "Canaliculi are assigned by network connectivity "
+                "(multi-source shortest path over the skeleton graph, "
+                "OCY-style) with short noise spurs pruned first. "
+                + (
+                    "One canaliculus = one graph edge between two nodes "
+                    "(count_mode='edge', OCY-style): canaliculi_count is "
+                    "the number of edges the cell owns and "
+                    "mean_canaliculus_length_px the mean edge length."
+                    if count_mode == "edge"
+                    else "One canaliculus = one cell-to-tip path "
+                    "(count_mode='path'), which re-counts the shared trunk "
+                    "of a branching thread once per tip."
+                )
                 if method == "graph"
                 else "Canaliculus count/length come from a per-lacuna "
                 "Euclidean-nearest skeleton assignment, an approximation "
-                "in dense fields, with no spur pruning."
+                "in dense fields, with no spur pruning; always path-based, "
+                "count_mode does not apply."
             )
             + " Border lacunae are kept (on_border=true) but excluded from summary stats."
         ),
@@ -599,6 +975,11 @@ def save_json(
         "summary": stats,
         "parameters": {
             "assignment_method": method,
+            "count_mode": count_mode if method == "graph" else "path (euclidean is always path-based)",
+            "preprocess_mode": preprocess,
+            "tophat_radius_px": TOPHAT_RADIUS_PX if preprocess == "tophat" else None,
+            "smooth_sigma_px": SMOOTH_SIGMA_PX if preprocess == "tophat" else None,
+            "background_mode_subtract": BACKGROUND_MODE_SUBTRACT if preprocess == "tophat" else None,
             "pixel_size_um": config.PIXEL_SIZE_UM,
             "lacuna_segmentation": "segment_lacunae_v2 (multi-Otsu 3-class + watershed; see that module)",
             "total_signal_threshold_t_lo": t_lo,
@@ -607,6 +988,8 @@ def save_json(
             "min_thread_object_px2": MIN_THREAD_OBJECT_PX2,
             "lacuna_attach_gap_px": LACUNA_ATTACH_GAP_PX,
             "prune_spur_len_px": PRUNE_SPUR_LEN_PX,
+            "min_internal_edge_len_px": MIN_INTERNAL_EDGE_LEN_PX,
+            "graph_cleanup_max_iter": GRAPH_CLEANUP_MAX_ITER,
             "max_root_gap_px": MAX_ROOT_GAP_PX,
         },
         "lacunae": measurements,
@@ -614,6 +997,158 @@ def save_json(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2)
+
+
+# --- Sanity report (pooled across a whole run) ---------------------------
+
+# Cumulative edge-length bins (px) for the report, the same idea as OCY's
+# n.dist_edge in OCY_get_network_params.m (which uses 0.5 um bins at a
+# known scale). PIXEL_SIZE_UM is None here, so these are pixel bins and
+# nothing is compared to a published micron figure.
+SANITY_EDGE_LEN_BINS_PX = (5, 10, 20, 40, 80, 160)
+
+# Literature anchors. A real canalicular network is tree-like: branch
+# points are overwhelmingly 3-way (one thread splitting into two), and the
+# canaliculi between them are mostly short, i.e. the length distribution is
+# strongly right-skewed. These are shape checks, not absolute ones -- with
+# no um/px calibration an absolute length cannot be compared to anything
+# published.
+SANITY_MIN_DEG3_FRACTION_OF_JUNCTIONS = 0.8
+SANITY_MIN_SKEW_RATIO = 1.2  # mean / median of edge length
+# Fraction of real nodes that may be degree-1 (thread ends) before the
+# skeleton counts as fragmented rather than connected. In a connected
+# tree-like network, endpoints are a minority of nodes.
+SANITY_MAX_DEG1_FRACTION = 0.5
+
+
+def _percentiles(values: np.ndarray, qs=(10, 25, 50, 75, 90, 99)) -> str:
+    return "  ".join(f"p{q}={np.percentile(values, q):7.2f}" for q in qs)
+
+
+def _real_subgraph(G: nx.Graph) -> nx.Graph:
+    """The skeleton graph without the virtual ("cell", id) nodes, so a
+    node's degree counts canaliculi and not its lacuna attachment."""
+    return G.subgraph([n for n in G.nodes() if not _is_cell_node(n)])
+
+
+def sanity_report(runs: list[dict]) -> None:
+    """Pooled edge-length and node-degree distributions across every image
+    in this run, checked against the literature shape of a real LCN.
+
+    Modelled on what OCY reports in OCY_get_network_params.m: n.dist_edge
+    (cumulative edge-length distribution over the `link` structs), n.hbz
+    (cumulative node degree over non-cell non-endpoint nodes) and n.t_nodes
+    (tree-like nodes: degree 3 with clustering coefficient 0). Everything
+    stays in pixels.
+
+    Two populations are reported separately, because they answer different
+    questions: ALL edges/nodes in the skeleton graph, and only those the
+    per-cell numbers are actually computed from (edges with an owning
+    cell). A skeleton fragment not graph-connected to any lacuna inflates
+    the first and never touches the second."""
+    runs = [r for r in runs if r.get("graph") is not None]
+    if not runs:
+        print("\n[sanity] no graph-method runs to report on (euclidean method has no network graph).")
+        return
+
+    all_lengths: list[float] = []
+    owned_lengths: list[float] = []
+    all_degrees: list[int] = []
+    owned_degrees: list[int] = []
+    tree_nodes = junction_nodes = 0
+
+    print("\n" + "=" * 78)
+    print("SANITY REPORT -- pooled over", len(runs), "image(s). v1-raw / pre-validation, PIXEL units.")
+    print("=" * 78)
+    print(f'{"image":24s} {"nodes":>7s} {"edges":>7s} {"owned_edges":>12s} {"components":>11s}')
+
+    for run in runs:
+        G = run["graph"]
+        real = _real_subgraph(G)
+        edge_owner = run["edge_owner"] or {}
+
+        for u, v, w in real.edges(data="weight"):
+            all_lengths.append(float(w))
+            if frozenset((u, v)) in edge_owner:
+                owned_lengths.append(float(w))
+
+        owned_nodes = {n for edge in edge_owner for n in tuple(edge)}
+        clustering = nx.clustering(real)
+        for node in real.nodes():
+            degree = real.degree(node)
+            all_degrees.append(degree)
+            if node in owned_nodes:
+                owned_degrees.append(degree)
+            if degree >= 3:
+                junction_nodes += 1
+                if degree == 3 and clustering[node] == 0:
+                    tree_nodes += 1  # OCY's n.t_nodes criterion
+
+        print(
+            f'{run["image"][:24]:24s} {real.number_of_nodes():7d} {real.number_of_edges():7d} '
+            f'{len(edge_owner):12d} {nx.number_connected_components(real):11d}'
+        )
+
+    for label, lengths in (("ALL edges", all_lengths), ("CELL-OWNED edges", owned_lengths)):
+        arr = np.array(lengths, dtype=float)
+        if arr.size == 0:
+            print(f"\n-- Edge length ({label}): none")
+            continue
+        print(f"\n-- Edge length distribution, {label} (px), n={arr.size}")
+        print(f"   mean={arr.mean():7.2f}  {_percentiles(arr)}  max={arr.max():7.2f}")
+        print("   cumulative (OCY n.dist_edge style):", end="")
+        for b in SANITY_EDGE_LEN_BINS_PX:
+            print(f"  >={b}px: {100 * (arr >= b).mean():5.1f}%", end="")
+        print()
+
+    for label, degrees in (("ALL nodes", all_degrees), ("CELL-OWNED nodes", owned_degrees)):
+        arr = np.array(degrees, dtype=int)
+        if arr.size == 0:
+            print(f"\n-- Node degree ({label}): none")
+            continue
+        print(f"\n-- Node degree distribution, {label}, n={arr.size}")
+        for d in (1, 2, 3, 4):
+            print(f"   deg {d}{'+' if d == 4 else ' '}: {int((arr >= d).sum() if d == 4 else (arr == d).sum()):7d}"
+                  f"  ({100 * ((arr >= d).mean() if d == 4 else (arr == d).mean()):5.1f}%)")
+        junctions = arr[arr >= 3]
+        if junctions.size:
+            print(f"   mean degree over junctions (deg>=3, OCY n.mean_deg): {junctions.mean():.3f}")
+
+    # --- verdicts against the literature shape ---------------------------
+    print("\n-- Anchors (literature shape of a real LCN; shape checks only, no um/px scale)")
+    arr = np.array(owned_lengths or all_lengths, dtype=float)
+    median, mean = float(np.median(arr)), float(arr.mean())
+    skew_ratio = mean / median if median else float("inf")
+    _verdict(
+        skew_ratio >= SANITY_MIN_SKEW_RATIO,
+        "most canaliculi short (right-skewed edge lengths)",
+        f"mean/median = {mean:.1f}/{median:.1f} = {skew_ratio:.2f} "
+        f"(want >= {SANITY_MIN_SKEW_RATIO})",
+    )
+
+    deg = np.array(all_degrees, dtype=int)
+    junctions = deg[deg >= 3]
+    deg3_fraction = float((junctions == 3).mean()) if junctions.size else 0.0
+    _verdict(
+        deg3_fraction >= SANITY_MIN_DEG3_FRACTION_OF_JUNCTIONS,
+        "branch points are 3-way (tree-like)",
+        f"{100 * deg3_fraction:.1f}% of junctions are degree-3 "
+        f"(want >= {100 * SANITY_MIN_DEG3_FRACTION_OF_JUNCTIONS:.0f}%); "
+        f"{tree_nodes}/{junction_nodes} also have clustering 0 (OCY n.t_nodes)",
+    )
+
+    deg1_fraction = float((deg == 1).mean()) if deg.size else 0.0
+    _verdict(
+        deg1_fraction <= SANITY_MAX_DEG1_FRACTION,
+        "network is connected, not fragmented",
+        f"{100 * deg1_fraction:.1f}% of all nodes are degree-1 thread ends "
+        f"(want <= {100 * SANITY_MAX_DEG1_FRACTION:.0f}%)",
+    )
+    print("=" * 78)
+
+
+def _verdict(ok: bool, name: str, detail: str) -> None:
+    print(f"   [{'OK  ' if ok else 'FLAG'}] {name}\n          {detail}")
 
 
 def print_summary(stats: dict) -> None:
@@ -625,20 +1160,38 @@ def print_summary(stats: dict) -> None:
         print(f"    {field:28s} mean={mean:>10s}  median={median:>10s}  sd={sd:>10s}  ({unit})")
 
 
-def process(image_path: Path, method: str | None = None, output_suffix: str = "") -> dict:
+def save_mask_pngs(candidate: np.ndarray, skeleton: np.ndarray, out_dir: Path, suffix: str) -> None:
+    """The raw binary network mask and its skeleton, unannotated -- what
+    the per-cell tracing is actually built on."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    imsave(out_dir / f"canaliculi_mask{suffix}.png", (candidate * 255).astype(np.uint8), check_contrast=False)
+    imsave(out_dir / f"skeleton{suffix}.png", (skeleton * 255).astype(np.uint8), check_contrast=False)
+
+
+def process(
+    image_path: Path,
+    method: str | None = None,
+    output_suffix: str = "",
+    preprocess: str | None = None,
+    count_mode: str | None = None,
+) -> dict:
     method = method or ASSIGNMENT_METHOD
+    preprocess = preprocess or PREPROCESS_MODE
+    count_mode = count_mode or COUNT_MODE
 
     display, channel = load_channel(image_path)
     _display2, labels, kept, t_hi = seg2.segment_image(image_path)
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(labels, kept)
-    candidate, t_lo = canaliculi_candidate_mask(channel, lacuna_mask)
+    candidate, t_lo = canaliculi_candidate_mask(channel, lacuna_mask, preprocess)
     skeleton = morphology.skeletonize(candidate)
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
 
+    graph = edge_owner = None
     if method == "graph":
-        measurements, owner_map = canaliculi_measurements_graph(
-            kept, skeleton, dist_to_lacuna, nearest_id, precision=config.CSV_FLOAT_PRECISION
+        measurements, owner_map, graph, edge_owner = canaliculi_measurements_graph(
+            kept, skeleton, dist_to_lacuna, nearest_id,
+            precision=config.CSV_FLOAT_PRECISION, count_mode=count_mode,
         )
     elif method == "euclidean":
         measurements = canaliculi_measurements_euclidean(
@@ -651,24 +1204,33 @@ def process(image_path: Path, method: str | None = None, output_suffix: str = ""
     stats = summarize_interior(measurements, precision=config.CSV_FLOAT_PRECISION)
 
     out_dir = image_output_dir(image_path)
+    if SAVE_MASK_PNG:
+        save_mask_pngs(candidate, skeleton, out_dir, output_suffix)
     colors = lacuna_colors(len(kept))
     all_ids = list(range(1, len(kept) + 1))
     save_verification(
         display, lacuna_id_map, skeleton, owner_map, all_ids, colors, out_dir / f"verification{output_suffix}.png"
     )
-    save_xlsx(image_path.name, measurements, stats, method, out_dir / f"measurements{output_suffix}.xlsx")
-    save_json(image_path, measurements, stats, t_lo, t_hi, method, out_dir / f"measurements{output_suffix}.json")
+    save_xlsx(
+        image_path.name, measurements, stats, method, count_mode, preprocess,
+        out_dir / f"measurements{output_suffix}.xlsx",
+    )
+    save_json(
+        image_path, measurements, stats, t_lo, t_hi, method, preprocess, count_mode,
+        out_dir / f"measurements{output_suffix}.json",
+    )
 
     mean_count = stats["canaliculi_count"]["mean"]
     mean_length = stats["mean_canaliculus_length_px"]["mean"]
     mean_count_s = "n/a" if mean_count is None else f"{mean_count:.2f}"
     mean_length_s = "n/a" if mean_length is None else f"{mean_length:.2f}"
+    mode_tag = count_mode if method == "graph" else "path"
     print(
-        f"{image_path.name} [{method}]: lacunae={len(kept)}  mean_canaliculi_per_cell={mean_count_s}  "
-        f"mean_canaliculus_length_px={mean_length_s}  -> {out_dir}"
+        f"{image_path.name} [{method}/{preprocess}/{mode_tag}]: lacunae={len(kept)}  "
+        f"mean_canaliculi_per_cell={mean_count_s}  mean_canaliculus_length_px={mean_length_s}  -> {out_dir}"
     )
     print_summary(stats)
-    return stats
+    return {"stats": stats, "graph": graph, "edge_owner": edge_owner, "image": image_path.name}
 
 
 def main() -> None:
@@ -685,19 +1247,57 @@ def main() -> None:
         help="Override ASSIGNMENT_METHOD for this run; suffixes output filenames with _<method> "
         "so a comparison run never overwrites the default-method outputs.",
     )
+    parser.add_argument(
+        "--preprocess",
+        choices=["tophat", "none"],
+        default=None,
+        help="Override PREPROCESS_MODE for this run; suffixes output filenames with _pre-<mode> "
+        "so a comparison run never overwrites the default outputs.",
+    )
+    parser.add_argument(
+        "--count-mode",
+        choices=["edge", "path"],
+        default=None,
+        help="Override COUNT_MODE for this run ('edge' = one canaliculus per graph edge, OCY-style; "
+        "'path' = one per cell-to-tip path). Graph method only; suffixes output filenames with "
+        "_count-<mode> so a comparison run never overwrites the default outputs.",
+    )
+    parser.add_argument(
+        "--no-sanity",
+        action="store_true",
+        help="Skip the pooled edge-length / node-degree sanity report printed after the run.",
+    )
     args = parser.parse_args()
 
-    suffix = f"_{args.method}" if args.method else ""
+    suffix = ""
+    if args.method:
+        suffix += f"_{args.method}"
+    if args.preprocess:
+        suffix += f"_pre-{args.preprocess}"
+    if args.count_mode:
+        suffix += f"_count-{args.count_mode}"
 
     if args.image:
         if not args.image.is_file():
             raise FileNotFoundError(f"No such file: {args.image}")
-        process(args.image, method=args.method, output_suffix=suffix)
+        paths = [args.image]
     else:
         if not args.dir.is_dir():
             raise NotADirectoryError(f"No such directory: {args.dir}")
-        for image_path in sorted(args.dir.glob("*.tif")):
-            process(image_path, method=args.method, output_suffix=suffix)
+        paths = sorted(args.dir.glob("*.tif"))
+
+    runs = [
+        process(
+            image_path,
+            method=args.method,
+            output_suffix=suffix,
+            preprocess=args.preprocess,
+            count_mode=args.count_mode,
+        )
+        for image_path in paths
+    ]
+    if not args.no_sanity:
+        sanity_report(runs)
 
 
 if __name__ == "__main__":

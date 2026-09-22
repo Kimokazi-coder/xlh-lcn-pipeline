@@ -109,12 +109,12 @@ def attach_gaps_for_image(image_path: Path) -> list[tuple]:
     _display2, labels, kept, _t_hi = seg2.segment_image(image_path)
 
     lacuna_mask, lacuna_id_map = can1.build_lacuna_maps(labels, kept)
-    candidate, _t_lo = can1.canaliculi_candidate_mask(channel, lacuna_mask)
+    candidate, _t_lo = can1.canaliculi_candidate_mask(channel, lacuna_mask, can1.PREPROCESS_MODE)
     skeleton = morphology.skeletonize(candidate)
     dist_to_lacuna, nearest_id = can1.nearest_lacuna_map(lacuna_id_map)
 
-    G, _skel_obj, _edge_branch_index = can1.build_network_graph(skeleton)
-    can1.prune_spurs(G)
+    G, _skel_obj = can1.build_network_graph(skeleton)
+    can1.clean_network_graph(G, dist_to_lacuna)
 
     rows = []
     for lacuna_id in range(1, len(kept) + 1):

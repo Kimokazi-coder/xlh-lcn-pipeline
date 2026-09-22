@@ -1,0 +1,143 @@
+{
+  "status": "v1-raw",
+  "note": "Not yet validated against ground truth. Canaliculi are assigned by network connectivity (multi-source shortest path over the skeleton graph, OCY-style) with short noise spurs pruned first. One canaliculus = one graph edge between two nodes (count_mode='edge', OCY-style): canaliculi_count is the number of edges the cell owns and mean_canaliculus_length_px the mean edge length. Border lacunae are kept (on_border=true) but excluded from summary stats.",
+  "image": "data\\WT\\543-2.tif",
+  "units": "px",
+  "lacuna_count": 12,
+  "summary": {
+    "interior_lacuna_count": 12,
+    "units": "px",
+    "canaliculi_count": {
+      "mean": 193.25,
+      "median": 170.0,
+      "sd": 120.4228
+    },
+    "total_length_px": {
+      "mean": 2848.9632,
+      "median": 2645.3525,
+      "sd": 1547.9959
+    },
+    "mean_canaliculus_length_px": {
+      "mean": 15.4403,
+      "median": 14.9684,
+      "sd": 2.7769
+    }
+  },
+  "parameters": {
+    "assignment_method": "graph",
+    "count_mode": "edge",
+    "preprocess_mode": "none",
+    "tophat_radius_px": null,
+    "smooth_sigma_px": null,
+    "background_mode_subtract": null,
+    "pixel_size_um": null,
+    "lacuna_segmentation": "segment_lacunae_v2 (multi-Otsu 3-class + watershed; see that module)",
+    "total_signal_threshold_t_lo": 0.33247549019607847,
+    "lacuna_top_class_threshold_t_hi": 0.5969362745098039,
+    "lacuna_dilation_px": 2,
+    "min_thread_object_px2": 8,
+    "lacuna_attach_gap_px": 10,
+    "prune_spur_len_px": 4,
+    "min_internal_edge_len_px": 6,
+    "graph_cleanup_max_iter": 20,
+    "max_root_gap_px": 15
+  },
+  "lacunae": [
+    {
+      "lacuna_id": 1,
+      "canaliculi_count": 172,
+      "total_length_px": 2998.0348,
+      "mean_canaliculus_length_px": 17.4304,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 2,
+      "canaliculi_count": 533,
+      "total_length_px": 7001.1895,
+      "mean_canaliculus_length_px": 13.1354,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 3,
+      "canaliculi_count": 131,
+      "total_length_px": 1854.6043,
+      "mean_canaliculus_length_px": 14.1573,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 4,
+      "canaliculi_count": 208,
+      "total_length_px": 2302.2683,
+      "mean_canaliculus_length_px": 11.0686,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 5,
+      "canaliculi_count": 99,
+      "total_length_px": 1316.8154,
+      "mean_canaliculus_length_px": 13.3012,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 6,
+      "canaliculi_count": 132,
+      "total_length_px": 2069.5159,
+      "mean_canaliculus_length_px": 15.6782,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 7,
+      "canaliculi_count": 46,
+      "total_length_px": 993.8082,
+      "mean_canaliculus_length_px": 21.6045,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 8,
+      "canaliculi_count": 239,
+      "total_length_px": 3688.4684,
+      "mean_canaliculus_length_px": 15.4329,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 9,
+      "canaliculi_count": 204,
+      "total_length_px": 3365.2897,
+      "mean_canaliculus_length_px": 16.4965,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 10,
+      "canaliculi_count": 168,
+      "total_length_px": 2373.4936,
+      "mean_canaliculus_length_px": 14.1279,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 11,
+      "canaliculi_count": 159,
+      "total_length_px": 2917.2115,
+      "mean_canaliculus_length_px": 18.3472,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 12,
+      "canaliculi_count": 228,
+      "total_length_px": 3306.8582,
+      "mean_canaliculus_length_px": 14.5038,
+      "on_border": false,
+      "units": "px"
+    }
+  ]
+}
