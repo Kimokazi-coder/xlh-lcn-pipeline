@@ -1,0 +1,136 @@
+{
+  "status": "v1-raw",
+  "note": "Not yet validated against ground truth. Canaliculus count/length come from a per-lacuna Euclidean-nearest skeleton assignment, an approximation in dense fields. Border lacunae are kept (on_border=true) but excluded from summary stats.",
+  "image": "F:\\lcn-quant\\data\\WT\\682_z29c1-3.tif",
+  "units": "px",
+  "lacuna_count": 13,
+  "summary": {
+    "interior_lacuna_count": 11,
+    "units": "px",
+    "canaliculi_count": {
+      "mean": 53.5455,
+      "median": 31.0,
+      "sd": 55.9792
+    },
+    "mean_canaliculus_length_px": {
+      "mean": 138.1376,
+      "median": 114.4376,
+      "sd": 83.6394
+    }
+  },
+  "parameters": {
+    "pixel_size_um": null,
+    "lacuna_segmentation": "segment_lacunae_v2 (multi-Otsu 3-class + watershed; see that module)",
+    "total_signal_threshold_t_lo": 0.23189338235294119,
+    "lacuna_top_class_threshold_t_hi": 0.5234375,
+    "lacuna_dilation_px": 2,
+    "min_thread_object_px2": 8,
+    "max_root_gap_px": 15
+  },
+  "lacunae": [
+    {
+      "lacuna_id": 1,
+      "canaliculi_count": 125,
+      "total_length_px": 27282.0825,
+      "mean_canaliculus_length_px": 218.2567,
+      "on_border": true,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 2,
+      "canaliculi_count": 81,
+      "total_length_px": 13476.435,
+      "mean_canaliculus_length_px": 166.3757,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 3,
+      "canaliculi_count": 192,
+      "total_length_px": 65517.4271,
+      "mean_canaliculus_length_px": 341.2366,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 4,
+      "canaliculi_count": 115,
+      "total_length_px": 25397.1809,
+      "mean_canaliculus_length_px": 220.8451,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 5,
+      "canaliculi_count": 50,
+      "total_length_px": 8209.4292,
+      "mean_canaliculus_length_px": 164.1886,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 6,
+      "canaliculi_count": 31,
+      "total_length_px": 3547.5668,
+      "mean_canaliculus_length_px": 114.4376,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 7,
+      "canaliculi_count": 28,
+      "total_length_px": 5457.1833,
+      "mean_canaliculus_length_px": 194.8994,
+      "on_border": true,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 8,
+      "canaliculi_count": 31,
+      "total_length_px": 3491.6623,
+      "mean_canaliculus_length_px": 112.6343,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 9,
+      "canaliculi_count": 12,
+      "total_length_px": 735.2986,
+      "mean_canaliculus_length_px": 61.2749,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 10,
+      "canaliculi_count": 11,
+      "total_length_px": 791.7544,
+      "mean_canaliculus_length_px": 71.9777,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 11,
+      "canaliculi_count": 16,
+      "total_length_px": 979.5656,
+      "mean_canaliculus_length_px": 61.2228,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 12,
+      "canaliculi_count": 21,
+      "total_length_px": 2474.0967,
+      "mean_canaliculus_length_px": 117.8141,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 13,
+      "canaliculi_count": 29,
+      "total_length_px": 2537.6652,
+      "mean_canaliculus_length_px": 87.5057,
+      "on_border": false,
+      "units": "px"
+    }
+  ]
+}

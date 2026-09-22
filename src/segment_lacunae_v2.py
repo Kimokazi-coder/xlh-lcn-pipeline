@@ -22,6 +22,11 @@ Approach:
        attached mesh by thickness, instead of losing it to fusion.
     3. Widened shape/size filters as a final sanity check (not the primary
        gate), to avoid re-introducing the original rejection problem.
+    4. Re-merge watershed splits that turned out to be spurious: one
+       smoothly elongated lacuna can present two comparable-height
+       distance-transform peaks with no real neck between them, which
+       watershed still cuts in two. See MERGE_SADDLE_RATIO_MIN /
+       merge_shallow_splits below.
 
 Border handling: objects touching the image edge are KEPT (they count
 toward lacuna_count) and flagged with on_border=True per object, rather than
@@ -94,6 +99,19 @@ TEST_MIN_SOLIDITY = 0.5
 TEST_ASPECT_RATIO_MAX = 6.0
 EXCLUDE_BORDER_OBJECTS = False  # False = keep + flag on_border (current default)
 
+# A single elongated lacuna can register two comparable-height distance-
+# transform peaks at its ends even with no real constriction between them,
+# so watershed splits it in two. Fix: after watershed, re-merge any 2-piece
+# split whose dividing saddle is shallow relative to both peaks (a smooth
+# single blob), while leaving a deep, narrow-necked split (two genuinely
+# touching lacunae) alone. Saddle = min distance-transform value along the
+# straight line between the two pieces' peaks; ratio = saddle / smaller peak.
+# Calibrated from src/diagnose_lacuna_splits.py over all 8 WT images: the 3
+# splits confirmed wrong by eye (542 WT 2_z06c1-2) had ratio >= 0.364; the
+# one split that looks like a real two-lobe separation had ratio 0.000.
+# 0.35 sits between them -- not yet checked against every borderline case.
+MERGE_SADDLE_RATIO_MIN = 0.35
+
 COUNT_DIR = config.RESULTS_DIR / "count"
 
 
@@ -144,6 +162,43 @@ def watershed_split(mask: np.ndarray) -> np.ndarray:
     return segmentation.watershed(-distance, markers=markers, mask=mask)
 
 
+def _sample_line_min(distance: np.ndarray, r0: float, c0: float, r1: float, c1: float, n: int = 50) -> float:
+    """Minimum distance-transform value sampled along the straight line
+    between two points -- the saddle depth between two candidate peaks."""
+    rows = np.linspace(r0, r1, n)
+    cols = np.linspace(c0, c1, n)
+    ri = np.clip(np.round(rows).astype(int), 0, distance.shape[0] - 1)
+    ci = np.clip(np.round(cols).astype(int), 0, distance.shape[1] - 1)
+    return float(distance[ri, ci].min())
+
+
+def merge_shallow_splits(labels: np.ndarray, mask: np.ndarray, distance: np.ndarray) -> np.ndarray:
+    """Undo a watershed split that isn't a real two-lobe separation: for
+    each pre-watershed component that came out as exactly two pieces,
+    re-merge them if the saddle between their two distance-transform peaks
+    is shallow relative to both peaks (see MERGE_SADDLE_RATIO_MIN)."""
+    components = measure.label(mask, connectivity=2)
+    merged = labels.copy()
+    for comp_id in range(1, components.max() + 1):
+        comp_mask = components == comp_id
+        piece_labels = np.unique(merged[comp_mask])
+        piece_labels = piece_labels[piece_labels != 0]
+        if len(piece_labels) != 2:
+            continue  # only the common 2-piece case is handled for now
+        label_a, label_b = piece_labels
+        mask_a = merged == label_a
+        mask_b = merged == label_b
+        peak_a = distance[mask_a].max()
+        peak_b = distance[mask_b].max()
+        ra, ca = np.unravel_index(np.argmax(np.where(mask_a, distance, -1)), distance.shape)
+        rb, cb = np.unravel_index(np.argmax(np.where(mask_b, distance, -1)), distance.shape)
+        saddle = _sample_line_min(distance, ra, ca, rb, cb)
+        ratio = saddle / min(peak_a, peak_b)
+        if ratio >= MERGE_SADDLE_RATIO_MIN:
+            merged[mask_b] = label_a
+    return merged
+
+
 def filter_regions(label_image: np.ndarray) -> list[tuple]:
     """Return [(region, on_border), ...] for objects passing the sanity-check
     filters. Border-touching objects are kept (flagged), not dropped, unless
@@ -177,6 +232,8 @@ def segment_image(image_path: Path):
     display, channel = load_channel(image_path)
     mask, t_hi = multiotsu_lacuna_mask(channel)
     labels = watershed_split(mask)
+    distance = ndi.distance_transform_edt(mask)
+    labels = merge_shallow_splits(labels, mask, distance)
     kept = filter_regions(labels)
     return display, labels, kept, t_hi
 
