@@ -151,6 +151,44 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
   `PIXEL_SIZE_UM=None` no absolute length can be compared to a published
   micron figure.
 
+### Exclusion of non-LCN structures (Phase 1, v1-raw)
+- **`src/exclusion_mask.py` (new)** — removes vascular canals, canal edges
+  and section boundaries from the canaliculi candidate mask before
+  skeletonization. Wired into `canaliculi_v1.py` behind `EXCLUSION_MODE`
+  (`"none"` = **default, current behaviour unchanged**, `"auto"`,
+  `"manual"`, `"both"`; CLI `--exclusion`, outputs suffixed
+  `_excl-<mode>`). Writes `exclusion.png` and records excluded area in
+  `measurements.json`.
+- **"auto" works on the RAW channel, not on skeleton geometry.** The
+  obvious rule (flag long, straight, wide skeleton components) was tested
+  in Phase 0(d) and flagged nothing across 6471 components from all 8 WT
+  images: `canaliculi_v1`'s top-hat deletes anything broader than
+  2·`TOPHAT_RADIUS_PX`+1 px, so a broad structure never reaches the
+  canaliculi mask as a broad object. Before the top-hat it is plainly
+  detectable — the 542_z06 structure is one 27496 px² object spanning 63%
+  of the image height.
+- **Shape gate** (both required, and on the 8 WT images they select the
+  same 5 objects): span ≥ `EXCLUSION_MIN_SPAN_FRACTION=0.45` of an image
+  dimension AND major axis ≥ `EXCLUSION_MIN_MAJOR_AXIS_PX=420`. Derived
+  from the pooled v2 lacuna distribution: the largest lacuna-scale object
+  across all 8 images (kept **or** rejected, n=103) spans 0.23 of a
+  dimension with a 210.6 px major axis. Observed spans sort as 0.80, 0.73,
+  0.63, 0.62, 0.58, then 0.37, 0.35, 0.34 — a clean gap the cutoff sits
+  inside.
+- **Lacuna safety margin is absolute.** No pixel within
+  `LACUNA_SAFETY_MARGIN_PX=50` of a lacuna-scale v2 object (kept or
+  rejected) is ever excluded, by `"auto"` or by a hand-drawn mask. In Hyp
+  mice, periosteocytic lesions are broad bright regions around lacunae and
+  are what this thesis measures; a rule that removes broad bright regions
+  would delete them preferentially in the mutant genotypes and bias the
+  comparison toward the hypothesis. 50 px is an **initial value, not yet
+  tuned** — it cannot be derived from WT images, which have no lesions to
+  measure. Verified across all 8 images: **0 excluded pixels inside the
+  margin**.
+- **`src/report_exclusion.py` (new, read-only)** — per-image excluded
+  area, flagged objects, the safety-margin violation count, and the
+  inside-vs-outside density comparison below.
+
 ### Diagnostics (read-only, no pipeline effect)
 - **`src/inspect_tif_metadata.py`** — checked all 8 WT `.tif` files for
   embedded pixel-size/resolution metadata. Result: none usable (7 of 8 have
@@ -266,17 +304,67 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    choosing a bridge length without ground truth risks re-introducing the
    false connectivity that was just removed. Flagged for a decision.
 
-5. **Parallel edges are collapsed.** `nx.Graph` holds no parallel edges,
+5. **OPEN (Phase 1): auto-exclusion is defensible but of limited value,
+   and two Phase 0 claims turned out to be wrong.** `EXCLUSION_MODE` stays
+   `"none"` pending review. Three findings:
+   - *Flagged structures do not clearly inflate the canaliculi mask.*
+     Canaliculi-mask density inside the flagged structure vs outside it,
+     over the 5 images that have one: 1.13, 1.03, 0.85, 1.25, 1.43
+     (skeleton density 1.27, 1.18, 0.97, 1.44, 1.48). Two of five are at
+     or below 1. So excluding a flagged structure removes mask pixels at
+     roughly the field's own density — largely real canaliculi — except in
+     682_z29 and 682_z23, where there is a genuine ~1.4× excess.
+   - *Phase 0(d)'s "the structure's thin edges survive the top-hat" was
+     wrong.* Measured directly, canaliculi-mask density in rings outward
+     from the 542_z06 structure is 0.70×, 0.96×, 1.09×, 1.01×, 1.01× the
+     far-field baseline — at baseline from ~4 px out, with no elevated
+     edge response to cover. `EXCLUSION_DILATION_PX` is therefore 4, not
+     the larger margin that inference implied; a larger value would delete
+     ordinary canaliculi.
+   - *The safety margin makes "auto" nearly a no-op in lacuna-dense
+     fields,* which is the correct trade but should be understood. Excluded
+     fraction per image: 0.50%, 2.28%, 0%, 0%, 0%, 5.03%, 3.46%, 6.22%. In
+     542_z06 the margin suppresses 29106 of 34365 flagged px² (85%), so
+     only two slivers of the vertical structure are removed. Auto mode is
+     effective mainly where a structure runs through lacuna-free ground
+     (a field edge), not where it threads between cells.
+   The three 543_* images have no flagged structure at all.
+
+6. **The second RGB channel is NOT a usable exclusion source** (checked,
+   as asked, before offering it). The green channel is empty (mean 0.7–1.0
+   of 255). Blue correlates +0.34 to +0.49 with red, i.e. it largely
+   mirrors it. Blue exceeds red on 0.00–0.15% of pixels, never forming a
+   coherent region. Decisively, the blue/red **ratio** is not elevated on
+   the flagged structures: lift 0.81, 0.80, 1.06, 0.92, 0.88 — four of
+   five below 1 — and the high-ratio region overlaps the flagged structure
+   by 0.9%. The purple appearance is constant blue bleed-through becoming
+   visible where red is dim, not a distinct tissue marker. No switch was
+   added. Evidence in `results/diagnostics/canaliculi_v2/_channel_evidence/`.
+
+7. **Parallel edges are collapsed.** `nx.Graph` holds no parallel edges,
    so where two separate branches join the same pair of nodes (a small
    loop) only the shorter weight is kept, though both branches' pixels are
    recorded and still drawn. Affects 1.3% of branches across the 8 WT
    images. Noted rather than fixed — a `MultiGraph` would complicate every
    shortest-path step downstream for a ~1% effect.
-6. **v1 (`count_lacunae.py`) and v2 disagree** and v1 is not being kept in
+8. **v1 (`count_lacunae.py`) and v2 disagree** and v1 is not being kept in
    sync with v2's fixes. Not deleted yet: v2's own loader function is
    imported from v1's file (`from count_lacunae import load_channel`), so
    removing v1 requires a small refactor first (move that loader to a
    shared module).
+
+## Planned next (Phase 2 onward)
+
+- **Phase 2 must be judged on the guard metrics, not on owned fraction.**
+  Phase 0(c) found that the angle between a thread's local direction and
+  the vector to its nearest different component is only mildly peaked
+  toward 0 degrees (21% under 20 deg, 8.5% above 100 deg), so many nearest
+  neighbours are PARALLEL threads, not continuations of the same one.
+  Hysteresis thresholding and gap bridging will both raise the owned
+  length fraction by fusing neighbouring threads, which looks like success
+  and is not. Judge them primarily on total skeleton length (must not jump
+  sharply) and on the number of loops/cycles in the skeleton graph (must
+  not jump), with owned fraction as a secondary readout only.
 
 ## Pending validation
 

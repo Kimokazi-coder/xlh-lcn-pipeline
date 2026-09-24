@@ -80,6 +80,40 @@ Note that some entries in `config.py` belong to the superseded
 `count_lacunae.py` and are not read by the current modules. `PIXEL_SIZE_UM`
 stays `None` — see Units above.
 
+## Drawing a manual exclusion mask
+
+Some fields contain bright structures that are not canalicular network —
+vascular canals, canal edges, section boundaries. A hand-drawn mask marks
+those regions so they are dropped from the canaliculi mask before
+skeletonization.
+
+To make one in Fiji:
+
+1. Open the image and draw an ROI around the region to exclude.
+2. `Edit > Selection > Create Mask`.
+3. Save as PNG into `data/exclusion_masks/<image_stem>.png`, where
+   `<image_stem>` is the image filename without its extension.
+
+White (non-zero) means **exclude**. The mask must be the same pixel size as
+the image — the pipeline refuses a mismatched mask rather than resampling
+it, because resampling would move the boundary you drew.
+
+**Draw these blinded to genotype.** Deciding which bright regions are "not
+network" is a judgement call, and making that call differently in mutant
+and wild-type fields would bias the comparison. Work from coded filenames
+with the `code_key` out of reach.
+
+Two things the pipeline does regardless of what you draw:
+
+- No pixel within a fixed margin of a lacuna is ever excluded, by hand or
+  automatically. In Hyp mice the broad bright regions around lacunae are
+  periosteocytic lesions, which are what this thesis measures; removing
+  them would bias the genotype comparison in the direction of the
+  hypothesis.
+- Every exclusion is written out as `exclusion.png` next to the other
+  outputs, and the excluded area is recorded in `measurements.json`, so
+  what was removed is always auditable.
+
 ## Where to look first
 
 `PROGRESS.md` is the authoritative record of what exists, what is known to be

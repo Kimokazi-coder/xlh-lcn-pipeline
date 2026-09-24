@@ -1,0 +1,49 @@
+========================================================================================================
+PHASE 1 EXCLUSION REPORT -- mode=auto, v1-raw / pre-validation, PIXEL units. Read-only.
+span gate >= 0.45  major axis gate >= 420px  safety margin 50px  dilation 4px
+========================================================================================================
+image                  set         excl px2  excl %  flagged px2  suppressed  protected %  VIOLATIONS
+542 WT  2_z06c1-2      tuning          5259   0.50%        34365       29106        37.6%           0
+542 WT  2_z18c1-2      held-out       23877   2.28%        45078       21201        28.6%           0
+543-2                  tuning             0   0.00%            0           0        22.2%           0
+543_3                  held-out           0   0.00%            0           0        20.5%           0
+543_z13c1-2            held-out           0   0.00%            0           0        19.8%           0
+682_z08c1-2            held-out       52712   5.03%        84301       31589        20.9%           0
+682_z23c-2             held-out       36264   3.46%        65313       29049        23.8%           0
+682_z29c1-3            tuning         65194   6.22%        77762       12568        21.5%           0
+
+TOTAL pixels excluded inside the lacuna safety margin: 0  (must be 0)  OK
+
+========================================================================================================
+OBJECTS FLAGGED BY THE SHAPE GATE
+========================================================================================================
+image                    area px2  major px  aspect   span   centroid (x,y)
+542 WT  2_z06c1-2           27496     716.6    6.99  0.634        (552,321)
+542 WT  2_z18c1-2           38842     646.0    6.96  0.581        (610,271)
+682_z08c1-2                 76239     919.5    6.51  0.801         (445,56)
+682_z23c-2                  57507     726.4    4.95  0.731         (311,51)
+682_z29c1-3                 67919     672.8    3.13  0.623         (295,69)
+
+========================================================================================================
+WOULD EXCLUDING THESE REMOVE NON-LCN SIGNAL, OR ORDINARY CANALICULI?
+========================================================================================================
+Canaliculi-mask and skeleton density inside each flagged structure vs outside it.
+A ratio near 1 means the structure carries network at the same density as the rest of
+the field, i.e. the top-hat already suppressed the structure itself and excluding it
+would mostly delete real canaliculi.
+
+image                    mask in  mask out   ratio   skel in  skel out   ratio
+542 WT  2_z06c1-2         0.2335    0.2059    1.13    0.0397    0.0314    1.27
+542 WT  2_z18c1-2         0.2058    0.1996    1.03    0.0363    0.0307    1.18
+682_z08c1-2               0.1562    0.1842    0.85    0.0296    0.0305    0.97
+682_z23c-2                0.2587    0.2065    1.25    0.0481    0.0333    1.44
+682_z29c1-3               0.2801    0.1954    1.43    0.0474    0.0322    1.48
+
+========================================================================================================
+NAMED CHECK: the kept object at (555, 140) in 542_z06 (reported only, not removed)
+========================================================================================================
+  nearest kept lacuna id=2 at (555,149), 9px from the named point
+  area=445px2  on_border=False
+  fraction of its body inside the exclusion: 0.00%
+  -> NOT inside the exclusion region (the safety margin protects it).
+========================================================================================================

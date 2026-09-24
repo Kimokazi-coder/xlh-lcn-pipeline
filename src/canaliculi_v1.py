@@ -153,6 +153,7 @@ import config  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from count_lacunae import load_channel  # noqa: E402
 import segment_lacunae_v2 as seg2  # noqa: E402
+import exclusion_mask  # noqa: E402
 
 # --- Candidate parameters (NOT in config.py yet -- see module docstring) ---
 
@@ -174,6 +175,21 @@ ASSIGNMENT_METHOD = "graph"
 #       canaliculi, each carrying the whole stem length again -- so it
 #       inflates both count and mean length.
 COUNT_MODE = "edge"
+
+# Removal of non-LCN structures (vascular canals, canal edges) from the
+# canaliculi candidate mask before skeletonization. See exclusion_mask.py
+# for how each mode builds its region and why "auto" works on the raw
+# channel rather than on skeleton geometry.
+#   "none"   (default) no exclusion -- current behaviour, unchanged
+#   "auto"   broad bright raw-channel structures far larger than any lacuna
+#   "manual" a hand-drawn mask from data/exclusion_masks/<stem>.png
+#   "both"   union of the two
+# Stays "none" until the exclusion has been reviewed: on the 8 WT images
+# the flagged structures do NOT measurably inflate the canaliculi mask
+# inside themselves (density ratios 0.80-1.46, two of five below 1), so
+# switching this on would remove mask pixels at roughly the field's own
+# density -- i.e. mostly real canaliculi. See PROGRESS.md.
+EXCLUSION_MODE = "none"
 
 # --- Canalicular-mask preprocessing (OCY-style; see module docstring) ---
 # "tophat" = smooth + white top-hat + histogram-mode offset subtraction
@@ -977,6 +993,7 @@ def save_json(
     method: str,
     preprocess: str,
     count_mode: str,
+    exclusion_info: dict,
     out_path: Path,
 ) -> None:
     payload = {
@@ -1009,6 +1026,7 @@ def save_json(
         "units": "px",
         "lacuna_count": len(measurements),
         "summary": stats,
+        "exclusion": exclusion_info,
         "parameters": {
             "assignment_method": method,
             "count_mode": count_mode if method == "graph" else "path (euclidean is always path-based)",
@@ -1210,16 +1228,23 @@ def process(
     output_suffix: str = "",
     preprocess: str | None = None,
     count_mode: str | None = None,
+    exclusion: str | None = None,
 ) -> dict:
     method = method or ASSIGNMENT_METHOD
     preprocess = preprocess or PREPROCESS_MODE
     count_mode = count_mode or COUNT_MODE
+    exclusion = exclusion or EXCLUSION_MODE
 
     display, channel = load_channel(image_path)
     _display2, labels, kept, t_hi = seg2.segment_image(image_path)
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(labels, kept)
     candidate, t_lo = canaliculi_candidate_mask(channel, lacuna_mask, preprocess)
+    # Non-LCN structures are dropped from the candidate mask BEFORE
+    # skeletonizing, so nothing downstream ever sees them as network.
+    excluded, exclusion_info = exclusion_mask.build_exclusion(image_path, channel, labels, exclusion)
+    if excluded.any():
+        candidate = candidate & ~excluded
     skeleton = morphology.skeletonize(candidate)
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
 
@@ -1242,6 +1267,11 @@ def process(
     out_dir = image_output_dir(image_path, output_suffix)
     if SAVE_MASK_PNG:
         save_mask_pngs(candidate, skeleton, out_dir, output_suffix)
+    if exclusion != "none":
+        exclusion_mask.save_exclusion_overlay(
+            display, excluded, exclusion_mask.protected_region(labels),
+            out_dir / f"exclusion{output_suffix}.png",
+        )
     colors = lacuna_colors(len(kept))
     all_ids = list(range(1, len(kept) + 1))
     save_verification(
@@ -1253,7 +1283,7 @@ def process(
     )
     save_json(
         image_path, measurements, stats, t_lo, t_hi, method, preprocess, count_mode,
-        out_dir / f"measurements{output_suffix}.json",
+        exclusion_info, out_dir / f"measurements{output_suffix}.json",
     )
 
     mean_count = stats["canaliculi_count"]["mean"]
@@ -1261,6 +1291,8 @@ def process(
     mean_count_s = "n/a" if mean_count is None else f"{mean_count:.2f}"
     mean_length_s = "n/a" if mean_length is None else f"{mean_length:.2f}"
     mode_tag = count_mode if method == "graph" else "path"
+    if exclusion != "none":
+        mode_tag += f"/excl-{exclusion}"
     print(
         f"{image_path.name} [{method}/{preprocess}/{mode_tag}]: lacunae={len(kept)}  "
         f"mean_canaliculi_per_cell={mean_count_s}  mean_canaliculus_length_px={mean_length_s}  -> {out_dir}"
@@ -1299,6 +1331,13 @@ def main() -> None:
         "_count-<mode> so a comparison run never overwrites the default outputs.",
     )
     parser.add_argument(
+        "--exclusion",
+        choices=list(exclusion_mask.VALID_MODES),
+        default=None,
+        help="Override EXCLUSION_MODE for this run; suffixes output filenames with _excl-<mode> "
+        "so a comparison run never overwrites the default outputs.",
+    )
+    parser.add_argument(
         "--no-sanity",
         action="store_true",
         help="Skip the pooled edge-length / node-degree sanity report printed after the run.",
@@ -1312,6 +1351,8 @@ def main() -> None:
         suffix += f"_pre-{args.preprocess}"
     if args.count_mode:
         suffix += f"_count-{args.count_mode}"
+    if args.exclusion:
+        suffix += f"_excl-{args.exclusion}"
 
     if args.image:
         if not args.image.is_file():
@@ -1329,6 +1370,7 @@ def main() -> None:
             output_suffix=suffix,
             preprocess=args.preprocess,
             count_mode=args.count_mode,
+            exclusion=args.exclusion,
         )
         for image_path in paths
     ]
