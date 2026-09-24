@@ -7,6 +7,39 @@ checked against ground truth. Parameters below are candidates only and are
 kept out of config.py until validated. Everything stays in PIXEL units --
 PIXEL_SIZE_UM is None, so nothing is converted to microns.
 
+SWITCHES (defaults marked *). Every one keeps the previous behaviour
+available so old and new can be compared on the same image; any
+non-default run writes to all_method_results/ with a suffix naming the
+setting, so it can never overwrite a default output.
+
+    LACUNA_SOURCE      *"v2" | "v3_candidate"
+                       which lacuna detector feeds this module
+    PREPROCESS_MODE    *"tophat" | "ridge" | "tophat+ridge" | "none"
+                       how the channel is flattened before thresholding
+    THRESHOLD_MODE     *"multiotsu_low" | "hysteresis"
+                       how the pre-processed image is cut
+    GAP_BRIDGING       *False | True
+                       evidence-based joining of broken threads
+    EXCLUSION_MODE     *"none" | "auto" | "manual" | "both"
+                       removal of non-LCN structures before skeletonizing
+    ASSIGNMENT_METHOD  *"graph" | "euclidean"
+                       how a canaliculus is attributed to a cell
+    COUNT_MODE         *"edge" | "path" | "roots"
+                       what counts as one canaliculus
+
+NONE of these defaults has been validated. They are the settings that have
+been looked at most, not the settings known to be right. Every tunable
+constant below carries its own provenance comment -- what it does, why
+that value, and whether it came from a measured distribution, a visual
+check, or is an untuned initial guess. Values derived from data were
+derived on a fixed tuning set (542_z06, 543-2, 682_z29) with the other
+five WT images held out.
+
+A NOTE ON COUNT_MODE, for the write-up: "edge" counts graph edges, which
+is an OCY-style NETWORK parameter and NOT "canaliculi per cell". A tree
+with T tips has ~2T-1 edges, so edge counts run about double any per-cell
+canaliculus count. "roots" is the per-cell quantity.
+
 Method:
     1. Segment lacunae with segment_lacunae_v2's multi-Otsu + watershed
        approach (imported as-is).
@@ -143,7 +176,7 @@ from pathlib import Path
 import networkx as nx
 import numpy as np
 from scipy import ndimage as ndi
-from skimage import filters, morphology, segmentation
+from skimage import filters, measure, morphology, segmentation
 from skimage.io import imsave
 from skan import Skeleton, summarize
 
@@ -1179,6 +1212,7 @@ def save_xlsx(
     method: str,
     count_mode: str,
     preprocess: str,
+    field_stats: dict | None,
     out_path: Path,
 ) -> None:
     from openpyxl import Workbook
@@ -1206,6 +1240,25 @@ def save_xlsx(
         s = stats[field]
         summary.append([field, s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
 
+    # NOTE: named field_stats, not field -- the SUMMARY_METRICS loop above
+    # binds a loop variable called `field`, which would shadow it.
+    if field_stats:
+        sheet = wb.create_sheet("field")
+        sheet.append(["per-field metrics -- independent of the per-lacuna assignment"])
+        sheet.append([
+            "Only ~23% of skeleton length is graph-connected to any lacuna in these 2D",
+            "sections, so per-cell numbers use a quarter of the network. These use all of it.",
+        ])
+        sheet.append([])
+        sheet.append(["metric", "value", "units"])
+        for key, value in field_stats.items():
+            if key in ("units", "note"):
+                continue
+            unit = "px^-1" if key.endswith("_per_px") else ("px^-2" if key.endswith("_per_px2") else "px")
+            if key.endswith("count"):
+                unit = "unitless"
+            sheet.append([key, value, unit])
+
     per_lacuna = wb.create_sheet("per_lacuna")
     fields = ["lacuna_id", "canaliculi_count", "total_length_px", "mean_canaliculus_length_px", "on_border", "units"]
     per_lacuna.append(fields)
@@ -1226,6 +1279,7 @@ def save_json(
     preprocess: str,
     count_mode: str,
     exclusion_info: dict,
+    field: dict | None,
     threshold_mode: str,
     gap_bridging: bool,
     bridges: list,
@@ -1262,6 +1316,7 @@ def save_json(
         "lacuna_count": len(measurements),
         "summary": stats,
         "exclusion": exclusion_info,
+        "field": field,
         "parameters": {
             "assignment_method": method,
             "count_mode": count_mode if method == "graph" else "path (euclidean is always path-based)",
@@ -1382,6 +1437,34 @@ def sanity_report(runs: list[dict]) -> None:
         print(
             f'{run["image"][:24]:24s} {real.number_of_nodes():7d} {real.number_of_edges():7d} '
             f'{len(edge_owner):12d} {nx.number_connected_components(real):11d}'
+        )
+
+    # --- Phase 0(b) fragmentation + Phase 4a per-field metrics -----------
+    fields = [r["field"] for r in runs if r.get("field")]
+    if fields:
+        print()
+        print("-- Fragmentation and per-field metrics (per image)")
+        print(
+            f'{"image":24s} {"skel_px":>8s} {"comps":>6s} {"comp/10k":>9s} {"len_dens":>10s} '
+            f'{"junc_dens":>10s} {"lac/area":>10s} {"med_comp":>9s}'
+        )
+        for run in runs:
+            f = run.get("field")
+            if not f:
+                continue
+            skel_px = f["total_skeleton_length_px"]
+            comps = f["skeleton_component_count"]
+            print(
+                f'{run["image"][:24]:24s} {skel_px:8.0f} {comps:6d} '
+                f'{(10000.0 * comps / skel_px if skel_px else 0):9.1f} '
+                f'{f["canalicular_length_density_per_px"]:10.5f} '
+                f'{f["junction_density_per_px2"]:10.6f} {f["lacunae_per_px2"]:10.7f} '
+                f'{f["median_component_length_px"]:9.1f}'
+            )
+        print(
+            "   Per-field metrics do not use the per-lacuna assignment. Only ~23% of skeleton "
+            "length is graph-connected to a lacuna in these 2D sections, so per-cell numbers "
+            "are computed from a quarter of the network and these are not."
         )
 
     for label, lengths in (("ALL edges", all_lengths), ("CELL-OWNED edges", owned_lengths)):
@@ -1528,6 +1611,14 @@ def process(
         raise ValueError(f"Unknown method: {method!r} (expected 'graph' or 'euclidean')")
 
     stats = summarize_interior(measurements, precision=config.CSV_FLOAT_PRECISION)
+    field = (
+        field_metrics(
+            skeleton, graph, lacuna_mask, excluded, len(kept),
+            precision=config.CSV_FLOAT_PRECISION,
+        )
+        if graph is not None
+        else None
+    )
 
     out_dir = image_output_dir(image_path, output_suffix)
     if SAVE_MASK_PNG:
@@ -1550,12 +1641,12 @@ def process(
         display, lacuna_id_map, skeleton, owner_map, all_ids, colors, out_dir / f"verification{output_suffix}.png"
     )
     save_xlsx(
-        image_path.name, measurements, stats, method, count_mode, preprocess,
+        image_path.name, measurements, stats, method, count_mode, preprocess, field,
         out_dir / f"measurements{output_suffix}.xlsx",
     )
     save_json(
         image_path, measurements, stats, t_lo, t_hi, method, preprocess, count_mode,
-        exclusion_info, threshold_mode, gap_bridging, bridges,
+        exclusion_info, field, threshold_mode, gap_bridging, bridges,
         out_dir / f"measurements{output_suffix}.json",
     )
 
@@ -1575,7 +1666,14 @@ def process(
         f"mean_canaliculi_per_cell={mean_count_s}  mean_canaliculus_length_px={mean_length_s}  -> {out_dir}"
     )
     print_summary(stats)
-    return {"stats": stats, "graph": graph, "edge_owner": edge_owner, "image": image_path.name}
+    return {
+        "stats": stats,
+        "graph": graph,
+        "edge_owner": edge_owner,
+        "image": image_path.name,
+        "field": field,
+        "skeleton": skeleton,
+    }
 
 
 def main() -> None:
@@ -1628,6 +1726,13 @@ def main() -> None:
         "suffixes output filenames with _bridged.",
     )
     parser.add_argument(
+        "--hysteresis-low",
+        type=float,
+        default=None,
+        help="Override HYSTERESIS_LOW_FRACTION for this run (only meaningful with "
+        "--threshold-mode hysteresis); suffixes output filenames with _hl<value>.",
+    )
+    parser.add_argument(
         "--lacuna-source",
         choices=["v2", "v3_candidate"],
         default=None,
@@ -1655,6 +1760,9 @@ def main() -> None:
         suffix += "_bridged"
     if args.lacuna_source:
         suffix += f"_lac-{args.lacuna_source}"
+    if args.hysteresis_low is not None:
+        suffix += f"_hl{args.hysteresis_low}"
+        globals()["HYSTERESIS_LOW_FRACTION"] = args.hysteresis_low
 
     if args.image:
         if not args.image.is_file():

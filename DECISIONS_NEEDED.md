@@ -245,3 +245,55 @@ scientific question. Two ways forward, both needing your judgement:
 focal plane is a lacuna for counting purposes. It changes counts by 50-290%
 per image, so it is the single largest open question in the pipeline, and
 it is a question about what the thesis is measuring, not about code.
+
+---
+
+## D5. Which outcome should be the primary canaliculi measure?
+
+**Status: NOTHING CHANGED. `COUNT_MODE="edge"` is still the default;
+`"roots"` is available but not selected.**
+
+Phase 4 ran every metric on all 8 WT images under BOTH the current default
+and the Phase 2 recommended setting, to see which outcomes survive a change
+of segmentation. Pooled over 8 images:
+
+| metric | default | recommended | change |
+|---|---|---|---|
+| canalicular length density (px⁻¹) | 0.0347 | 0.0393 | **+13.3%** |
+| junction density (px⁻²) | 0.0004 | 0.0005 | +44.5% |
+| median component length (px) | 15.5 | 16.8 | **+8.1%** |
+| skeleton components | 808.9 | 684.6 | −15.4% |
+| **edge count / cell** | 26.6 | 47.3 | **+77.9%** |
+| **ROOTS / cell** | 6.82 | 7.58 | **+11.2%** |
+
+**The per-cell edge count nearly doubles when the segmentation changes,
+while roots/cell moves by a ninth and length density by an eighth.** An
+outcome that swings 78% on a choice nobody has validated cannot carry a
+genotype comparison; the difference between two mouse lines would be buried
+inside the uncertainty from a preprocessing switch.
+
+Two further reasons not to lead with edge count:
+- It is an OCY **network** parameter, not a per-cell count. A tree with T
+  tips has ~2T−1 edges, so 26.6 edges/cell is not "26.6 canaliculi".
+  Reporting it as canaliculi per cell would be wrong on its face.
+- It is computed from the ~23% of skeleton length that is graph-connected
+  to a lacuna, so it inherits all of the fragmentation problem.
+
+**My recommendation, for your supervisor:**
+1. **Primary outcome: canalicular length density (px⁻¹), per field.** Most
+   stable across settings (+13.3%), uses the whole skeleton, and does not
+   depend on the per-lacuna assignment at all.
+2. **Secondary, per-cell: roots per lacuna.** 6.8–7.6 per cell, which is a
+   plausible number a person could check by eye in ImageJ, and it moves
+   only +11.2% across settings. This is the number to validate against
+   Mahmoud's counts, because it is the number his counts actually measure.
+3. **Report edge count as a network parameter** if at all, clearly labelled,
+   never as "canaliculi per cell".
+
+Junction density is listed above for completeness but moves +44.5% and
+should not be a primary outcome.
+
+**Still needs your supervisor, not me:** whether the primary outcome should
+be per-field or per-lacuna is a question about what the thesis claims, not
+about which number is most stable. I can only report that the per-field
+ones are more robust.

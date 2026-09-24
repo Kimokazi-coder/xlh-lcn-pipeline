@@ -378,7 +378,33 @@ single objects (loops 13 to 504; longest component 708 to 36,051 px in
 542_z06). Recommendation and full table in DECISIONS_NEEDED.md D1; nothing
 applied.
 
-## Planned next (Phase 3 onward)
+### Phase 3 (done, 2026-09-24 ~18:10) — lacuna-side candidate
+`src/segment_lacunae_v3_candidate.py` (NEW, non-default) detects lacunae by
+BREADTH (morphological opening of the raw channel, r=12) instead of
+brightness, importing v2's watershed/merge/filters unchanged so the
+comparison isolates detection. `LACUNA_SOURCE` switch added, default
+`"v2"`. `segment_lacunae_v2.py` untouched; `TEST_MIN_SOLIDITY` untouched.
+The (230,300) rejection is explained (a thin CURVED body, aspect 5.90 —
+an erosion test rules out attached roots). v3 recovers it at solidity
+0.952. v3 finds essentially all v2 objects plus 5–29 per image, but those
+extras are half as bright (mean intensity p50 0.378 vs 0.827) and include
+the vascular canal. See DECISIONS_NEEDED.md D3, D4.
+
+### Phase 4 (done, 2026-09-24 ~19:40) — robust measurements
+Per-field metrics (`field_metrics`) now in a `"field"` sheet of
+measurements.xlsx and a `"field"` block in the JSON, plus in the sanity
+report. `COUNT_MODE="roots"` added (non-default): one canaliculus = one
+thread leaving the lacuna surface, attachment points merged below
+`ROOT_MERGE_DIST_PX=8`.
+
+**Key result — which outcomes survive a change of segmentation.** Pooled
+over 8 WT images, default vs the Phase 2 recommendation: canalicular
+length density +13.3%, median component length +8.1%, **roots/cell
++11.2%**, but **edge count/cell +77.9%**. An outcome that swings 78% on an
+unvalidated preprocessing choice cannot carry a genotype comparison. See
+DECISIONS_NEEDED.md D5.
+
+## Planned next
 
 - **Phase 2 must be judged on the guard metrics, not on owned fraction.**
   Phase 0(c) found that the angle between a thread's local direction and

@@ -80,6 +80,71 @@ Note that some entries in `config.py` belong to the superseded
 `count_lacunae.py` and are not read by the current modules. `PIXEL_SIZE_UM`
 stays `None` — see Units above.
 
+## Switches
+
+Every option below is a module-level constant in `src/canaliculi_v1.py`
+with a matching CLI flag. **Defaults are marked in bold and none of them
+have been validated** — they are the settings that have been looked at
+most, not the settings known to be right. Any non-default run writes to
+`all_method_results/` with a filename suffix naming the setting, so a
+comparison can never overwrite a default output.
+
+| switch | values | CLI |
+| --- | --- | --- |
+| `LACUNA_SOURCE` | **`"v2"`** · `"v3_candidate"` | `--lacuna-source` |
+| `PREPROCESS_MODE` | **`"tophat"`** · `"ridge"` · `"tophat+ridge"` · `"none"` | `--preprocess` |
+| `THRESHOLD_MODE` | **`"multiotsu_low"`** · `"hysteresis"` | `--threshold-mode` |
+| `GAP_BRIDGING` | **`False`** · `True` | `--gap-bridging` |
+| `EXCLUSION_MODE` | **`"none"`** · `"auto"` · `"manual"` · `"both"` | `--exclusion` |
+| `ASSIGNMENT_METHOD` | **`"graph"`** · `"euclidean"` | `--method` |
+| `COUNT_MODE` | **`"edge"`** · `"path"` · `"roots"` | `--count-mode` |
+
+**Parameter provenance.** Every tunable constant carries a comment saying
+what it does, why that value, and where the value came from — a measured
+distribution, a visual check, or an explicit "initial guess, not yet
+tuned". Read the comment before changing a number. Values derived from
+data were derived on a fixed tuning set (542_z06, 543-2, 682_z29) with the
+other five WT images held out, so a number that was tuned says so.
+
+**What `COUNT_MODE` means.** `"edge"` counts graph edges the cell owns.
+That is an OCY-style **network parameter**, not "canaliculi per cell" — a
+tree with T tips has about 2T−1 edges, so edge counts run roughly double
+any per-cell canaliculus count. Do not report it under that name.
+`"roots"` counts distinct threads leaving the lacuna surface and is the
+per-cell quantity, closest to what a person counts by eye in ImageJ.
+
+## Where we follow OCY, and where we depart
+
+The method draws on the published OCY pipeline (Kollmannsberger et al.,
+*New J. Phys.* 2017, github.com/phi-max/OCY_connectomics). **OCY was built
+for 3D confocal stacks; our data are single 2D optical sections.** That
+difference drives every departure.
+
+Followed, with the OCY file cited at each site in the code:
+
+- top-hat background flattening and the histogram-mode offset subtraction
+  before thresholding (`OCY_thr_stack.m`), and the light Gaussian before it
+  (`OCY_main.m`)
+- short-branch removal and the iterate-until-stable graph cleanup
+  (`OCY_run_Skel2Graph3D.m`, `Skel2Graph3D`'s `THR_BRANCH`)
+- assigning a canaliculus to the cell it connects to through the network,
+  reached through whichever end is nearer a cell (`OCY_assign_dist.m`)
+- counting canaliculi as graph edges, and the edge-length and node-degree
+  distributions in the sanity report (`OCY_get_network_params.m`)
+
+Departed from, and why:
+
+- **Gap bridging and ridge/hysteresis options have no OCY counterpart.** In
+  a 3D stack a canaliculus leaving one plane continues in the next, so
+  out-of-plane truncation does not exist for OCY. In our sections 82% of
+  skeleton nodes are degree-1 thread ends.
+- **Exclusion of non-LCN structures has no OCY counterpart.** Our fields
+  are chosen by the microscopist and routinely contain vascular canal
+  edges.
+- **Parameter values are re-derived from our own images, never scaled from
+  OCY's.** OCY's short-branch threshold is about 2.5× their canaliculus
+  diameter; applied here that would remove half of all internal edges.
+
 ## Drawing a manual exclusion mask
 
 Some fields contain bright structures that are not canalicular network —
