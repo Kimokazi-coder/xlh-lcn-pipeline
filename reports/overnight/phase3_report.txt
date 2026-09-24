@@ -1,0 +1,164 @@
+====================================================================================================
+PHASE 3: v2 vs v3-candidate, every differing object (v3-raw, pre-validation, px)
+v3 detector = broad opening r=12px; all filters are v2's, unchanged
+====================================================================================================
+
+542 WT  2_z06c1-2   v2=16  v3=21  shared=16  v2-only=0  v3-only=5
+  V3-ONLY (v3 adds these -- for your review):
+    (   527,   289) area=   7832 sol=0.779 border=False mean_I=0.451
+    (   535,   570) area=   1637 sol=0.917 border=False mean_I=0.445
+    (   230,   303) area=   1241 sol=0.952 border=False mean_I=0.736
+    (   224,   351) area=    591 sol=0.958 border=False mean_I=0.736
+    (     7,   927) area=    494 sol=0.959 border=True mean_I=0.678
+
+542 WT  2_z18c1-2   v2=12  v3=20  shared=12  v2-only=0  v3-only=8
+  V3-ONLY (v3 adds these -- for your review):
+    (   581,   464) area=   8820 sol=0.896 border=False mean_I=0.374
+    (   598,   303) area=   8773 sol=0.784 border=False mean_I=0.381
+    (    81,   687) area=   2633 sol=0.877 border=False mean_I=0.369
+    (   997,   846) area=   1510 sol=0.948 border=False mean_I=0.289
+    (   212,   890) area=   1197 sol=0.950 border=False mean_I=0.506
+    (   228,   328) area=   1180 sol=0.955 border=False mean_I=0.378
+    (   981,   957) area=   1054 sol=0.948 border=False mean_I=0.308
+    (    75,   256) area=    441 sol=0.948 border=False mean_I=0.457
+
+543-2   v2=12  v3=28  shared=12  v2-only=0  v3-only=16
+  V3-ONLY (v3 adds these -- for your review):
+    (   830,   147) area=   3634 sol=0.830 border=False mean_I=0.408
+    (   172,  1006) area=   3371 sol=0.904 border=True mean_I=0.388
+    (   180,   297) area=   2455 sol=0.884 border=False mean_I=0.401
+    (   998,   149) area=   1797 sol=0.959 border=False mean_I=0.407
+    (  1004,    98) area=   1168 sol=0.957 border=True mean_I=0.392
+    (    98,  1007) area=   1037 sol=0.948 border=True mean_I=0.391
+    (   966,   608) area=   1023 sol=0.960 border=False mean_I=0.387
+    (   950,   108) area=    887 sol=0.960 border=False mean_I=0.380
+    (    90,   471) area=    853 sol=0.958 border=False mean_I=0.374
+    (   997,     8) area=    800 sol=0.956 border=True mean_I=0.383
+    (  1001,   418) area=    595 sol=0.955 border=False mean_I=0.427
+    (   145,   498) area=    550 sol=0.957 border=False mean_I=0.420
+    (    56,   611) area=    541 sol=0.956 border=False mean_I=0.453
+    (   239,   942) area=    524 sol=0.954 border=False mean_I=0.391
+    (   852,    61) area=    441 sol=0.948 border=False mean_I=0.387
+    (   911,   354) area=    441 sol=0.948 border=False mean_I=0.349
+
+543_3   v2=10  v3=39  shared=10  v2-only=0  v3-only=29
+  V3-ONLY (v3 adds these -- for your review):
+    (    42,   337) area=  10612 sol=0.882 border=True mean_I=0.526
+    (   183,   282) area=   7849 sol=0.918 border=False mean_I=0.389
+    (   292,   856) area=   4700 sol=0.920 border=False mean_I=0.409
+    (   114,   493) area=   4228 sol=0.889 border=False mean_I=0.378
+    (   481,   454) area=   3325 sol=0.945 border=False mean_I=0.391
+    (   396,   638) area=   1830 sol=0.928 border=False mean_I=0.374
+    (   628,  1012) area=   1569 sol=0.941 border=True mean_I=0.376
+    (   982,    87) area=   1365 sol=0.956 border=False mean_I=0.383
+    (   808,    56) area=   1248 sol=0.958 border=False mean_I=0.422
+    (    49,   826) area=   1055 sol=0.952 border=False mean_I=0.407
+    (   826,   148) area=    928 sol=0.954 border=False mean_I=0.408
+    (    36,   171) area=    865 sol=0.959 border=False mean_I=0.396
+    (   124,   882) area=    856 sol=0.953 border=False mean_I=0.354
+    (   590,   961) area=    852 sol=0.956 border=False mean_I=0.437
+    (   148,   224) area=    770 sol=0.961 border=False mean_I=0.402
+    (   608,   838) area=    702 sol=0.958 border=False mean_I=0.375
+    (   926,   342) area=    695 sol=0.961 border=False mean_I=0.387
+    (    42,   934) area=    648 sol=0.960 border=False mean_I=0.388
+    (   988,   221) area=    631 sol=0.959 border=False mean_I=0.392
+    (    57,   967) area=    629 sol=0.959 border=False mean_I=0.385
+    (     9,   682) area=    595 sol=0.963 border=True mean_I=0.372
+    (   942,    10) area=    591 sol=0.952 border=True mean_I=0.370
+    (   877,    52) area=    574 sol=0.957 border=False mean_I=0.414
+    (     7,   157) area=    517 sol=0.972 border=True mean_I=0.382
+    (    76,   207) area=    497 sol=0.952 border=False mean_I=0.390
+    (   846,    58) area=    466 sol=0.951 border=False mean_I=0.375
+    (   818,   118) area=    440 sol=0.946 border=False mean_I=0.341
+    (  1017,    87) area=    432 sol=0.954 border=True mean_I=0.379
+    (    15,   507) area=    420 sol=0.963 border=False mean_I=0.355
+
+543_z13c1-2   v2=11  v3=19  shared=11  v2-only=0  v3-only=8
+  V3-ONLY (v3 adds these -- for your review):
+    (    38,   297) area=   5632 sol=0.902 border=False mean_I=0.410
+    (   363,   395) area=   4247 sol=0.949 border=False mean_I=0.436
+    (  1001,   146) area=   1478 sol=0.954 border=False mean_I=0.394
+    (   616,    96) area=    995 sol=0.959 border=False mean_I=0.484
+    (   197,   298) area=    559 sol=0.957 border=False mean_I=0.399
+    (   836,   186) area=    497 sol=0.952 border=False mean_I=0.424
+    (    20,   679) area=    441 sol=0.948 border=False mean_I=0.408
+    (   241,   926) area=    441 sol=0.948 border=False mean_I=0.384
+
+682_z08c1-2   v2=10  v3=27  shared=9  v2-only=1  v3-only=18
+  V2-ONLY (v3 misses these):
+    (   428,    32) area=   9321 sol=0.684 border=True best_overlap=0.00
+  V3-ONLY (v3 adds these -- for your review):
+    (    53,   600) area=   3922 sol=0.906 border=False mean_I=0.445
+    (   925,   999) area=   3020 sol=0.930 border=True mean_I=0.360
+    (   692,   216) area=   2326 sol=0.825 border=False mean_I=0.427
+    (   308,  1011) area=   2231 sol=0.970 border=True mean_I=0.383
+    (   642,   322) area=   1664 sol=0.925 border=False mean_I=0.340
+    (  1006,   885) area=   1610 sol=0.927 border=True mean_I=0.303
+    (   962,   360) area=   1295 sol=0.875 border=False mean_I=0.440
+    (   126,   848) area=   1288 sol=0.964 border=False mean_I=0.452
+    (    10,    92) area=    869 sol=0.945 border=True mean_I=0.443
+    (   710,   334) area=    838 sol=0.956 border=False mean_I=0.335
+    (   980,   885) area=    607 sol=0.956 border=False mean_I=0.304
+    (    70,    53) area=    600 sol=0.957 border=False mean_I=0.362
+    (   743,   332) area=    530 sol=0.955 border=False mean_I=0.344
+    (   567,   370) area=    523 sol=0.954 border=False mean_I=0.448
+    (   255,    58) area=    500 sol=0.954 border=False mean_I=0.474
+    (   636,   228) area=    441 sol=0.948 border=False mean_I=0.491
+    (   778,   335) area=    441 sol=0.948 border=False mean_I=0.345
+    (   981,   928) area=    441 sol=0.948 border=False mean_I=0.321
+
+682_z23c-2   v2=14  v3=36  shared=11  v2-only=3  v3-only=26
+  V2-ONLY (v3 misses these):
+    (   107,    13) area=    510 sol=0.810 border=True best_overlap=0.00
+    (   363,     7) area=    448 sol=0.677 border=True best_overlap=0.00
+    (   472,    61) area=   1379 sol=0.797 border=False best_overlap=0.00
+  V3-ONLY (v3 adds these -- for your review):
+    (   826,    70) area=  10694 sol=0.797 border=True mean_I=0.315
+    (   980,   972) area=   7456 sol=0.904 border=True mean_I=0.306
+    (    79,   351) area=   7146 sol=0.777 border=True mean_I=0.261
+    (   906,    52) area=   4854 sol=0.863 border=False mean_I=0.314
+    (   445,   978) area=   3112 sol=0.940 border=False mean_I=0.283
+    (   169,   525) area=   1813 sol=0.962 border=False mean_I=0.425
+    (   246,   115) area=   1682 sol=0.904 border=False mean_I=0.355
+    (   745,    60) area=   1389 sol=0.963 border=False mean_I=0.362
+    (   545,   403) area=   1311 sol=0.959 border=False mean_I=0.297
+    (   571,    90) area=   1020 sol=0.902 border=False mean_I=0.352
+    (   230,   188) area=   1012 sol=0.964 border=False mean_I=0.305
+    (   102,   446) area=    908 sol=0.928 border=False mean_I=0.337
+    (   721,   122) area=    719 sol=0.960 border=False mean_I=0.299
+    (   676,   137) area=    715 sol=0.955 border=False mean_I=0.315
+    (   678,   172) area=    645 sol=0.957 border=False mean_I=0.301
+    (   458,   251) area=    608 sol=0.957 border=False mean_I=0.312
+    (   587,   379) area=    608 sol=0.957 border=False mean_I=0.336
+    (   106,   178) area=    552 sol=0.953 border=False mean_I=0.322
+    (  1013,   104) area=    537 sol=0.968 border=True mean_I=0.313
+    (  1016,   672) area=    528 sol=0.965 border=True mean_I=0.299
+    (   153,   284) area=    497 sol=0.952 border=False mean_I=0.291
+    (   577,   503) area=    483 sol=0.953 border=False mean_I=0.262
+    (   730,   162) area=    466 sol=0.951 border=False mean_I=0.321
+    (   312,  1018) area=    442 sol=0.959 border=True mean_I=0.302
+    (   714,    90) area=    441 sol=0.948 border=False mean_I=0.257
+    (   190,   339) area=    441 sol=0.948 border=False mean_I=0.309
+
+682_z29c1-3   v2=13  v3=24  shared=13  v2-only=0  v3-only=12
+  V3-ONLY (v3 adds these -- for your review):
+    (   449,    33) area=  15981 sol=0.793 border=True mean_I=0.324
+    (   857,   725) area=   2756 sol=0.938 border=False mean_I=0.396
+    (   847,   102) area=   2341 sol=0.930 border=False mean_I=0.357
+    (   902,    49) area=   1743 sol=0.935 border=False mean_I=0.336
+    (   840,    25) area=   1464 sol=0.819 border=True mean_I=0.340
+    (   256,   184) area=   1317 sol=0.937 border=False mean_I=0.351
+    (    61,   939) area=   1299 sol=0.963 border=False mean_I=0.340
+    (   212,   179) area=   1067 sol=0.941 border=False mean_I=0.343
+    (   177,   524) area=    639 sol=0.957 border=False mean_I=0.348
+    (   206,   108) area=    492 sol=0.953 border=False mean_I=0.343
+    (   311,    94) area=    441 sol=0.948 border=False mean_I=0.338
+    (   108,   325) area=    441 sol=0.948 border=False mean_I=0.274
+
+====================================================================================================
+CHARACTER OF THE DISAGREEMENT
+====================================================================================================
+
+v2-kept objects (the accepted population) (n=98): area p50=2132 p10=768 | solidity p50=0.886 | mean_I p50=0.827 | on_border 12%
+
+v3-ONLY objects (what v3 adds) (n=122): area p50=878 p10=441 | solidity p50=0.952 | mean_I p50=0.378 | on_border 19%

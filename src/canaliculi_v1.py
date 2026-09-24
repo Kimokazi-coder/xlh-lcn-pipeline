@@ -175,7 +175,30 @@ ASSIGNMENT_METHOD = "graph"
 #       branching thread -- a stem that forks into 4 tips is reported as 4
 #       canaliculi, each carrying the whole stem length again -- so it
 #       inflates both count and mean length.
+#   "roots" (Phase 4b, NOT default): one canaliculus = one distinct thread
+#       LEAVING THE LACUNA SURFACE. Counts the skeleton branches attaching
+#       within LACUNA_ATTACH_GAP_PX of the body, merging attachment points
+#       closer than ROOT_MERGE_DIST_PX so one thick root is not counted
+#       twice. This is closest to what a person counts by eye in ImageJ
+#       ("canaliculi emanating per lacuna"), and is insensitive to how the
+#       thread fragments further out -- which matters here, because 82% of
+#       skeleton nodes are degree-1 thread ends (Phase 0b).
+#
+# IMPORTANT, for the write-up: "edge" is an OCY-style NETWORK parameter --
+# the number of graph edges the cell owns. It is NOT "canaliculi per cell"
+# and should not be reported under that name. A tree with T tips has ~2T-1
+# edges, so edge counts run about double any per-cell canaliculus count.
+# "roots" is the per-cell quantity.
 COUNT_MODE = "edge"
+
+# Two attachment points closer than this are treated as one root. A single
+# thick canaliculus can meet the lacuna boundary over several skeleton
+# pixels and so present more than one graph node within the attachment
+# gap; merging below one thread width stops that being counted twice.
+# Measured canalicular full width is p50 ~6.0 and p99 ~8.5 px (Phase 0),
+# so 8 px is just under the widest real thread -- below it, two points
+# cannot be separate threads.
+ROOT_MERGE_DIST_PX = 8.0
 
 # Removal of non-LCN structures (vascular canals, canal edges) from the
 # canaliculi candidate mask before skeletonization. See exclusion_mask.py
@@ -191,6 +214,17 @@ COUNT_MODE = "edge"
 # switching this on would remove mask pixels at roughly the field's own
 # density -- i.e. mostly real canaliculi. See PROGRESS.md.
 EXCLUSION_MODE = "none"
+
+# Which lacuna detector feeds the canaliculi step.
+#   "v2"           (default) segment_lacunae_v2: brightness, the top class
+#                  of a 3-class multi-Otsu cut. Accepted and unchanged.
+#   "v3_candidate" segment_lacunae_v3_candidate: breadth, a large
+#                  morphological opening of the raw channel. NOT default.
+# v3 finds every v2 object on 7 of 8 WT images and adds 5-29 more per
+# image. Whether those extras are real lacunae -- many are partly outside
+# the focal plane -- is a scientific decision, not a coding one, so they
+# are listed in DECISIONS_NEEDED.md for review rather than adopted.
+LACUNA_SOURCE = "v2"
 
 # --- Canalicular-mask preprocessing (OCY-style; see module docstring) ---
 # "tophat" = smooth + white top-hat + histogram-mode offset subtraction
@@ -871,6 +905,100 @@ def trace_cell_canaliculi(G: nx.Graph, cell_id: int, owner: dict) -> list[float]
     return lengths
 
 
+def cell_root_lengths(G: nx.Graph, cell_id: int) -> list[float]:
+    """Root-based canaliculi for one cell (COUNT_MODE="roots").
+
+    The attachment points are exactly the real nodes attach_lacunae linked
+    to this cell's virtual node. They are clustered by single-linkage at
+    ROOT_MERGE_DIST_PX, so one thick thread meeting the boundary over
+    several nodes counts once. The "length" returned per root is the
+    length of the edge leaving that attachment point, so the caller's
+    existing count/total/mean reporting still means something -- but the
+    COUNT is the quantity this mode exists for."""
+    src = ("cell", cell_id)
+    if not G.has_node(src):
+        return []
+    points = [n for n in G.neighbors(src) if not _is_cell_node(n)]
+    if not points:
+        return []
+
+    # Single-linkage clustering by Euclidean distance between attachment
+    # points. Done directly rather than via scipy so the rule stays visible.
+    unmerged = list(points)
+    clusters: list[list] = []
+    while unmerged:
+        seed = unmerged.pop()
+        cluster = [seed]
+        changed = True
+        while changed:
+            changed = False
+            for other in list(unmerged):
+                if any(np.hypot(other[0] - m[0], other[1] - m[1]) <= ROOT_MERGE_DIST_PX for m in cluster):
+                    cluster.append(other)
+                    unmerged.remove(other)
+                    changed = True
+        clusters.append(cluster)
+
+    lengths = []
+    for cluster in clusters:
+        best = 0.0
+        for node in cluster:
+            for neighbour in G.neighbors(node):
+                if _is_cell_node(neighbour):
+                    continue
+                best = max(best, float(G[node][neighbour]["weight"]))
+        lengths.append(best)
+    return lengths
+
+
+def field_metrics(
+    skeleton: np.ndarray,
+    G: nx.Graph,
+    lacuna_mask: np.ndarray,
+    excluded: np.ndarray,
+    n_lacunae: int,
+    precision: int,
+) -> dict:
+    """Per-FIELD measurements (Phase 4a), independent of which cell owns
+    which thread.
+
+    This matters because per-lacuna attribution is the fragile part in 2D:
+    only ~23% of skeleton length is graph-connected to any lacuna (Phase
+    0b), so anything per-cell is computed from a quarter of the network.
+    These numbers use all of it and do not depend on the assignment step at
+    all, which makes them far less sensitive to fragmentation."""
+    rows, cols = skeleton.shape
+    analysed_area = float(rows * cols - lacuna_mask.sum() - (excluded & ~lacuna_mask).sum())
+    skel_px = float(skeleton.sum())
+
+    comp_labels = measure.label(skeleton, connectivity=2)
+    sizes = np.bincount(comp_labels.ravel())[1:].astype(float)
+
+    real = _real_subgraph(G)
+    junctions = sum(1 for n in real.nodes() if real.degree(n) >= 3)
+
+    def per_area(value: float) -> float | None:
+        return round(value / analysed_area, precision + 4) if analysed_area > 0 else None
+
+    return {
+        "analysed_area_px2": round(analysed_area, precision),
+        "total_skeleton_length_px": round(skel_px, precision),
+        "canalicular_length_density_per_px": per_area(skel_px),
+        "junction_count": int(junctions),
+        "junction_density_per_px2": per_area(float(junctions)),
+        "lacuna_count": int(n_lacunae),
+        "lacunae_per_px2": per_area(float(n_lacunae)),
+        "skeleton_component_count": int(sizes.size),
+        "mean_component_length_px": round(float(sizes.mean()), precision) if sizes.size else 0.0,
+        "median_component_length_px": round(float(np.median(sizes)), precision) if sizes.size else 0.0,
+        "units": "px",
+        "note": (
+            "Per-field metrics do not use the per-lacuna assignment, so "
+            "fragmentation affects them far less than any per-cell number."
+        ),
+    }
+
+
 def build_owner_pixel_map(
     shape: tuple[int, int],
     skel_obj,
@@ -932,8 +1060,12 @@ def canaliculi_measurements_graph(
             lengths = cell_edge_lengths(G, edge_owner, lacuna_id)
         elif count_mode == "path":
             lengths = trace_cell_canaliculi(G, lacuna_id, owner)
+        elif count_mode == "roots":
+            lengths = cell_root_lengths(G, lacuna_id)
         else:
-            raise ValueError(f"Unknown count mode: {count_mode!r} (expected 'edge' or 'path')")
+            raise ValueError(
+                f"Unknown count mode: {count_mode!r} (expected 'edge', 'path' or 'roots')"
+            )
         measurements.append(_measurement_row(lacuna_id, lengths, on_border, precision))
 
     owner_map = build_owner_pixel_map(skeleton.shape, skel_obj, G, edge_owner, owner)
@@ -1340,6 +1472,7 @@ def process(
     exclusion: str | None = None,
     threshold_mode: str | None = None,
     gap_bridging: bool | None = None,
+    lacuna_source: str | None = None,
 ) -> dict:
     method = method or ASSIGNMENT_METHOD
     preprocess = preprocess or PREPROCESS_MODE
@@ -1347,9 +1480,19 @@ def process(
     exclusion = exclusion or EXCLUSION_MODE
     threshold_mode = threshold_mode or THRESHOLD_MODE
     gap_bridging = GAP_BRIDGING if gap_bridging is None else gap_bridging
+    lacuna_source = lacuna_source or LACUNA_SOURCE
 
     display, channel = load_channel(image_path)
-    _display2, labels, kept, t_hi = seg2.segment_image(image_path)
+    if lacuna_source == "v2":
+        _display2, labels, kept, t_hi = seg2.segment_image(image_path)
+    elif lacuna_source == "v3_candidate":
+        import segment_lacunae_v3_candidate as seg3
+
+        _display2, labels, kept, t_hi = seg3.segment_image(image_path)
+    else:
+        raise ValueError(
+            f"Unknown lacuna source: {lacuna_source!r} (expected 'v2' or 'v3_candidate')"
+        )
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(labels, kept)
     candidate, t_lo = canaliculi_candidate_mask(channel, lacuna_mask, preprocess, threshold_mode)
@@ -1458,7 +1601,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--count-mode",
-        choices=["edge", "path"],
+        choices=["edge", "path", "roots"],
         default=None,
         help="Override COUNT_MODE for this run ('edge' = one canaliculus per graph edge, OCY-style; "
         "'path' = one per cell-to-tip path). Graph method only; suffixes output filenames with "
@@ -1485,6 +1628,12 @@ def main() -> None:
         "suffixes output filenames with _bridged.",
     )
     parser.add_argument(
+        "--lacuna-source",
+        choices=["v2", "v3_candidate"],
+        default=None,
+        help="Override LACUNA_SOURCE for this run; suffixes output filenames with _lac-<source>.",
+    )
+    parser.add_argument(
         "--no-sanity",
         action="store_true",
         help="Skip the pooled edge-length / node-degree sanity report printed after the run.",
@@ -1504,6 +1653,8 @@ def main() -> None:
         suffix += f"_thr-{args.threshold_mode}"
     if args.gap_bridging:
         suffix += "_bridged"
+    if args.lacuna_source:
+        suffix += f"_lac-{args.lacuna_source}"
 
     if args.image:
         if not args.image.is_file():
@@ -1524,6 +1675,7 @@ def main() -> None:
             exclusion=args.exclusion,
             threshold_mode=args.threshold_mode,
             gap_bridging=args.gap_bridging,
+            lacuna_source=args.lacuna_source,
         )
         for image_path in paths
     ]

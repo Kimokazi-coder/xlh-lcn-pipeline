@@ -136,3 +136,112 @@ and no passing Phase 2 setting creates a new reason to turn it on. **But if
 you ever adopt a ridge-based setting, revisit this** — under ridge the
 flagged structures do get traced as long lines, and exclusion would then be
 doing real work.
+
+---
+
+## D3. Why the (230,300) lacuna in 542_z06 is rejected, and what to do
+
+**Status: NOTHING CHANGED. `TEST_MIN_SOLIDITY` is still 0.5, as instructed.**
+
+**It is not a threshold miss.** The object IS in v2's mask — area 1698 px²,
+mean intensity 0.901 against t_hi = 0.647, so comfortably bright. v2's
+`filter_regions` rejects it on **solidity 0.452 < 0.5**, with aspect 5.90
+also close to the 6.0 limit.
+
+**Why its solidity is low.** Not attached canalicular roots. An erosion
+test distinguishes the two causes — thin attachments erode away fast while
+the body survives, so solidity should jump at small radii:
+
+| erosion r | area kept | solidity | pieces |
+|---|---|---|---|
+| 0 | 100% | 0.452 | 1 |
+| 1 | 80% | **0.393** | 1 |
+| 2 | 61% | 0.461 | 2 |
+| 3 | 43% | 0.595 | 5 |
+
+Solidity *falls* at r=1 and only recovers at r=3 having lost 57% of the
+area. So the low solidity is the object's own shape: it is a long, thin,
+**curved** body (aspect 5.90), and a banana shape has low solidity by
+geometry, convex hull versus body, regardless of attachments. It is not
+two fused lacunae either — it stays a single piece through r=1.
+
+Visually (`results/diagnostics/phase3/542_z06_lacuna_230_300.png`, panels:
+raw | v2 mask | the object | object vs its convex hull) it reads as a
+lacuna sectioned obliquely, so the section cuts a long thin slice through
+it rather than a compact cross-section.
+
+**Options.**
+1. Leave `TEST_MIN_SOLIDITY=0.5`. The kept population bottoms out at
+   solidity 0.525 and only two rejected objects across all 8 WT images sit
+   in [0.35, 0.5) — (226,310) at 0.452 and (543,492) at 0.456 — so the
+   cutoff currently sits in a real gap, not in the middle of a
+   distribution. Lowering it to ~0.44 would admit both.
+2. Change nothing in v2 and use v3 instead: **v3 already recovers this
+   object, at solidity 0.952, without anyone touching the filter.** The
+   broad opening resolves the thin curved body into a compact one, so it
+   passes v2's unchanged solidity test. See D4.
+
+**My recommendation: option 2.** It needs no change to an accepted module,
+and the mechanism is the right one — the object was never un-lacuna-like,
+it was thin and curved, and a detector that measures breadth sees it
+correctly. But note this hinges on whether an obliquely sectioned lacuna
+should be counted at all, which is D4's question and your supervisor's
+call.
+
+---
+
+## D4. v3-candidate lacuna detection: adopt, and on what terms?
+
+**Status: NOTHING CHANGED. `LACUNA_SOURCE = "v2"` is the default; v3 is
+reachable only via `--lacuna-source v3_candidate`.**
+
+`src/segment_lacunae_v3_candidate.py` detects lacunae by BREADTH (a
+morphological opening of the raw channel, radius 12 px) instead of
+BRIGHTNESS. Everything after detection is v2's own watershed, merge and
+filters, imported unchanged, so this compares detectors and nothing else.
+
+| image | v2 | v3 | shared | v2-only | v3-only |
+|---|---|---|---|---|---|
+| 542_z06 | 16 | 21 | 16 | 0 | 5 |
+| 542_z18 | 12 | 20 | 12 | 0 | 8 |
+| 543-2 | 12 | 28 | 12 | 0 | 16 |
+| 543_3 | 10 | 39 | 10 | 0 | 29 |
+| 543_z13 | 11 | 19 | 11 | 0 | 8 |
+| 682_z08 | 10 | 27 | 9 | 1 | 18 |
+| 682_z23 | 14 | 36 | 11 | 3 | 26 |
+| 682_z29 | 13 | 24 | 13 | 0 | 12 |
+
+v3 finds essentially everything v2 finds (4 v2-only objects in total, all
+in 682_z08/682_z23) and adds 5–29 per image. Every differing object is
+listed with its position, area, solidity and mean intensity in
+`reports/overnight/phase3_report.txt`.
+
+**The extras split cleanly by brightness**, and this is the key fact:
+
+| population | n | area p50 | solidity p50 | **mean intensity p50** |
+|---|---|---|---|---|
+| v2-kept (accepted) | 98 | 2132 | 0.886 | **0.827** |
+| v3-only (added) | 122 | 878 | 0.952 | **0.378** |
+
+The added objects are less than half as bright. Within them there are two
+visibly different groups — in 542_z06, (230,303) and (224,351) come in at
+mean_I 0.736, close to real lacunae, while (527,289) at 7832 px² and
+(535,570) sit at 0.45 **on the vascular canal band at x≈530-580**. So v3 at
+r=12 is detecting the canal as lacunae, which is a real false-positive
+mode, not a borderline call.
+
+**My recommendation: do NOT adopt v3 as the default yet.** It solves the
+(230,300) problem cleanly, but it currently buys that by admitting the
+vascular canal and a large dim population whose status is exactly the open
+scientific question. Two ways forward, both needing your judgement:
+- If partially sectioned lacunae SHOULD count: v3 is the right detector,
+  but it needs the Phase 1 exclusion turned on to keep the canal out — and
+  that interacts with D2, because the canal is what exclusion was built
+  for. This is the combination I would test next.
+- If they should NOT count: stay on v2, and treat D3 as the narrow
+  question of whether to admit two objects by lowering solidity to ~0.44.
+
+**What I cannot decide for you:** whether a lacuna lying partly outside the
+focal plane is a lacuna for counting purposes. It changes counts by 50-290%
+per image, so it is the single largest open question in the pipeline, and
+it is a question about what the thesis is measuring, not about code.
