@@ -154,6 +154,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from count_lacunae import load_channel  # noqa: E402
 import segment_lacunae_v2 as seg2  # noqa: E402
 import exclusion_mask  # noqa: E402
+import gap_bridging as gap_bridging_mod  # noqa: E402
 
 # --- Candidate parameters (NOT in config.py yet -- see module docstring) ---
 
@@ -195,7 +196,58 @@ EXCLUSION_MODE = "none"
 # "tophat" = smooth + white top-hat + histogram-mode offset subtraction
 # before thresholding (default). "none" = threshold the raw channel, the
 # old behaviour, kept behind this switch for before/after comparison.
+# "ridge" and "tophat+ridge" are Phase 2 additions and are NOT default.
+#   "tophat"       (default) smooth + white top-hat + mode subtraction
+#   "ridge"        smooth + multi-scale ridge filter
+#   "tophat+ridge" the top-hat chain, then the ridge filter on its output
+#   "none"         raw channel
 PREPROCESS_MODE = "tophat"
+
+# Which multi-scale ridge (tubeness) filter the "ridge" modes use.
+# skimage offers three and they are not interchangeable here:
+#   "sato"      responds to bright tube-like structures from the Hessian
+#               eigenvalues, with the scale set only by `sigmas`. Chosen as
+#               the default of the two offered: one meaningful parameter,
+#               and it degrades gracefully where threads cross.
+#   "meijering" built for neurites, uses a modified Hessian that is more
+#               sensitive to very thin lines but also noisier on texture,
+#               which this densely textured matrix has a lot of.
+#   frangi      NOT offered. It carries three extra parameters (alpha,
+#               beta, gamma) that would each need tuning and provenance,
+#               and it is known to suppress response at junctions -- which
+#               is where the canalicular network's branch points are, the
+#               thing we most need to keep.
+RIDGE_FILTER = "sato"
+
+# Scales (px) the ridge filter is evaluated at. A ridge filter responds
+# most where sigma matches the structure's half-width, so these have to
+# span the measured canalicular half-width range rather than be guessed.
+# Measured post-top-hat over all 8 WT images (diagnose_canaliculi_mask.py):
+# half-width p50 ~3.0, p90 ~4.2, p99 ~4.2 px, with the thinnest threads
+# around 1 px. 1-4 covers that range at 1 px steps.
+RIDGE_SIGMAS_PX = (1.0, 2.0, 3.0, 4.0)
+
+# How the (pre-processed) image is cut into foreground/background.
+#   "multiotsu_low" (default) the lower of the two 3-class multi-Otsu cuts
+#   "hysteresis"    keep dim pixels only where they connect to a
+#                   confidently bright one -- reconnects a dim stretch of a
+#                   real thread without admitting isolated background
+#                   speckle. NOT default.
+THRESHOLD_MODE = "multiotsu_low"
+
+# For "hysteresis": the high cut is the image's own multi-Otsu low cut (the
+# value the default pipeline uses), and the low cut is this fraction of it.
+# Both are therefore derived per image from its own histogram, with no
+# global intensity constant, as the brief requires. 0.5 is an INITIAL
+# VALUE, NOT YET TUNED: it is the midpoint between the current cut and
+# zero, chosen so the permissive cut is clearly below the strict one
+# without reaching the background mode. Phase 2's guard metrics (total
+# skeleton length, loop count) are what would justify moving it.
+HYSTERESIS_LOW_FRACTION = 0.5
+
+# Evidence-based gap bridging (Phase 2c). NOT default. See gap_bridging.py
+# for the three tests a bridge must pass and where each limit comes from.
+GAP_BRIDGING = False
 
 # Radius (px) of the disk structuring element for the white top-hat.
 # Adapted from OCY_thr_stack.m, which uses strel('disk',25) at 0.2 um/voxel.
@@ -347,17 +399,43 @@ def preprocess_channel(channel: np.ndarray, mode: str) -> np.ndarray:
     returns the channel unchanged."""
     if mode == "none":
         return channel
-    if mode != "tophat":
-        raise ValueError(f"Unknown preprocess mode: {mode!r} (expected 'tophat' or 'none')")
+    if mode not in ("tophat", "ridge", "tophat+ridge"):
+        raise ValueError(
+            f"Unknown preprocess mode: {mode!r} "
+            "(expected 'tophat', 'ridge', 'tophat+ridge' or 'none')"
+        )
 
     img = channel
     if SMOOTH_SIGMA_PX > 0:
         img = ndi.gaussian_filter(img, SMOOTH_SIGMA_PX)
-    img = morphology.white_tophat(img, morphology.disk(TOPHAT_RADIUS_PX))
-    if BACKGROUND_MODE_SUBTRACT:
-        img = _subtract_background_mode(img)
+    if mode in ("tophat", "tophat+ridge"):
+        img = morphology.white_tophat(img, morphology.disk(TOPHAT_RADIUS_PX))
+        if BACKGROUND_MODE_SUBTRACT:
+            img = _subtract_background_mode(img)
+    if mode in ("ridge", "tophat+ridge"):
+        img = _ridge_response(img)
     peak = float(img.max())
     return img / peak if peak > 0 else img
+
+
+def _ridge_response(img: np.ndarray) -> np.ndarray:
+    """Multi-scale ridge (tubeness) response for BRIGHT thin structures.
+    See RIDGE_FILTER for why sato is offered and frangi is not, and
+    RIDGE_SIGMAS_PX for where the scales come from.
+
+    This is a departure from OCY, which thresholds a top-hatted image
+    globally (OCY_thr_stack.m) and has no ridge step. The reason is the 2D
+    setting: OCY's 3D stacks keep a canaliculus continuous across planes,
+    while a single optical section leaves ~82% of skeleton nodes as
+    degree-1 thread ends (Phase 0b). A ridge filter scores a pixel on
+    whether it sits on a locally line-like structure rather than on its
+    brightness alone, which is the property that survives a thread dimming
+    as it leaves the focal plane."""
+    if RIDGE_FILTER == "sato":
+        return filters.sato(img, sigmas=RIDGE_SIGMAS_PX, black_ridges=False)
+    if RIDGE_FILTER == "meijering":
+        return filters.meijering(img, sigmas=RIDGE_SIGMAS_PX, black_ridges=False)
+    raise ValueError(f"Unknown RIDGE_FILTER: {RIDGE_FILTER!r} (expected 'sato' or 'meijering')")
 
 
 def total_signal_mask(channel: np.ndarray) -> tuple[np.ndarray, float]:
@@ -383,10 +461,32 @@ def build_lacuna_maps(labels: np.ndarray, kept: list[tuple]) -> tuple[np.ndarray
     return lacuna_id_map > 0, lacuna_id_map
 
 
+def threshold_mask(img: np.ndarray, threshold_mode: str) -> tuple[np.ndarray, float]:
+    """Cut the pre-processed image into foreground/background. Returns
+    (mask, the strict cut), so the reported t_lo means the same thing in
+    both modes and stays comparable across settings."""
+    strict_mask, t_lo = total_signal_mask(img)
+    if threshold_mode == "multiotsu_low":
+        return strict_mask, t_lo
+    if threshold_mode == "hysteresis":
+        # Keep a dim pixel only where it is connected to a confidently
+        # bright one. Both cuts come from this image's own histogram --
+        # the high cut IS the default pipeline's cut, so hysteresis can
+        # only ever ADD to the default mask, never remove from it.
+        low = t_lo * HYSTERESIS_LOW_FRACTION
+        return filters.apply_hysteresis_threshold(img, low, t_lo), t_lo
+    raise ValueError(
+        f"Unknown threshold mode: {threshold_mode!r} (expected 'multiotsu_low' or 'hysteresis')"
+    )
+
+
 def canaliculi_candidate_mask(
-    channel: np.ndarray, lacuna_mask: np.ndarray, mode: str
+    channel: np.ndarray,
+    lacuna_mask: np.ndarray,
+    mode: str,
+    threshold_mode: str = "multiotsu_low",
 ) -> tuple[np.ndarray, float]:
-    signal, t_lo = total_signal_mask(preprocess_channel(channel, mode))
+    signal, t_lo = threshold_mask(preprocess_channel(channel, mode), threshold_mode)
     buffered_lacunae = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
     candidate = signal & ~buffered_lacunae
     candidate = morphology.remove_small_objects(candidate, min_size=MIN_THREAD_OBJECT_PX2)
@@ -994,6 +1094,9 @@ def save_json(
     preprocess: str,
     count_mode: str,
     exclusion_info: dict,
+    threshold_mode: str,
+    gap_bridging: bool,
+    bridges: list,
     out_path: Path,
 ) -> None:
     payload = {
@@ -1031,9 +1134,15 @@ def save_json(
             "assignment_method": method,
             "count_mode": count_mode if method == "graph" else "path (euclidean is always path-based)",
             "preprocess_mode": preprocess,
-            "tophat_radius_px": TOPHAT_RADIUS_PX if preprocess == "tophat" else None,
-            "smooth_sigma_px": SMOOTH_SIGMA_PX if preprocess == "tophat" else None,
-            "background_mode_subtract": BACKGROUND_MODE_SUBTRACT if preprocess == "tophat" else None,
+            "threshold_mode": threshold_mode,
+            "hysteresis_low_fraction": HYSTERESIS_LOW_FRACTION if threshold_mode == "hysteresis" else None,
+            "ridge_filter": RIDGE_FILTER if "ridge" in preprocess else None,
+            "ridge_sigmas_px": list(RIDGE_SIGMAS_PX) if "ridge" in preprocess else None,
+            "gap_bridging": gap_bridging,
+            "n_bridges_added": len(bridges),
+            "tophat_radius_px": TOPHAT_RADIUS_PX if "tophat" in preprocess else None,
+            "smooth_sigma_px": SMOOTH_SIGMA_PX if preprocess != "none" else None,
+            "background_mode_subtract": BACKGROUND_MODE_SUBTRACT if "tophat" in preprocess else None,
             "pixel_size_um": config.PIXEL_SIZE_UM,
             "lacuna_segmentation": "segment_lacunae_v2 (multi-Otsu 3-class + watershed; see that module)",
             "total_signal_threshold_t_lo": t_lo,
@@ -1229,23 +1338,36 @@ def process(
     preprocess: str | None = None,
     count_mode: str | None = None,
     exclusion: str | None = None,
+    threshold_mode: str | None = None,
+    gap_bridging: bool | None = None,
 ) -> dict:
     method = method or ASSIGNMENT_METHOD
     preprocess = preprocess or PREPROCESS_MODE
     count_mode = count_mode or COUNT_MODE
     exclusion = exclusion or EXCLUSION_MODE
+    threshold_mode = threshold_mode or THRESHOLD_MODE
+    gap_bridging = GAP_BRIDGING if gap_bridging is None else gap_bridging
 
     display, channel = load_channel(image_path)
     _display2, labels, kept, t_hi = seg2.segment_image(image_path)
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(labels, kept)
-    candidate, t_lo = canaliculi_candidate_mask(channel, lacuna_mask, preprocess)
+    candidate, t_lo = canaliculi_candidate_mask(channel, lacuna_mask, preprocess, threshold_mode)
     # Non-LCN structures are dropped from the candidate mask BEFORE
     # skeletonizing, so nothing downstream ever sees them as network.
     excluded, exclusion_info = exclusion_mask.build_exclusion(image_path, channel, labels, exclusion)
     if excluded.any():
         candidate = candidate & ~excluded
     skeleton = morphology.skeletonize(candidate)
+
+    bridges: list = []
+    if gap_bridging:
+        preprocessed = preprocess_channel(channel, preprocess)
+        forbidden = lacuna_mask | excluded
+        bridges = gap_bridging_mod.find_bridges(skeleton, preprocessed, t_lo, forbidden)
+        if bridges:
+            candidate = gap_bridging_mod.apply_bridges(candidate, bridges)
+            skeleton = morphology.skeletonize(candidate)
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
 
     graph = edge_owner = None
@@ -1272,6 +1394,13 @@ def process(
             display, excluded, exclusion_mask.protected_region(labels),
             out_dir / f"exclusion{output_suffix}.png",
         )
+    if gap_bridging:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        imsave(
+            out_dir / f"bridges{output_suffix}.png",
+            gap_bridging_mod.bridge_overlay(display, skeleton, bridges),
+            check_contrast=False,
+        )
     colors = lacuna_colors(len(kept))
     all_ids = list(range(1, len(kept) + 1))
     save_verification(
@@ -1283,7 +1412,8 @@ def process(
     )
     save_json(
         image_path, measurements, stats, t_lo, t_hi, method, preprocess, count_mode,
-        exclusion_info, out_dir / f"measurements{output_suffix}.json",
+        exclusion_info, threshold_mode, gap_bridging, bridges,
+        out_dir / f"measurements{output_suffix}.json",
     )
 
     mean_count = stats["canaliculi_count"]["mean"]
@@ -1293,6 +1423,10 @@ def process(
     mode_tag = count_mode if method == "graph" else "path"
     if exclusion != "none":
         mode_tag += f"/excl-{exclusion}"
+    if threshold_mode != "multiotsu_low":
+        mode_tag += f"/{threshold_mode}"
+    if gap_bridging:
+        mode_tag += f"/bridged({len(bridges)})"
     print(
         f"{image_path.name} [{method}/{preprocess}/{mode_tag}]: lacunae={len(kept)}  "
         f"mean_canaliculi_per_cell={mean_count_s}  mean_canaliculus_length_px={mean_length_s}  -> {out_dir}"
@@ -1317,7 +1451,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--preprocess",
-        choices=["tophat", "none"],
+        choices=["tophat", "ridge", "tophat+ridge", "none"],
         default=None,
         help="Override PREPROCESS_MODE for this run; suffixes output filenames with _pre-<mode> "
         "so a comparison run never overwrites the default outputs.",
@@ -1338,6 +1472,19 @@ def main() -> None:
         "so a comparison run never overwrites the default outputs.",
     )
     parser.add_argument(
+        "--threshold-mode",
+        choices=["multiotsu_low", "hysteresis"],
+        default=None,
+        help="Override THRESHOLD_MODE for this run; suffixes output filenames with _thr-<mode>.",
+    )
+    parser.add_argument(
+        "--gap-bridging",
+        action="store_true",
+        default=None,
+        help="Enable evidence-based gap bridging for this run (GAP_BRIDGING override); "
+        "suffixes output filenames with _bridged.",
+    )
+    parser.add_argument(
         "--no-sanity",
         action="store_true",
         help="Skip the pooled edge-length / node-degree sanity report printed after the run.",
@@ -1353,6 +1500,10 @@ def main() -> None:
         suffix += f"_count-{args.count_mode}"
     if args.exclusion:
         suffix += f"_excl-{args.exclusion}"
+    if args.threshold_mode:
+        suffix += f"_thr-{args.threshold_mode}"
+    if args.gap_bridging:
+        suffix += "_bridged"
 
     if args.image:
         if not args.image.is_file():
@@ -1371,6 +1522,8 @@ def main() -> None:
             preprocess=args.preprocess,
             count_mode=args.count_mode,
             exclusion=args.exclusion,
+            threshold_mode=args.threshold_mode,
+            gap_bridging=args.gap_bridging,
         )
         for image_path in paths
     ]

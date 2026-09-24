@@ -1,0 +1,86 @@
+================================================================================================================
+PHASE 2 COMPARISON -- v1-raw / pre-validation, PIXEL units. Read-only, no default changed.
+GUARDS (fixed before running): G1 length > 1.2x default;  G2 loops > max(1.5x default, default+50)
+================================================================================================================
+  542 WT  2_z06c1-2.tif      8 settings in 107.9s
+  542 WT  2_z18c1-2.tif      8 settings in  80.8s
+  543-2.tif                  8 settings in  32.6s
+  543_3.tif                  8 settings in  34.6s
+  543_z13c1-2.tif            8 settings in  32.1s
+  682_z08c1-2.tif            8 settings in  50.0s
+  682_z23c-2.tif             8 settings in  65.0s
+  682_z29c1-3.tif            8 settings in  64.2s
+
+================================================================================================================
+GUARD METRICS
+================================================================================================================
+
+-- TUNING set (n=3 images)
+setting           skel_px  vs def   loops   vs def  comp/10k  deg1_f  owned_f bridges  guards
+default             35286   1.00x      13    1.00x     225.3   0.825    0.244       0  ok
+hysteresis          45893   1.30x      83    6.53x     102.2   0.664    0.581       0  G1-LENGTH  G2-LOOPS
+hyst-0.75           39858   1.13x      27    2.11x     174.0   0.767    0.337       0  ok
+ridge               42142   1.19x     107    8.42x      64.2   0.592    0.773       0  G2-LOOPS
+ridge+hyst          55544   1.57x     504   39.79x      11.2   0.398    0.976       0  G1-LENGTH  G2-LOOPS
+default+bridge      35826   1.02x      13    1.03x     188.0   0.798    0.291     122  ok
+ridge+bridge        42570   1.21x     113    8.92x      46.3   0.560    0.837      79  G1-LENGTH  G2-LOOPS
+hyst0.75+bridge     39927   1.13x      27    2.13x     169.1   0.763    0.343      18  ok
+
+-- HELD-OUT set (n=5 images)
+setting           skel_px  vs def   loops   vs def  comp/10k  deg1_f  owned_f bridges  guards
+default             35514   1.00x      15    1.00x     235.1   0.820    0.224       0  ok
+hysteresis          46677   1.31x      90    5.93x     104.0   0.660    0.547       0  G1-LENGTH  G2-LOOPS
+hyst-0.75           40232   1.13x      33    2.17x     179.9   0.762    0.329       0  ok
+ridge               42091   1.19x     110    7.26x      63.8   0.589    0.792       0  G2-LOOPS
+ridge+hyst          56614   1.59x     551   36.28x       9.8   0.384    0.972       0  G1-LENGTH  G2-LOOPS
+default+bridge      36072   1.02x      16    1.08x     195.1   0.793    0.261     131  ok
+ridge+bridge        42529   1.20x     118    7.75x      45.7   0.556    0.854      80  G2-LOOPS
+hyst0.75+bridge     40295   1.13x      33    2.17x     174.7   0.759    0.337      19  ok
+
+================================================================================================================
+STRAIGHT-LINE FUSION GUARD (images with a Phase 1 flagged structure)
+================================================================================================================
+image                  setting        longest comp  longest in flagged  longest straight
+542 WT  2_z06c1-2      default                 708                  97              64.2
+542 WT  2_z06c1-2      hysteresis             3147                 105              63.3
+542 WT  2_z06c1-2      hyst-0.75              1528                  99              64.2
+542 WT  2_z06c1-2      ridge                 12890                 131              84.2
+542 WT  2_z06c1-2      ridge+hyst            36051                 217              84.2
+542 WT  2_z06c1-2      default+bridge           919                  97              64.2
+542 WT  2_z06c1-2      ridge+bridge          14397                 131              84.2
+542 WT  2_z06c1-2      hyst0.75+bridge          1923                  99              64.2
+542 WT  2_z18c1-2      default                 479                 163              92.8
+542 WT  2_z18c1-2      hysteresis             1690                 368             183.4
+542 WT  2_z18c1-2      hyst-0.75               995                 175              96.5
+542 WT  2_z18c1-2      ridge                  5110                 414             195.5
+542 WT  2_z18c1-2      ridge+hyst            46169                1580             347.3
+542 WT  2_z18c1-2      default+bridge           942                 173             103.1
+542 WT  2_z18c1-2      ridge+bridge          11782                 427             195.5
+542 WT  2_z18c1-2      hyst0.75+bridge           995                 175              96.5
+682_z08c1-2            default                2122                 344             112.1
+682_z08c1-2            hysteresis             7254                 823             162.9
+682_z08c1-2            hyst-0.75              4506                 418             112.0
+682_z08c1-2            ridge                 14788                 726             160.9
+682_z08c1-2            ridge+hyst            49463                1573             283.2
+682_z08c1-2            default+bridge          2479                 381             112.1
+682_z08c1-2            ridge+bridge          16879                 726             160.9
+682_z08c1-2            hyst0.75+bridge          4588                 418             112.0
+682_z23c-2             default                1213                 298             103.6
+682_z23c-2             hysteresis             9003                 418             126.3
+682_z23c-2             hyst-0.75              1893                 379             126.3
+682_z23c-2             ridge                 18167                 780             161.9
+682_z23c-2             ridge+hyst            55831                1508             214.4
+682_z23c-2             default+bridge          1378                 298             113.7
+682_z23c-2             ridge+bridge          21551                 780             161.9
+682_z23c-2             hyst0.75+bridge          2256                 379             126.3
+682_z29c1-3            default                1801                1164             237.1
+682_z29c1-3            hysteresis            11761                1787             237.9
+682_z29c1-3            hyst-0.75              3499                1386             238.1
+682_z29c1-3            ridge                 12996                1898             236.4
+682_z29c1-3            ridge+hyst            53236                2268             302.3
+682_z29c1-3            default+bridge          3129                1284             237.1
+682_z29c1-3            ridge+bridge          15169                1898             236.4
+682_z29c1-3            hyst0.75+bridge          3533                1386             238.1
+
+total elapsed 467s
+crops written under F:\lcn-quant\results\diagnostics\phase2

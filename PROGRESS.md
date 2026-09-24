@@ -1,6 +1,6 @@
 # Progress status
 
-_Last updated: 2026-09-22. Everything below is v1-raw/v2-raw and pre-validation
+_Last updated: 2026-09-24 (overnight autonomous run). Everything below is v1-raw/v2-raw and pre-validation
 against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
 
 ## Features that exist
@@ -353,7 +353,32 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    removing v1 requires a small refactor first (move that loader to a
    shared module).
 
-## Planned next (Phase 2 onward)
+## Overnight autonomous run, 2026-09-24
+
+Branch `canaliculi-v2-fixes`. **No default switch value was changed.** The
+543-2 default check (37.00 canaliculi/cell, 29.43 px mean edge length) was
+re-run after every phase and held throughout.
+
+### Phase 2 (done, 2026-09-24 ~16:15) — fragmentation settings
+New NON-DEFAULT switches in `canaliculi_v1.py`: `PREPROCESS_MODE` gains
+`"ridge"` and `"tophat+ridge"` (`RIDGE_FILTER="sato"`,
+`RIDGE_SIGMAS_PX=(1,2,3,4)` spanning the measured canalicular half-width
+range); `THRESHOLD_MODE` = `"multiotsu_low"` (default) or `"hysteresis"`
+(`HYSTERESIS_LOW_FRACTION`, both cuts derived per image from its own
+histogram); `GAP_BRIDGING` (default False) implemented in the new
+`src/gap_bridging.py`, with all three limits taken from the Phase 0(c)
+distributions.
+
+Eight settings x 8 images. Guards G1 (length > 1.20x) and G2 (loops >
+max(1.5x, +50)) were fixed in writing before running — see
+DECISIONS_NEEDED.md D0. **Five settings failed a guard, three passed.** The
+guards mattered: `ridge+hyst` scores best on every secondary readout
+(owned fraction 0.976, 11.2 components per 10k) while fusing the field into
+single objects (loops 13 to 504; longest component 708 to 36,051 px in
+542_z06). Recommendation and full table in DECISIONS_NEEDED.md D1; nothing
+applied.
+
+## Planned next (Phase 3 onward)
 
 - **Phase 2 must be judged on the guard metrics, not on owned fraction.**
   Phase 0(c) found that the angle between a thread's local direction and
