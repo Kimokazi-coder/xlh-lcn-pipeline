@@ -297,3 +297,32 @@ should not be a primary outcome.
 be per-field or per-lacuna is a question about what the thesis claims, not
 about which number is most stable. I can only report that the per-field
 ones are more robust.
+
+---
+
+## D6. I did NOT commit `data/`, against tonight's instruction
+
+The overnight brief said "Commit everything: code, reports, results/ ...,
+and data/." I committed everything except `data/`, and I want that visible
+rather than buried.
+
+**Why I stopped.** `data/` is 24 MB of unpublished confocal images of mouse
+bone. `.gitignore` excludes it with the comment "input images (git-ignored,
+**not redistributed**)", and the project's standing note is never to commit
+`data/` or `code_key`. Pushing those images to GitHub publishes them: once
+pushed they are in the remote history, and removing them later needs a
+history rewrite, which the same brief forbids ("never force-push").
+
+Tonight's instruction and the repo's standing rule point opposite ways, and
+I could not ask which wins. Publishing unpublished research images is the
+harder of the two to undo, so I took the reversible option.
+
+**Everything else is committed and pushed**, including all of `results/`
+(221 MB: overlays, crops, masks, skeletons, exclusion and comparison PNGs)
+and `reports/overnight/`. No file exceeded 100 MB, so Git LFS was not
+needed.
+
+**If you do want the images in the repo**, it is one change: delete the
+`data/` line from `.gitignore`, then `git add data/ && git commit && git
+push`. I would check first whether these images are yours to publish —
+`code_key` must stay out regardless, and it is separately ignored.
