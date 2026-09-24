@@ -78,7 +78,9 @@ Border lacunae (on_border=True, from v2) are kept in the per-lacuna table
 and drawn in the verification image, but excluded from the per-image
 summary stats -- their canaliculi are truncated by the field of view.
 
-Outputs, per image, under results/canaliculi/<image_stem_with_underscores>/:
+Outputs, per image, under results/canaliculi/<image_stem_with_underscores>/.
+A DEFAULT run (no CLI overrides) writes these five files, unsuffixed, at
+the top level of that folder:
     verification.png   original image at near-full brightness; every lacuna
                         and its owned canaliculi drawn in one unique,
                         randomly (but reproducibly) assigned color, so the
@@ -88,16 +90,38 @@ Outputs, per image, under results/canaliculi/<image_stem_with_underscores>/:
                         its connected threads and stop at network branch
                         points, not cut the field into straight-edged
                         blocks.
+    canaliculi_mask.png the raw binary network mask, unannotated -- what
+                         the per-cell tracing is actually built on
+    skeleton.png        that mask's 1px-wide skeleton, unannotated
     measurements.xlsx   "summary" sheet (interior-only mean/median/SD of
-                         canaliculi_count and mean_canaliculus_length_px)
-                         + "per_lacuna" sheet (one row per lacuna, incl.
-                         border ones, flagged on_border)
+                         canaliculi_count, total_length_px and
+                         mean_canaliculus_length_px) + "per_lacuna" sheet
+                         (one row per lacuna, incl. border ones, flagged
+                         on_border)
     measurements.json   same data + the parameters used for this run
 
-When --method is passed on the CLI (overriding ASSIGNMENT_METHOD for that
-run only, e.g. for a before/after comparison), all three output filenames
-are suffixed with "_<method>" so they never overwrite the default-method
-outputs.
+A COMPARISON run -- any run passing --method, --preprocess or
+--count-mode to override a default for that run only -- suffixes every
+filename with the overrides used ("_<method>", "_pre-<mode>",
+"_count-<mode>", concatenated if several) AND writes the whole set into
+the all_method_results/ subfolder of the same image folder:
+
+    results/canaliculi/<image>/
+        verification.png              <- default run
+        canaliculi_mask.png
+        skeleton.png
+        measurements.xlsx
+        measurements.json
+        all_method_results/           <- every comparison run
+            verification_euclidean.png
+            measurements_pre-none.json
+            skeleton_count-path.png
+            ...
+
+So a comparison run can never overwrite the default outputs, and the
+current default result stays visible at the top of the folder instead of
+being buried among a dozen variants. Existing results were moved into
+this layout by src/tidy_canaliculi_results.py.
 
 Usage:
     python src/canaliculi_v1.py --dir data/WT
@@ -269,6 +293,13 @@ COLOR_SATURATION = 0.9
 COLOR_VALUE = 1.0
 
 CANALICULI_DIR = config.RESULTS_DIR / "canaliculi"
+
+# Subfolder of an image's output folder that comparison runs (any run with
+# a non-empty output suffix, i.e. one overriding a default via --method,
+# --preprocess or --count-mode) write into, so the default run's outputs
+# stay alone at the top level. Layout only -- affects no measurement.
+# src/tidy_canaliculi_results.py uses the same name for existing results.
+COMPARISON_SUBDIR = "all_method_results"
 
 
 # --- Canalicular network segmentation -----------------------------------
@@ -840,9 +871,14 @@ def summarize_interior(measurements: list[dict], precision: int) -> dict:
 
 # --- Output ---------------------------------------------------------------
 
-def image_output_dir(image_path: Path) -> Path:
+def image_output_dir(image_path: Path, output_suffix: str = "") -> Path:
+    """Where this run's files go. A default run (empty suffix) writes to
+    the image's own folder; a comparison run (any CLI override, so a
+    non-empty suffix) writes one level down in COMPARISON_SUBDIR, keeping
+    the default outputs alone at the top level."""
     safe_stem = image_path.stem.replace(" ", "_")
-    return CANALICULI_DIR / safe_stem
+    image_dir = CANALICULI_DIR / safe_stem
+    return image_dir / COMPARISON_SUBDIR if output_suffix else image_dir
 
 
 def lacuna_colors(n_lacunae: int) -> dict[int, tuple[int, int, int]]:
@@ -1203,7 +1239,7 @@ def process(
 
     stats = summarize_interior(measurements, precision=config.CSV_FLOAT_PRECISION)
 
-    out_dir = image_output_dir(image_path)
+    out_dir = image_output_dir(image_path, output_suffix)
     if SAVE_MASK_PNG:
         save_mask_pngs(candidate, skeleton, out_dir, output_suffix)
     colors = lacuna_colors(len(kept))
