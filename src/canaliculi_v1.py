@@ -12,7 +12,7 @@ available so old and new can be compared on the same image; any
 non-default run writes to all_method_results/ with a suffix naming the
 setting, so it can never overwrite a default output.
 
-    LACUNA_SOURCE      *"v2" | "v3_candidate"
+    LACUNA_SOURCE      *"v2" | "v3_candidate" | "hybrid"
                        which lacuna detector feeds this module
     PREPROCESS_MODE    *"tophat" | "ridge" | "tophat+ridge" | "none"
                        how the channel is flattened before thresholding
@@ -253,6 +253,11 @@ EXCLUSION_MODE = "none"
 #                  of a 3-class multi-Otsu cut. Accepted and unchanged.
 #   "v3_candidate" segment_lacunae_v3_candidate: breadth, a large
 #                  morphological opening of the raw channel. NOT default.
+#   "hybrid"       segment_lacunae_hybrid: every v2 lacuna, plus a v3-only
+#                  object only if it is bright enough relative to this
+#                  image's own lacunae, is not on a flagged structure, and
+#                  has >= MIN_ROOTS canaliculi radiating from it. NOT
+#                  default. Adds 2 objects across the 8 WT images.
 # v3 finds every v2 object on 7 of 8 WT images and adds 5-29 more per
 # image. Whether those extras are real lacunae -- many are partly outside
 # the focal plane -- is a scientific decision, not a coding one, so they
@@ -1629,9 +1634,14 @@ def process(
         import segment_lacunae_v3_candidate as seg3
 
         _display2, labels, kept, t_hi = seg3.segment_image(image_path)
+    elif lacuna_source == "hybrid":
+        import segment_lacunae_hybrid as seghy
+
+        _display2, labels, kept, t_hi = seghy.segment_image(image_path)
     else:
         raise ValueError(
-            f"Unknown lacuna source: {lacuna_source!r} (expected 'v2' or 'v3_candidate')"
+            f"Unknown lacuna source: {lacuna_source!r} "
+            "(expected 'v2', 'v3_candidate' or 'hybrid')"
         )
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(labels, kept)
@@ -1804,7 +1814,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--lacuna-source",
-        choices=["v2", "v3_candidate"],
+        choices=["v2", "v3_candidate", "hybrid"],
         default=None,
         help="Override LACUNA_SOURCE for this run; suffixes output filenames with _lac-<source>.",
     )

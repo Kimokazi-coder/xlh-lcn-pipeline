@@ -1,0 +1,19 @@
+HYBRID LACUNA DETECTION -- candidate, NOT default. v-raw, pre-validation, PIXEL units.
+Gates: (a) relative intensity >= 0.75 x this image's median v2 lacuna
+       (b) no overlap with a Phase 1 flagged structure
+       (c) >= 4 canalicular roots attached (pooled p10 of v2-kept interior lacunae)
+
+image                    v2  hybrid  added  cand  fail a  fail b  fail c
+542 WT  2_z06c1-2        16      18      2     5       3       2       0
+      + ADDED (230,303) area=1241 rel_I=0.783 roots=5 border=False
+      + ADDED (224,351) area=591 rel_I=0.783 roots=6 border=False
+542 WT  2_z18c1-2        12      12      0     8       8       2       1
+543-2                    12      12      0    16      16       0       5
+543_3                    10      10      0    29      29       0       6
+543_z13c1-2              11      11      0     8       8       0       0
+682_z08c1-2              10      10      0    18      18       3       8
+682_z23c-2               14      14      0    26      26       2       5
+682_z29c1-3              13      13      0    12      12       5       3
+
+total added across the run: 2
+overlays and crops under F:\lcn-quant\results\candidates\lacunae_hybrid
