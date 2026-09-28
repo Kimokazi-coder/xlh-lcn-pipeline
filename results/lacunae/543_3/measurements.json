@@ -1,0 +1,200 @@
+{
+  "status": "v2-raw",
+  "note": "Not yet size/shape-filtered or validated against ground truth. Still includes small mesh specks and some elongated/fused objects. Border objects are kept (on_border=true), not dropped. Summary stats below are over interior (on_border=false) lacunae only.",
+  "image": "F:\\lcn-quant\\data\\WT\\543_3.tif",
+  "units": "px",
+  "lacuna_count": 10,
+  "border_count": 1,
+  "interior_count": 9,
+  "summary": {
+    "interior_lacuna_count": 9,
+    "units": "px",
+    "area": {
+      "mean": 2187.2222,
+      "median": 2174.0,
+      "sd": 598.7996
+    },
+    "major_axis_length": {
+      "mean": 82.3704,
+      "median": 87.6934,
+      "sd": 10.0353
+    },
+    "minor_axis_length": {
+      "mean": 36.7931,
+      "median": 35.2412,
+      "sd": 11.1805
+    },
+    "aspect_ratio": {
+      "mean": 2.387,
+      "median": 2.2947,
+      "sd": 0.6949
+    },
+    "eccentricity": {
+      "mean": 0.8811,
+      "median": 0.9,
+      "sd": 0.0775
+    },
+    "solidity": {
+      "mean": 0.8856,
+      "median": 0.9295,
+      "sd": 0.0959
+    }
+  },
+  "parameters": {
+    "channel": 0,
+    "channel_axis": -1,
+    "invert_signal": false,
+    "pixel_size_um": null,
+    "threshold_method": "multiotsu_3class_top",
+    "computed_threshold_t_hi": 0.5798483455882353,
+    "seed_prominence_fraction": 0.3,
+    "despeckle_opening_radius_px": 1,
+    "min_area_px2": 400,
+    "max_area_fraction_of_image": 0.05,
+    "min_solidity": 0.5,
+    "aspect_ratio_max": 6.0,
+    "exclude_border_objects": false
+  },
+  "lacunae": [
+    {
+      "lacuna_id": 1,
+      "area": 2174.0,
+      "major_axis_length": 80.8669,
+      "minor_axis_length": 35.2412,
+      "aspect_ratio": 2.2947,
+      "eccentricity": 0.9,
+      "solidity": 0.9518,
+      "orientation": 0.4109,
+      "centroid_row": 79.3965,
+      "centroid_col": 270.8979,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 2,
+      "area": 3447.0,
+      "major_axis_length": 90.3677,
+      "minor_axis_length": 63.9486,
+      "aspect_ratio": 1.4131,
+      "eccentricity": 0.7066,
+      "solidity": 0.674,
+      "orientation": 0.4223,
+      "centroid_row": 197.0592,
+      "centroid_col": 916.9017,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 3,
+      "area": 1883.0,
+      "major_axis_length": 69.2617,
+      "minor_axis_length": 34.8694,
+      "aspect_ratio": 1.9863,
+      "eccentricity": 0.864,
+      "solidity": 0.9448,
+      "orientation": 0.5742,
+      "centroid_row": 250.8327,
+      "centroid_col": 340.47,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 4,
+      "area": 2052.0,
+      "major_axis_length": 69.2015,
+      "minor_axis_length": 39.4228,
+      "aspect_ratio": 1.7554,
+      "eccentricity": 0.8219,
+      "solidity": 0.9112,
+      "orientation": 0.0622,
+      "centroid_row": 388.6706,
+      "centroid_col": 369.9386,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 5,
+      "area": 2266.0,
+      "major_axis_length": 88.1613,
+      "minor_axis_length": 35.5691,
+      "aspect_ratio": 2.4786,
+      "eccentricity": 0.915,
+      "solidity": 0.9021,
+      "orientation": 0.1324,
+      "centroid_row": 473.0499,
+      "centroid_col": 745.1911,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 6,
+      "area": 1344.0,
+      "major_axis_length": 87.6934,
+      "minor_axis_length": 23.0299,
+      "aspect_ratio": 3.8078,
+      "eccentricity": 0.9649,
+      "solidity": 0.7764,
+      "orientation": 0.2206,
+      "centroid_row": 545.1897,
+      "centroid_col": 876.8661,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 7,
+      "area": 1683.0,
+      "major_axis_length": 71.0123,
+      "minor_axis_length": 31.3735,
+      "aspect_ratio": 2.2634,
+      "eccentricity": 0.8971,
+      "solidity": 0.9355,
+      "orientation": -0.0518,
+      "centroid_row": 634.6803,
+      "centroid_col": 198.3155,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 8,
+      "area": 2203.0,
+      "major_axis_length": 91.2092,
+      "minor_axis_length": 31.4053,
+      "aspect_ratio": 2.9043,
+      "eccentricity": 0.9389,
+      "solidity": 0.9295,
+      "orientation": 0.0832,
+      "centroid_row": 734.3014,
+      "centroid_col": 635.4403,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 9,
+      "area": 2633.0,
+      "major_axis_length": 93.5592,
+      "minor_axis_length": 36.2778,
+      "aspect_ratio": 2.579,
+      "eccentricity": 0.9218,
+      "solidity": 0.9454,
+      "orientation": 0.0457,
+      "centroid_row": 780.5761,
+      "centroid_col": 481.4953,
+      "on_border": false,
+      "units": "px"
+    },
+    {
+      "lacuna_id": 10,
+      "area": 531.0,
+      "major_axis_length": 28.7881,
+      "minor_axis_length": 24.8252,
+      "aspect_ratio": 1.1596,
+      "eccentricity": 0.5063,
+      "solidity": 0.9332,
+      "orientation": 0.5942,
+      "centroid_row": 1012.2844,
+      "centroid_col": 184.8343,
+      "on_border": true,
+      "units": "px"
+    }
+  ]
+}

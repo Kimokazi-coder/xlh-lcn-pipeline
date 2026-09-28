@@ -8,18 +8,22 @@
 # Exception: results/count/ (v2 outputs) is deliberately committed for now,
 # while v2 is under active review -- see git log.
 results/*
-!results/count/
-!results/count/**
+# Committed output subtrees. `results/*` above ignores everything, so EVERY
+# new top-level folder under results/ needs an exception added here or its
+# contents are silently left out of commits -- which is exactly what
+# happened to results/lacunae/ and results/candidates/ when the 2026-09-28
+# reorganization renamed results/count/ and results/count_v3_candidate/.
+# If you add a folder under results/, add it here too.
 !results/canaliculi/
 !results/canaliculi/**
+!results/lacunae/
+!results/lacunae/**
+!results/candidates/
+!results/candidates/**
 # Phase 0 diagnostics: the evidence the later phases are argued from,
 # so it is kept with the code that produced it.
 !results/diagnostics/
 !results/diagnostics/**
-# v3-candidate lacuna comparison overlays, referenced from
-# reports/overnight/SUMMARY.md.
-!results/count_v3_candidate/
-!results/count_v3_candidate/**
 
 # --- Blinding key ----------------------------------------------------------
 # Maps coded specimen IDs to experimental groups. Committing this would
