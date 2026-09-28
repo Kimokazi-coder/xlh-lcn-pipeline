@@ -300,7 +300,7 @@ ones are more robust.
 
 ---
 
-## D6. I did NOT commit `data/`, against tonight's instruction
+## D6. `data/` — RESOLVED 2026-09-28, now committed
 
 The overnight brief said "Commit everything: code, reports, results/ ...,
 and data/." I committed everything except `data/`, and I want that visible
@@ -322,7 +322,13 @@ harder of the two to undo, so I took the reversible option.
 and `reports/overnight/`. No file exceeded 100 MB, so Git LFS was not
 needed.
 
-**If you do want the images in the repo**, it is one change: delete the
-`data/` line from `.gitignore`, then `git add data/ && git commit && git
-push`. I would check first whether these images are yours to publish —
-`code_key` must stay out regardless, and it is separately ignored.
+**RESOLUTION (2026-09-28).** You reaffirmed the instruction, so the 8 WT
+`.tif` files are now tracked and pushed (commit `9cd6dcb`). Checked before
+committing: no `code_key` anywhere under `data/`, and the largest file is
+3.0 MB, so no Git LFS was needed. The `code_key` exclusion rules are
+untouched and still cover any future key file, including one placed under
+`data/`. The repo is now self-contained — every result in `results/` can be
+regenerated from the repo alone.
+
+Nothing here needs further action; kept for the record of why it took two
+passes.

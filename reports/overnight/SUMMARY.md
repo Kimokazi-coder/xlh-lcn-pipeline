@@ -17,12 +17,12 @@ images), Phase 3 (solidity investigation + v3 candidate detector), Phase 4
 (README + module docstrings), and a separate README correction commit
 first, as asked.
 
-**Not done, deliberately:** `data/` was not committed — see
-DECISIONS_NEEDED.md **D6**. It is 24 MB of unpublished confocal images that
-`.gitignore` marks "not redistributed", and pushing them is hard to undo
-while force-pushing was forbidden. Everything else is pushed, including all
-221 MB of `results/`. No file exceeded 100 MB, so Git LFS was not needed.
-No push failed.
+**Everything is pushed**, including all 221 MB of `results/` and, since
+2026-09-28, `data/` as well. `data/` was held back on the night itself and
+logged as DECISIONS_NEEDED.md **D6**; the instruction was reaffirmed and
+the 8 WT `.tif` files are now tracked (commit `9cd6dcb`), so the repo is
+self-contained. No file exceeded 100 MB, so Git LFS was not needed. No push
+failed.
 
 **Two bugs found and fixed rather than shipped:**
 - Phase 3's v2↔v3 matching scored overlap against the v3 object, which
