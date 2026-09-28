@@ -44,7 +44,7 @@ CHECK_POINT_542_Z06 = (555, 140)
 
 TUNING_IMAGE_STEMS = ("542 WT  2_z06c1-2", "543-2", "682_z29c1-3")
 
-REPORT_DIR = config.RESULTS_DIR / "diagnostics" / "canaliculi_v2"
+REPORT_DIR = config.DIAGNOSTICS_DIR / "phase1"
 
 
 def main() -> None:

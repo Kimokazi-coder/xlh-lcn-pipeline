@@ -50,7 +50,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
 
-CANALICULI_DIR = config.RESULTS_DIR / "canaliculi"
+CANALICULI_DIR = config.CANALICULI_DIR
 
 # Subfolder that non-default (suffixed) outputs are moved into. Must match
 # canaliculi_v1.COMPARISON_SUBDIR, which is where new comparison runs write.

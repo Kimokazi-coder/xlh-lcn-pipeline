@@ -4,7 +4,7 @@ STATUS: v1-raw / pre-validation. This module measures the CURRENT default
 canaliculi pipeline (canaliculi_v1 with ASSIGNMENT_METHOD="graph",
 PREPROCESS_MODE="tophat", COUNT_MODE="edge") and reports evidence. It
 imports canaliculi_v1 and segment_lacunae_v2 and calls their functions
-unmodified; it writes only into results/diagnostics/canaliculi_v2/.
+unmodified; it writes only into results/diagnostics/phase0/.
 Everything is in PIXEL units (config.PIXEL_SIZE_UM is None).
 
 What it answers, section by section:
@@ -174,7 +174,7 @@ KNOWN_POINTS_542_Z06 = {
 # column band. Used only to check whether (d)'s flagging catches it.
 KNOWN_LINEAR_STRUCTURE_542_Z06 = {"col_min": 530, "col_max": 580}
 
-DIAG_DIR = config.RESULTS_DIR / "diagnostics" / "canaliculi_v2"
+DIAG_DIR = config.DIAGNOSTICS_DIR / "phase0"
 
 NEIGHBOUR_OFFSETS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
@@ -782,7 +782,7 @@ def split_sets(states: list[dict]) -> tuple[list[dict], list[dict]]:
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Phase 0 read-only diagnostics for the canaliculi pipeline. Writes nothing outside "
-        "results/diagnostics/canaliculi_v2/ and changes no pipeline behaviour."
+        "results/diagnostics/phase0/ and changes no pipeline behaviour."
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--image", type=Path, help="Path to a single .tif image.")

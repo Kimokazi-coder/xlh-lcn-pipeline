@@ -90,7 +90,7 @@ FILL_HOLES_BELOW_PX2 = 20
 # lacuna.
 MATCH_OVERLAP_MIN = 0.5
 
-V3_DIR = config.RESULTS_DIR / "count_v3_candidate"
+V3_DIR = config.CANDIDATES_DIR / "lacunae_v3"
 
 
 def broad_lacuna_mask(channel: np.ndarray) -> tuple[np.ndarray, float]:

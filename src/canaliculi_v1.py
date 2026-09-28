@@ -245,7 +245,7 @@ ROOT_MERGE_DIST_PX = 8.0
 # the flagged structures do NOT measurably inflate the canaliculi mask
 # inside themselves (density ratios 0.80-1.46, two of five below 1), so
 # switching this on would remove mask pixels at roughly the field's own
-# density -- i.e. mostly real canaliculi. See PROGRESS.md.
+# density -- i.e. mostly real canaliculi. See docs/PROGRESS.md.
 EXCLUSION_MODE = "none"
 
 # Which lacuna detector feeds the canaliculi step.
@@ -256,7 +256,7 @@ EXCLUSION_MODE = "none"
 # v3 finds every v2 object on 7 of 8 WT images and adds 5-29 more per
 # image. Whether those extras are real lacunae -- many are partly outside
 # the focal plane -- is a scientific decision, not a coding one, so they
-# are listed in DECISIONS_NEEDED.md for review rather than adopted.
+# are listed in docs/DECISIONS_NEEDED.md for review rather than adopted.
 LACUNA_SOURCE = "v2"
 
 # --- Canalicular-mask preprocessing (OCY-style; see module docstring) ---
@@ -309,7 +309,7 @@ RIDGE_SIGMAS_PX = (1.0, 2.0, 3.0, 4.0)
 # 1.13x total skeleton length against a 1.20x limit, 2.13x loops against a
 # max(1.5x, +50) limit -- while cutting components per 10,000 skeleton px
 # from 225 to 169 and raising owned length fraction from 0.244 to 0.343.
-# Five of the eight settings failed a guard; see DECISIONS_NEEDED.md D1.
+# Five of the eight settings failed a guard; see docs/DECISIONS_NEEDED.md D1.
 THRESHOLD_MODE = "hysteresis"
 
 # For "hysteresis": the high cut is the image's own multi-Otsu low cut (the
@@ -466,7 +466,7 @@ VIS_DIM_FACTOR = 1.0
 COLOR_SATURATION = 0.9
 COLOR_VALUE = 1.0
 
-CANALICULI_DIR = config.RESULTS_DIR / "canaliculi"
+CANALICULI_DIR = config.CANALICULI_DIR
 
 # Subfolder of an image's output folder that comparison runs (any run with
 # a non-empty output suffix, i.e. one overriding a default via --method,

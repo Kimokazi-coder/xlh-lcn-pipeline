@@ -25,8 +25,36 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # Input images. Kept out of version control (see .gitignore).
 DATA_DIR = PROJECT_ROOT / "data"
 
-# All generated output: masks, overlays, per-image CSVs, summary tables, plots.
+# All generated output: masks, overlays, per-image tables, figures.
 RESULTS_DIR = PROJECT_ROOT / "results"
+
+# Output layout, one constant per destination so no script hard-codes a
+# path. The organising principle is that what the CURRENT DEFAULT pipeline
+# produces sits at the top of its folder, and everything else -- comparison
+# runs, experimental detectors, diagnostics -- sits one level down, grouped
+# by what it is. src/reorganize_outputs.py moved the tree into this shape
+# on 2026-09-28 and is idempotent if it ever needs re-running.
+#
+#   canaliculi/<image>/   per-image canalicular outputs (default at top,
+#                         non-default runs in all_method_results/)
+#   lacunae/<image>/      per-image lacuna outputs from the current default
+#                         detector (segment_lacunae_v2). Was results/count/.
+#   candidates/           detectors NOT in use by default, e.g.
+#                         candidates/lacunae_v3/
+#   diagnostics/          read-only measurement output, grouped by the
+#                         phase or round that produced it
+CANALICULI_DIR = RESULTS_DIR / "canaliculi"
+LACUNAE_DIR = RESULTS_DIR / "lacunae"
+CANDIDATES_DIR = RESULTS_DIR / "candidates"
+DIAGNOSTICS_DIR = RESULTS_DIR / "diagnostics"
+
+# Text reports, one folder per run (reports/phase0_1/, reports/overnight/,
+# reports/round2/ ...). Figures belong under RESULTS_DIR, not here.
+REPORTS_DIR = PROJECT_ROOT / "reports"
+
+# Planning notes and the running record: PROGRESS.md, DECISIONS_NEEDED.md.
+# README.md stays in the repository root.
+DOCS_DIR = PROJECT_ROOT / "docs"
 
 # File extensions treated as input images. Matching is case-insensitive.
 IMAGE_EXTENSIONS = (".tif", ".tiff", ".png")

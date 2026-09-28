@@ -112,7 +112,7 @@ EXCLUDE_BORDER_OBJECTS = False  # False = keep + flag on_border (current default
 # 0.35 sits between them -- not yet checked against every borderline case.
 MERGE_SADDLE_RATIO_MIN = 0.35
 
-COUNT_DIR = config.RESULTS_DIR / "count"
+COUNT_DIR = config.LACUNAE_DIR
 
 
 def multiotsu_lacuna_mask(channel: np.ndarray) -> tuple[np.ndarray, float]:

@@ -353,6 +353,37 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    removing v1 requires a small refactor first (move that loader to a
    shared module).
 
+## Output reorganization, 2026-09-28
+
+`src/reorganize_outputs.py` (move-only, idempotent, aborts before touching
+anything if a destination exists) moved 65 files into a layout where the
+CURRENT DEFAULT result sits at the top of each folder and everything else
+sits one level down: `results/count/` -> `results/lacunae/`,
+`results/count_v3_candidate/` -> `results/candidates/lacunae_v3/`,
+`results/diagnostics/canaliculi_v2/` split into `diagnostics/phase0/` and
+`diagnostics/phase1/`, text reports to `reports/phase0_1/`, planning notes
+to `docs/`. Output paths are now constants in `config.py`
+(`CANALICULI_DIR`, `LACUNAE_DIR`, `CANDIDATES_DIR`, `DIAGNOSTICS_DIR`,
+`REPORTS_DIR`, `DOCS_DIR`); no script hard-codes one.
+
+**EXCEPTION TO THE "do not modify segment_lacunae_v2.py" RULE.** One line
+in that file was changed, with explicit approval:
+
+    COUNT_DIR = config.RESULTS_DIR / "count"   ->   COUNT_DIR = config.LACUNAE_DIR
+
+That is a PATH CONSTANT ONLY. No segmentation, watershed, merge, filter or
+measurement logic was touched, and the module's behaviour and numbers are
+unchanged — only where it writes. Without it the next v2 run would have
+recreated `results/count/` and undone the reorganization.
+
+A consequence to be aware of: that module's DOCSTRING still says outputs go
+to `results/count/<image_stem>/`, because the instruction was to change
+only the constant and nothing else in the file. **The docstring is stale;
+the constant is correct.** Fix it whenever the no-modify rule is lifted.
+
+Verified after the move: 543-2 canaliculi 62.33 / 27.41 (unchanged), and
+v2 lacunae now write to `results/lacunae/543-2`.
+
 ## Fixes round 2, 2026-09-28 (branch `canaliculi-v2-fixes`)
 
 ### Step 1 (done) — Phase 2 setting adopted as default

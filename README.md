@@ -40,14 +40,15 @@ Takes 2D images of stained bone sections — one channel carrying the LCN signal
 ## Repository layout
 
 ```
-data/        input images (git-ignored, not redistributed)
-results/     generated masks, overlays, tables, diagnostics
+data/        input images
 src/         pipeline code
 config.py    shared configuration (paths, channel selection, output settings)
-PROGRESS.md  current state, known issues, what is and is not validated
+docs/        PROGRESS.md, DECISIONS_NEEDED.md
+reports/     text reports, one folder per run
+results/     generated masks, overlays, tables, diagnostics (see Outputs)
 ```
 
-`data/` is excluded from version control, as is any `code_key` file — the
+Any `code_key` file is excluded from version control — the
 blinding key mapping coded specimen IDs to experimental groups must stay out of
 the repository. Most of `results/` is git-ignored; the subtrees that are
 committed are listed in `.gitignore`.
@@ -80,6 +81,36 @@ Note that some entries in `config.py` belong to the superseded
 `count_lacunae.py` and are not read by the current modules. `PIXEL_SIZE_UM`
 stays `None` — see Units above.
 
+## Outputs
+
+Every path is a constant in `config.py`; no script hard-codes one. The rule
+throughout is that **what the current default pipeline produces sits at the
+top of its folder**, and everything else sits one level down, grouped by
+what it is.
+
+```
+results/
+  canaliculi/<image>/          the 5 default canaliculi files
+      all_method_results/      any run with a non-default switch
+  lacunae/<image>/             default lacuna outputs (was results/count/)
+  candidates/
+      lacunae_v3/              detectors not in use by default
+  diagnostics/
+      phase0/ phase1/ phase2/ phase3/   read-only measurement output,
+      round2/step2/                     grouped by the run that made it
+reports/
+  phase0_1/  overnight/        text reports, one folder per run
+docs/
+  PROGRESS.md  DECISIONS_NEEDED.md
+```
+
+A non-default run never overwrites a default output: its filenames carry a
+suffix naming the setting AND it writes to `all_method_results/`.
+
+`src/reorganize_outputs.py` moved the tree into this shape on 2026-09-28.
+It is move-only, aborts before touching anything if a destination exists,
+and is idempotent.
+
 ## Switches
 
 Every option below is a module-level constant in `src/canaliculi_v1.py`
@@ -93,11 +124,18 @@ comparison can never overwrite a default output.
 | --- | --- | --- |
 | `LACUNA_SOURCE` | **`"v2"`** · `"v3_candidate"` | `--lacuna-source` |
 | `PREPROCESS_MODE` | **`"tophat"`** · `"ridge"` · `"tophat+ridge"` · `"none"` | `--preprocess` |
-| `THRESHOLD_MODE` | **`"multiotsu_low"`** · `"hysteresis"` | `--threshold-mode` |
-| `GAP_BRIDGING` | **`False`** · `True` | `--gap-bridging` |
+| `THRESHOLD_MODE` | `"multiotsu_low"` · **`"hysteresis"`** | `--threshold-mode` |
+| `HYSTERESIS_LOW_FRACTION` | **`0.75`** | — |
+| `GAP_BRIDGING` | `False` · **`True`** | `--gap-bridging` |
+| `BLOCK_GROWTH_IN_FLAGGED` | `False` · **`True`** | `--no-block-growth` |
 | `EXCLUSION_MODE` | **`"none"`** · `"auto"` · `"manual"` · `"both"` | `--exclusion` |
 | `ASSIGNMENT_METHOD` | **`"graph"`** · `"euclidean"` | `--method` |
 | `COUNT_MODE` | **`"edge"`** · `"path"` · `"roots"` | `--count-mode` |
+
+`THRESHOLD_MODE="hysteresis"` + `GAP_BRIDGING=True` became the defaults on
+2026-09-28, which **changed the 543-2 reference check from 37.00 / 29.43 to
+62.33 / 27.41**. `BLOCK_GROWTH_IN_FLAGGED` then stops those two from adding
+connections along a vascular canal; it never deletes anything.
 
 **Parameter provenance.** Every tunable constant carries a comment saying
 what it does, why that value, and where the value came from — a measured
@@ -181,5 +219,5 @@ Two things the pipeline does regardless of what you draw:
 
 ## Where to look first
 
-`PROGRESS.md` is the authoritative record of what exists, what is known to be
+`docs/PROGRESS.md` is the authoritative record of what exists, what is known to be
 wrong, and what is still unvalidated. Read it before trusting any output here.

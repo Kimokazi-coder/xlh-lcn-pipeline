@@ -6,7 +6,7 @@ for each, on the tuning and held-out sets separately. Changes no default;
 writes only reports and crops.
 
 GUARDS, fixed in writing before any setting was run (see
-DECISIONS_NEEDED.md D0):
+docs/DECISIONS_NEEDED.md D0):
   G1 total skeleton length  FLAG if > 1.20x the default
   G2 loop count (E-V+C)     FLAG if > max(1.5x default, default + 50)
 Owned length fraction, components per 10k and degree-1 fraction are
@@ -46,9 +46,9 @@ import diagnose_canaliculi_v2 as diag  # noqa: E402
 
 TUNING_IMAGE_STEMS = diag.TUNING_IMAGE_STEMS
 CROP_SIZE_PX = diag.CROP_SIZE_PX
-OUT_DIR = config.RESULTS_DIR / "diagnostics" / "phase2"
+OUT_DIR = config.DIAGNOSTICS_DIR / "phase2"
 
-# Guard thresholds. See the module docstring and DECISIONS_NEEDED.md D0.
+# Guard thresholds. See the module docstring and docs/DECISIONS_NEEDED.md D0.
 GUARD_LENGTH_RATIO = 1.20
 GUARD_LOOP_RATIO = 1.50
 GUARD_LOOP_FLOOR = 50

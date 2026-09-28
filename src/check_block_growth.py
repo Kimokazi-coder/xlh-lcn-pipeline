@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 sys.path.insert(0,'src'); sys.path.insert(0,'.')
 from count_lacunae import load_channel
+import config
 import canaliculi_v1 as can
 import exclusion_mask as excl
 import segment_lacunae_v2 as seg2
@@ -13,7 +14,7 @@ from skimage.io import imsave
 print("STEP 2 CHECK -- block new connections inside flagged structures")
 print("Required: vertical segment gone in the x555_y500 crop; skeleton length OUTSIDE flagged unchanged.\n")
 print(f'{"image":22s} {"block":>6s} {"skel_total":>11s} {"in_flagged":>11s} {"OUTSIDE":>11s} {"bridges":>8s}')
-out = Path('results/diagnostics/step2'); out.mkdir(parents=True, exist_ok=True)
+out = config.DIAGNOSTICS_DIR / 'round2' / 'step2'; out.mkdir(parents=True, exist_ok=True)
 
 for stem in ("542 WT  2_z06c1-2","542 WT  2_z18c1-2","682_z08c1-2","682_z23c-2","682_z29c1-3","543-2"):
     p = Path(f'data/WT/{stem}.tif')
@@ -50,5 +51,5 @@ for stem in ("542 WT  2_z06c1-2","542 WT  2_z18c1-2","682_z08c1-2","682_z23c-2",
         sep = np.full((256,4,3),128,np.uint8)
         imsave(out/'542_z06_x555_y500_block_off_vs_on.png',
                np.hstack([panels[0],sep,panels[1],sep,panels[2]]), check_contrast=False)
-        print("  saved results/diagnostics/step2/542_z06_x555_y500_block_off_vs_on.png")
+        print(f"  saved {out}/542_z06_x555_y500_block_off_vs_on.png")
         print("  panels: block OFF | block ON | flagged region\n")
