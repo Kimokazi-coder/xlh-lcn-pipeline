@@ -188,6 +188,7 @@ from count_lacunae import load_channel  # noqa: E402
 import segment_lacunae_v2 as seg2  # noqa: E402
 import exclusion_mask  # noqa: E402
 import gap_bridging as gap_bridging_mod  # noqa: E402
+import merge_adjacent_lacunae  # noqa: E402
 
 # --- Candidate parameters (NOT in config.py yet -- see module docstring) ---
 
@@ -1644,6 +1645,11 @@ def process(
             "(expected 'v2', 'v3_candidate' or 'hybrid')"
         )
 
+    # Optional post-merge of lacuna pieces split apart by a thresholding
+    # break. Off by default; applies to whatever LACUNA_SOURCE produced.
+    if merge_adjacent_lacunae.MERGE_ADJACENT_PAIRS:
+        labels, kept, _pairs = merge_adjacent_lacunae.apply_merges(labels, kept)
+
     lacuna_mask, lacuna_id_map = build_lacuna_maps(labels, kept)
     # The Phase 1 shape gate, BEFORE the safety margin. Used only to stop
     # hysteresis and bridging ADDING connections along a vascular canal;
@@ -1819,6 +1825,12 @@ def main() -> None:
         help="Override LACUNA_SOURCE for this run; suffixes output filenames with _lac-<source>.",
     )
     parser.add_argument(
+        "--merge-adjacent",
+        action="store_true",
+        help="Merge kept lacuna pieces separated by a thresholding break "
+        "(MERGE_ADJACENT_PAIRS override); suffixes output filenames with _merged.",
+    )
+    parser.add_argument(
         "--no-block-growth",
         action="store_true",
         help="Disable BLOCK_GROWTH_IN_FLAGGED for this run (lets hysteresis and bridging grow "
@@ -1848,6 +1860,9 @@ def main() -> None:
         suffix += f"_lac-{args.lacuna_source}"
     if args.no_block_growth:
         suffix += "_nogrowthblock"
+    if args.merge_adjacent:
+        suffix += "_merged"
+        merge_adjacent_lacunae.MERGE_ADJACENT_PAIRS = True
     if args.hysteresis_low is not None:
         suffix += f"_hl{args.hysteresis_low}"
         globals()["HYSTERESIS_LOW_FRACTION"] = args.hysteresis_low
