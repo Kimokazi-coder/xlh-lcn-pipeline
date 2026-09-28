@@ -295,26 +295,43 @@ RIDGE_FILTER = "sato"
 RIDGE_SIGMAS_PX = (1.0, 2.0, 3.0, 4.0)
 
 # How the (pre-processed) image is cut into foreground/background.
-#   "multiotsu_low" (default) the lower of the two 3-class multi-Otsu cuts
-#   "hysteresis"    keep dim pixels only where they connect to a
+#   "multiotsu_low" the lower of the two 3-class multi-Otsu cuts. The
+#                   pre-2026-09-28 default, kept for comparison.
+#   "hysteresis"    (DEFAULT) keep dim pixels only where they connect to a
 #                   confidently bright one -- reconnects a dim stretch of a
 #                   real thread without admitting isolated background
-#                   speckle. NOT default.
-THRESHOLD_MODE = "multiotsu_low"
+#                   speckle.
+#
+# ADOPTED AS DEFAULT 2026-09-28, on the Phase 2 comparison plus a visual
+# check of the crops confirming the added connections follow real dim
+# threads. Of eight settings tried, this one (with bridging, below) was
+# inside BOTH pre-declared guards on the tuning AND held-out sets --
+# 1.13x total skeleton length against a 1.20x limit, 2.13x loops against a
+# max(1.5x, +50) limit -- while cutting components per 10,000 skeleton px
+# from 225 to 169 and raising owned length fraction from 0.244 to 0.343.
+# Five of the eight settings failed a guard; see DECISIONS_NEEDED.md D1.
+THRESHOLD_MODE = "hysteresis"
 
 # For "hysteresis": the high cut is the image's own multi-Otsu low cut (the
-# value the default pipeline uses), and the low cut is this fraction of it.
-# Both are therefore derived per image from its own histogram, with no
-# global intensity constant, as the brief requires. 0.5 is an INITIAL
-# VALUE, NOT YET TUNED: it is the midpoint between the current cut and
-# zero, chosen so the permissive cut is clearly below the strict one
-# without reaching the background mode. Phase 2's guard metrics (total
-# skeleton length, loop count) are what would justify moving it.
-HYSTERESIS_LOW_FRACTION = 0.5
+# value the old default used), and the low cut is this fraction of it. Both
+# are therefore derived per image from its own histogram, with no global
+# intensity constant.
+#
+# 0.75 was SELECTED, not assumed. 0.5 was tried first and failed both
+# guards (1.30x length, 6.53x loops) by growing dim regions into sheets;
+# 0.75 passes on tuning and held-out alike. It remains lightly tuned --
+# one value tried after one failure, not a swept parameter -- so treat it
+# as the weakest-provenance number in the default set.
+HYSTERESIS_LOW_FRACTION = 0.75
 
-# Evidence-based gap bridging (Phase 2c). NOT default. See gap_bridging.py
-# for the three tests a bridge must pass and where each limit comes from.
-GAP_BRIDGING = False
+# Evidence-based gap bridging (Phase 2c). See gap_bridging.py for the three
+# tests a bridge must pass and where each limit comes from.
+#
+# ADOPTED AS DEFAULT 2026-09-28. On top of hysteresis it adds only ~18
+# bridges per image, against ~122 on the old default, because hysteresis
+# has already closed most of the same gaps -- two independent mechanisms
+# converging on the same gaps, which is the evidence those gaps are real.
+GAP_BRIDGING = True
 
 # Radius (px) of the disk structuring element for the white top-hat.
 # Adapted from OCY_thr_stack.m, which uses strel('disk',25) at 0.2 um/voxel.

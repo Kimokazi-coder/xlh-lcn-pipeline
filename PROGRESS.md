@@ -1,6 +1,6 @@
 # Progress status
 
-_Last updated: 2026-09-24 (overnight autonomous run). Everything below is v1-raw/v2-raw and pre-validation
+_Last updated: 2026-09-28 (fixes round 2). Everything below is v1-raw/v2-raw and pre-validation
 against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
 
 ## Features that exist
@@ -352,6 +352,33 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    imported from v1's file (`from count_lacunae import load_channel`), so
    removing v1 requires a small refactor first (move that loader to a
    shared module).
+
+## Fixes round 2, 2026-09-28 (branch `canaliculi-v2-fixes`)
+
+### Step 1 (done) — Phase 2 setting adopted as default
+`THRESHOLD_MODE="hysteresis"`, `HYSTERESIS_LOW_FRACTION=0.75`,
+`GAP_BRIDGING=True` are now the DEFAULTS, on the Phase 2 guard comparison
+plus a visual check of the crops confirming the added connections follow
+real dim threads.
+
+**Reference check for 543-2 has therefore CHANGED:**
+
+| | canaliculi/cell | mean edge length px | bridges |
+| --- | --- | --- | --- |
+| old default (to 2026-09-28) | 37.00 | 29.43 | 0 |
+| **new default (from 2026-09-28)** | **62.33** | **27.41** | **21** |
+
+Use **62.33 / 27.41** as the regression check from now on. The old
+`multiotsu_low` path is still available via `--threshold-mode
+multiotsu_low` and `GAP_BRIDGING` via omitting `--gap-bridging`, so the
+old numbers remain reproducible.
+
+Note the edge count rose 37.00 -> 62.33 (+68%). That is expected and is
+exactly why Phase 4 recommended against edge count as a primary outcome:
+it is the most segmentation-sensitive metric measured (+77.9% pooled). The
+per-field metrics and roots/cell moved by ~11-13% over the same change.
+`HYSTERESIS_LOW_FRACTION=0.75` remains the weakest-provenance number in
+the default set -- one value tried after one failure, not a sweep.
 
 ## Overnight autonomous run, 2026-09-24
 
