@@ -1,0 +1,39 @@
+HYBRID LACUNA DETECTION -- candidate, NOT default. v-raw, pre-validation, PIXEL units.
+Gates: (a) relative intensity >= 0.75 x this image's median v2 lacuna
+       (b) no overlap with a Phase 1 flagged structure
+       (c) >= 4 canalicular roots attached (pooled p10 of v2-kept interior lacunae)
+
+image                    v2  hybrid  added  cand  fail a  fail b  fail c
+542 WT  2_z06c1-2        16      18      2     5       3       2       0
+      + ADDED (230,303) area=1241 rel_I=0.783 roots=5 core_roots=5/8.0 border=False  [all gates]
+      + ADDED (224,351) area=591 rel_I=0.783 roots=6 core_roots=5/8.0 border=False  [all gates]
+542 WT  2_z18c1-2        12      13      1     8       8       2       1
+      + ADDED (81,687) area=2633 rel_I=0.404 roots=18 core_roots=12/8.0 border=False  [OVERRIDE]
+543-2                    12      14      2    16      16       0       5
+      + ADDED (998,149) area=1797 rel_I=0.503 roots=12 core_roots=12/7.5 border=False  [OVERRIDE]
+      + ADDED (172,1006) area=3371 rel_I=0.480 roots=11 core_roots=8/7.5 border=True  [OVERRIDE]
+543_3                    10      16      6    29      29       0       6
+      + ADDED (982,87) area=1365 rel_I=0.488 roots=9 core_roots=9/7.0 border=False  [OVERRIDE]
+      + ADDED (42,337) area=10612 rel_I=0.670 roots=24 core_roots=11/7.0 border=True  [OVERRIDE]
+      + ADDED (396,638) area=1830 rel_I=0.476 roots=8 core_roots=8/7.0 border=False  [OVERRIDE]
+      + ADDED (9,682) area=595 rel_I=0.473 roots=7 core_roots=7/7.0 border=True  [OVERRIDE]
+      + ADDED (608,838) area=702 rel_I=0.478 roots=7 core_roots=7/7.0 border=False  [OVERRIDE]
+      + ADDED (628,1012) area=1569 rel_I=0.479 roots=9 core_roots=9/7.0 border=True  [OVERRIDE]
+543_z13c1-2              11      13      2     8       8       0       0
+      + ADDED (1001,146) area=1478 rel_I=0.489 roots=7 core_roots=7/7.0 border=False  [OVERRIDE]
+      + ADDED (197,298) area=559 rel_I=0.496 roots=7 core_roots=7/7.0 border=False  [OVERRIDE]
+682_z08c1-2              10      11      1    18      18       3       8
+      + ADDED (308,1011) area=2231 rel_I=0.416 roots=9 core_roots=9/9.0 border=True  [OVERRIDE]
+682_z23c-2               14      18      4    26      26       2       5
+      + ADDED (906,52) area=4854 rel_I=0.405 roots=19 core_roots=7/6.0 border=False  [OVERRIDE]
+      + ADDED (826,70) area=10694 rel_I=0.405 roots=35 core_roots=9/6.0 border=True  [OVERRIDE]
+      + ADDED (676,137) area=715 rel_I=0.405 roots=6 core_roots=6/6.0 border=False  [OVERRIDE]
+      + ADDED (106,178) area=552 rel_I=0.414 roots=6 core_roots=6/6.0 border=False  [OVERRIDE]
+682_z29c1-3              13      17      4    12      12       5       3
+      + ADDED (840,25) area=1464 rel_I=0.457 roots=6 core_roots=5/5.0 border=True  [OVERRIDE]
+      + ADDED (902,49) area=1743 rel_I=0.452 roots=11 core_roots=7/5.0 border=False  [OVERRIDE]
+      + ADDED (847,102) area=2341 rel_I=0.480 roots=12 core_roots=5/5.0 border=False  [OVERRIDE]
+      + ADDED (177,524) area=639 rel_I=0.468 roots=5 core_roots=5/5.0 border=False  [OVERRIDE]
+
+total added across the run: 22
+overlays and crops under F:\lcn-quant\results\candidates\lacunae_hybrid

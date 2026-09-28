@@ -446,3 +446,87 @@ skeleton length of 97 px is well under half that image's median of 247, so
 the ring test does. A relative criterion is the better instrument; it does
 not change D7's conclusion that local normalization is the wrong fix, since
 the flagged lacunae are still sparse in mask rather than dim in raw signal.
+
+---
+
+## D9. The D8 override is implemented — and I recommend AGAINST adopting it
+
+**Status: implemented behind `LACUNA_SOURCE="hybrid"`, which is still NOT
+the default. `LACUNA_SOURCE="v2"` unchanged. No default changed.**
+
+This reverses the recommendation I made in D8. The size-bias check you
+asked for did its job, and then the crops showed something the numbers did
+not.
+
+### The size bias was real, and it changes the motivating case
+
+| measure | (860,730) in 682_z29 | that image's v2-kept median |
+|---|---|---|
+| raw roots | **7** | 5 |
+| roots / 100 px perimeter | 3.11 | 2.80 |
+| **CORE roots (size-corrected)** | **3** | **5** |
+
+Its 2756 px² outline reaches 10 px further out than its 575 px² v2-scale
+core, and that is where the extra 4 roots came from. **So the object that
+motivated D8 FAILS the size-corrected criterion.** I have not fudged the
+measure to rescue it.
+
+The three measures disagree sharply on the 80 candidates that pass (b)+(c)
+but fail (a): raw roots admits 42, roots/100px admits **79** (it
+discriminates nothing, because candidates are *smaller* than v2 lacunae —
+median body 1018 vs 2174 px² — so dividing by a smaller perimeter pushes
+them over automatically), core roots admits 27.
+
+### Cutoffs, all pinned to measured data
+
+- **Roots measure:** CORE roots, recounted on a body shrunk to v2 scale
+  (intersected with v2's pre-filter pieces where they exist, else eroded to
+  the image's median v2 area). A no-op on the v2-kept population, so the
+  two distributions stay comparable.
+- **Threshold:** ≥ that image's median v2-kept core roots.
+- **Intensity floor: 0.40.** Each image's raw background mode, expressed in
+  relative-intensity units, runs min 0.096, mean 0.215, **max 0.333**.
+  0.40 is 1.20× that worst case, so nothing at haze level can qualify
+  anywhere in this dataset. It bites: two candidates at 0.336 and 0.338 —
+  essentially at background — are removed, 27 → 20.
+
+### Confirmations you asked for
+
+| check | result |
+|---|---|
+| (230,300) in 542_z06 added | **YES** — via all three gates, rel_I 0.783. Unaffected by the override. |
+| (860,730) in 682_z29 added | **NO** — core roots 3 < median 5 |
+| nothing on a flagged structure | **CONFIRMED, 0 of 22** — gate (b) is required for the override too |
+
+Total added: 22 (2 through all gates, **20 through the override**).
+
+### Why I now recommend against it
+
+I examined four of the twenty override additions. **Three are false
+positives** — the outline sits on dense canalicular mesh with no lacuna
+body in it at all:
+
+- `543-2/added_x998_y149.png` — empty mesh at the frame edge; the real
+  lacuna in that crop is elsewhere and already found by v2
+- `682_z23c-2/added_x676_y137.png` — empty mesh, no body
+- `682_z29c1-3/added_x177_y524.png` — a thread crossing, the nearest bright
+  blob sits outside the outline
+- `543_3/added_x42_y337.png` — a **real** lacuna, but with a badly inflated
+  outline covering far more than the bright body
+
+**The mechanism.** "Roots" counts threads passing within
+`LACUNA_ATTACH_GAP_PX` of the body, not threads *emanating from* it. A
+lacuna is a hub where threads terminate; a point in dense mesh is where
+threads pass through. Both score high. The size correction fixes the
+*outline* inflation but not this, because eroding a blob that sits in mesh
+leaves a smaller blob still sitting in mesh.
+
+**Recommendation: do not adopt.** Keep `LACUNA_SOURCE="v2"`. Adding 20
+objects of which a majority look like mesh would inflate lacuna counts in
+exactly the dense fields where the genotype comparison matters most.
+
+**If you want to pursue it**, the missing test is whether threads *end* at
+the object rather than pass by — e.g. requiring that a majority of
+attaching branches have a degree-1 endpoint inside or adjacent to the body,
+rather than continuing through. That is new method design, not a cutoff
+change, and I have not built it.

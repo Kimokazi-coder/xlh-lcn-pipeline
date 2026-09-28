@@ -96,7 +96,109 @@ MIN_RELATIVE_INTENSITY = 0.75
 # few roots as a separate problem.
 MIN_ROOTS = 4
 
+# --- D8 override: strong connectivity can outvote the intensity gate -----
+# A v3-only object that FAILS gate (a) is still admitted if it is
+# exceptionally well connected. Gate (a) was shown to reject objects with
+# more canaliculi radiating from them than the typical accepted lacuna in
+# their own field, which is the failure gate (c) exists to prevent.
+OVERRIDE_ON_ROOTS = True
+
+# WHICH roots measure the override uses. This is the load-bearing choice,
+# because the three available measures disagree sharply -- of 80 candidates
+# that pass (b) and (c) but fail (a), the number reaching their image's
+# v2-kept median is:
+#     raw roots            42/80   INFLATED, see below
+#     roots per 100px      79/80   admits almost everything, no discrimination
+#     CORE roots           27/80   size-corrected
+#
+# Raw roots are inflated for a v3 object: roots are counted from skeleton
+# nodes within can.LACUNA_ATTACH_GAP_PX of the BODY, so a larger outline
+# reaches further out and catches threads that merely pass by. Roots per
+# 100 px of perimeter over-corrects in the opposite direction -- candidates
+# are SMALLER than v2 lacunae (median body 1018 vs 2174 px^2), so dividing
+# by a smaller perimeter pushes them above the median almost automatically,
+# which is why it admits 79 of 80 and discriminates nothing.
+#
+# CORE roots is the direct correction: recount on a body shrunk to v2
+# scale (see core_body). Applied identically to the v2-kept population,
+# where it is a no-op, so the two distributions stay comparable.
+OVERRIDE_ROOTS_MEASURE = "core"
+
+# Intensity floor for the override. However well connected an object looks,
+# nothing at haze level may be admitted.
+#
+# PROVENANCE. Each image's raw background MODE, expressed the way a
+# candidate's relative intensity is (divided by that image's median v2
+# lacuna intensity), across the 8 WT images: min 0.096, mean 0.215,
+# MAX 0.333. That maximum is what "pure haze" looks like in the worst
+# field. 0.40 is 1.20x it, so nothing at or near background level can
+# qualify anywhere in this dataset. It is not a free parameter fitted to
+# admit a particular object: it is pinned to the measured background.
+#
+# It does bite. Of the 27 candidates clearing the core-roots criterion,
+# two sit at 0.336 and 0.338 -- essentially AT the worst image's background
+# level -- and this floor removes them along with five others, leaving 20.
+OVERRIDE_MIN_RELATIVE_INTENSITY = 0.40
+
 HYBRID_DIR = config.CANDIDATES_DIR / "lacunae_hybrid"
+
+
+# --- Size correction for the roots count ---------------------------------
+# A v3 object is inflated by the r=12 opening that found it, and roots are
+# counted from skeleton nodes within can.LACUNA_ATTACH_GAP_PX of the BODY.
+# A larger outline therefore reaches further out and can touch threads that
+# merely pass by, inflating its roots relative to a v2-sized lacuna. Any
+# comparison of a v3 object's roots against the v2-kept population has to
+# correct for that or it compares two different measurements.
+#
+# Two corrections are computed, and both are reported:
+#   (i)  roots per 100 px of perimeter -- normalises by how much boundary
+#        there is for a thread to attach to.
+#   (ii) roots recounted on a CORE body shrunk to v2 scale, which is the
+#        more direct correction: it asks what the roots count would have
+#        been if the object had been outlined the way v2 outlines a lacuna.
+# Both are applied identically to the v2-kept population, so the two
+# distributions stay comparable.
+
+
+def core_body(body: np.ndarray, v2_prefilter_labels: np.ndarray, target_area: float) -> np.ndarray:
+    """Shrink an object to v2 scale, for a like-for-like roots count.
+
+    Preferred route: intersect with whatever v2's PRE-FILTER mask found
+    inside it. That is the most faithful correction available, because it
+    uses v2's own idea of where the object's body is -- for the (860,730)
+    object in 682_z29, v2 found two pieces of 346 and 229 px^2 inside a
+    2756 px^2 v3 outline, and those pieces ARE the v2-scale body.
+
+    Fallback, when v2 found nothing inside: erode until the area drops to
+    `target_area`, the median v2-kept lacuna area in that image. Erosion is
+    isotropic so it shrinks the outline without moving its centre."""
+    from skimage import morphology as morph
+
+    inside = v2_prefilter_labels[body]
+    present = [lab for lab in np.unique(inside) if lab != 0]
+    if present:
+        core = np.isin(v2_prefilter_labels, present) & body
+        if core.any():
+            return core
+
+    if body.sum() <= target_area:
+        return body
+    core = body
+    for radius in range(1, 31):
+        eroded = morph.erosion(body, morph.disk(radius))
+        if not eroded.any():
+            break
+        core = eroded
+        if core.sum() <= target_area:
+            break
+    return core
+
+
+def perimeter_of(body: np.ndarray) -> float:
+    """Perimeter in px of a boolean body, via regionprops."""
+    props = measure.regionprops(body.astype(int))
+    return float(props[0].perimeter) if props else 0.0
 
 
 def count_roots_for_body(G, body: np.ndarray) -> int:
@@ -187,6 +289,19 @@ def evaluate_candidates(image_path: Path) -> dict:
     if flagged is None:
         flagged, _objs = excl.flagged_structures(channel)
 
+    # The v2-kept INTERIOR population this image's override compares
+    # against, measured the same size-corrected way the candidates are.
+    interior = [(r, ob) for r, ob in v2_kept if not ob]
+    target_area = float(np.median([r.area for r, _ob in interior])) if interior else 0.0
+    _lacuna_mask, lacuna_id = can.build_lacuna_maps(v2_labels, v2_kept)
+    v2_core_roots = []
+    for lid, (_region, on_border) in enumerate(v2_kept, start=1):
+        if on_border:
+            continue
+        body = lacuna_id == lid
+        v2_core_roots.append(count_roots_for_body(G, core_body(body, v2_labels, target_area)))
+    median_core_roots = float(np.median(v2_core_roots)) if v2_core_roots else float("inf")
+
     candidates = []
     for region, on_border in v3_kept:
         key = (round(region.centroid[1], 1), round(region.centroid[0], 1))
@@ -202,6 +317,19 @@ def evaluate_candidates(image_path: Path) -> dict:
         passes_a = relative >= MIN_RELATIVE_INTENSITY
         passes_b = on_flagged == 0.0
         passes_c = roots >= MIN_ROOTS
+
+        # D8 override: size-corrected connectivity can outvote gate (a),
+        # but never gate (b), and never the haze floor.
+        core = core_body(body, v2_labels, target_area)
+        core_roots = count_roots_for_body(G, core)
+        overrode = bool(
+            OVERRIDE_ON_ROOTS
+            and not passes_a
+            and passes_b
+            and passes_c
+            and core_roots >= median_core_roots
+            and relative >= OVERRIDE_MIN_RELATIVE_INTENSITY
+        )
         candidates.append(
             {
                 "label": int(region.label),
@@ -213,10 +341,14 @@ def evaluate_candidates(image_path: Path) -> dict:
                 "relative_intensity": relative,
                 "on_flagged_fraction": on_flagged,
                 "roots": roots,
+                "core_roots": core_roots,
+                "core_area": float(core.sum()),
+                "median_core_roots": median_core_roots,
                 "a_bright": passes_a,
                 "b_not_flagged": passes_b,
                 "c_connected": passes_c,
-                "accepted": passes_a and passes_b and passes_c,
+                "overrode_a": overrode,
+                "accepted": (passes_a and passes_b and passes_c) or overrode,
             }
         )
 
@@ -335,10 +467,12 @@ def main() -> None:
             f'{sum(1 for c in cands if not c["c_connected"]):7d}'
         )
         for candidate in accepted:
+            how = "OVERRIDE" if candidate["overrode_a"] else "all gates"
             print(
                 f'      + ADDED ({candidate["x"]:.0f},{candidate["y"]:.0f}) area={candidate["area"]:.0f} '
                 f'rel_I={candidate["relative_intensity"]:.3f} roots={candidate["roots"]} '
-                f'border={candidate["on_border"]}'
+                f'core_roots={candidate["core_roots"]}/{candidate["median_core_roots"]:.1f} '
+                f'border={candidate["on_border"]}  [{how}]'
             )
 
     print(f"\ntotal added across the run: {total_added}")

@@ -1,0 +1,72 @@
+====================================================================================================
+D8 OVERRIDE CUTOFF DERIVATION. v-raw / pre-validation, PIXEL units. Read-only.
+====================================================================================================
+
+[1] INTENSITY FLOOR: where is 'pure haze' in relative-intensity units?
+    Each image's raw background MODE, expressed the same way a candidate is
+    (divided by that image's median v2 lacuna intensity). Nothing at or near
+    this level carries signal, so the floor must sit clearly above it.
+
+    image                   bg mode  med v2 I  bg / med v2
+    542 WT  2_z06c1-2        0.0898    0.9402        0.096
+    542 WT  2_z18c1-2        0.1250    0.9132        0.137
+    543-2                    0.2578    0.8080        0.319
+    543_3                    0.2617    0.7856        0.333
+    543_z13c1-2              0.2578    0.8055        0.320
+    682_z08c1-2              0.1680    0.9214        0.182
+    682_z23c-2               0.1250    0.7766        0.161
+    682_z29c1-3              0.1250    0.7439        0.168
+
+    background/median across the 8 images: min 0.096  max 0.333  mean 0.215
+
+[2] WHICH ROOTS MEASURE, and what each admits
+
+    raw roots (INFLATED, for reference): 42 of 80 candidates reach their image median
+        (230,300) 542_z06: not in this candidate set (already accepted by the base gates)
+        (860,730) 682_z29: 7.00 vs median 5.00 -> PASSES
+
+    roots per 100px perimeter: 79 of 80 candidates reach their image median
+        (230,300) 542_z06: not in this candidate set (already accepted by the base gates)
+        (860,730) 682_z29: 3.11 vs median 2.80 -> PASSES
+
+    CORE roots (size-corrected): 27 of 80 candidates reach their image median
+        (230,300) 542_z06: not in this candidate set (already accepted by the base gates)
+        (860,730) 682_z29: 3.00 vs median 5.00 -> FAILS
+
+[3] CANDIDATES PASSING THE CORE-ROOTS CRITERION (before any intensity floor)
+    image                      x     y    area  rel_I  core_r   med  core_a
+    542 WT  2_z18c1-2         81   687    2633  0.404      12   8.0     116
+    543-2                    998   149    1797  0.503      12   7.5    1797
+    543-2                    172  1006    3371  0.480       8   7.5    2002
+    543_3                     42   337   10612  0.670      11   7.0    3536
+    543_3                    982    87    1365  0.488       9   7.0    1365
+    543_3                    628  1012    1569  0.479       9   7.0    1569
+    543_3                    396   638    1830  0.476       8   7.0    1830
+    543_3                      9   682     595  0.473       7   7.0     595
+    543_3                    608   838     702  0.478       7   7.0     702
+    543_z13c1-2             1001   146    1478  0.489       7   7.0    1478
+    543_z13c1-2              197   298     559  0.496       7   7.0     559
+    682_z08c1-2              710   334     838  0.364      11   9.0     838
+    682_z08c1-2              925   999    3020  0.391      10   9.0    2514
+    682_z08c1-2              308  1011    2231  0.416       9   9.0    2231
+    682_z23c-2               826    70   10694  0.405       9   6.0     440
+    682_z23c-2               980   972    7456  0.393       8   6.0    1354
+    682_z23c-2               906    52    4854  0.405       7   6.0      85
+    682_z23c-2               230   188    1012  0.392       7   6.0    1012
+    682_z23c-2                79   351    7146  0.336       7   6.0    1444
+    682_z23c-2               676   137     715  0.405       6   6.0     715
+    682_z23c-2               678   172     645  0.387       6   6.0     645
+    682_z23c-2               106   178     552  0.414       6   6.0     552
+    682_z23c-2               577   503     483  0.338       6   6.0     483
+    682_z29c1-3              902    49    1743  0.452       7   5.0      68
+    682_z29c1-3              840    25    1464  0.457       5   5.0     115
+    682_z29c1-3              847   102    2341  0.480       5   5.0     259
+    682_z29c1-3              177   524     639  0.468       5   5.0     639
+
+[4] EFFECT OF AN INTENSITY FLOOR on that set
+    their relative intensities: min 0.336  p50 0.452  max 0.670
+      floor 0.30 -> 27 of 27 survive
+      floor 0.35 -> 25 of 27 survive
+      floor 0.40 -> 20 of 27 survive
+      floor 0.45 -> 14 of 27 survive
+      floor 0.50 -> 2 of 27 survive
