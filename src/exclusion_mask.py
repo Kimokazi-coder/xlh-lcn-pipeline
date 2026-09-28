@@ -179,9 +179,18 @@ def protected_region(v2_labels: np.ndarray) -> np.ndarray:
     return lacuna_scale
 
 
-def auto_exclusion(channel: np.ndarray, v2_labels: np.ndarray) -> tuple[np.ndarray, dict]:
-    """Broad bright structures in the raw channel that are far larger and
-    more elongated than any lacuna, minus the lacuna safety margin."""
+def flagged_structures(channel: np.ndarray) -> tuple[np.ndarray, list]:
+    """The shape gate ONLY: broad bright raw-channel structures far larger
+    and more elongated than any lacuna, dilated by EXCLUSION_DILATION_PX.
+
+    This is the region BEFORE the lacuna safety margin is subtracted, so it
+    is NOT an exclusion and nothing here is removed from anything. It is
+    exposed separately because canaliculi_v1 uses it for a different
+    purpose: BLOCK_GROWTH_IN_FLAGGED forbids hysteresis and gap bridging
+    from creating NEW connections along a vascular canal, while leaving
+    every pixel that was already there untouched. That blocking has to
+    apply whatever EXCLUSION_MODE is set to, which is why it cannot be
+    derived from auto_exclusion's output."""
     rows, cols = channel.shape
     labels, regions = broad_objects(channel)
 
@@ -209,6 +218,13 @@ def auto_exclusion(channel: np.ndarray, v2_labels: np.ndarray) -> tuple[np.ndarr
 
     if flagged.any() and EXCLUSION_DILATION_PX > 0:
         flagged = morphology.dilation(flagged, morphology.disk(EXCLUSION_DILATION_PX))
+    return flagged, objects
+
+
+def auto_exclusion(channel: np.ndarray, v2_labels: np.ndarray) -> tuple[np.ndarray, dict]:
+    """Broad bright structures in the raw channel that are far larger and
+    more elongated than any lacuna, minus the lacuna safety margin."""
+    flagged, objects = flagged_structures(channel)
 
     protected = protected_region(v2_labels)
     exclusion = flagged & ~protected

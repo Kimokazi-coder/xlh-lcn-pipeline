@@ -333,6 +333,28 @@ HYSTERESIS_LOW_FRACTION = 0.75
 # converging on the same gaps, which is the evidence those gaps are real.
 GAP_BRIDGING = True
 
+# Forbid hysteresis and gap bridging from creating NEW connections inside a
+# Phase 1 flagged structure (the auto shape gate in exclusion_mask, taken
+# BEFORE the lacuna safety margin).
+#
+# WHY. Step 1 adopted hysteresis + bridging as defaults. The x555_y500 crop
+# of 542_z06 then showed both of them growing a vertical segment along the
+# vascular band, which the assignment step duly handed to a cell. That is a
+# vessel wall being counted as a canaliculus.
+#
+# WHAT IT DOES, AND DOES NOT DO. Inside a flagged structure, hysteresis may
+# keep only pixels that were ALREADY above the high (strict) cut, and no
+# gap bridge may start in, end in, or cross the region. Nothing is deleted:
+# every pixel the old multiotsu_low default would have had is still there,
+# so this can only ever remove connections the new default would have ADDED.
+# Outside flagged structures nothing changes at all.
+#
+# This is independent of EXCLUSION_MODE, which stays "none". Exclusion
+# REMOVES signal and is still unjustified (Phase 1 found flagged structures
+# do not clearly inflate the mask); this only declines to ADD any, which
+# needs no such justification.
+BLOCK_GROWTH_IN_FLAGGED = True
+
 # Radius (px) of the disk structuring element for the white top-hat.
 # Adapted from OCY_thr_stack.m, which uses strel('disk',25) at 0.2 um/voxel.
 # A white top-hat keeps what is NARROWER than its structuring element and
@@ -545,20 +567,31 @@ def build_lacuna_maps(labels: np.ndarray, kept: list[tuple]) -> tuple[np.ndarray
     return lacuna_id_map > 0, lacuna_id_map
 
 
-def threshold_mask(img: np.ndarray, threshold_mode: str) -> tuple[np.ndarray, float]:
+def threshold_mask(
+    img: np.ndarray, threshold_mode: str, no_growth: np.ndarray | None = None
+) -> tuple[np.ndarray, float]:
     """Cut the pre-processed image into foreground/background. Returns
     (mask, the strict cut), so the reported t_lo means the same thing in
-    both modes and stays comparable across settings."""
+    both modes and stays comparable across settings.
+
+    `no_growth` is a region where the permissive cut may not add anything:
+    inside it only pixels already above the STRICT cut survive. See
+    BLOCK_GROWTH_IN_FLAGGED."""
     strict_mask, t_lo = total_signal_mask(img)
     if threshold_mode == "multiotsu_low":
         return strict_mask, t_lo
     if threshold_mode == "hysteresis":
         # Keep a dim pixel only where it is connected to a confidently
         # bright one. Both cuts come from this image's own histogram --
-        # the high cut IS the default pipeline's cut, so hysteresis can
-        # only ever ADD to the default mask, never remove from it.
+        # the high cut IS the old default pipeline's cut, so hysteresis can
+        # only ever ADD to that mask, never remove from it.
         low = t_lo * HYSTERESIS_LOW_FRACTION
-        return filters.apply_hysteresis_threshold(img, low, t_lo), t_lo
+        mask = filters.apply_hysteresis_threshold(img, low, t_lo)
+        if no_growth is not None and no_growth.any():
+            # Subtract only what hysteresis ADDED inside the region; the
+            # strict-cut pixels there are kept, so nothing is deleted.
+            mask = mask & ~(no_growth & ~strict_mask)
+        return mask, t_lo
     raise ValueError(
         f"Unknown threshold mode: {threshold_mode!r} (expected 'multiotsu_low' or 'hysteresis')"
     )
@@ -569,8 +602,9 @@ def canaliculi_candidate_mask(
     lacuna_mask: np.ndarray,
     mode: str,
     threshold_mode: str = "multiotsu_low",
+    no_growth: np.ndarray | None = None,
 ) -> tuple[np.ndarray, float]:
-    signal, t_lo = threshold_mask(preprocess_channel(channel, mode), threshold_mode)
+    signal, t_lo = threshold_mask(preprocess_channel(channel, mode), threshold_mode, no_growth)
     buffered_lacunae = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
     candidate = signal & ~buffered_lacunae
     candidate = morphology.remove_small_objects(candidate, min_size=MIN_THREAD_OBJECT_PX2)
@@ -1300,6 +1334,8 @@ def save_json(
     threshold_mode: str,
     gap_bridging: bool,
     bridges: list,
+    block_growth: bool,
+    flagged: np.ndarray,
     out_path: Path,
 ) -> None:
     payload = {
@@ -1344,6 +1380,8 @@ def save_json(
             "ridge_sigmas_px": list(RIDGE_SIGMAS_PX) if "ridge" in preprocess else None,
             "gap_bridging": gap_bridging,
             "n_bridges_added": len(bridges),
+            "block_growth_in_flagged": block_growth,
+            "flagged_area_px2": float(flagged.sum()),
             "tophat_radius_px": TOPHAT_RADIUS_PX if "tophat" in preprocess else None,
             "smooth_sigma_px": SMOOTH_SIGMA_PX if preprocess != "none" else None,
             "background_mode_subtract": BACKGROUND_MODE_SUBTRACT if "tophat" in preprocess else None,
@@ -1573,6 +1611,7 @@ def process(
     threshold_mode: str | None = None,
     gap_bridging: bool | None = None,
     lacuna_source: str | None = None,
+    block_growth: bool | None = None,
 ) -> dict:
     method = method or ASSIGNMENT_METHOD
     preprocess = preprocess or PREPROCESS_MODE
@@ -1581,6 +1620,7 @@ def process(
     threshold_mode = threshold_mode or THRESHOLD_MODE
     gap_bridging = GAP_BRIDGING if gap_bridging is None else gap_bridging
     lacuna_source = lacuna_source or LACUNA_SOURCE
+    block_growth = BLOCK_GROWTH_IN_FLAGGED if block_growth is None else block_growth
 
     display, channel = load_channel(image_path)
     if lacuna_source == "v2":
@@ -1595,7 +1635,17 @@ def process(
         )
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(labels, kept)
-    candidate, t_lo = canaliculi_candidate_mask(channel, lacuna_mask, preprocess, threshold_mode)
+    # The Phase 1 shape gate, BEFORE the safety margin. Used only to stop
+    # hysteresis and bridging ADDING connections along a vascular canal;
+    # nothing is removed. Independent of EXCLUSION_MODE.
+    flagged = (
+        exclusion_mask.flagged_structures(channel)[0]
+        if block_growth
+        else np.zeros(channel.shape, dtype=bool)
+    )
+    candidate, t_lo = canaliculi_candidate_mask(
+        channel, lacuna_mask, preprocess, threshold_mode, flagged if block_growth else None
+    )
     # Non-LCN structures are dropped from the candidate mask BEFORE
     # skeletonizing, so nothing downstream ever sees them as network.
     excluded, exclusion_info = exclusion_mask.build_exclusion(image_path, channel, labels, exclusion)
@@ -1606,7 +1656,10 @@ def process(
     bridges: list = []
     if gap_bridging:
         preprocessed = preprocess_channel(channel, preprocess)
-        forbidden = lacuna_mask | excluded
+        # A bridge may not start in, end in, or cross a lacuna body, an
+        # excluded region, or (with BLOCK_GROWTH_IN_FLAGGED) a flagged
+        # non-LCN structure.
+        forbidden = lacuna_mask | excluded | flagged
         bridges = gap_bridging_mod.find_bridges(skeleton, preprocessed, t_lo, forbidden)
         if bridges:
             candidate = gap_bridging_mod.apply_bridges(candidate, bridges)
@@ -1663,7 +1716,7 @@ def process(
     )
     save_json(
         image_path, measurements, stats, t_lo, t_hi, method, preprocess, count_mode,
-        exclusion_info, field, threshold_mode, gap_bridging, bridges,
+        exclusion_info, field, threshold_mode, gap_bridging, bridges, block_growth, flagged,
         out_dir / f"measurements{output_suffix}.json",
     )
 
@@ -1756,6 +1809,12 @@ def main() -> None:
         help="Override LACUNA_SOURCE for this run; suffixes output filenames with _lac-<source>.",
     )
     parser.add_argument(
+        "--no-block-growth",
+        action="store_true",
+        help="Disable BLOCK_GROWTH_IN_FLAGGED for this run (lets hysteresis and bridging grow "
+        "along flagged non-LCN structures); suffixes output filenames with _nogrowthblock.",
+    )
+    parser.add_argument(
         "--no-sanity",
         action="store_true",
         help="Skip the pooled edge-length / node-degree sanity report printed after the run.",
@@ -1777,6 +1836,8 @@ def main() -> None:
         suffix += "_bridged"
     if args.lacuna_source:
         suffix += f"_lac-{args.lacuna_source}"
+    if args.no_block_growth:
+        suffix += "_nogrowthblock"
     if args.hysteresis_low is not None:
         suffix += f"_hl{args.hysteresis_low}"
         globals()["HYSTERESIS_LOW_FRACTION"] = args.hysteresis_low
@@ -1801,6 +1862,7 @@ def main() -> None:
             threshold_mode=args.threshold_mode,
             gap_bridging=args.gap_bridging,
             lacuna_source=args.lacuna_source,
+            block_growth=False if args.no_block_growth else None,
         )
         for image_path in paths
     ]
