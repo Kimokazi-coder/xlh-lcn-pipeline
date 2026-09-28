@@ -332,3 +332,55 @@ regenerated from the repo alone.
 
 Nothing here needs further action; kept for the record of why it took two
 passes.
+
+---
+
+## D7. Round 2 Step 5: local normalization NOT built, because the premise does not hold
+
+**Status: NOTHING ADDED. `PREPROCESS_MODE` has no `"tophat_localnorm"`, and
+there is no `LOCAL_NORMALIZE` switch.**
+
+Step 5 was conditional: *"a) First measure it... b) **If they do** [sit in
+locally dim regions], add PREPROCESS option `tophat_localnorm`"*. I ran (a)
+and the condition is not met, so I did not build (b).
+
+**(a), measured over all 86 interior lacunae, 8 WT images.** For each, its
+root count against the canaliculi-mask density and the raw signal in a 30 px
+ring just outside its body, both normalised to that image:
+
+| | n | local mask density (× image) | local raw signal (× image median) |
+|---|---|---|---|
+| < 3 roots | **1** | 0.392 | **1.080** |
+| ≥ 3 roots | 85 | 0.779 | 1.287 |
+
+- **Only 1 of 86 interior lacunae (1.2%) has fewer than 3 roots.** None has
+  zero. The brief expected "some lacunae get 0 to 3 roots"; on this data
+  that is one lacuna, in 543-2.
+- **The one case is not in a dim region.** Its local raw signal is 1.080×
+  the image median — normal brightness. What is low is the local *mask*
+  density (0.392×). So the canaliculi are genuinely absent from the mask
+  there despite ordinary local brightness.
+- Correlation of roots with local mask density is +0.575; with local raw
+  signal only **+0.169**. Roots track how much network is nearby, not how
+  bright the neighbourhood is.
+
+**Step 1 had already largely fixed this.** Under the pre-Step-1 default,
+3 of 86 (3.5%) had <3 roots; under the new default, 1 of 86 (1.2%). Median
+roots per interior lacuna is 7.0 either way. Adopting hysteresis + bridging
+did the work that local normalization was meant to do.
+
+**Why I did not build it anyway.** `tophat_localnorm` divides by a
+large-scale local signal estimate so dim regions threshold like bright
+ones. The one remaining case has *normal* local brightness, so that
+transform would not touch it. Building it would add an unjustified
+preprocessing option, a new sigma parameter with no provenance, and another
+axis to the guard testing — to address 1.2% of lacunae by a mechanism the
+measurement says is not the cause.
+
+**My recommendation: leave it out.** Revisit if any of these change:
+- the <3-roots fraction rises materially on Hyp or Hyp;Enpp1 fields, which
+  are dimmer and have not been measured;
+- the correlation of roots with local *raw signal* rises well above +0.169;
+- you decide 1 lacuna in 86 is worth correcting anyway.
+
+`src/measure_local_root_density.py` re-runs the measurement.
