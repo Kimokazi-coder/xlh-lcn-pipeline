@@ -386,6 +386,10 @@ v2 lacunae now write to `results/lacunae/543-2`.
 
 ## Fixes round 2, 2026-09-28 (branch `canaliculi-v2-fixes`)
 
+Full write-up: `reports/round2/fixes_round2.md`. Steps 1-2 changed
+defaults; Steps 3-4 added switches that stay OFF; Step 5 was measured and
+deliberately not built (see DECISIONS_NEEDED.md D7).
+
 ### Step 1 (done) — Phase 2 setting adopted as default
 `THRESHOLD_MODE="hysteresis"`, `HYSTERESIS_LOW_FRACTION=0.75`,
 `GAP_BRIDGING=True` are now the DEFAULTS, on the Phase 2 guard comparison
@@ -410,6 +414,26 @@ it is the most segmentation-sensitive metric measured (+77.9% pooled). The
 per-field metrics and roots/cell moved by ~11-13% over the same change.
 `HYSTERESIS_LOW_FRACTION=0.75` remains the weakest-provenance number in
 the default set -- one value tried after one failure, not a sweep.
+
+### Steps 2-5 (done, 2026-09-28)
+- **Step 2** `BLOCK_GROWTH_IN_FLAGGED=True` (DEFAULT): inside a flagged
+  non-LCN structure, hysteresis keeps only already-strict pixels and no
+  gap bridge may start, end or cross. Deletes nothing. Skeleton px inside
+  flagged dropped 11-18% per affected image; outside unchanged to within
+  2-4 px of ~33,000.
+- **Step 3** `src/segment_lacunae_hybrid.py`, `LACUNA_SOURCE="hybrid"`
+  (NOT default): v2 plus v3-only objects passing intensity, not-flagged
+  and >=4-roots gates. Adds 2 objects over 8 images; **(230,300) in
+  542_z06 is recovered**. Gate (a) decided every verdict, so gate (c)
+  never bound on WT data.
+- **Step 4** `src/merge_adjacent_lacunae.py`, `MERGE_ADJACENT_PAIRS`
+  (NOT default): merges lacuna pieces split by a thresholding break.
+  Exactly one pair exists across all 8 images (682_z29, 13 -> 12).
+  Deliberately does NOT use the saddle ratio, which misreads a
+  disconnection as a deep neck. `MERGE_SADDLE_RATIO_MIN` untouched.
+- **Step 5** measured only. 1 of 86 interior lacunae has <3 roots, and it
+  is NOT in a dim region (local raw 1.080x the image median).
+  `tophat_localnorm` deliberately not built -- see DECISIONS_NEEDED.md D7.
 
 ## Overnight autonomous run, 2026-09-24
 
