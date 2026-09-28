@@ -376,10 +376,12 @@ measurement logic was touched, and the module's behaviour and numbers are
 unchanged — only where it writes. Without it the next v2 run would have
 recreated `results/count/` and undone the reorganization.
 
-A consequence to be aware of: that module's DOCSTRING still says outputs go
-to `results/count/<image_stem>/`, because the instruction was to change
-only the constant and nothing else in the file. **The docstring is stale;
-the constant is correct.** Fix it whenever the no-modify rule is lifted.
+**RESOLVED 2026-09-28.** The stale docstring was then fixed with explicit
+approval: two comment/docstring lines in that file now say
+`results/lacunae/` instead of `results/count/`. Verified comment-only by
+parsing the file before and after, stripping every docstring, and
+confirming the two ASTs are identical -- so no statement, expression or
+constant in the module changed.
 
 Verified after the move: 543-2 canaliculi 62.33 / 27.41 (unchanged), and
 v2 lacunae now write to `results/lacunae/543-2`.

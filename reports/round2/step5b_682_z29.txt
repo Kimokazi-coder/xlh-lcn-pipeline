@@ -1,0 +1,54 @@
+====================================================================================================
+FOLLOW-UP on 682_z29c1-3 -- CURRENT DEFAULT. v-raw / pre-validation, PIXEL units. Read-only.
+====================================================================================================
+
+(a) roots and 30px-ring skeleton length per INTERIOR lacuna
+    image median roots = 5.0    image median ring skeleton = 247 px
+     id     x     y  roots   /med  ring_px   /med  note
+      2   921   135      8   1.60      375   1.52  
+      3   449   250      4   0.80      309   1.25  
+      4   220   431      8   1.60      352   1.43  
+      5   493   532      5   1.00      240   0.97  <- A
+      6   357   555      6   1.20      352   1.43  
+      8   182   716      5   1.00      247   1.00  
+      9    76   831      5   1.00      149   0.60  
+     10   125   842      4   0.80      179   0.72  
+     11   761   905      3   0.60       97   0.39  <- B
+     12   307   920      7   1.40      313   1.27  
+     13   438   978      6   1.20      186   0.75  
+    (2 border lacunae excluded; 11 interior)
+
+(b) the unoutlined dim elongated object at ~(860,730)
+    v2 pre-filter object at (872,724) area=346 mean_I=0.622 solidity=0.824 aspect=3.35
+        -> REJECTED area 346 < 400
+    v2 pre-filter object at (846,735) area=229 mean_I=0.605 solidity=0.871 aspect=1.89
+        -> REJECTED area 229 < 400
+    v3: KEPT object at (857,725) area=2756 solidity=0.938
+    hybrid candidate at (857,725) area=2756:
+        (a) relative intensity 0.532 (needs >= 0.75) -> REJECT
+        (b) flagged-overlap 0.000 (needs 0) -> PASS
+        (c) roots 7 (needs >= 4) -> PASS
+        ACCEPTED BY HYBRID: False
+
+(c) RELATIVE sparsity criterion across all 8 images
+    flag a lacuna if roots < 0.5 x its image's median roots,
+    OR ring skeleton length < 0.5 x its image's median ring length
+
+    image                  n_int med_roots  med_ring  by roots  by ring  EITHER
+    542 WT  2_z06c1-2         13       8.0       319         0        0       0
+    542 WT  2_z18c1-2         11       8.0       376         1        1       1
+    543-2                     12       7.5       310         1        1       1
+    543_3                      9       7.0       300         0        0       0
+    543_z13c1-2               11       7.0       310         1        0       1
+    682_z08c1-2                8       9.0       362         0        0       0
+    682_z23c-2                11       6.0       306         0        0       0
+    682_z29c1-3               11       5.0       247         0        1       1
+
+    POOLED: 4 of 86 interior lacunae flagged (4.7%).
+    For comparison, the absolute "< 3 roots" rule flagged 1 of 86 (1.2%).
+682_z29c1-3.tif [graph/tophat/edge/hysteresis/bridged(17)]: lacunae=13  mean_canaliculi_per_cell=26.18  mean_canaliculus_length_px=38.20  -> F:\lcn-quant\results\canaliculi\682_z29c1-3\all_method_results
+    canaliculi_count             mean=     26.18  median=     22.00  sd=     22.17  (unitless)
+    total_length_px              mean=    848.51  median=    799.78  sd=    602.72  (px)
+    mean_canaliculus_length_px   mean=     38.20  median=     36.53  sd=     13.11  (px)
+
+verification overlay: results/canaliculi/682_z29c1-3/all_method_results/verification_round2-step5b.png

@@ -41,7 +41,7 @@ area distribution of interior (non-border) kept objects across a directory
 of images before deciding whether/how to raise it -- do not bump this
 number without looking at that distribution first.
 
-Outputs, per image, under results/count/<image_stem_with_underscores>/:
+Outputs, per image, under results/lacunae/<image_stem_with_underscores>/:
     overlay.png        original image with kept objects outlined in green
     measurements.xlsx   "summary" sheet (image, lacuna_count, border_count,
                          interior_count, then mean/median/SD over INTERIOR
@@ -347,7 +347,7 @@ def summarize_interior(measurements: list[dict], precision: int) -> dict:
 # --- Output -------------------------------------------------------------
 
 def image_output_dir(image_path: Path) -> Path:
-    """results/count/<image_stem_with_spaces_replaced_by_underscores>/"""
+    """results/lacunae/<image_stem_with_spaces_replaced_by_underscores>/"""
     safe_stem = image_path.stem.replace(" ", "_")
     return COUNT_DIR / safe_stem
 

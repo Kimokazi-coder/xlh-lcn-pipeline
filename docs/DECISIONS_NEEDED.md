@@ -384,3 +384,65 @@ measurement says is not the cause.
 - you decide 1 lacuna in 86 is worth correcting anyway.
 
 `src/measure_local_root_density.py` re-runs the measurement.
+
+---
+
+## D8. The hybrid intensity gate overrides strong connectivity evidence
+
+**Status: NOTHING CHANGED. `LACUNA_SOURCE="v2"` is still the default and
+the hybrid gates are unchanged. This is a correction to what I reported in
+Step 3, plus a recommendation.**
+
+In Step 3 I wrote that gate (a), relative intensity, "decided every
+verdict" and that gate (c), the roots test, "never changed an outcome", and
+treated that as benign. Examining 682_z29c1-3 shows it is not benign.
+
+**The unoutlined dim elongated object at ~(860,730) in 682_z29c1-3:**
+
+| gate | value | threshold | verdict |
+|---|---|---|---|
+| (a) relative intensity | **0.532** | ≥ 0.75 | **REJECT** |
+| (b) flagged overlap | 0.000 | 0 | PASS |
+| (c) roots attached | **7** | ≥ 4 | PASS |
+
+**It has 7 canalicular roots. The median interior lacuna in that same
+image has 5.** So an object with *more* canaliculi radiating from it than
+the typical accepted lacuna in its own field is rejected purely for being
+dim — which is precisely the failure mode gate (c) was designed to
+prevent. Gate (a) is not a harmless first filter here; it is overriding the
+evidence the brief called the key discriminator.
+
+It is also missed three separate ways, which is worth seeing together:
+- **v2 does find it**, but splits it into two pieces of 346 and 229 px²,
+  both rejected on `area < TEST_MIN_AREA_PX2 = 400`. Their combined area,
+  575 px², would pass.
+- **`MERGE_ADJACENT_PAIRS` cannot rescue it** — that step only considers
+  pairs of *kept* lacunae, and neither piece is kept.
+- **v3 does find it cleanly**, as one object of 2756 px² at solidity 0.938,
+  and hybrid then rejects it on brightness.
+
+**Options.**
+1. Leave as is. Costs this object and others like it in dim fields.
+2. Let (c) override (a) when connectivity is clearly strong — e.g. accept
+   if roots ≥ the image's median roots, regardless of intensity. On the WT
+   data that would admit this object; how many others it admits has not
+   been measured.
+3. Lower `MIN_RELATIVE_INTENSITY`. Risky and blunt: the v2-kept/v3-only
+   populations separate cleanly at 0.823/0.783, so lowering the cut to 0.53
+   would admit most of the 122 dim v3-only objects, not just this one.
+
+**My recommendation: option 2**, because it uses the discriminator that
+actually distinguishes a lacuna from haze rather than the one that
+correlates with it. But it needs measuring across all 8 images before
+adoption, and it interacts with **D4** — whether partly-sectioned lacunae
+count at all — so it should not be decided in isolation.
+
+**Also note for D7.** The relative sparsity criterion (roots or ring
+skeleton length below half the image median) flags **4 of 86** interior
+lacunae, against **1 of 86** for the absolute "< 3 roots" rule. The two
+sub-criteria are complementary: lacuna B at (761,905) in 682_z29 has 3
+roots, which the roots test does NOT flag (3 > 0.5 × 5.0), but its ring
+skeleton length of 97 px is well under half that image's median of 247, so
+the ring test does. A relative criterion is the better instrument; it does
+not change D7's conclusion that local normalization is the wrong fix, since
+the flagged lacunae are still sparse in mask rather than dim in raw signal.
