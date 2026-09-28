@@ -1,6 +1,9 @@
-# --- Project data and outputs (never commit) -------------------------------
-# Raw and derived image data: large, often not redistributable.
-data/
+# --- Project data and outputs ----------------------------------------------
+# Input images ARE tracked, by explicit instruction (2026-09-24 overnight
+# brief, reaffirmed 2026-09-28): the repo is meant to be self-contained, so
+# a run is reproducible from the repo alone. The 8 WT .tif files are 2-3 MB
+# each, 24 MB total. The blinding key stays excluded regardless -- see the
+# code_key section below, which is what actually must never be committed.
 # Generated masks, overlays, CSVs, figures - reproducible from data/ + code.
 # Exception: results/count/ (v2 outputs) is deliberately committed for now,
 # while v2 is under active review -- see git log.
