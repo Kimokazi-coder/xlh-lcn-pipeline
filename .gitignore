@@ -1,29 +1,13 @@
 # --- Project data and outputs ----------------------------------------------
-# Input images ARE tracked, by explicit instruction (2026-09-24 overnight
-# brief, reaffirmed 2026-09-28): the repo is meant to be self-contained, so
-# a run is reproducible from the repo alone. The 8 WT .tif files are 2-3 MB
-# each, 24 MB total. The blinding key stays excluded regardless -- see the
-# code_key section below, which is what actually must never be committed.
-# Generated masks, overlays, CSVs, figures - reproducible from data/ + code.
-# Exception: results/count/ (v2 outputs) is deliberately committed for now,
-# while v2 is under active review -- see git log.
-results/*
-# Committed output subtrees. `results/*` above ignores everything, so EVERY
-# new top-level folder under results/ needs an exception added here or its
-# contents are silently left out of commits -- which is exactly what
-# happened to results/lacunae/ and results/candidates/ when the 2026-09-28
-# reorganization renamed results/count/ and results/count_v3_candidate/.
-# If you add a folder under results/, add it here too.
-!results/canaliculi/
-!results/canaliculi/**
-!results/lacunae/
-!results/lacunae/**
-!results/candidates/
-!results/candidates/**
-# Phase 0 diagnostics: the evidence the later phases are argued from,
-# so it is kept with the code that produced it.
-!results/diagnostics/
-!results/diagnostics/**
+# POLICY (reaffirmed 2026-09-29): push everything. Input images, results/,
+# reports/ and docs/ are all tracked and pushed, by explicit instruction --
+# the repo is meant to be fully self-contained, so a run is reproducible
+# from the repo alone. There is no blanket ignore on data/ or results/ any
+# more (an earlier `results/*` + per-folder allowlist here was a foot-gun:
+# a new results/ subfolder was silently dropped from commits unless someone
+# remembered to add an exception for it -- that already happened once,
+# during the 2026-09-28 reorganization). The blinding key is the one
+# absolute, unconditional exclusion -- see code_key below.
 
 # --- Blinding key ----------------------------------------------------------
 # Maps coded specimen IDs to experimental groups. Committing this would
