@@ -16,10 +16,12 @@ setting, so it can never overwrite a default output.
                        which lacuna detector feeds this module
     PREPROCESS_MODE    *"tophat" | "ridge" | "tophat+ridge" | "none"
                        how the channel is flattened before thresholding
-    THRESHOLD_MODE     *"multiotsu_low" | "hysteresis"
+    THRESHOLD_MODE     "multiotsu_low" | *"hysteresis"
                        how the pre-processed image is cut
-    GAP_BRIDGING       *False | True
+    GAP_BRIDGING       False | *True
                        evidence-based joining of broken threads
+    BLOCK_GROWTH_IN_FLAGGED  False | *True
+                       no new connections inside flagged non-LCN structures
     EXCLUSION_MODE     *"none" | "auto" | "manual" | "both"
                        removal of non-LCN structures before skeletonizing
     ASSIGNMENT_METHOD  *"graph" | "euclidean"
@@ -161,6 +163,8 @@ Usage:
     python src/canaliculi_v1.py --dir data/WT --method euclidean
     python src/canaliculi_v1.py --dir data/WT --preprocess none
     python src/canaliculi_v1.py --dir data/WT --count-mode path
+    python src/canaliculi_v1.py --dir data/WT --threshold-mode multiotsu_low --no-gap-bridging
+        (the pre-2026-09-28 default; 543-2 gives 37.00 / 29.43 / 0 bridges)
     python src/canaliculi_v1.py --image data/WT/example.tif
 """
 

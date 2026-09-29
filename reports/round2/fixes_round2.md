@@ -29,7 +29,9 @@ segmentation-sensitive metric measured (+77.9% pooled). Per-field metrics
 and roots/cell moved 11–13% over the same change.
 
 **Became default.** The old path stays reachable via
-`--threshold-mode multiotsu_low` and omitting `--gap-bridging`.
+`--threshold-mode multiotsu_low --no-gap-bridging`. (Corrected
+2026-09-29: this originally said "omitting `--gap-bridging`", which did
+not turn bridging off. The `--no-gap-bridging` flag was added for this.)
 
 `HYSTERESIS_LOW_FRACTION=0.75` remains the weakest-provenance number in the
 default set: 0.5 was tried, failed both guards, 0.75 passed. One value
@@ -193,6 +195,7 @@ revisiting.
 
 ## Decisions waiting
 
-`docs/DECISIONS_NEEDED.md` — D0–D7. The largest is still **D4**: whether a
+`docs/DECISIONS_NEEDED.md`, D0 to D9 (D8 and D9 were added after this
+report was written). The largest is still **D4**: whether a
 lacuna lying partly outside the focal plane counts. **D7** is new from this
 round.

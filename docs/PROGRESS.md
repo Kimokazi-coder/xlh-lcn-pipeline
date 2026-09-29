@@ -1,6 +1,6 @@
 # Progress status
 
-_Last updated: 2026-09-28 (fixes round 2). Everything below is v1-raw/v2-raw and pre-validation
+_Last updated: 2026-09-29 (round 3 housekeeping). Everything below is v1-raw/v2-raw and pre-validation
 against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
 
 ## Features that exist
@@ -20,7 +20,7 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
   `TEST_ASPECT_RATIO_MAX=6.0`, `SEED_PROMINENCE_FRACTION=0.3`,
   `MERGE_SADDLE_RATIO_MIN=0.35` (new, see Known Issues). Border lacunae are
   kept and flagged `on_border`, not dropped. Outputs per image under
-  `results/count/<image>/`: `overlay.png`, `measurements.xlsx` (summary +
+  `results/lacunae/<image>/`: `overlay.png`, `measurements.xlsx` (summary +
   per_lacuna sheets), `measurements.json`. Per-image summary stats
   (mean/median/SD of area, axis lengths, aspect_ratio, eccentricity,
   solidity) computed over interior (non-border) lacunae only.
@@ -407,8 +407,9 @@ real dim threads.
 
 Use **62.33 / 27.41** as the regression check from now on. The old
 `multiotsu_low` path is still available via `--threshold-mode
-multiotsu_low` and `GAP_BRIDGING` via omitting `--gap-bridging`, so the
-old numbers remain reproducible.
+multiotsu_low` and `GAP_BRIDGING` via `--no-gap-bridging` (added
+2026-09-29; before that, omitting `--gap-bridging` still bridged), so the
+old numbers remain reproducible: 543-2 gives 37.00 / 29.43 / 0 bridges.
 
 Note the edge count rose 37.00 -> 62.33 (+68%). That is expected and is
 exactly why Phase 4 recommended against edge count as a primary outcome:
@@ -436,6 +437,21 @@ the default set -- one value tried after one failure, not a sweep.
 - **Step 5** measured only. 1 of 86 interior lacunae has <3 roots, and it
   is NOT in a dim region (local raw 1.080x the image median).
   `tophat_localnorm` deliberately not built -- see DECISIONS_NEEDED.md D7.
+
+## Round 3 housekeeping, 2026-09-29 (branch `canaliculi-v2-fixes`)
+
+- **Hybrid roots override OFF** (`OVERRIDE_ON_ROOTS = False`), per D9.
+  Hybrid adds 2 objects over 8 WT images, both in 542_z06: (230,303) and
+  (224,351). With the override on it added 22.
+- **Stale default outputs regenerated.** `results/canaliculi/<image>/` for
+  7 of 8 images still held output from 2026-09-22, before hysteresis,
+  bridging and block-growth existed. Only 543-2 had been re-run. All 8 now
+  reflect the current defaults. Mean edge count per cell changed, for
+  example, 542_z06 20.15 to 30.85, 543_3 23.78 to 47.11, 682_z29 13.55 to
+  26.18. Any figure read from those folders before this date for those 7
+  images came from the old pipeline.
+- **`--no-gap-bridging` added.** The old default is reproducible again.
+- 543-2 reference check after each commit: 62.33 / 27.41 / 21 bridges.
 
 ## Overnight autonomous run, 2026-09-24
 

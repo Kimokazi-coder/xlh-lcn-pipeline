@@ -35,11 +35,11 @@ size/shape measurements are truncated by the field of view. Downstream
 stats should filter on on_border, not this script. Set EXCLUDE_BORDER_OBJECTS
 below to restore the old drop-them behaviour for comparison.
 
-Min-area filter: TEST_MIN_AREA_PX2 is still a rough guess (not yet derived
-from data). Use --report-area-distribution (see main()) to print the pooled
-area distribution of interior (non-border) kept objects across a directory
-of images before deciding whether/how to raise it -- do not bump this
-number without looking at that distribution first.
+Min-area filter: TEST_MIN_AREA_PX2 = 400 was derived from the pooled area
+distribution of interior objects over all 8 WT images (see the comment on
+the constant); it is data-derived but not validated against ground truth.
+Use --report-area-distribution (see main()) to reprint that distribution
+before changing it.
 
 Outputs, per image, under results/lacunae/<image_stem_with_underscores>/:
     overlay.png        original image with kept objects outlined in green

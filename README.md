@@ -50,8 +50,9 @@ results/     generated masks, overlays, tables, diagnostics (see Outputs)
 
 Any `code_key` file is excluded from version control — the
 blinding key mapping coded specimen IDs to experimental groups must stay out of
-the repository. Most of `results/` is git-ignored; the subtrees that are
-committed are listed in `.gitignore`.
+the repository. Everything else is tracked and pushed: `data/`, `results/`,
+`reports/` and `docs/`, so every result can be regenerated from the repo
+alone (policy since 2026-09-29, see `.gitignore`).
 
 ## Pipeline modules
 
@@ -122,11 +123,11 @@ comparison can never overwrite a default output.
 
 | switch | values | CLI |
 | --- | --- | --- |
-| `LACUNA_SOURCE` | **`"v2"`** · `"v3_candidate"` | `--lacuna-source` |
+| `LACUNA_SOURCE` | **`"v2"`** · `"v3_candidate"` · `"hybrid"` | `--lacuna-source` |
 | `PREPROCESS_MODE` | **`"tophat"`** · `"ridge"` · `"tophat+ridge"` · `"none"` | `--preprocess` |
 | `THRESHOLD_MODE` | `"multiotsu_low"` · **`"hysteresis"`** | `--threshold-mode` |
 | `HYSTERESIS_LOW_FRACTION` | **`0.75`** | — |
-| `GAP_BRIDGING` | `False` · **`True`** | `--gap-bridging` |
+| `GAP_BRIDGING` | `False` · **`True`** | `--no-gap-bridging` |
 | `BLOCK_GROWTH_IN_FLAGGED` | `False` · **`True`** | `--no-block-growth` |
 | `EXCLUSION_MODE` | **`"none"`** · `"auto"` · `"manual"` · `"both"` | `--exclusion` |
 | `ASSIGNMENT_METHOD` | **`"graph"`** · `"euclidean"` | `--method` |
@@ -135,7 +136,10 @@ comparison can never overwrite a default output.
 `THRESHOLD_MODE="hysteresis"` + `GAP_BRIDGING=True` became the defaults on
 2026-09-28, which **changed the 543-2 reference check from 37.00 / 29.43 to
 62.33 / 27.41**. `BLOCK_GROWTH_IN_FLAGGED` then stops those two from adding
-connections along a vascular canal; it never deletes anything.
+connections along a vascular canal; it never deletes anything. The old
+default is still reproducible with
+`--threshold-mode multiotsu_low --no-gap-bridging` (543-2: 37.00 / 29.43,
+0 bridges).
 
 **Parameter provenance.** Every tunable constant carries a comment saying
 what it does, why that value, and where the value came from — a measured

@@ -49,8 +49,12 @@ Owned fraction alone can therefore never justify a setting.
 
 ## D1. Phase 2: which fragmentation setting, if any, should become default?
 
-**Status: NOTHING CHANGED. `PREPROCESS_MODE="tophat"`,
-`THRESHOLD_MODE="multiotsu_low"`, `GAP_BRIDGING=False` all still default.**
+**Status: RESOLVED 2026-09-28. The recommended `hyst0.75+bridge` was
+adopted (fixes round 2, Step 1): `THRESHOLD_MODE="hysteresis"`,
+`HYSTERESIS_LOW_FRACTION=0.75`, `GAP_BRIDGING=True` are now default. The
+old default stays reachable with
+`--threshold-mode multiotsu_low --no-gap-bridging`. The text below is the
+original recommendation, kept for the record.**
 
 Eight settings were run on all 8 WT images. Guards G1/G2 were fixed before
 running (D0 above). Five settings FAILED a guard; three passed.
@@ -451,8 +455,12 @@ the flagged lacunae are still sparse in mask rather than dim in raw signal.
 
 ## D9. The D8 override is implemented — and I recommend AGAINST adopting it
 
-**Status: implemented behind `LACUNA_SOURCE="hybrid"`, which is still NOT
-the default. `LACUNA_SOURCE="v2"` unchanged. No default changed.**
+**Status: RESOLVED 2026-09-29, NOT adopted. `OVERRIDE_ON_ROOTS = False` in
+`segment_lacunae_hybrid.py` (the code path is kept, so this comparison can
+be re-run by setting it True). Hybrid now adds 2 objects over the 8 WT
+images, both in 542_z06, as before the override. `LACUNA_SOURCE="v2"` is
+still the default. The crops cited below were written while the override
+was on and are kept as the evidence for this decision.**
 
 This reverses the recommendation I made in D8. The size-bias check you
 asked for did its job, and then the crops showed something the numbers did
