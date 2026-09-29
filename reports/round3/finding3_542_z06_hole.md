@@ -67,3 +67,9 @@ understated by 146 px², and solidity by 0.036.
 periosteocytic lesions change the inside and the surround of a lacuna in
 these images is not yet known, so any hole rule should be checked against
 the POL measurement plan (finding 6) before it is adopted.
+
+## Decision (2026-09-29)
+
+**Option 3: recorded as a known case, nothing changed in v2.** Recorded in
+`docs/PROGRESS.md`, Known issue 11. Any hole rule will be designed together
+with the POL measurement plan (finding 6) before it runs on Hyp fields.

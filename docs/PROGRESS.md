@@ -368,6 +368,15 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
     start of an attached canalicular loop. The count is right, but its area
     is inflated by about 30% and its solidity (0.527, 2nd lowest of 98)
     describes body plus tail. Same report as 9.
+11. **KNOWN CASE, left as is (2026-09-29): unfilled hole in a kept
+    lacuna.** 542_z06 id 12 at (783,581) has an enclosed 146 px^2 hole, a
+    real dim oval in the raw image, left open because v2 fills holes of
+    20 px^2 or less only. It is the only such hole in the 98 kept lacunae
+    (the other 70 raw-cut holes are at most 10 px^2). Area is understated by
+    4.3% and solidity reads 0.829 instead of 0.865. No canaliculi effect.
+    No hole rule is built: any rule is to be designed together with the POL
+    measurement plan (finding 6) before it runs on Hyp fields. Evidence:
+    `reports/round3/finding3_542_z06_hole.md`.
 
 ## Output reorganization, 2026-09-28
 
