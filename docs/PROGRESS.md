@@ -352,6 +352,22 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    imported from v1's file (`from count_lacunae import load_channel`), so
    removing v1 requires a small refactor first (move that loader to a
    shared module).
+9. **KNOWN CASE, left as is (2026-09-29): thread-scale kept objects on
+   flagged bands.** 542_z06 id 2 at (555,149) and 682_z23 id 2 at (363,7)
+   pass every v2 filter but look like vascular-band wall or band-edge
+   thread, not lacunae. Both are inside a flagged band, and they are the two
+   thinnest kept objects (10.2 and 12.8 px). They are also the only kept
+   objects losing more than 65% of their area to an opening with the
+   top-hat disk (they keep 0.207 and 0.348, next is 0.681). Each adds 1 to
+   its image's lacuna count and acts as a cell in the canaliculi graph.
+   682_z23 id 2 touches the frame edge, so it is already out of the summary
+   stats. To be raised with Dr. Murshed together with D4. Evidence:
+   `reports/round3/finding2_542_z06_objects.md`.
+10. **KNOWN CASE, left as is (2026-09-29): leaked lacuna outline.** 542_z06
+    id 3 at (106,67) is a real lacuna whose v2 outline runs into the thick
+    start of an attached canalicular loop. The count is right, but its area
+    is inflated by about 30% and its solidity (0.527, 2nd lowest of 98)
+    describes body plus tail. Same report as 9.
 
 ## Output reorganization, 2026-09-28
 

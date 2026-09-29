@@ -80,3 +80,22 @@ body plus the tail.
    (r=5) instead of the raw mask, as an additional column rather than a
    replacement, so the effect on the area distribution can be seen first.
 3. Leave both as they are and record them as known cases.
+
+## Decision (2026-09-29) and follow-up on 682_z23 id 2
+
+**Option 3 chosen: both 542_z06 objects are recorded as known cases and
+nothing is changed.** The band-object question goes to Dr. Murshed together
+with D4. Recorded in `docs/PROGRESS.md`, Known issues 9 and 10.
+
+**682_z23 id 2 at (363,7), looked at by eye**
+(`results/diagnostics/round3/finding2/682_z23c-2_id2_x363_y7.png`, numbers
+in `finding2_682_z23_id2.txt`). The visible part is a thin hooked sliver on
+the top edge of the frame, inside a broad hazy flagged region, with no
+compact body in the raw panel. It is 12.8 px thick (3rd thinnest of 98) and
+keeps 0.348 after the r=5 opening (2nd lowest). It has 2 roots (2nd lowest)
+and relative intensity 0.828 (3rd lowest). Reading: band-edge thread, not a
+lacuna, with one caveat. It touches the frame edge, so a lacuna lying
+mostly outside the field of view cannot be excluded from this image alone.
+It is flagged on_border, so it is already left out of the summary
+statistics, but it still counts toward lacuna_count and acts as a cell in
+the canaliculi graph.
