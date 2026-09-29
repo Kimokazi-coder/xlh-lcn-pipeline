@@ -101,7 +101,14 @@ MIN_ROOTS = 4
 # exceptionally well connected. Gate (a) was shown to reject objects with
 # more canaliculi radiating from them than the typical accepted lacuna in
 # their own field, which is the failure gate (c) exists to prevent.
-OVERRIDE_ON_ROOTS = True
+#
+# OFF since 2026-09-29, on the D9 finding in docs/DECISIONS_NEEDED.md: of
+# four override additions examined by eye, three were dense canalicular mesh
+# with no lacuna body. "Roots" counts threads passing near an object, not
+# threads ending at it, so a point in dense mesh scores like a hub. With this
+# False, hybrid admits only objects passing all three gates (2 on the WT set).
+# The code path is kept so the D9 comparison stays reproducible.
+OVERRIDE_ON_ROOTS = False
 
 # WHICH roots measure the override uses. This is the load-bearing choice,
 # because the three available measures disagree sharply -- of 80 candidates
