@@ -414,6 +414,35 @@ SAVE_MASK_PNG = True
 # if the dataset or the preprocessing changes.
 LACUNA_ATTACH_GAP_PX = 10
 
+# Maximum graph distance (px) at which a cell may still take ownership of a
+# thread ("graph" method only). None = no cap, the behaviour before
+# 2026-09-29, and the DEFAULT: the cap is a switch, off unless asked for.
+#
+# WHY. Ownership is a multi-source shortest path through the whole skeleton
+# with no distance limit, so a cell attached to a large connected mesh can
+# own threads far across the field. Measured over the 8 WT images
+# (diagnostics/canaliculi/measure_reach.py, reports/round3/step1_reach.md):
+# owned threads end a median 105 px from their cell but reach up to 864 px,
+# 46 of 98 cells own threads more than 200 px away, and the largest owner in
+# each image takes 17 to 41% of that image's owned length.
+#
+# RULE. A node stays owned only if its graph distance to its cell (node_dist,
+# including the attachment gap) is <= the cap. An edge (thread) stays owned
+# if at least one end is still owned, and is then kept WHOLE, so owned
+# material can extend past the cap by at most one edge length. Nothing is
+# reassigned: multi-source Dijkstra already gave each node to its nearest
+# cell, so a node beyond the cap for its own cell is beyond it for all.
+#
+# VALUE when switched on: REACH_CAP_PRIMARY_PX. Chosen by a rule fixed
+# before looking at any capped output: the smallest cap that keeps at least
+# 90% of pooled owned skeleton length owned, rounded to a multiple of 25 px.
+# The exact value is 265.1 px (the length-weighted p90 of entry distance);
+# rounding up gives 275 px, which keeps 90.8%. By construction this trims
+# only the far tail. It does not make owned length a local measure; see the
+# ring lengths below for that.
+REACH_CAP_PX = None
+REACH_CAP_PRIMARY_PX = 275.0
+
 # Terminal branches (graph method) shorter than this are treated as
 # thresholding-noise spurs and pruned before counting/assignment -- this
 # is what brings canaliculi_count down from the tens-to-hundreds/cell seen
@@ -924,6 +953,19 @@ def assign_by_connectivity(G: nx.Graph, cell_ids: list[int]) -> tuple[dict, dict
     return owner, node_dist
 
 
+def apply_reach_cap(owner: dict, node_dist: dict, cap: float | None) -> tuple[dict, dict]:
+    """Drop ownership of every node farther than `cap` (graph px) from its
+    cell. None returns the inputs unchanged. See REACH_CAP_PX for the rule
+    and why nothing is reassigned."""
+    if cap is None:
+        return owner, node_dist
+    kept = {n for n, d in node_dist.items() if d <= cap}
+    return (
+        {n: c for n, c in owner.items() if n in kept},
+        {n: d for n, d in node_dist.items() if n in kept},
+    )
+
+
 def assign_edges(G: nx.Graph, owner: dict, node_dist: dict) -> dict:
     """Give EVERY real (non-virtual) edge an owning cell, not just the
     edges that happen to lie on some node's shortest path. An edge belongs
@@ -1135,17 +1177,20 @@ def canaliculi_measurements_graph(
     nearest_id: np.ndarray,
     precision: int,
     count_mode: str,
+    reach_cap: float | None = None,
 ) -> tuple[list[dict], np.ndarray, nx.Graph, dict]:
     """Assignment is identical in both count modes (network connectivity,
     multi-source shortest path); only what gets COUNTED differs -- see
     COUNT_MODE. Also returns the final graph and its edge ownership, for
-    the sanity report."""
+    the sanity report. `reach_cap` (px, None = off) limits how far through
+    the network a cell may own; see REACH_CAP_PX."""
     cell_ids = list(range(1, len(kept) + 1))
 
     G, skel_obj = build_network_graph(skeleton)
     clean_network_graph(G, dist_to_lacuna)
     attach_lacunae(G, dist_to_lacuna, nearest_id, cell_ids)
     owner, node_dist = assign_by_connectivity(G, cell_ids)
+    owner, node_dist = apply_reach_cap(owner, node_dist, reach_cap)
     edge_owner = assign_edges(G, owner, node_dist)
 
     measurements = []
@@ -1347,6 +1392,7 @@ def save_json(
     block_growth: bool,
     flagged: np.ndarray,
     out_path: Path,
+    reach_cap: float | None = None,
 ) -> None:
     payload = {
         "status": "v1-raw",
@@ -1391,6 +1437,7 @@ def save_json(
             "gap_bridging": gap_bridging,
             "n_bridges_added": len(bridges),
             "block_growth_in_flagged": block_growth,
+            "reach_cap_px": reach_cap if method == "graph" else None,
             "flagged_area_px2": float(flagged.sum()),
             "tophat_radius_px": TOPHAT_RADIUS_PX if "tophat" in preprocess else None,
             "smooth_sigma_px": SMOOTH_SIGMA_PX if preprocess != "none" else None,
@@ -1611,6 +1658,9 @@ def save_mask_pngs(candidate: np.ndarray, skeleton: np.ndarray, out_dir: Path, s
     imsave(out_dir / f"skeleton{suffix}.png", (skeleton * 255).astype(np.uint8), check_contrast=False)
 
 
+_UNSET = object()
+
+
 def process(
     image_path: Path,
     method: str | None = None,
@@ -1622,7 +1672,11 @@ def process(
     gap_bridging: bool | None = None,
     lacuna_source: str | None = None,
     block_growth: bool | None = None,
+    reach_cap=_UNSET,
 ) -> dict:
+    # None means "cap off" for reach_cap, so "use the module default" needs
+    # its own marker.
+    reach_cap = REACH_CAP_PX if reach_cap is _UNSET else reach_cap
     method = method or ASSIGNMENT_METHOD
     preprocess = preprocess or PREPROCESS_MODE
     count_mode = count_mode or COUNT_MODE
@@ -1690,7 +1744,7 @@ def process(
     if method == "graph":
         measurements, owner_map, graph, edge_owner = canaliculi_measurements_graph(
             kept, skeleton, dist_to_lacuna, nearest_id,
-            precision=config.CSV_FLOAT_PRECISION, count_mode=count_mode,
+            precision=config.CSV_FLOAT_PRECISION, count_mode=count_mode, reach_cap=reach_cap,
         )
     elif method == "euclidean":
         measurements = canaliculi_measurements_euclidean(
@@ -1737,7 +1791,7 @@ def process(
     save_json(
         image_path, measurements, stats, t_lo, t_hi, method, preprocess, count_mode,
         exclusion_info, field, threshold_mode, gap_bridging, bridges, block_growth, flagged,
-        out_dir / f"measurements{output_suffix}.json",
+        out_dir / f"measurements{output_suffix}.json", reach_cap=reach_cap,
     )
 
     mean_count = stats["canaliculi_count"]["mean"]
@@ -1751,6 +1805,8 @@ def process(
         mode_tag += f"/{threshold_mode}"
     if gap_bridging:
         mode_tag += f"/bridged({len(bridges)})"
+    if reach_cap is not None and method == "graph":
+        mode_tag += f"/cap{reach_cap:g}"
     print(
         f"{image_path.name} [{method}/{preprocess}/{mode_tag}]: lacunae={len(kept)}  "
         f"mean_canaliculi_per_cell={mean_count_s}  mean_canaliculus_length_px={mean_length_s}  -> {out_dir}"
@@ -1851,6 +1907,27 @@ def main() -> None:
         help="Disable BLOCK_GROWTH_IN_FLAGGED for this run (lets hysteresis and bridging grow "
         "along flagged non-LCN structures); suffixes output filenames with _nogrowthblock.",
     )
+    # REACH_CAP_PX is None (off) by default. --reach-cap turns it on for one
+    # run, at REACH_CAP_PRIMARY_PX unless a value is given; --no-reach-cap
+    # forces it off, so the uncapped behaviour stays reproducible whatever
+    # the module default is set to later.
+    cap = parser.add_mutually_exclusive_group()
+    cap.add_argument(
+        "--reach-cap",
+        type=float,
+        nargs="?",
+        const=REACH_CAP_PRIMARY_PX,
+        default=None,
+        metavar="PX",
+        help=f"Cap how far through the network a cell may own threads, in px (default value "
+        f"{REACH_CAP_PRIMARY_PX:g} when given without a number). Graph method only; suffixes "
+        "output filenames with _cap<PX>.",
+    )
+    cap.add_argument(
+        "--no-reach-cap",
+        action="store_true",
+        help="Force the reach cap off for this run; suffixes output filenames with _nocap.",
+    )
     parser.add_argument(
         "--no-sanity",
         action="store_true",
@@ -1877,6 +1954,10 @@ def main() -> None:
         suffix += f"_lac-{args.lacuna_source}"
     if args.no_block_growth:
         suffix += "_nogrowthblock"
+    if args.reach_cap is not None:
+        suffix += f"_cap{args.reach_cap:g}"
+    if args.no_reach_cap:
+        suffix += "_nocap"
     if args.merge_adjacent:
         suffix += "_merged"
         merge_adjacent_lacunae.MERGE_ADJACENT_PAIRS = True
@@ -1905,6 +1986,7 @@ def main() -> None:
             gap_bridging=False if args.no_gap_bridging else args.gap_bridging,
             lacuna_source=args.lacuna_source,
             block_growth=False if args.no_block_growth else None,
+            reach_cap=(None if args.no_reach_cap else args.reach_cap if args.reach_cap is not None else _UNSET),
         )
         for image_path in paths
     ]
