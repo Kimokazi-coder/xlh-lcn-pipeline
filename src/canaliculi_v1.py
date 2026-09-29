@@ -509,6 +509,14 @@ VIS_SKELETON_DILATION_PX = 2
 # tracing, for a direct check that the tracing actually matches the signal.
 VIS_DIM_FACTOR = 1.0
 
+# Cosmetic only: also draw the skeleton that NO cell owns, in a neutral
+# grey, so an overlay shows what is not counted per cell (for example
+# threads beyond the reach cap, or fragments never connected to a lacuna).
+# Off by default so the default verification.png is unchanged; the
+# presentation outputs turn it on. Affects no measurement.
+SHOW_UNOWNED_GREY = False
+UNOWNED_GREY_RGB = (150, 150, 150)
+
 # Cosmetic only: colors are evenly spaced around the hue wheel for maximum
 # contrast, then shuffled so lacuna N and N+1 (often spatial neighbors)
 # don't land on adjacent, blend-prone hues. Shuffled with config.RANDOM_SEED
@@ -1351,6 +1359,12 @@ def save_verification(
     either the euclidean nearest_id map or the graph method's
     build_owner_pixel_map output. Same drawing code either way."""
     vis = (display_uint8.astype(np.float32) * VIS_DIM_FACTOR).astype(np.uint8)
+    if SHOW_UNOWNED_GREY:
+        # Drawn first, so owned threads painted below sit on top of it.
+        unowned = skeleton & (owner_map == 0)
+        if unowned.any():
+            unowned = morphology.dilation(unowned, morphology.disk(VIS_SKELETON_DILATION_PX))
+        vis[unowned] = UNOWNED_GREY_RGB
     for lacuna_id in lacuna_ids:
         color = colors[lacuna_id]
         boundary = segmentation.find_boundaries(lacuna_id_map == lacuna_id, mode="outer")
