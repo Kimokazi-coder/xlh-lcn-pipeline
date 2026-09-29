@@ -1804,12 +1804,23 @@ def main() -> None:
         default=None,
         help="Override THRESHOLD_MODE for this run; suffixes output filenames with _thr-<mode>.",
     )
-    parser.add_argument(
+    # GAP_BRIDGING defaults to True, so --gap-bridging alone could never turn
+    # it off and the pre-2026-09-28 path was unreachable from the command
+    # line. --no-gap-bridging is the way back to it.
+    bridging = parser.add_mutually_exclusive_group()
+    bridging.add_argument(
         "--gap-bridging",
         action="store_true",
         default=None,
-        help="Enable evidence-based gap bridging for this run (GAP_BRIDGING override); "
+        help="Force gap bridging on for this run (it is already the default); "
         "suffixes output filenames with _bridged.",
+    )
+    bridging.add_argument(
+        "--no-gap-bridging",
+        action="store_true",
+        help="Disable gap bridging for this run (GAP_BRIDGING override); "
+        "suffixes output filenames with _nobridge. With --threshold-mode multiotsu_low "
+        "this reproduces the pre-2026-09-28 default.",
     )
     parser.add_argument(
         "--hysteresis-low",
@@ -1856,6 +1867,8 @@ def main() -> None:
         suffix += f"_thr-{args.threshold_mode}"
     if args.gap_bridging:
         suffix += "_bridged"
+    if args.no_gap_bridging:
+        suffix += "_nobridge"
     if args.lacuna_source:
         suffix += f"_lac-{args.lacuna_source}"
     if args.no_block_growth:
@@ -1885,7 +1898,7 @@ def main() -> None:
             count_mode=args.count_mode,
             exclusion=args.exclusion,
             threshold_mode=args.threshold_mode,
-            gap_bridging=args.gap_bridging,
+            gap_bridging=False if args.no_gap_bridging else args.gap_bridging,
             lacuna_source=args.lacuna_source,
             block_growth=False if args.no_block_growth else None,
         )
