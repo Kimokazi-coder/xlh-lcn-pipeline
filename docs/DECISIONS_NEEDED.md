@@ -460,7 +460,8 @@ the flagged lacunae are still sparse in mask rather than dim in raw signal.
 be re-run by setting it True). Hybrid now adds 2 objects over the 8 WT
 images, both in 542_z06, as before the override. `LACUNA_SOURCE="v2"` is
 still the default. The crops cited below were written while the override
-was on and are kept as the evidence for this decision.**
+was on and are kept as the evidence for this decision, all 20 of them in
+`results/candidates/lacunae_hybrid/override_d9/<image>/`.**
 
 This reverses the recommendation I made in D8. The size-bias check you
 asked for did its job, and then the crops showed something the numbers did
@@ -514,12 +515,12 @@ I examined four of the twenty override additions. **Three are false
 positives** — the outline sits on dense canalicular mesh with no lacuna
 body in it at all:
 
-- `543-2/added_x998_y149.png` — empty mesh at the frame edge; the real
+- `results/candidates/lacunae_hybrid/override_d9/543-2/added_x998_y149.png` — empty mesh at the frame edge; the real
   lacuna in that crop is elsewhere and already found by v2
-- `682_z23c-2/added_x676_y137.png` — empty mesh, no body
-- `682_z29c1-3/added_x177_y524.png` — a thread crossing, the nearest bright
+- `results/candidates/lacunae_hybrid/override_d9/682_z23c-2/added_x676_y137.png` — empty mesh, no body
+- `results/candidates/lacunae_hybrid/override_d9/682_z29c1-3/added_x177_y524.png` — a thread crossing, the nearest bright
   blob sits outside the outline
-- `543_3/added_x42_y337.png` — a **real** lacuna, but with a badly inflated
+- `results/candidates/lacunae_hybrid/override_d9/543_3/added_x42_y337.png` — a **real** lacuna, but with a badly inflated
   outline covering far more than the bright body
 
 **The mechanism.** "Roots" counts threads passing within
