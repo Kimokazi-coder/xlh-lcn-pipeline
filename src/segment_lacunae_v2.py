@@ -106,7 +106,7 @@ EXCLUDE_BORDER_OBJECTS = False  # False = keep + flag on_border (current default
 # single blob), while leaving a deep, narrow-necked split (two genuinely
 # touching lacunae) alone. Saddle = min distance-transform value along the
 # straight line between the two pieces' peaks; ratio = saddle / smaller peak.
-# Calibrated from src/diagnose_lacuna_splits.py over all 8 WT images: the 3
+# Calibrated from diagnostics/lacunae/diagnose_lacuna_splits.py over all 8 WT images: the 3
 # splits confirmed wrong by eye (542 WT 2_z06c1-2) had ratio >= 0.364; the
 # one split that looks like a real two-lobe separation had ratio 0.000.
 # 0.35 sits between them -- not yet checked against every borderline case.

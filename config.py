@@ -32,7 +32,7 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 # path. The organising principle is that what the CURRENT DEFAULT pipeline
 # produces sits at the top of its folder, and everything else -- comparison
 # runs, experimental detectors, diagnostics -- sits one level down, grouped
-# by what it is. src/reorganize_outputs.py moved the tree into this shape
+# by what it is. diagnostics/tools/reorganize_outputs.py moved the tree into this shape
 # on 2026-09-28 and is idempotent if it ever needs re-running.
 #
 #   canaliculi/<image>/   per-image canalicular outputs (default at top,

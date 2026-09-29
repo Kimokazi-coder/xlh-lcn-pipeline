@@ -156,7 +156,7 @@ the all_method_results/ subfolder of the same image folder:
 So a comparison run can never overwrite the default outputs, and the
 current default result stays visible at the top of the folder instead of
 being buried among a dozen variants. Existing results were moved into
-this layout by src/tidy_canaliculi_results.py.
+this layout by diagnostics/tools/tidy_canaliculi_results.py.
 
 Usage:
     python src/canaliculi_v1.py --dir data/WT
@@ -482,7 +482,7 @@ CANALICULI_DIR = config.CANALICULI_DIR
 # a non-empty output suffix, i.e. one overriding a default via --method,
 # --preprocess or --count-mode) write into, so the default run's outputs
 # stay alone at the top level. Layout only -- affects no measurement.
-# src/tidy_canaliculi_results.py uses the same name for existing results.
+# diagnostics/tools/tidy_canaliculi_results.py uses the same name for existing results.
 COMPARISON_SUBDIR = "all_method_results"
 
 
