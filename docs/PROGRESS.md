@@ -478,6 +478,25 @@ the default set -- one value tried after one failure, not a sweep.
 - **`--no-gap-bridging` added.** The old default is reproducible again.
 - 543-2 reference check after each commit: 62.33 / 27.41 / 21 bridges.
 
+## Canaliculi ownership, 2026-09-29 (branch `presentation-prep`, not merged)
+
+Full write-up: `reports/round3/overnight_summary.md`. No default changed.
+- **Reach measured** (`diagnostics/canaliculi/measure_reach.py`): owned
+  threads end a median 105 px from their cell, up to 864 px; 46 of 98
+  cells own threads more than 200 px away.
+- **`REACH_CAP_PX`** switch, OFF by default; `REACH_CAP_PRIMARY_PX = 275`
+  (smallest cap keeping at least 90% of pooled owned length, rounded to
+  25 px). CLI `--reach-cap [PX]` / `--no-reach-cap`. 543-2 with the cap:
+  56.58 / 27.27 / 21.
+- **New per-cell columns**, ownership-free: `roots_count`,
+  `ring_length_r30_px`, `ring_length_r60_px` (`RING_RADII_PX`); plus
+  `owned_length_px`. Roots, rings and field density do not move at any
+  cap from 100 to 325 px; owned length and edge count do.
+- **`SHOW_UNOWNED_GREY`** cosmetic switch, off by default.
+- **Presentation outputs** in `results/presentation/` (cap on, unowned grey)
+  from `src/make_presentation.py`. `results/canaliculi/` defaults were not
+  regenerated and do not yet carry the new columns.
+
 ## Overnight autonomous run, 2026-09-24
 
 Branch `canaliculi-v2-fixes`. **No default switch value was changed.** The
