@@ -1,6 +1,6 @@
 {
   "status": "v1-raw",
-  "note": "Not yet validated against ground truth. Canaliculi are assigned by network connectivity (multi-source shortest path over the skeleton graph, OCY-style) with short noise spurs pruned first. One canaliculus = one graph edge between two nodes (count_mode='edge', OCY-style): canaliculi_count is the number of edges the cell owns and mean_canaliculus_length_px the mean edge length. Border lacunae are kept (on_border=true) but excluded from summary stats.",
+  "note": "Not yet validated against ground truth. Canaliculi are assigned by network connectivity (multi-source shortest path over the skeleton graph, OCY-style) with short noise spurs pruned first. One canaliculus = one cell-to-tip path (count_mode='path'), which re-counts the shared trunk of a branching thread once per tip. Border lacunae are kept (on_border=true) but excluded from summary stats.",
   "image": "data\\WT\\543-2.tif",
   "units": "px",
   "lacuna_count": 12,
@@ -8,19 +8,19 @@
     "interior_lacuna_count": 12,
     "units": "px",
     "canaliculi_count": {
-      "mean": 62.3333,
-      "median": 51.0,
-      "sd": 44.9188
+      "mean": 7.5833,
+      "median": 7.5,
+      "sd": 2.7455
     },
     "total_length_px": {
-      "mean": 1687.3328,
-      "median": 1266.4158,
-      "sd": 1263.5954
+      "mean": 259.54,
+      "median": 241.0157,
+      "sd": 105.9372
     },
     "mean_canaliculus_length_px": {
-      "mean": 27.4088,
-      "median": 28.085,
-      "sd": 4.2017
+      "mean": 36.1756,
+      "median": 32.1365,
+      "sd": 11.4416
     },
     "roots_count": {
       "mean": 7.5833,
@@ -68,7 +68,7 @@
   },
   "parameters": {
     "assignment_method": "graph",
-    "count_mode": "edge",
+    "count_mode": "roots",
     "preprocess_mode": "tophat",
     "threshold_mode": "hysteresis",
     "hysteresis_low_fraction": 0.75,
@@ -97,9 +97,9 @@
   "lacunae": [
     {
       "lacuna_id": 1,
-      "canaliculi_count": 73,
-      "total_length_px": 1615.5454,
-      "mean_canaliculus_length_px": 22.1308,
+      "canaliculi_count": 9,
+      "total_length_px": 291.2914,
+      "mean_canaliculus_length_px": 32.3657,
       "on_border": false,
       "units": "px",
       "roots_count": 9,
@@ -109,9 +109,9 @@
     },
     {
       "lacuna_id": 2,
-      "canaliculi_count": 146,
-      "total_length_px": 3672.5811,
-      "mean_canaliculus_length_px": 25.1547,
+      "canaliculi_count": 12,
+      "total_length_px": 382.8894,
+      "mean_canaliculus_length_px": 31.9074,
       "on_border": false,
       "units": "px",
       "roots_count": 12,
@@ -121,9 +121,9 @@
     },
     {
       "lacuna_id": 3,
-      "canaliculi_count": 35,
-      "total_length_px": 1009.4478,
-      "mean_canaliculus_length_px": 28.8414,
+      "canaliculi_count": 10,
+      "total_length_px": 264.9655,
+      "mean_canaliculus_length_px": 26.4966,
       "on_border": false,
       "units": "px",
       "roots_count": 10,
@@ -133,9 +133,9 @@
     },
     {
       "lacuna_id": 4,
-      "canaliculi_count": 52,
-      "total_length_px": 1016.0925,
-      "mean_canaliculus_length_px": 19.5402,
+      "canaliculi_count": 8,
+      "total_length_px": 152.0538,
+      "mean_canaliculus_length_px": 19.0067,
       "on_border": false,
       "units": "px",
       "roots_count": 8,
@@ -145,9 +145,9 @@
     },
     {
       "lacuna_id": 5,
-      "canaliculi_count": 18,
-      "total_length_px": 509.0021,
-      "mean_canaliculus_length_px": 28.2779,
+      "canaliculi_count": 4,
+      "total_length_px": 185.3675,
+      "mean_canaliculus_length_px": 46.3419,
       "on_border": false,
       "units": "px",
       "roots_count": 4,
@@ -157,9 +157,9 @@
     },
     {
       "lacuna_id": 6,
-      "canaliculi_count": 50,
-      "total_length_px": 1516.7392,
-      "mean_canaliculus_length_px": 30.3348,
+      "canaliculi_count": 7,
+      "total_length_px": 264.7939,
+      "mean_canaliculus_length_px": 37.8277,
       "on_border": false,
       "units": "px",
       "roots_count": 7,
@@ -169,9 +169,9 @@
     },
     {
       "lacuna_id": 7,
-      "canaliculi_count": 10,
-      "total_length_px": 352.664,
-      "mean_canaliculus_length_px": 35.2664,
+      "canaliculi_count": 2,
+      "total_length_px": 118.2548,
+      "mean_canaliculus_length_px": 59.1274,
       "on_border": false,
       "units": "px",
       "roots_count": 2,
@@ -181,9 +181,9 @@
     },
     {
       "lacuna_id": 8,
-      "canaliculi_count": 103,
-      "total_length_px": 3205.0836,
-      "mean_canaliculus_length_px": 31.1173,
+      "canaliculi_count": 10,
+      "total_length_px": 370.1615,
+      "mean_canaliculus_length_px": 37.0161,
       "on_border": false,
       "units": "px",
       "roots_count": 10,
@@ -193,9 +193,9 @@
     },
     {
       "lacuna_id": 9,
-      "canaliculi_count": 22,
-      "total_length_px": 568.7595,
-      "mean_canaliculus_length_px": 25.8527,
+      "canaliculi_count": 6,
+      "total_length_px": 176.1249,
+      "mean_canaliculus_length_px": 29.3541,
       "on_border": false,
       "units": "px",
       "roots_count": 6,
@@ -205,9 +205,9 @@
     },
     {
       "lacuna_id": 10,
-      "canaliculi_count": 33,
-      "total_length_px": 826.2397,
-      "mean_canaliculus_length_px": 25.0376,
+      "canaliculi_count": 7,
+      "total_length_px": 217.2376,
+      "mean_canaliculus_length_px": 31.0339,
       "on_border": false,
       "units": "px",
       "roots_count": 7,
@@ -217,9 +217,9 @@
     },
     {
       "lacuna_id": 11,
-      "canaliculi_count": 134,
-      "total_length_px": 3947.6004,
-      "mean_canaliculus_length_px": 29.4597,
+      "canaliculi_count": 9,
+      "total_length_px": 476.6884,
+      "mean_canaliculus_length_px": 52.9654,
       "on_border": false,
       "units": "px",
       "roots_count": 9,
@@ -229,9 +229,9 @@
     },
     {
       "lacuna_id": 12,
-      "canaliculi_count": 72,
-      "total_length_px": 2008.2388,
-      "mean_canaliculus_length_px": 27.8922,
+      "canaliculi_count": 7,
+      "total_length_px": 214.6518,
+      "mean_canaliculus_length_px": 30.6645,
       "on_border": false,
       "units": "px",
       "roots_count": 7,

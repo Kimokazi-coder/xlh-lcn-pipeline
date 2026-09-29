@@ -443,6 +443,18 @@ LACUNA_ATTACH_GAP_PX = 10
 REACH_CAP_PX = None
 REACH_CAP_PRIMARY_PX = 275.0
 
+# Radii (px) for the ownership-free RING SKELETON LENGTH per lacuna: skeleton
+# pixels within this Euclidean distance of the lacuna body, each pixel
+# counted only for its nearest lacuna. Uses neither the graph nor ownership,
+# so the reach cap cannot change it.
+#   30 px: the ring already used in round 2 Step 5
+#       (diagnostics/canaliculi/measure_local_root_density.py, RING = 30).
+#   60 px: twice that, about two thirds of the median lacuna major axis
+#       (89 px, pooled v2 kept lacunae), as a second, wider band.
+# Lengths are skeleton PIXEL COUNTS, the same unit as the per-field
+# total_skeleton_length_px, so a diagonal step counts as 1 px, not 1.41.
+RING_RADII_PX = (30, 60)
+
 # Terminal branches (graph method) shorter than this are treated as
 # thresholding-noise spurs and pruned before counting/assignment -- this
 # is what brings canaliculi_count down from the tens-to-hundreds/cell seen
@@ -734,6 +746,9 @@ def canaliculi_measurements_euclidean(
         owned_skeleton = skeleton & (nearest_id == lacuna_id)
         lengths = trace_lacuna_canaliculi(owned_skeleton, dist_to_lacuna)
         measurements.append(_measurement_row(lacuna_id, lengths, on_border, precision))
+    add_ownership_free(
+        measurements, ring_lengths(skeleton, dist_to_lacuna, nearest_id, len(kept)), None, None, precision
+    )
     return measurements
 
 
@@ -1207,8 +1222,40 @@ def canaliculi_measurements_graph(
             )
         measurements.append(_measurement_row(lacuna_id, lengths, on_border, precision))
 
+    roots = {i: len(cell_root_lengths(G, i)) for i in cell_ids}
+    owned = {i: sum(cell_edge_lengths(G, edge_owner, i)) for i in cell_ids}
+    add_ownership_free(
+        measurements, ring_lengths(skeleton, dist_to_lacuna, nearest_id, len(kept)), roots, owned, precision
+    )
+
     owner_map = build_owner_pixel_map(skeleton.shape, skel_obj, G, edge_owner, owner)
     return measurements, owner_map, G, edge_owner
+
+
+# --- Ownership-free per-cell measures -------------------------------------
+
+def ring_lengths(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                 n_lacunae: int) -> dict:
+    """{radius: array indexed by lacuna id} of skeleton pixel counts within
+    that radius of each lacuna, each pixel counted for its nearest lacuna.
+    See RING_RADII_PX."""
+    out = {}
+    for radius in RING_RADII_PX:
+        pixels = skeleton & (dist_to_lacuna <= radius) & (nearest_id > 0)
+        out[radius] = np.bincount(nearest_id[pixels], minlength=n_lacunae + 1)
+    return out
+
+
+def add_ownership_free(measurements: list[dict], rings: dict, roots: dict | None,
+                       owned: dict | None, precision: int) -> None:
+    """Add roots_count, ring_length_r<R>_px and owned_length_px to each row.
+    roots/owned are None for the euclidean method, which has no graph."""
+    for m in measurements:
+        lid = m["lacuna_id"]
+        m["roots_count"] = None if roots is None else int(roots[lid])
+        for radius in RING_RADII_PX:
+            m[f"ring_length_r{radius}_px"] = int(rings[radius][lid])
+        m["owned_length_px"] = None if owned is None else round(float(owned[lid]), precision)
 
 
 # --- Shared measurement row / summary ------------------------------------
@@ -1237,6 +1284,13 @@ SUMMARY_METRICS = [
     ("canaliculi_count", "unitless"),
     ("total_length_px", "px"),
     ("mean_canaliculus_length_px", "px"),
+    # Ownership-free per-cell measures (2026-09-29). roots_count does not
+    # depend on ownership; ring lengths use neither the graph nor ownership.
+    ("roots_count", "unitless"),
+    *[(f"ring_length_r{r}_px", "px") for r in RING_RADII_PX],
+    # Sum of owned edge lengths, whatever COUNT_MODE is. The one of these
+    # that the reach cap changes.
+    ("owned_length_px", "px"),
 ]
 
 
@@ -1245,13 +1299,13 @@ def summarize_interior(measurements: list[dict], precision: int) -> dict:
     n = len(interior)
     stats = {"interior_lacuna_count": n, "units": "px"}
     for field, _unit in SUMMARY_METRICS:
-        values = np.array([m[field] for m in interior], dtype=float)
-        if n == 0:
+        values = np.array([m[field] for m in interior if m.get(field) is not None], dtype=float)
+        if values.size == 0:
             mean = median = sd = None
         else:
             mean = round(float(values.mean()), precision)
             median = round(float(np.median(values)), precision)
-            sd = round(float(values.std(ddof=1)), precision) if n >= 2 else None
+            sd = round(float(values.std(ddof=1)), precision) if values.size >= 2 else None
         stats[field] = {"mean": mean, "median": median, "sd": sd}
     return stats
 
@@ -1340,6 +1394,13 @@ def save_xlsx(
             "'path': one canaliculus = one cell-to-tip path (re-counts shared trunks)"
         ]
     )
+    summary.append(
+        [
+            "roots_count: threads leaving the lacuna surface (ownership-free). "
+            "ring_length_r<R>_px: skeleton px within R px of the body, nearest lacuna only "
+            "(ownership-free). owned_length_px: sum of owned edge lengths (changes with the reach cap)."
+        ]
+    )
     summary.append(["v1-raw / pre-validation -- stats below over interior (on_border=False) lacunae only"])
     summary.append(["metric", "mean", "median", "sd", "units", "n"])
     for field, unit in SUMMARY_METRICS:
@@ -1366,7 +1427,9 @@ def save_xlsx(
             sheet.append([key, value, unit])
 
     per_lacuna = wb.create_sheet("per_lacuna")
-    fields = ["lacuna_id", "canaliculi_count", "total_length_px", "mean_canaliculus_length_px", "on_border", "units"]
+    fields = ["lacuna_id", "canaliculi_count", "total_length_px", "mean_canaliculus_length_px",
+              "roots_count", *[f"ring_length_r{r}_px" for r in RING_RADII_PX], "owned_length_px",
+              "on_border", "units"]
     per_lacuna.append(fields)
     for m in measurements:
         per_lacuna.append([m[f] for f in fields])
