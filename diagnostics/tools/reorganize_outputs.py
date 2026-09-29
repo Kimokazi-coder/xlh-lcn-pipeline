@@ -54,8 +54,8 @@ Safety, in order of importance:
   * Idempotent: a second run finds nothing to do.
 
 Usage:
-    python src/reorganize_outputs.py --dry-run   # print the plan only
-    python src/reorganize_outputs.py             # actually move
+    python diagnostics/tools/reorganize_outputs.py --dry-run   # print the plan only
+    python diagnostics/tools/reorganize_outputs.py             # actually move
 """
 
 from __future__ import annotations
@@ -65,7 +65,7 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
 ROOT = config.PROJECT_ROOT

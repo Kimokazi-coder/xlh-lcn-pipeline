@@ -19,7 +19,7 @@ The lacuna segmentation is identical across settings, so it is computed
 once per image and reused -- it is 7.5 of the 9.5 seconds an image costs.
 
 Usage:
-    python src/report_phase2.py --dir data/WT
+    python diagnostics/canaliculi/report_phase2.py --dir data/WT
 """
 
 from __future__ import annotations
@@ -33,10 +33,11 @@ import numpy as np
 from skimage import measure, morphology
 from skimage.io import imsave
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling diagnose_canaliculi_v2
 from count_lacunae import load_channel  # noqa: E402
 import canaliculi_v1 as can  # noqa: E402
 import exclusion_mask as excl  # noqa: E402

@@ -38,7 +38,7 @@ cyan, other lacunae green) with the flagged region tinted blue | the
 default skeleton in white.
 
 Usage (one line):
-    python src/inspect_kept_lacunae.py --dir data/WT
+    python diagnostics/lacunae/inspect_kept_lacunae.py --dir data/WT
         --target "542 WT  2_z06c1-2" 555,145 --target "542 WT  2_z06c1-2" 100,65
 """
 
@@ -54,10 +54,10 @@ from scipy import ndimage as ndi
 from skimage import measure, morphology, segmentation
 from skimage.io import imsave
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from count_lacunae import load_channel  # noqa: E402
 import canaliculi_v1 as can  # noqa: E402
 import exclusion_mask as excl  # noqa: E402

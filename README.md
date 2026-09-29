@@ -20,7 +20,7 @@ documented module-level constants in `src/`, not in `config.py`; they move into
 micron output anywhere in the pipeline. Areas are px², lengths are px.
 
 This is not an oversight. The `.tif` files carry no usable spatial calibration
-(checked by `src/inspect_tif_metadata.py`: seven of the eight have no
+(checked by `diagnostics/tools/inspect_tif_metadata.py`: seven of the eight have no
 resolution tags at all, and the one that does reports a generic 300 DPI value
 that is implausible for confocal and is almost certainly a software default).
 A real µm/px figure has to come from the confocal acquisition record, not from
@@ -41,7 +41,8 @@ Takes 2D images of stained bone sections — one channel carrying the LCN signal
 
 ```
 data/        input images
-src/         pipeline code
+src/         pipeline code (the workflow only)
+diagnostics/ read-only diagnostic and one-off tool scripts (see Scripts layout)
 config.py    shared configuration (paths, channel selection, output settings)
 docs/        PROGRESS.md, DECISIONS_NEEDED.md
 reports/     text reports, one folder per run
@@ -61,7 +62,9 @@ alone (policy since 2026-09-29, see `.gitignore`).
 | `src/count_lacunae.py` | v1 lacuna counter, single global threshold. Superseded; kept because v2 imports its image loader. |
 | `src/segment_lacunae_v2.py` | **current** lacuna segmentation: multi-Otsu + marker-controlled watershed. |
 | `src/canaliculi_v1.py` | **current** canalicular segmentation, skeletonization, graph cleanup and per-lacuna attribution. |
-| `src/diagnose_*.py` | read-only diagnostics. They measure the pipeline and print evidence; they change nothing. |
+| `src/segment_lacunae_hybrid.py`, `src/segment_lacunae_v3_candidate.py` | alternative lacuna detectors, reached only through `LACUNA_SOURCE`. Not default. |
+| `src/gap_bridging.py`, `src/exclusion_mask.py`, `src/merge_adjacent_lacunae.py` | steps called by `canaliculi_v1.py`, each behind its own switch. |
+| `diagnostics/...` | read-only diagnostics. They measure the pipeline and print evidence; they change nothing. See Scripts layout. |
 
 Run any module with `--help` for its options. Typical use:
 
@@ -72,6 +75,23 @@ python src/canaliculi_v1.py --dir data/WT
 
 Each module's own docstring is the reference for its parameters, what each
 value is, and where that value came from.
+
+## Scripts layout
+
+Since 2026-09-29, scripts are split by role. **Run every script from the
+repo root.**
+
+```
+src/                    the workflow: everything a default or switch run uses
+diagnostics/lacunae/    read-only measurements of lacuna detection
+diagnostics/canaliculi/ read-only measurements of the canaliculi step
+diagnostics/tools/      one-off helpers: tif metadata check, output-tree moves
+```
+
+Nothing in `src/` imports anything in `diagnostics/`. A diagnostic imports
+the workflow modules it measures, so changing a workflow module can change
+what a diagnostic reports, never the other way round. Diagnostic outputs
+still go to `results/diagnostics/`, and their text reports to `reports/`.
 
 ## Configuration
 
@@ -108,7 +128,7 @@ docs/
 A non-default run never overwrites a default output: its filenames carry a
 suffix naming the setting AND it writes to `all_method_results/`.
 
-`src/reorganize_outputs.py` moved the tree into this shape on 2026-09-28.
+`diagnostics/tools/reorganize_outputs.py` moved the tree into this shape on 2026-09-28.
 It is move-only, aborts before touching anything if a destination exists,
 and is idempotent.
 

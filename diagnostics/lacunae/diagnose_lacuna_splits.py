@@ -10,9 +10,9 @@
 Does not modify anything -- prints tables only.
 
 Usage:
-    python src/diagnose_lacuna_splits.py --dir data/WT
-    python src/diagnose_lacuna_splits.py --dir data/WT --debug-component "542 WT  2_z06c1-2.tif" 121
-    python src/diagnose_lacuna_splits.py --dir data/WT --attach-gaps
+    python diagnostics/lacunae/diagnose_lacuna_splits.py --dir data/WT
+    python diagnostics/lacunae/diagnose_lacuna_splits.py --dir data/WT --debug-component "542 WT  2_z06c1-2.tif" 121
+    python diagnostics/lacunae/diagnose_lacuna_splits.py --dir data/WT --attach-gaps
 """
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ import numpy as np
 from scipy import ndimage as ndi
 from skimage import measure, morphology
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from count_lacunae import load_channel  # noqa: E402
 import segment_lacunae_v2 as seg2  # noqa: E402
 import canaliculi_v1 as can1  # noqa: E402

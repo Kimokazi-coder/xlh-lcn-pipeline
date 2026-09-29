@@ -5,7 +5,7 @@ or pipeline output changed. Numbers: `finding2_542_z06_objects.txt` (same
 folder). Crops: `results/diagnostics/round3/finding2/` (raw | outlines, target
 cyan, flagged band tinted blue | default skeleton). Full per-lacuna table:
 `results/diagnostics/round3/finding2/kept_population.json`. Re-run with
-`src/inspect_kept_lacunae.py`.
+`diagnostics/lacunae/inspect_kept_lacunae.py`.
 
 Population: all 98 kept v2 lacunae over the 8 WT images. Roots are counted
 on the current default canaliculi graph, the way `COUNT_MODE="roots"` counts

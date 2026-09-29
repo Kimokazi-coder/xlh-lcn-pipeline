@@ -19,7 +19,7 @@ Measures per object:
                      exist, else eroded to the image's median v2 area)
 
 Usage:
-    python src/measure_size_corrected_roots.py --dir data/WT
+    python diagnostics/lacunae/measure_size_corrected_roots.py --dir data/WT
 """
 
 from __future__ import annotations
@@ -30,10 +30,10 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from count_lacunae import load_channel  # noqa: E402
 import canaliculi_v1 as can  # noqa: E402
 import segment_lacunae_hybrid as hyb  # noqa: E402

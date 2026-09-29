@@ -53,7 +53,7 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
   into ribbons. Before this change the mask was ~24% of the field with
   ~6-10 px fused ribbons; the diffuse halo around each lacuna thresholded
   in as a solid slab and adjacent threads merged, and the skeleton of
-  that branches everywhere. See `src/diagnose_canaliculi_mask.py`.
+  that branches everywhere. See `diagnostics/canaliculi/diagnose_canaliculi_mask.py`.
 
   **Skeleton graph cleanup (`clean_network_graph`)** — prune, collapse,
   re-simplify, iterated to a fixed point, the way OCY_run_Skel2Graph3D.m
@@ -185,23 +185,23 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
   tuned** — it cannot be derived from WT images, which have no lesions to
   measure. Verified across all 8 images: **0 excluded pixels inside the
   margin**.
-- **`src/report_exclusion.py` (new, read-only)** — per-image excluded
+- **`diagnostics/canaliculi/report_exclusion.py` (new, read-only)** — per-image excluded
   area, flagged objects, the safety-margin violation count, and the
   inside-vs-outside density comparison below.
 
 ### Diagnostics (read-only, no pipeline effect)
-- **`src/inspect_tif_metadata.py`** — checked all 8 WT `.tif` files for
+- **`diagnostics/tools/inspect_tif_metadata.py`** — checked all 8 WT `.tif` files for
   embedded pixel-size/resolution metadata. Result: none usable (7 of 8 have
   no resolution tags at all; the 1 that does has a generic 300 DPI /
   ~84.7 µm/px value that's implausible for confocal and almost certainly a
   software default, not a real calibration). `PIXEL_SIZE_UM` stays `None`.
-- **`src/diagnose_canaliculi_mask.py`** — read-only, sizes the canalicular
+- **`diagnostics/canaliculi/diagnose_canaliculi_mask.py`** — read-only, sizes the canalicular
   mask preprocessing. Reports the distance-transform half-width
   distribution inside the candidate mask (what the top-hat structuring
   element must be larger than and the Gaussian sigma must stay below) and
   mask area fraction / component count with and without a candidate
   top-hat radius. Used to pick `TOPHAT_RADIUS_PX`.
-- **`src/diagnose_lacuna_splits.py`** — (a) finds lacunae watershed split
+- **`diagnostics/lacunae/diagnose_lacuna_splits.py`** — (a) finds lacunae watershed split
   into two pieces and scores how real the split is (saddle depth between
   the two distance-transform peaks vs. the peaks themselves); (b)
   `--attach-gaps`: for canaliculi_v1's graph method, the minimum
@@ -225,7 +225,7 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    calibrated so all 3 user-confirmed-bad cases (ratio >= 0.364) merge
    while the one case that looks like a genuine two-lobe separation (ratio
    0.000, 682_z29c1-3 component 174) stays split. Verified via
-   `src/diagnose_lacuna_splits.py --dir data/WT` (down to that single
+   `diagnostics/lacunae/diagnose_lacuna_splits.py --dir data/WT` (down to that single
    expected remaining split) and visually on `results/count/542_WT__2_z06c1-2/overlay.png`
    (every lacuna now one clean outline). `results/count/` and
    `results/canaliculi/` both regenerated against the fix. Net effect:
@@ -247,7 +247,7 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
    unreachable. The min-gap distribution across all 98 lacunae was smooth
    (2.24–11.18px, no natural break), so `LACUNA_ATTACH_GAP_PX=10` was
    chosen as a coverage target (97/98 attached) rather than a gap-based
-   cutoff — see `src/diagnose_lacuna_splits.py --attach-gaps`.
+   cutoff — see `diagnostics/lacunae/diagnose_lacuna_splits.py --attach-gaps`.
    Also fixed: `total_signal_mask` now uses strict `>` instead of `>=`.
 3. **PARTLY RESOLVED (as of this update): canaliculi counts were too
    high and the tracing did not follow the real threads.** Root cause was
@@ -380,7 +380,7 @@ against Mahmoud's ImageJ ground truth counts, unless stated otherwise._
 
 ## Output reorganization, 2026-09-28
 
-`src/reorganize_outputs.py` (move-only, idempotent, aborts before touching
+`diagnostics/tools/reorganize_outputs.py` (move-only, idempotent, aborts before touching
 anything if a destination exists) moved 65 files into a layout where the
 CURRENT DEFAULT result sits at the top of each folder and everything else
 sits one level down: `results/count/` -> `results/lacunae/`,

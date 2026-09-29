@@ -78,9 +78,9 @@ is held out. Every pooled table in this module is printed for the two sets
 separately so a parameter cannot be silently tuned on all of them.
 
 Usage:
-    python src/diagnose_canaliculi_v2.py --dir data/WT
-    python src/diagnose_canaliculi_v2.py --dir data/WT --crop 555,400
-    python src/diagnose_canaliculi_v2.py --image "data/WT/543-2.tif"
+    python diagnostics/canaliculi/diagnose_canaliculi_v2.py --dir data/WT
+    python diagnostics/canaliculi/diagnose_canaliculi_v2.py --dir data/WT --crop 555,400
+    python diagnostics/canaliculi/diagnose_canaliculi_v2.py --image "data/WT/543-2.tif"
 """
 
 from __future__ import annotations
@@ -94,10 +94,10 @@ from scipy import ndimage as ndi
 from skimage import measure, morphology, segmentation
 from skimage.io import imsave
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from count_lacunae import load_channel  # noqa: E402
 import canaliculi_v1 as can  # noqa: E402
 import segment_lacunae_v2 as seg2  # noqa: E402

@@ -22,7 +22,7 @@ RAW top-class cut inside the object's filled outline, so the fill limit of
 fills, and which it leaves.
 
 Usage (one line):
-    python src/inspect_lacuna_hole.py --dir data/WT --target "542 WT  2_z06c1-2" 785,545
+    python diagnostics/lacunae/inspect_lacuna_hole.py --dir data/WT --target "542 WT  2_z06c1-2" 785,545
 """
 
 from __future__ import annotations
@@ -36,10 +36,10 @@ from scipy import ndimage as ndi
 from skimage import filters, measure, morphology, segmentation
 from skimage.io import imread, imsave
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from count_lacunae import load_channel  # noqa: E402
 import canaliculi_v1 as can  # noqa: E402
 import segment_lacunae_hybrid as hy  # noqa: E402

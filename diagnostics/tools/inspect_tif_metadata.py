@@ -6,7 +6,7 @@ the question "is there a real calibration hiding in the file metadata, or
 is PIXEL_SIZE_UM = None in config.py correct until someone measures it?"
 
 Usage:
-    python src/inspect_tif_metadata.py --dir data/WT
+    python diagnostics/tools/inspect_tif_metadata.py --dir data/WT
 """
 
 from __future__ import annotations

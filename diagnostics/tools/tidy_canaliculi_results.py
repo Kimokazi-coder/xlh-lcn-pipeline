@@ -36,8 +36,8 @@ Safety rules, in order of importance:
     do, because the five names kept at the top level are never moved.
 
 Usage:
-    python src/tidy_canaliculi_results.py --dry-run   # print the plan only
-    python src/tidy_canaliculi_results.py             # actually move
+    python diagnostics/tools/tidy_canaliculi_results.py --dry-run   # print the plan only
+    python diagnostics/tools/tidy_canaliculi_results.py             # actually move
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
 CANALICULI_DIR = config.CANALICULI_DIR

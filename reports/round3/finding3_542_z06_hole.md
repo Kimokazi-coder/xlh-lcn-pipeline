@@ -4,7 +4,7 @@
 or pipeline output changed. Numbers: `finding3_542_z06_hole.txt` (same
 folder). Crop: `results/diagnostics/round3/finding3/542_WT__2_z06c1-2_id12_hole.png`
 (raw | outline cyan, hole yellow | default skeleton, hole dim yellow).
-Re-run with `src/inspect_lacuna_hole.py`.
+Re-run with `diagnostics/lacunae/inspect_lacuna_hole.py`.
 
 ## What it is
 

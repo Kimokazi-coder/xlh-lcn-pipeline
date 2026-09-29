@@ -387,7 +387,7 @@ measurement says is not the cause.
 - the correlation of roots with local *raw signal* rises well above +0.169;
 - you decide 1 lacuna in 86 is worth correcting anyway.
 
-`src/measure_local_root_density.py` re-runs the measurement.
+`diagnostics/canaliculi/measure_local_root_density.py` re-runs the measurement.
 
 ---
 

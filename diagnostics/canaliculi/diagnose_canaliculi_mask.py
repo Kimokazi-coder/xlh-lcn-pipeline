@@ -13,8 +13,8 @@ Reports, per image and pooled over a directory:
     claim can be checked numerically rather than by eye.
 
 Usage:
-    python src/diagnose_canaliculi_mask.py --dir data/WT
-    python src/diagnose_canaliculi_mask.py --dir data/WT --radius 12
+    python diagnostics/canaliculi/diagnose_canaliculi_mask.py --dir data/WT
+    python diagnostics/canaliculi/diagnose_canaliculi_mask.py --dir data/WT --radius 12
 """
 
 from __future__ import annotations
@@ -27,10 +27,10 @@ import numpy as np
 from scipy import ndimage as ndi
 from skimage import measure, morphology
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import config  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from count_lacunae import load_channel  # noqa: E402
 import canaliculi_v1 as can  # noqa: E402
 import segment_lacunae_v2 as seg2  # noqa: E402
