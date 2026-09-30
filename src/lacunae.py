@@ -1,0 +1,518 @@
+"""Feature 1: osteocyte lacuna detection, counting and measurement.
+
+PRE-VALIDATION. Nothing here has been checked against manual (ImageJ)
+counts yet. PIXEL units throughout: config.PIXEL_SIZE_UM is None because
+the images carry no usable spatial calibration, so areas are px^2 and
+lengths are px.
+
+Method, per image:
+    1. Load the image and take the signal channel (config.CHANNEL, red).
+    2. Split that channel's own histogram into three classes with
+       multi-Otsu (background, canalicular network, lacunae) and keep the
+       top class. Fill small holes and remove single-pixel specks.
+    3. Separate touching bodies by thickness: a distance transform, one seed
+       per relative distance maximum, then a marker-controlled watershed.
+    4. Re-merge watershed pieces whose dividing saddle is shallow, so one
+       elongated lacuna is not cut in two.
+    5. Keep objects by area, solidity and aspect ratio. Objects touching the
+       frame edge are kept and flagged on_border; they count toward
+       lacuna_count but every summary statistic uses interior objects only,
+       because their size and shape are truncated by the field of view.
+
+Outputs, per image, in results/<image>/ (the image name with each run of
+spaces replaced by one underscore):
+    lacunae_overlay.png   the image with kept lacunae outlined in green
+    lacunae.xlsx          "summary" (counts and interior mean, median, SD)
+                          and "per_lacuna" sheets
+    lacunae.json          the same numbers plus the parameters used
+
+Usage (from the repo root):
+    python src/lacunae.py --dir data/WT
+    python src/lacunae.py --image "data/WT/543-2.tif"
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+from scipy import ndimage as ndi
+from skimage import filters, measure, morphology, segmentation
+from skimage.io import imread, imsave
+from skimage.util import img_as_float, img_as_ubyte
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import config  # noqa: E402
+
+# Parameters
+# None of these has been validated against manual counts. Each comment says
+# what the value does and where it came from.
+
+# Holes in the lacuna mask up to this size (px^2) are filled before
+# splitting, so a dim spot inside a lacuna does not break it into a ring.
+# Same value as the first lacuna counter used. Across the 98 kept WT
+# lacunae the raw mask has 71 enclosed holes: 70 are at most 10 px^2 and are
+# filled; one of 146 px^2 (542_z06, lacuna at (783,581)) stays open and is a
+# known case.
+FILL_HOLES_PX2 = 20
+
+# Radius (px) of the opening that removes single-pixel specks after the
+# hole fill. The smallest disk there is; an initial value, not tuned.
+DESPECKLE_OPENING_RADIUS_PX = 1
+
+# Watershed seeds are distance-transform maxima at least this fraction of
+# their own component's peak, so seeding scales with each blob's size. An
+# initial value, not tuned; the over-splits it can cause are undone by the
+# shallow-split re-merge below.
+SEED_PROMINENCE_FRACTION = 0.3
+
+# A single elongated lacuna can show two comparable distance-transform peaks
+# with no real constriction between them, and watershed then splits it.
+# After watershed, pieces of one component are re-merged when the saddle
+# between their peaks (the lowest distance value on the straight line
+# joining them) is at least this fraction of the smaller peak. Calibrated on
+# all 8 WT images: the 3 splits confirmed wrong by eye (542_z06) had ratio
+# >= 0.364; the one split that looks like a real two-lobe separation had
+# ratio 0.000. 0.35 sits between them.
+MERGE_SADDLE_RATIO_MIN = 0.35
+
+# Smallest kept object (px^2). From the pooled area distribution of interior
+# objects over all 8 WT images (n=177 before this filter): 45% piled up
+# against the earlier floor of 80, in [81, 373) px^2, a censored speck
+# population rather than lacunae. The widest gap between consecutive sorted
+# areas in that region is 346 to 429 px^2; 400 sits inside it.
+MIN_AREA_PX2 = 400
+
+# Largest kept object, as a fraction of the image area. A sanity cap against
+# fused debris: 5% of a 1024 x 1024 field is 52,429 px^2, while the largest
+# kept WT lacuna is 9,321 px^2.
+MAX_AREA_FRACTION_OF_IMAGE = 0.05
+
+# Sanity limits on shape. The kept population bottoms out at solidity 0.525
+# and only two rejected lacuna-scale objects over the 8 images sit between
+# 0.35 and 0.5, so the solidity cut sits in a real gap. The largest kept
+# aspect ratio is 5.76.
+MIN_SOLIDITY = 0.5
+MAX_ASPECT_RATIO = 6.0
+
+LACUNA_MEASUREMENT_FIELDS = [
+    "lacuna_id",
+    "area_px2",
+    "major_axis_length_px",
+    "minor_axis_length_px",
+    "aspect_ratio",
+    "eccentricity",
+    "solidity",
+    "orientation_rad",
+    "centroid_row_px",
+    "centroid_col_px",
+    "on_border",
+]
+
+LACUNA_SUMMARY_METRICS = [
+    ("area_px2", "px^2"),
+    ("major_axis_length_px", "px"),
+    ("minor_axis_length_px", "px"),
+    ("aspect_ratio", "unitless"),
+    ("eccentricity", "unitless"),
+    ("solidity", "unitless"),
+]
+
+
+# Loading
+
+def load_channel(image_path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Return (display_rgb_uint8, signal_channel_float).
+
+    display_rgb_uint8 is the original image as RGB uint8, for overlays.
+    signal_channel_float is config.CHANNEL as a 2D float array in [0, 1],
+    inverted if config.INVERT_SIGNAL is set."""
+    raw = imread(image_path)
+
+    if raw.ndim == 2:
+        display = np.stack([raw] * 3, axis=-1)
+        channel_2d = raw
+    elif raw.ndim == 3:
+        if config.CHANNEL_AXIS == 0:
+            raw = np.moveaxis(raw, 0, -1)
+        elif config.CHANNEL_AXIS not in (-1, 2):
+            raise ValueError(f"Unsupported config.CHANNEL_AXIS: {config.CHANNEL_AXIS!r}")
+
+        n_channels = raw.shape[-1]
+        if n_channels not in (3, 4):
+            raise ValueError(f"Expected an RGB or RGBA image, got shape {raw.shape} for {image_path}")
+        if config.CHANNEL is None or not (0 <= config.CHANNEL < n_channels):
+            raise ValueError(
+                f"config.CHANNEL={config.CHANNEL!r} is not a valid index into "
+                f"an image with {n_channels} channels ({image_path})"
+            )
+        display = raw[..., :3]  # drop alpha, if present
+        channel_2d = raw[..., config.CHANNEL]
+    else:
+        raise ValueError(f"Unsupported image ndim={raw.ndim} for {image_path}")
+
+    display_uint8 = img_as_ubyte(display)
+    channel_float = img_as_float(channel_2d)
+    if config.INVERT_SIGNAL:
+        channel_float = 1.0 - channel_float
+    return display_uint8, channel_float
+
+
+def clean_name(image_path: Path) -> str:
+    """Output folder name for an image: its stem with every run of
+    whitespace replaced by one underscore ("542 WT  2_z06c1-2" becomes
+    "542_WT_2_z06c1-2")."""
+    return "_".join(image_path.stem.split())
+
+
+# Segmentation
+
+def multiotsu_lacuna_mask(channel: np.ndarray) -> tuple[np.ndarray, float]:
+    """Three-class Otsu on this image's own histogram; the top class holds
+    the bright lacuna population, separate from the dimmer network."""
+    try:
+        thresholds = filters.threshold_multiotsu(channel, classes=3)
+        t_hi = float(thresholds[-1])
+    except ValueError:
+        # Degenerate histogram (for example a near-constant field).
+        t_hi = float(filters.threshold_otsu(channel))
+
+    mask = channel >= t_hi
+    mask = morphology.remove_small_holes(mask, area_threshold=FILL_HOLES_PX2)
+    if DESPECKLE_OPENING_RADIUS_PX > 0:
+        mask = morphology.opening(mask, morphology.disk(DESPECKLE_OPENING_RADIUS_PX))
+    return mask, t_hi
+
+
+def watershed_split(mask: np.ndarray) -> np.ndarray:
+    """Separate fused blobs by thickness: seeds at each connected
+    component's own relative distance-transform maxima, then a
+    marker-controlled watershed, which cuts along thin necks."""
+    distance = ndi.distance_transform_edt(mask)
+    components = measure.label(mask, connectivity=2)
+
+    markers = np.zeros_like(components, dtype=np.int32)
+    next_id = 1
+    for comp_id in range(1, components.max() + 1):
+        comp_mask = components == comp_id
+        d_local = np.where(comp_mask, distance, 0.0)
+        peak = d_local.max()
+        if peak <= 0:
+            continue
+        h = max(SEED_PROMINENCE_FRACTION * peak, 1e-6)
+        seeds = morphology.h_maxima(d_local, h) & comp_mask
+        seed_labels = measure.label(seeds, connectivity=2)
+        n = seed_labels.max()
+        if n == 0:
+            continue
+        remap = seed_labels.copy()
+        remap[seed_labels > 0] += next_id - 1
+        markers[seed_labels > 0] = remap[seed_labels > 0]
+        next_id += n
+
+    return segmentation.watershed(-distance, markers=markers, mask=mask)
+
+
+def _sample_line_min(distance: np.ndarray, r0: float, c0: float, r1: float, c1: float, n: int = 50) -> float:
+    """Lowest distance-transform value on the straight line between two
+    points: the saddle depth between two candidate peaks."""
+    rows = np.linspace(r0, r1, n)
+    cols = np.linspace(c0, c1, n)
+    ri = np.clip(np.round(rows).astype(int), 0, distance.shape[0] - 1)
+    ci = np.clip(np.round(cols).astype(int), 0, distance.shape[1] - 1)
+    return float(distance[ri, ci].min())
+
+
+def merge_shallow_splits(labels: np.ndarray, mask: np.ndarray, distance: np.ndarray) -> np.ndarray:
+    """Undo watershed splits that are not a real multi-lobe separation.
+
+    Within each pre-watershed component, only pieces of at least
+    MIN_AREA_PX2 are considered (smaller crumbs are dropped later by the
+    area filter). There can be more than two. Any two whose saddle is
+    shallow relative to both peaks (see MERGE_SADDLE_RATIO_MIN) are joined
+    with union-find, so a chain of shallow links merges all of them."""
+    components = measure.label(mask, connectivity=2)
+    merged = labels.copy()
+    for comp_id in range(1, components.max() + 1):
+        comp_mask = components == comp_id
+        piece_labels = np.unique(merged[comp_mask])
+        piece_labels = piece_labels[piece_labels != 0]
+        substantial = [lbl for lbl in piece_labels if (merged == lbl).sum() >= MIN_AREA_PX2]
+        if len(substantial) < 2:
+            continue
+
+        peaks = {}
+        peak_locs = {}
+        for lbl in substantial:
+            piece_mask = merged == lbl
+            peaks[lbl] = distance[piece_mask].max()
+            r, c = np.unravel_index(np.argmax(np.where(piece_mask, distance, -1)), distance.shape)
+            peak_locs[lbl] = (r, c)
+
+        parent = {lbl: lbl for lbl in substantial}
+
+        def find(x):
+            while parent[x] != x:
+                x = parent[x]
+            return x
+
+        for i in range(len(substantial)):
+            for j in range(i + 1, len(substantial)):
+                a, b = substantial[i], substantial[j]
+                ra, ca = peak_locs[a]
+                rb, cb = peak_locs[b]
+                saddle = _sample_line_min(distance, ra, ca, rb, cb)
+                ratio = saddle / min(peaks[a], peaks[b])
+                if ratio >= MERGE_SADDLE_RATIO_MIN:
+                    ra_root, rb_root = find(a), find(b)
+                    if ra_root != rb_root:
+                        parent[ra_root] = rb_root
+
+        for lbl in substantial:
+            root = find(lbl)
+            if root != lbl:
+                merged[merged == lbl] = root
+    return merged
+
+
+def filter_regions(label_image: np.ndarray) -> list[tuple]:
+    """[(region, on_border), ...] for objects passing the area, solidity and
+    aspect filters. Objects touching the frame edge are kept and flagged."""
+    rows, cols = label_image.shape
+    max_area = MAX_AREA_FRACTION_OF_IMAGE * rows * cols
+    kept = []
+    for region in measure.regionprops(label_image):
+        if region.area < MIN_AREA_PX2:
+            continue
+        if region.area > max_area:
+            continue
+        if region.solidity < MIN_SOLIDITY:
+            continue
+        minor = region.axis_minor_length
+        major = region.axis_major_length
+        aspect = (major / minor) if minor > 0 else float("inf")
+        if aspect > MAX_ASPECT_RATIO:
+            continue
+
+        min_row, min_col, max_row, max_col = region.bbox
+        on_border = min_row == 0 or min_col == 0 or max_row == rows or max_col == cols
+        kept.append((region, on_border))
+    return kept
+
+
+def segment(channel: np.ndarray) -> tuple[np.ndarray, list[tuple], float]:
+    """(label_image, kept, t_hi) for one signal channel."""
+    mask, t_hi = multiotsu_lacuna_mask(channel)
+    labels = watershed_split(mask)
+    distance = ndi.distance_transform_edt(mask)
+    labels = merge_shallow_splits(labels, mask, distance)
+    kept = filter_regions(labels)
+    return labels, kept, t_hi
+
+
+def segment_image(image_path: Path):
+    """(display, channel, label_image, kept, t_hi) for one image file."""
+    display, channel = load_channel(image_path)
+    labels, kept, t_hi = segment(channel)
+    return display, channel, labels, kept, t_hi
+
+
+# Measurements
+
+def region_to_measurement(lacuna_id: int, region, on_border: bool, precision: int) -> dict:
+    minor = region.axis_minor_length
+    major = region.axis_major_length
+    aspect_ratio = (major / minor) if minor > 0 else float("inf")
+    row, col = region.centroid
+    return {
+        "lacuna_id": lacuna_id,
+        "area_px2": round(float(region.area), precision),
+        "major_axis_length_px": round(float(major), precision),
+        "minor_axis_length_px": round(float(minor), precision),
+        "aspect_ratio": round(float(aspect_ratio), precision),
+        "eccentricity": round(float(region.eccentricity), precision),
+        "solidity": round(float(region.solidity), precision),
+        "orientation_rad": round(float(region.orientation), precision),
+        "centroid_row_px": round(float(row), precision),
+        "centroid_col_px": round(float(col), precision),
+        "on_border": bool(on_border),
+    }
+
+
+def measurements_for(kept: list[tuple], precision: int) -> list[dict]:
+    """One row per kept lacuna, numbered 1..N in kept order. The canaliculi
+    feature uses the same numbering."""
+    return [
+        region_to_measurement(i, region, on_border, precision)
+        for i, (region, on_border) in enumerate(kept, start=1)
+    ]
+
+
+def summarize_interior(measurements: list[dict], precision: int) -> dict:
+    """Mean, median and sample SD (ddof=1) over interior lacunae only. SD is
+    None below 2 objects, and everything is None with no interior object."""
+    interior = [m for m in measurements if not m["on_border"]]
+    n = len(interior)
+
+    stats = {"interior_lacuna_count": n, "units": "px"}
+    for field, _unit in LACUNA_SUMMARY_METRICS:
+        values = np.array([m[field] for m in interior], dtype=float)
+        if n == 0:
+            mean = median = sd = None
+        else:
+            mean = round(float(values.mean()), precision)
+            median = round(float(np.median(values)), precision)
+            sd = round(float(values.std(ddof=1)), precision) if n >= 2 else None
+        stats[field] = {"mean": mean, "median": median, "sd": sd}
+    return stats
+
+
+def analyse_image(image_path: Path) -> dict:
+    """Everything feature 1 computes for one image, without writing."""
+    precision = config.CSV_FLOAT_PRECISION
+    display, channel, labels, kept, t_hi = segment_image(image_path)
+    rows = measurements_for(kept, precision)
+    border = sum(1 for _r, on_border in kept if on_border)
+    return {
+        "image_path": image_path,
+        "display": display,
+        "labels": labels,
+        "kept": kept,
+        "t_hi": t_hi,
+        "rows": rows,
+        "lacuna_count": len(kept),
+        "border_lacuna_count": border,
+        "interior_lacuna_count": len(kept) - border,
+        "summary": summarize_interior(rows, precision),
+    }
+
+
+# Output
+
+def save_overlay(display_uint8: np.ndarray, label_image: np.ndarray, kept: list[tuple], out_path: Path) -> None:
+    kept_ids = {region.label for region, _ in kept}
+    kept_mask = np.isin(label_image, list(kept_ids)) if kept_ids else np.zeros_like(label_image, dtype=bool)
+    boundaries = segmentation.find_boundaries(kept_mask, mode="outer")
+    overlay = display_uint8.copy()
+    overlay[boundaries] = [0, 255, 0]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    imsave(out_path, overlay, check_contrast=False)
+
+
+def parameters() -> dict:
+    return {
+        "channel": config.CHANNEL,
+        "channel_axis": config.CHANNEL_AXIS,
+        "invert_signal": config.INVERT_SIGNAL,
+        "pixel_size_um": config.PIXEL_SIZE_UM,
+        "threshold_method": "multiotsu_3class_top",
+        "fill_holes_px2": FILL_HOLES_PX2,
+        "despeckle_opening_radius_px": DESPECKLE_OPENING_RADIUS_PX,
+        "seed_prominence_fraction": SEED_PROMINENCE_FRACTION,
+        "merge_saddle_ratio_min": MERGE_SADDLE_RATIO_MIN,
+        "min_area_px2": MIN_AREA_PX2,
+        "max_area_fraction_of_image": MAX_AREA_FRACTION_OF_IMAGE,
+        "min_solidity": MIN_SOLIDITY,
+        "max_aspect_ratio": MAX_ASPECT_RATIO,
+    }
+
+
+def save_json(result: dict, out_path: Path) -> None:
+    payload = {
+        "status": "pre-validation",
+        "units": "px",
+        "image": result["image_path"].name,
+        "note": (
+            "Pre-validation: not checked against manual counts. Pixel units. "
+            "Border lacunae count toward lacuna_count but the summary covers "
+            "interior lacunae only."
+        ),
+        "lacuna_count": result["lacuna_count"],
+        "border_lacuna_count": result["border_lacuna_count"],
+        "interior_lacuna_count": result["interior_lacuna_count"],
+        "summary": result["summary"],
+        "parameters": {**parameters(), "computed_threshold_t_hi": result["t_hi"]},
+        "lacunae": result["rows"],
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w") as f:
+        json.dump(payload, f, indent=2)
+
+
+def save_xlsx(result: dict, out_path: Path) -> None:
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    summary = wb.active
+    summary.title = "summary"
+    summary.append(["image", "status", "lacuna_count", "border_lacuna_count", "interior_lacuna_count"])
+    summary.append([
+        result["image_path"].name, "pre-validation", result["lacuna_count"],
+        result["border_lacuna_count"], result["interior_lacuna_count"],
+    ])
+    summary.append([])
+    summary.append(["Pre-validation, pixel units. Statistics below are over interior (on_border False) lacunae only."])
+    summary.append(["metric", "mean", "median", "sd", "units", "n"])
+    stats = result["summary"]
+    for field, unit in LACUNA_SUMMARY_METRICS:
+        s = stats[field]
+        summary.append([field, s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
+
+    per_lacuna = wb.create_sheet("per_lacuna")
+    per_lacuna.append(LACUNA_MEASUREMENT_FIELDS)
+    for m in result["rows"]:
+        per_lacuna.append([m[f] for f in LACUNA_MEASUREMENT_FIELDS])
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(out_path)
+
+
+def write_outputs(result: dict, out_dir: Path) -> None:
+    save_overlay(result["display"], result["labels"], result["kept"], out_dir / "lacunae_overlay.png")
+    save_xlsx(result, out_dir / "lacunae.xlsx")
+    save_json(result, out_dir / "lacunae.json")
+
+
+def image_paths(args) -> list[Path]:
+    """The images named by --image or --dir (sorted *.tif)."""
+    if args.image:
+        if not args.image.is_file():
+            raise FileNotFoundError(f"No such file: {args.image}")
+        return [args.image]
+    if not args.dir.is_dir():
+        raise NotADirectoryError(f"No such directory: {args.dir}")
+    return sorted(args.dir.glob("*.tif"))
+
+
+def add_input_arguments(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--image", type=Path, help="One .tif image.")
+    group.add_argument("--dir", type=Path, help="A folder of .tif images.")
+    parser.add_argument(
+        "--out", type=Path, default=config.RESULTS_DIR,
+        help="Results folder (default: results/). Each image gets its own subfolder.",
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Lacuna detection and measurement (pre-validation, px).")
+    add_input_arguments(parser)
+    args = parser.parse_args()
+
+    for image_path in image_paths(args):
+        result = analyse_image(image_path)
+        out_dir = args.out / clean_name(image_path)
+        write_outputs(result, out_dir)
+        s = result["summary"]["area_px2"]
+        print(
+            f"{image_path.name}: lacunae={result['lacuna_count']} "
+            f"(interior {result['interior_lacuna_count']}, border {result['border_lacuna_count']})  "
+            f"median interior area={s['median']} px^2  -> {out_dir}"
+        )
+
+
+if __name__ == "__main__":
+    main()
