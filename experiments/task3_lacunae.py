@@ -759,8 +759,106 @@ def item_3_7() -> None:
     print("\n".join(lines))
 
 
+# 3.6b a narrower crumb rule (added after 3.6 and 3.7) -----------------------------------
+
+# A dropped watershed piece joins a kept lacuna only if it touches exactly
+# that one kept lacuna and at least this share of it lies inside the kept
+# lacuna's convex hull. Over the 8 images only 4 dropped pieces touch a kept
+# lacuna; their inside-hull shares are 0.000, 0.000, 0.009 and 1.000, so any
+# value between 0.009 and 1.000 gives the same result. 0.5 is the middle.
+CRUMB_INSIDE_HULL_MIN = 0.5
+
+
+def crumbs_inside_hull(d: dict, record: list | None = None) -> tuple[np.ndarray, list]:
+    labels = d["labels"].copy()
+    kept_set = set(int(v) for v in d["kept_labels"])
+    regs = {r.label: r for r in measure.regionprops(labels)}
+    for q, r in regs.items():
+        if q in kept_set:
+            continue
+        qm = labels == q
+        ring = morphology.binary_dilation(qm, np.ones((3, 3), bool)) & ~qm
+        touch = [int(k) for k in np.unique(labels[ring]) if int(k) in kept_set]
+        if len(touch) != 1:
+            continue
+        rk = regs[touch[0]]
+        hull = np.zeros_like(qm)
+        r0, c0, r1, c1 = rk.bbox
+        hull[r0:r1, c0:c1] = rk.image_convex
+        share = float((qm & hull).sum() / qm.sum())
+        cy, cx = r.centroid
+        if record is not None:
+            record.append({"crumb_xy": f"({cx:.0f},{cy:.0f})", "crumb_px2": int(r.area),
+                           "lacuna_xy": f"({rk.centroid[1]:.0f},{rk.centroid[0]:.0f})",
+                           "inside_hull_share": round(share, 3), "joined": share >= CRUMB_INSIDE_HULL_MIN})
+        if share >= CRUMB_INSIDE_HULL_MIN:
+            labels[qm] = touch[0]
+    return labels, lacunae.filter_regions(labels)
+
+
+def item_3_6b() -> None:
+    names = [C.short(p) for p in C.IMAGE_PATHS]
+    rows, recs = [], []
+    for n in names:
+        path = OUT / "3.6_runs" / f"{n}__crumbs_inside_hull.json"
+        d = C.load(n)
+        if not path.is_file():
+            rec: list = []
+            labels, kept = crumbs_inside_hull(d, rec)
+            lrows = lacunae.measurements_for(kept, C.PRECISION)
+            net = C.network_stage(d["channel"], labels, kept, preprocessed=d["preprocessed"], flagged=d["flagged"],
+                                  signal=d["signal"], t_lo=d["t_lo"])
+            C.write_npz(C.OUT_ROOT / "_cache" / "variants" / f"{n}__crumbs_inside_hull.npz",
+                        lacuna_id_map=net["lacuna_id_map"], skeleton=net["skeleton"])
+            C.write_json(path, {"image": n, "variant": "crumbs_inside_hull",
+                                "headline": C.headline(lrows, net["cell_rows"], net["density"], len(net["bridges"])),
+                                "crumbs": rec, "lacuna_rows": lrows, "cell_rows": net["cell_rows"]})
+        j = json.loads(path.read_text())
+        base = C.headline(d["lacuna_rows"], d["cell_rows"], d["field"]["canalicular_length_density_per_px"], d["n_bridges"])
+        row = {"image": n}
+        for m in ("lacuna_count", "roots_per_cell", "ring30_per_cell_px", "field_density_per_px", "bridges"):
+            row[m] = j["headline"][m]
+            row[f"{m}_pct"] = 100 * (j["headline"][m] - base[m]) / base[m] if base[m] else float("nan")
+        cell = [(lr, cr, dl, dc) for lr, cr, dl, dc in zip(j["lacuna_rows"], j["cell_rows"], d["lacuna_rows"], d["cell_rows"])
+                if lr["area_px2"] != dl["area_px2"] or cr["roots_count"] != dc["roots_count"]
+                or cr["ring_length_r30_px"] != dc["ring_length_r30_px"]]
+        row["cells_changed"] = "; ".join(
+            f"({lr['centroid_col_px']:.0f},{lr['centroid_row_px']:.0f}) area {dl['area_px2']:.0f} to {lr['area_px2']:.0f}, "
+            f"roots {dc['roots_count']} to {cr['roots_count']}, ring30 {dc['ring_length_r30_px']} to {cr['ring_length_r30_px']}"
+            for lr, cr, dl, dc in cell)
+        rows.append(row)
+        recs += [{"image": n, **r} for r in j["crumbs"]]
+    df, rec = pd.DataFrame(rows), pd.DataFrame(recs)
+    C.write_csv(OUT / "3.6b_crumbs_inside_hull.csv", df)
+    # crop for the one case
+    case = ("543_3", 877, 545, 50)
+    fname = OUT / "3.7_crops" / "543_3_x877_y545_inside_hull.png"
+    if not fname.is_file():
+        d = C.load(case[0])
+        raw = (C.to_rgb(d["channel"]) * 0.85).astype(np.uint8)
+        x, y, half = case[1], case[2], case[3]
+        sl = (slice(y - half, y + half), slice(x - half, x + half))
+        with np.load(C.OUT_ROOT / "_cache" / "variants" / "543_3__crumbs_inside_hull.npz") as z:
+            idm, sk = z["lacuna_id_map"], z["skeleton"]
+        C.write_png(fname, C.panel_row([raw[sl], _panel(raw, d["lacuna_id_map"], d["skeleton"], d["skeleton"], sl, (0, 255, 0), False),
+                                        _panel(raw, idm, sk, d["skeleton"], sl, (255, 0, 255), True)],
+                                       ["543_3 (877,545) raw", "default", "crumbs_inside_hull"], scale=2))
+    md = ["# 3.6b A narrower crumb rule: crumbs inside the convex hull", "",
+          "Pre-validation, px. Added after 3.6 and 3.7, because the 3.6 crumb variant fixed the 543_3 gap but",
+          "also admitted new objects. Rule: after the pipeline's re-merge and filters, a dropped watershed",
+          "piece joins a kept lacuna only if it touches that one kept lacuna and at least",
+          f"{CRUMB_INSIDE_HULL_MIN} of it lies inside the lacuna's convex hull.", "",
+          "Every dropped piece that touches a kept lacuna, over the 8 images (the distribution the 0.5 sits in):", "",
+          C.md_table(rec), "",
+          "Effect, all 8 images:", "",
+          C.md_table(df, floatfmt="{:.4g}"), "",
+          "Crop: `3.7_crops/543_3_x877_y545_inside_hull.png`.", ""]
+    C.write_text_once(OUT / "3.6b_crumbs_inside_hull.md", "\n".join(md))
+    print("\n".join(md))
+
+
 ITEMS = {"3.0": item_3_0, "3.1": item_3_1, "3.2": item_3_2, "3.3": item_3_3, "3.4": item_3_4, "3.5": item_3_5,
-         "3.6": item_3_6, "3.7": item_3_7}
+         "3.6": item_3_6, "3.7": item_3_7, "3.6b": item_3_6b}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
