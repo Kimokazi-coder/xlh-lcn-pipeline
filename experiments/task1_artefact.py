@@ -150,31 +150,60 @@ def spectrum_peaks(P: np.ndarray) -> tuple[pd.DataFrame, np.ndarray]:
 def banding(profile: np.ndarray) -> dict:
     """Periodic banding in a row or column mean profile: detrend with a
     31 px moving mean, then the strongest 1D spectral peak with period
-    2 to 64 px, its power against the median of that band, and the
-    detrended profile's standard deviation in 8-bit grey levels."""
+    2 to 64 px, its power against the median of the spectrum within 10
+    bins of it (the local spectrum), and the detrended profile's standard
+    deviation in 8-bit grey levels. For a profile with no periodic
+    component, power over local median behaves like Exp/ln 2, so the
+    largest of the ~500 bins tested is expected near log2(500), about 9."""
     p = profile.astype(float)
     trend = ndi.uniform_filter1d(p, size=31, mode="reflect")
     d = p - trend
     spec = np.abs(np.fft.rfft(d * np.hanning(d.size))) ** 2
     freqs = np.fft.rfftfreq(d.size)
     band = (freqs >= 1 / 64) & (freqs <= 0.5)
-    k = np.argmax(np.where(band, spec, -1))
-    med = float(np.median(spec[band]))
+    local_med = ndi.median_filter(spec, size=21, mode="nearest")
+    ratio = np.where(band, spec / np.maximum(local_med, 1e-12), -1)
+    k = int(np.argmax(ratio))
     return {
         "period_px": round(1.0 / freqs[k], 2),
-        "power_over_median": round(float(spec[k] / med), 1) if med > 0 else float("nan"),
+        "power_over_local_median": round(float(ratio[k]), 1),
+        "noise_expected_max": round(float(np.log2(band.sum())), 1),
+        "period4_power_over_local_median": round(float(spec[np.argmin(abs(freqs - 0.25))] /
+                                                      max(local_med[np.argmin(abs(freqs - 0.25))], 1e-12)), 1),
         "detrended_sd_grey": round(float(d.std()), 3),
     }
 
 
+def folded_amplitude(img: np.ndarray, period: int, axis: int) -> float:
+    """Peak-to-peak of the image mean folded at `period` px along x
+    (axis=1) or y (axis=0), in the image's units. A 32 px moving mean
+    along that axis is removed first, so a brightness gradient across the
+    field does not show up as a phase difference (a 32 px mean cancels
+    periods 2 and 4 exactly, so they survive the detrending)."""
+    img = img - ndi.uniform_filter1d(img, size=32, axis=axis, mode="reflect")
+    means = [img[:, k::period].mean() if axis == 1 else img[k::period, :].mean() for k in range(period)]
+    return float(max(means) - min(means))
+
+
 def spectrum_png(ratio_log: np.ndarray, peaks: pd.DataFrame) -> np.ndarray:
-    rgb = C.to_rgb(ratio_log, lo=0.0, hi=1.5)
+    """Black map of the spectrum with only the bins that stand out: grey
+    where power over local median exceeds 10, white where it exceeds the
+    noise reference (18). Top peaks circled in red. 2 x 2 max-pooled to
+    512 px so single bins stay visible."""
     n0, n1 = ratio_log.shape
+    ratio = 10 ** ratio_log
+    g = np.zeros_like(ratio, dtype=np.uint8)
+    g[ratio > 10] = 110
+    g[ratio > 18] = 255
+    g = g.reshape(n0 // 2, 2, n1 // 2, 2).max(axis=(1, 3))
+    rgb = np.stack([g, g, g], axis=-1)
+    rgb[n0 // 4, :] = np.maximum(rgb[n0 // 4, :], 40)
+    rgb[:, n1 // 4] = np.maximum(rgb[:, n1 // 4], 40)
     for _, pk in peaks.iterrows():
         for s in (1, -1):
-            x = n1 // 2 + s * int(pk["u_bin"])
-            y = n0 // 2 + s * int(pk["v_bin"])
-            rgb = C.mark(rgb, x, y, color=(255, 0, 0), r=9)
+            x = n1 // 4 + s * int(pk["u_bin"]) // 2
+            y = n0 // 4 + s * int(pk["v_bin"]) // 2
+            rgb = C.mark(rgb, x, y, color=(255, 0, 0), r=6)
     return rgb
 
 
@@ -198,19 +227,35 @@ def item_1_2() -> None:
         for label, img in (("raw_red", raw), ("preprocessed", prep)):
             P = power_spectrum(img)
             pk, ratio_log = spectrum_peaks(P)
+            n0, n1 = P.shape
+            yy, xx = np.mgrid[0:n0, 0:n1]
+            vv, uu = yy - n0 // 2, xx - n1 // 2
+            half_plane = (vv > 0) | ((vv == 0) & (uu > 0))
+            n_tested = int((half_plane & (np.hypot(uu, vv) >= FFT_MIN_RADIUS_BINS)).sum())
+            pk["noise_expected_max"] = round(float(np.log2(n_tested)), 1)
             pk.insert(0, "image", name)
             pk.insert(1, "channel", label)
             pk_rows.append(pk)
-            pngs.append(C.downscale(spectrum_png(ratio_log, pk), 2))
+            pngs.append(spectrum_png(ratio_log, pk))
             scale = 255.0 if label == "preprocessed" else 1.0  # grey levels for both
-            for axis_name, prof in (("row_means", (img * scale).mean(axis=1)), ("column_means", (img * scale).mean(axis=0))):
+            g = img * scale
+            exact = {}
+            for tag, (du, dv) in (("x4", (256, 0)), ("y4", (0, 256)), ("x2", (512, 0)), ("y2", (0, 512))):
+                rr, cc = (n0 // 2 + dv) % n0, (n1 // 2 + du) % n1
+                exact[f"bin_{tag}_power_over_local_median"] = round(float(10 ** ratio_log[rr, cc]), 1)
+            for axis_name, prof in (("row_means", g.mean(axis=1)), ("column_means", g.mean(axis=0))):
                 b = banding(prof)
-                b_rows.append({"image": name, "channel": label, "profile": axis_name, **b})
+                b_rows.append({"image": name, "channel": label, "profile": axis_name, **b,
+                               "fold4_x_pp_grey": round(folded_amplitude(g, 4, 1), 3),
+                               "fold4_y_pp_grey": round(folded_amplitude(g, 4, 0), 3),
+                               "fold2_x_pp_grey": round(folded_amplitude(g, 2, 1), 3),
+                               "fold2_y_pp_grey": round(folded_amplitude(g, 2, 0), 3),
+                               **exact})
         pkdf = pd.concat(pk_rows, ignore_index=True)
         bdf = pd.DataFrame(b_rows)
         C.write_png(per_img_dir / f"{name}_spectra.png",
-                    C.panel_row(pngs, [f"{name} raw red: log10(P / local median), 0 to 1.5",
-                                       "preprocessed (top-hat)"]))
+                    C.panel_row(pngs, [f"{name} raw red: grey P/med > 10, white > 18",
+                                       "preprocessed: same"]))
         C.write_csv(bpart, bdf)
         C.write_csv(part, pkdf)
         all_peaks.append(pkdf)
@@ -220,6 +265,27 @@ def item_1_2() -> None:
     band = pd.concat(all_band, ignore_index=True)
     C.write_csv(peaks_csv, peaks)
     C.write_csv(band_csv, band)
+    top = peaks.sort_values("power_over_local_median", ascending=False).groupby(["image", "channel"]).head(3)
+    top = top.sort_values(["channel", "image"])
+    md = ["# 1.2 FFT peaks and banding", "",
+          "Pre-validation, px. 2D power spectrum of the raw red channel (8-bit grey levels) and of the",
+          "preprocessed channel, Hann window, mean removed. Strength is power over the median power in a",
+          "21 x 21 bin window around the frequency (the local spectrum). Periods above 64 px are left out",
+          "(the cells and canals themselves). wave_angle_deg is the direction the intensity varies along",
+          "(0 = along x, so the stripes are vertical; 90 = along y, horizontal stripes).", "",
+          "Noise reference: where there is no periodic signal the periodogram is close to exponential, so",
+          "power over local median behaves like Exp/ln 2 and the largest of N tested bins is expected near",
+          "log2(N). noise_expected_max gives that value (about 18 for the ~260,000 bins of one half plane).",
+          "A peak near it is what noise alone produces.", "",
+          "## Strongest 3 peaks per image and channel", "",
+          C.md_table(top, floatfmt="{:.2f}"), "",
+          "## Exact-period bins and banding", "",
+          "bin_x4 is the bin of period 4.00 px along x (u = 256, v = 0), bin_y4 the same along y, bin_x2 and",
+          "bin_y2 the Nyquist bins. fold4_x_pp_grey is the peak-to-peak of the image mean folded at 4 px along",
+          "x, in 8-bit grey levels (the preprocessed channel is scaled by 255 for this). The banding columns",
+          "come from the row and column mean profiles after removing a 31 px moving mean.", "",
+          C.md_table(band, floatfmt="{:.2f}"), ""]
+    C.write_text(OUT / "1.2_fft.md", "\n".join(md))
     print(peaks.to_string(index=False))
     print(band.to_string(index=False))
 
