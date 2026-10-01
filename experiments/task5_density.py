@@ -60,11 +60,11 @@ def roi_parts(path: Path) -> dict:
     return {"no_tissue": no_tissue, "purple": purple, "roi": ~(no_tissue | purple), "ratio": ratio, "sb": sb, "sr": sr}
 
 
-def roi_mask(path: Path) -> tuple[np.ndarray, str]:
-    """The bone ROI for one image: a hand-edited mask from roi_edited/ if one
-    exists (white = bone), else the saved draft."""
+def roi_mask(path: Path, edited_dir: Path | None = None) -> tuple[np.ndarray, str]:
+    """The bone ROI for one image: a hand-edited mask from roi_edited/ (or
+    `edited_dir`) if one exists (white = bone), else the saved draft."""
     name = C.short(path)
-    edited = ROI_EDITED_DIR / f"{name}.png"
+    edited = (edited_dir or ROI_EDITED_DIR) / f"{name}.png"
     if edited.is_file():
         return np.asarray(Image.open(edited).convert("L")) > 127, "edited"
     draft = ROI_DIR / f"{name}_roi.png"
@@ -272,7 +272,76 @@ def item_5_3() -> None:
         print(k, v)
 
 
-ITEMS = {"5.1": item_5_1, "5.2": item_5_2, "5.3": item_5_3}
+# 5.4 overlays for all 8 and hand-edited masks (pass 2) -------------------------------
+
+ROI_EDITED_README = """Hand-edited bone ROI masks
+
+Put one PNG per image here, named by the short image name used in the tables
+(542_z06.png, 542_z18.png, 543-2.png, 543_3.png, 543_z13.png, 682_z08.png,
+682_z23.png, 682_z29.png): 1024 x 1024, white = bone (analysed), black =
+excluded. A good start is the draft in ../roi_draft/<image>_roi.png.
+
+When a mask is here, experiments/task5_density.py uses it instead of the draft
+(roi_mask in that script); the roi_source column of 5.1 says which was used.
+Delete results_experiments/task5/5.1_density_three_ways.* and rerun
+python -u experiments/task5_density.py 5.1 to recompute. Nothing in src/ reads
+these masks.
+"""
+
+
+def item_5_4() -> None:
+    from skimage import segmentation
+    for p in C.IMAGE_PATHS:
+        name = C.short(p)
+        out = OUT / "5.4_roi_overlays" / f"{name}_roi_overlay.png"
+        if out.is_file():
+            continue
+        d = C.load(p)
+        parts = roi_parts(p)
+        roi, source = roi_mask(p)
+        parts["roi"] = roi
+        r, _g, b = channels(p)
+        rgb = np.stack([r, np.zeros_like(r), b], axis=-1).clip(0, 255).astype(np.uint8)
+        rgb = C.paint(rgb, parts["no_tissue"], (128, 128, 128), alpha=0.6)
+        rgb = C.paint(rgb, parts["purple"], (0, 220, 220), alpha=0.45)
+        rgb = C.paint(rgb, d["flagged"], (255, 255, 0), alpha=0.25)
+        rgb[segmentation.find_boundaries(d["lacuna_id_map"], mode="inner")] = (0, 255, 0)
+        rgb = C.outline(rgb, roi, (255, 255, 255), thick=2)
+        rgb = C.label_text(C.downscale(rgb, 2), 4, 4, f"{name} ROI {source}: {100 * roi.mean():.1f}% of field", (255, 255, 255))
+        C.write_png(out, rgb)
+        print(name, "overlay done")
+    if not (ROI_EDITED_DIR / "README.txt").is_file():
+        C.write_text(ROI_EDITED_DIR / "README.txt", ROI_EDITED_README)
+    # Self-test of the hand-edited path, in a temporary folder outside the
+    # outputs: a mask with the left half removed must be picked up and must
+    # change the ROI density.
+    import tempfile
+    p = C.image_path("543-2")
+    d = C.load(p)
+    with tempfile.TemporaryDirectory() as tmp:
+        m = np.full((1024, 1024), 255, np.uint8)
+        m[:, :512] = 0
+        Image.fromarray(m).save(Path(tmp) / "543-2.png")
+        roi, source = roi_mask(p, edited_dir=Path(tmp))
+        dens = C.density(d["skeleton"], d["lacuna_id_map"] > 0, area_mask=roi)
+    ok = source == "edited" and roi[:, :512].sum() == 0 and roi[:, 512:].all()
+    res = {"test": "hand-edited mask for 543-2 with x < 512 removed", "source_used": source, "mask_read_correctly": bool(ok),
+           "density_default": d["field"]["canalicular_length_density_per_px"], "density_right_half": dens}
+    C.write_json(OUT / "5.4_edited_mask_selftest.json", res)
+    print(res)
+    lines = ["# 5.4 ROI overlays for all 8 images", "",
+             "Pre-validation. `5.4_roi_overlays/<image>_roi_overlay.png`: red and blue channels (magenta),",
+             "no tissue grey, purple cyan, flagged canal mask yellow, kept lacunae green, ROI border white, at",
+             "half size. The title line says whether the draft or a hand-edited mask was used.", "",
+             "Hand-edited masks: see `roi_edited/README.txt`. The script reads `roi_edited/<image>.png` (white =",
+             "bone) in place of the draft. Self-test (`5.4_edited_mask_selftest.json`): a test mask for 543-2",
+             f"with x < 512 removed was read as '{source}', correctly ({ok}); density in the right half",
+             f"{dens:.5f} against {d['field']['canalicular_length_density_per_px']:.5f} for the whole field.", ""]
+    C.write_text_once(OUT / "5.4_roi_overlays.md", "\n".join(lines))
+    print("\n".join(lines))
+
+
+ITEMS = {"5.1": item_5_1, "5.2": item_5_2, "5.3": item_5_3, "5.4": item_5_4}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
