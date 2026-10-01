@@ -176,3 +176,16 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 `archive/` holds every earlier script, report and result, and the git tag
 `archive-before-cleanup` marks the repository as it was before this
 cleanup. Checking out that tag reproduces any earlier analysis.
+
+## 8. Overnight experiments (2026-10-01)
+
+Branch `overnight-fixes`. Experiments only: nothing in `src/` uses them and no default changed.
+Report: `docs/OVERNIGHT_REPORT.md`; outputs in `results_experiments/<task>/`.
+
+- `experiments/task0_cache.py`: cache of the default results, timing, and checks that the copied steps reproduce the pipeline.
+- `experiments/task1_artefact.py`: TIFF tags, FFT and banding, axis-aligned skeleton runs (682_z08 lattice), notch filter.
+- `experiments/task2_thresholds.py`: why visible bodies are missed, the cuts against brightness, sensitivity grid of both cuts and a pooled cut.
+- `experiments/task3_lacunae.py`: crumb loss, saddle audit (straight line against widest path), band objects, opening, holes, their network-level effect, a narrower crumb rule, crops.
+- `experiments/task4_size.py`: size dependence of roots and ring lengths, and normalised forms.
+- `experiments/task5_density.py`: green and blue channels, draft bone ROI, field density three ways, the 542_z06 vertical line.
+- `experiments/task6_repeat.py`: field groups from centroid matches and repeatability across sections.
