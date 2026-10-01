@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 16:20
-next action: 7.2 final report: fill pending sections, recommendations, Decisions needed, METHODS section, SHA links, checks, ALL DONE.
+last update: 2026-10-01 16:23
+next action: none all items done.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -33,4 +33,4 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 3.6b | Narrower crumb rule: crumbs inside the kept lacuna's convex hull (added) | DONE | d7b1dbb | added variant: joins only the 543_3 (877,545) middle crumb (inside-hull 1.000 vs 0.000 to 0.009 for the other 3 crumbs); fixes the gap, no other change in any image |
 | 3.7 | Before and after crops for the worst cases | DONE | 2915595 | 14 crops; opening does not fix the named tails or lobes and worsens 543_3 (877,545); crumb variant fixes that gap; band object removal adds band-wall skeleton; 682_z29 (100,835) reads as one cell by eye (Karim) |
 | 5.4 | ROI overlays for all 8 images; per-image ROI support | DONE | c5399f3 | overlays for all 8; draft keeps 95.9 to 100% of each field; misses the weaker purple patches of 682_z23 and 682_z29; roi_edited/<image>.png replaces the draft (self-test passed) |
-| 7.2 | Final report, METHODS section, checks, ALL DONE | TODO |  |  |
+| 7.2 | Final report, METHODS section, checks, ALL DONE | DONE | fd41c2a | report and METHODS section in fd41c2a; links pinned to it added in the next commit; both checks passed before the final push |
