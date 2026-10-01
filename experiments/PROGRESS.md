@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 16:09
-next action: 2.4 full grid: t_hi only, t_lo only, both, at 0.8 0.9 1.1 1.2 and pooled median cuts, all 8 images.
+last update: 2026-10-01 16:12
+next action: 3.6 network-level effect of the 3.1 to 3.5 variants on all 8 images: roots, ring30, density, bridges; list rejections of the band filter.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -28,7 +28,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 6.1 | Repeatability across matched cells; field groups from data | DONE | 997e10b | groups from data: 542_z06+542_z18, 543-2+543_3+543_z13, 682_z23+682_z29, 682_z08 alone (4 matches with 682_z23, 15x chance); field density within a group 1.7 to 3.0%; per matched cell rel diff roots 0.40, ring30 0.25, ring60 0.14, owned 0.86, edges 0.86; cell area also differs 40% |
 | 7.1 | Draft docs/OVERNIGHT_REPORT.md | DONE | 3fefcdf | docs/OVERNIGHT_REPORT.md drafted from pass 1; pass 2 sections marked pending |
 | 1.4 | Notch filter variant | DONE | dede1ff | null result: notch removes both x peaks; density -0.03 to +0.05%, roots unchanged in 6 of 8 (max 1.4%), ring30 within 0.3%, counts unchanged, bridges +-1 or 2; 682_z08 lattice share 0.333 to 0.330 |
-| 2.4 | Full threshold sensitivity grid on all 8 images | TODO |  |  |
+| 2.4 | Full threshold sensitivity grid on all 8 images | DONE | f0e940f | t_lo drives density about 1:1 (+11/-8% at 0.8/1.2), t_hi drives count and area and via size roots and ring30 (+19/-13%); counts change in every image under some t_hi scale; a pooled raw-unit network cut flips the field ordering (543 densest to least dense) |
 | 3.6 | Network-level effect of variants 3.1 to 3.5 | TODO |  |  |
 | 3.7 | Before and after crops for the worst cases | TODO |  |  |
 | 5.4 | ROI overlays for all 8 images; per-image ROI support | TODO |  |  |
