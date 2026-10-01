@@ -327,3 +327,47 @@ Every number above comes from a file under `results_experiments/`. `experiments/
 scripts and how to resume; `experiments/PROGRESS.md` lists every sub-item with its commit. Each script
 skips outputs that already exist, so delete an output to recompute it, for example
 `python -u experiments/task2_thresholds.py 2.4`.
+
+## Final commit and links
+
+Final content commit: `fd41c2a8904aa128d354876fd03e05e5a25cff4d` (the last commit that changed any result, script or report text; the
+commit after it only adds this list, and the next one marks PROGRESS.md done). Every link below is
+pinned to it, so it shows exactly what this report describes.
+
+- [docs/OVERNIGHT_REPORT.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/docs/OVERNIGHT_REPORT.md)
+- [experiments/PROGRESS.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/experiments/PROGRESS.md)
+- [results_experiments/task1/1.2_fft.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task1/1.2_fft.md)
+- [results_experiments/task1/1.3_axis_runs.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task1/1.3_axis_runs.md)
+- [results_experiments/task1/1.4_notch.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task1/1.4_notch.csv)
+- [results_experiments/task2/2.1_missed_bodies.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task2/2.1_missed_bodies.md)
+- [results_experiments/task2/2.2_cuts_vs_brightness.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task2/2.2_cuts_vs_brightness.csv)
+- [results_experiments/task2/2.4_grid.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task2/2.4_grid.csv)
+- [results_experiments/task2/2.4_grid.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task2/2.4_grid.md)
+- [results_experiments/task3/3.1_crumb_loss.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.1_crumb_loss.csv)
+- [results_experiments/task3/3.2_saddle_pairs.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.2_saddle_pairs.csv)
+- [results_experiments/task3/kept_lacunae_measures.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/kept_lacunae_measures.csv)
+- [results_experiments/task3/3.4_opening.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.4_opening.csv)
+- [results_experiments/task3/3.6_variants.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.6_variants.csv)
+- [results_experiments/task3/3.6b_crumbs_inside_hull.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.6b_crumbs_inside_hull.csv)
+- [results_experiments/task4/4.1_per_lacuna.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task4/4.1_per_lacuna.csv)
+- [results_experiments/task4/4.1_correlations.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task4/4.1_correlations.csv)
+- [results_experiments/task5/5.1_density_three_ways.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task5/5.1_density_three_ways.csv)
+- [results_experiments/task5/5.2_channels.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task5/5.2_channels.csv)
+- [results_experiments/task6/6.1_pair_matches.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task6/6.1_pair_matches.csv)
+- [results_experiments/task6/6.1_matched_cells.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task6/6.1_matched_cells.csv)
+- [results_experiments/task6/6.1_stability.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task6/6.1_stability.csv)
+- [results_experiments/task1/1.3_682_z08_lattice_and_control.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task1/1.3_682_z08_lattice_and_control.png)
+- [results_experiments/task1/1.3_682_z08_zoom.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task1/1.3_682_z08_zoom.png)
+- [results_experiments/task2/2.1_crops/543_3_x40_y310.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task2/2.1_crops/543_3_x40_y310.png)
+- [results_experiments/task2/2.1_crops/542_z06_x230_y300.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task2/2.1_crops/542_z06_x230_y300.png)
+- [results_experiments/task2/2.1_crops/542_z06_x5_y930.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task2/2.1_crops/542_z06_x5_y930.png)
+- [results_experiments/task3/3.7_crops/543_3_x877_y545.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.7_crops/543_3_x877_y545.png)
+- [results_experiments/task3/3.7_crops/543_3_x877_y545_inside_hull.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.7_crops/543_3_x877_y545_inside_hull.png)
+- [results_experiments/task3/3.7_crops/682_z29_x100_y835.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.7_crops/682_z29_x100_y835.png)
+- [results_experiments/task3/3.7_crops/542_z06_x570_y100.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.7_crops/542_z06_x570_y100.png)
+- [results_experiments/task3/3.7_crops/682_z29_x862_y728.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.7_crops/682_z29_x862_y728.png)
+- [results_experiments/task3/3.7_crops/543-2_x40_y300.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.7_crops/543-2_x40_y300.png)
+- [results_experiments/task3/3.7_crops/682_z08_x210_y434.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task3/3.7_crops/682_z08_x210_y434.png)
+- [results_experiments/task5/5.3_542_z06_trace.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task5/5.3_542_z06_trace.png)
+- [results_experiments/task5/5.4_roi_overlays/682_z08_roi_overlay.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task5/5.4_roi_overlays/682_z08_roi_overlay.png)
+- [results_experiments/task5/5.4_roi_overlays/542_z06_roi_overlay.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/fd41c2a8904aa128d354876fd03e05e5a25cff4d/results_experiments/task5/5.4_roi_overlays/542_z06_roi_overlay.png)
