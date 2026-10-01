@@ -463,6 +463,33 @@ def lattice_crops() -> None:
     C.write_csv(OUT / "1.3_local_fft_peaks.csv", loc)
     C.write_json(OUT / "1.3_control_box.json", {"control_box_x0_x1_y0_y1": list(ctrl)})
     print(loc.to_string(index=False))
+    # Orientation of the threads under the skeleton, from the structure
+    # tensor of the preprocessed channel (gradient sigma 1, window sigma 3).
+    # A raster artefact puts sharp spikes at exactly 0 and 90 degrees; real
+    # threads give broad peaks wherever the tissue points them.
+    from skimage.feature import structure_tensor
+    Arr, Arc, Acc = structure_tensor(prep, sigma=3, order="rc")
+    theta = 0.5 * np.degrees(np.arctan2(2 * Arc, Acc - Arr))  # dominant gradient direction
+    thread = (theta + 90.0) % 180.0  # thread direction, 0 = along x, 90 = along y
+    edges = np.arange(0, 181, 5)
+    rows = []
+    for box, name in ((LATTICE_BOX, "lattice"), (ctrl, "control"), ((0, 1024, 0, 1024), "whole image")):
+        bx0, bx1, by0, by1 = box
+        sk = np.zeros_like(skel)
+        sk[by0:by1, bx0:bx1] = skel[by0:by1, bx0:bx1]
+        ang = thread[sk]
+        h, _ = np.histogram(ang, bins=edges)
+        d0 = np.minimum(ang, 180 - ang)
+        d90 = abs(ang - 90)
+        d45 = np.minimum(abs(ang - 45), abs(ang - 135))
+        rows.append({"region": name, "skeleton_px": int(sk.sum()),
+                     "within_3deg_of_0": float((d0 <= 3).mean()), "within_3deg_of_90": float((d90 <= 3).mean()),
+                     "within_3deg_of_45_or_135": float((d45 <= 3).mean()) / 2,
+                     "within_10deg_of_0": float((d0 <= 10).mean()), "within_10deg_of_90": float((d90 <= 10).mean()),
+                     **{f"bin_{a}_{a + 5}": int(c) for a, c in zip(edges[:-1], h)}})
+    odf = pd.DataFrame(rows)
+    C.write_csv(OUT / "1.3_orientation.csv", odf)
+    print(odf.iloc[:, :8].to_string(index=False))
 
 
 ITEMS = {"1.1": item_1_1, "1.2": item_1_2, "1.3": item_1_3}
