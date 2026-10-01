@@ -1,6 +1,6 @@
 # Overnight progress
 
-last update: 2026-10-01 15:25
+last update: 2026-10-01 15:26
 next action: 1.2 FFT of raw red and preprocessed per image, peak table, row and column banding.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
@@ -10,7 +10,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 |---|---|---|---|---|
 | 0.1 | Branch, experiments/README.md and PROGRESS.md | DONE | b74daea | branch created from main 677ccd6 |
 | 0.2 | Default-result cache on all 8 images, and timing | DONE | a40e8ce | pipeline alone: 8.7 s (543-2) to 77.5 s (542_z06) per image, 275 s for all 8 in sequence (540 s with the cache step). Lacuna stage dominates (watershed and re-merge loops); network stage from cache 2 to 4 s. common.lacuna_stage and network_stage reproduce the pipeline exactly on all 8 (task0/verify.csv). (x,y)=(col,row) confirmed. |
-| 1.1 | TIFF tags of all 8 images | DONE |  | outputs written; committed with 0.2 work |
+| 1.1 | TIFF tags of all 8 images | DONE | 060adfa | all 8 are 8-bit RGB exports with no microscope metadata; 7 by ImageJ 1.54p without resolution; 542_z06 RGBA LZW 300 dpi from another program; no histogram combing |
 | 1.2 | 2D FFT peaks and row and column banding, raw and preprocessed | TODO |  |  |
 | 1.3 | Axis-aligned skeleton runs; 682_z08 lattice crops; where the lattice comes from | TODO |  |  |
 | 2.1 | Which stage rejects the visibly missed bodies | TODO |  |  |
