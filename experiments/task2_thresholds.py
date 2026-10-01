@@ -339,7 +339,100 @@ def item_2_3() -> None:
     print(rel[["image", "setting"] + [c + "_pct" for c in cols[2:]]].to_string(index=False))
 
 
-ITEMS = {"2.1": item_2_1, "2.1s": item_2_1_scaled, "2.2": item_2_2, "2.3": item_2_3}
+SCALES_2_4 = (0.8, 0.9, 1.1, 1.2)
+
+
+def item_2_4() -> None:
+    """Full grid on all 8 images: t_hi only, t_lo only, and both, at each
+    scale; plus pooled cuts. The pooled lacuna cut is the median t_hi over
+    the 8 images (raw units, comparable across images). The pooled network
+    cut is the median of t_lo in raw units (t_lo x the image's preprocessing
+    peak, from 2.2), converted back to each image's normalised scale."""
+    b = pd.read_csv(OUT / "2.2_cuts_vs_brightness.csv").set_index("image")
+    pooled_hi = float(np.median(b.t_hi))
+    pooled_lo_raw = float(np.median(b.t_lo_raw_units))
+    names = [C.short(p) for p in C.IMAGE_PATHS]
+    jobs, labels = [], {}
+
+    def add(n, hs, ls, hv, lv, mode, scale):
+        jobs.append((n, hs, ls, hv, lv))
+        labels[(n, setting_name(hs, ls, hv, lv))] = (mode, scale)
+
+    for n in names:
+        add(n, 1.0, 1.0, None, None, "default", 1.0)
+        for s in SCALES_2_4:
+            add(n, s, s, None, None, "both", s)
+            add(n, s, 1.0, None, None, "t_hi only", s)
+            add(n, 1.0, s, None, None, "t_lo only", s)
+        lv = pooled_lo_raw / b.loc[n, "prep_peak_raw_units"]
+        add(n, 1.0, 1.0, pooled_hi, None, "t_hi only", "pooled")
+        add(n, 1.0, 1.0, None, lv, "t_lo only", "pooled")
+        add(n, 1.0, 1.0, pooled_hi, lv, "both", "pooled")
+    run_jobs(jobs)
+    df = collect(jobs)
+    df["mode"] = [labels[(r.image, r.setting)][0] for r in df.itertuples()]
+    df["scale"] = [str(labels[(r.image, r.setting)][1]) for r in df.itertuples()]
+    rel = relative_to_default(df, setting_name(1.0, 1.0))
+    rel["mode"], rel["scale"] = df["mode"].values, df["scale"].values
+    rel["t_hi"], rel["t_lo"] = df["t_hi"].values, df["t_lo"].values
+    C.write_csv(OUT / "2.4_grid.csv", rel)
+
+    meas = ["lacuna_count", "interior_count", "median_area_px2", "roots_per_cell", "ring30_per_cell_px",
+            "ring60_per_cell_px", "field_density_per_px", "bridges", "skeleton_px"]
+    summ = []
+    for (mode, scale), g in rel[rel["mode"] != "default"].groupby(["mode", "scale"], sort=False):
+        row = {"mode": mode, "scale": scale}
+        for m in meas:
+            row[f"{m}_median_pct"] = float(np.median(g[f"{m}_pct"]))
+            row[f"{m}_min_pct"] = float(g[f"{m}_pct"].min())
+            row[f"{m}_max_pct"] = float(g[f"{m}_pct"].max())
+        row["images_count_changed"] = ", ".join(r.image for r in g.itertuples() if r.lacuna_count_pct != 0)
+        summ.append(row)
+    summ = pd.DataFrame(summ)
+    C.write_csv(OUT / "2.4_summary.csv", summ)
+
+    base = rel[rel["mode"] == "default"].set_index("image")
+    rel["setting_label"] = rel["mode"] + " " + rel["scale"]
+    order = ["default 1.0"] + [f"{m} {s}" for m in ("both", "t_hi only", "t_lo only") for s in ("0.8", "0.9", "1.1", "1.2", "pooled")]
+    counts = rel.pivot_table(index="image", columns="setting_label", values="lacuna_count", aggfunc="first")[order]
+    dens = rel.pivot_table(index="image", columns="setting_label", values="field_density_per_px", aggfunc="first")[
+        ["default 1.0", "t_lo only 0.8", "t_lo only 1.2", "t_lo only pooled", "both pooled"]]
+    roots = rel.pivot_table(index="image", columns="setting_label", values="roots_per_cell", aggfunc="first")[
+        ["default 1.0", "both 0.8", "both 1.2", "t_hi only pooled", "both pooled"]]
+    md = ["# 2.4 Full threshold sensitivity grid", "",
+          "Pre-validation, px. All 8 images. t_hi is the lacuna cut, t_lo the network strict cut (the",
+          "hysteresis low cut and the bridging test follow it). Scales multiply each image's own cut.",
+          f"pooled: one cut for all images, t_hi = {pooled_hi:.4f} (median over the 8 images) and t_lo =",
+          f"{pooled_lo_raw:.4f} in raw units (median of t_lo x preprocessing peak), converted to each image's",
+          "normalised scale. Per-cell values are means over interior lacunae. Percent changes are against",
+          "the default run of the same image.", "",
+          "## Median change over the 8 images (percent), with the range in brackets", ""]
+    hdr = ["mode", "scale", "roots per cell", "ring 30 px", "ring 60 px", "field density", "median area", "lacuna count", "bridges"]
+    md.append("| " + " | ".join(hdr) + " |")
+    md.append("|" + "|".join("---" for _ in hdr) + "|")
+    for r in summ.itertuples():
+        def f(m):
+            return f"{getattr(r, m + '_median_pct'):+.1f} [{getattr(r, m + '_min_pct'):+.1f}, {getattr(r, m + '_max_pct'):+.1f}]"
+        md.append(f"| {r.mode} | {r.scale} | {f('roots_per_cell')} | {f('ring30_per_cell_px')} | {f('ring60_per_cell_px')} | "
+                  f"{f('field_density_per_px')} | {f('median_area_px2')} | {f('lacuna_count')} | {f('bridges')} |")
+    md += ["", "## Lacuna count per image and setting", "",
+           C.md_table(counts.reset_index()), "",
+           "## Field density per image: default, t_lo scaled, and the pooled cut", "",
+           C.md_table(dens.reset_index(), floatfmt="{:.5f}"), "",
+           "## Roots per cell per image under selected settings", "",
+           C.md_table(roots.reset_index(), floatfmt="{:.3f}"), "",
+           "## Every run", "", "All values and percent changes: `2.4_grid.csv`. Pooled cuts per image:", ""]
+    pooled_rows = rel[(rel["scale"] == "pooled") & (rel["mode"] == "both")][["image", "t_hi", "t_lo"]].copy()
+    pooled_rows["default_t_hi"] = [b.loc[n, "t_hi"] for n in pooled_rows.image]
+    pooled_rows["default_t_lo"] = [b.loc[n, "t_lo"] for n in pooled_rows.image]
+    pooled_rows["t_hi_ratio"] = pooled_rows.t_hi / pooled_rows.default_t_hi
+    pooled_rows["t_lo_ratio"] = pooled_rows.t_lo / pooled_rows.default_t_lo
+    md.append(C.md_table(pooled_rows, floatfmt="{:.4f}"))
+    C.write_text_once(OUT / "2.4_grid.md", "\n".join(md) + "\n")
+    print("\n".join(md))
+
+
+ITEMS = {"2.1": item_2_1, "2.1s": item_2_1_scaled, "2.2": item_2_2, "2.3": item_2_3, "2.4": item_2_4}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
