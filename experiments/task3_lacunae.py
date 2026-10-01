@@ -610,7 +610,7 @@ def _variant_run(args) -> str:
     net = C.network_stage(d["channel"], labels, kept, preprocessed=d["preprocessed"], flagged=d["flagged"],
                           signal=d["signal"], t_lo=d["t_lo"])
     h = C.headline(rows, net["cell_rows"], net["density"], len(net["bridges"]))
-    C.write_npz(OUT / "_variant_masks" / f"{name}__{variant}.npz", lacuna_id_map=net["lacuna_id_map"],
+    C.write_npz(C.OUT_ROOT / "_cache" / "variants" / f"{name}__{variant}.npz", lacuna_id_map=net["lacuna_id_map"],
                 skeleton=net["skeleton"])
     C.write_json(path, {"image": name, "variant": variant, "headline": h, "skeleton_px": int(net["skeleton"].sum()),
                         "rejected_by_band_filter": rejected, "lacuna_rows": rows, "cell_rows": net["cell_rows"]})
@@ -696,8 +696,71 @@ def item_3_6() -> None:
     print("\n".join(md))
 
 
+# 3.7 before and after crops (pass 2) ------------------------------------------------
+
+OPENS = ["open_r2", "open_r3", "open_r4"]
+CASES_3_7 = [
+    # (image, x, y, half size, variants, why)
+    ("543-2", 40, 300, 70, OPENS, "named worst case: outline runs down a thread root"),
+    ("543-2", 265, 95, 70, OPENS, "named worst case: pointed tail at the lower tip"),
+    ("543_3", 920, 200, 80, OPENS + ["crumbs_join_merge"], "named worst case: irregular outline, left lobe and spur"),
+    ("542_z06", 105, 65, 60, ["open_r3", "crumbs_join_merge"], "named: leaked outline into a canalicular loop"),
+    ("542_z06", 783, 581, 60, ["fill_holes_200"], "named: unfilled 146 px^2 hole"),
+    ("682_z08", 210, 434, 70, OPENS, "serrated: perimeter -21% for area -6% at r = 3"),
+    ("682_z23", 472, 61, 60, OPENS, "serrated: perimeter -13% at r = 3"),
+    ("682_z29", 182, 716, 60, OPENS, "serrated: perimeter -12% at r = 3"),
+    ("542_z06", 570, 100, 80, ["widest_path_merge", "band_filter"], "split that flips: band pair (584,53) and (555,149)"),
+    ("682_z29", 100, 835, 70, ["widest_path_merge"], "split that flips: the calibration's two-lobe case"),
+    ("543_3", 877, 545, 50, ["crumbs_join_merge", "open_r2"], "crumb gap through the cell"),
+    ("542_z18", 937, 993, 50, ["crumbs_join_merge"], "crumb of 235 px^2 joins"),
+    ("682_z29", 862, 728, 50, ["crumbs_join_merge"], "new object from two crumbs (archived D8 object)"),
+    ("682_z23", 74, 8, 50, ["crumbs_join_merge"], "new object at the top edge"),
+]
+
+
+def _panel(raw_rgb, idmap, skel, base_skel, sl, color, show_diff: bool):
+    from skimage import segmentation
+    p = raw_rgb[sl].copy()
+    p = C.paint(p, skel[sl], (0, 200, 255), alpha=0.8)
+    if show_diff:
+        p = C.paint(p, (skel & ~base_skel)[sl], (255, 255, 0))
+        p = C.paint(p, (base_skel & ~skel)[sl], (255, 40, 40))
+    b = segmentation.find_boundaries(idmap[sl], mode="inner")
+    p[b] = color
+    return p
+
+
+def item_3_7() -> None:
+    out = OUT / "3.7_crops"
+    lines = ["# 3.7 Before and after crops", "",
+             "Pre-validation, px. Each crop: raw red | default (outline green, skeleton blue) | each variant",
+             "(outline magenta, skeleton blue, skeleton added by the variant yellow, removed red). 2x zoom.", "",
+             "| file | image | at (x,y) | variants | why |", "|---|---|---|---|---|"]
+    for name, x, y, half, variants, why in CASES_3_7:
+        fname = f"{name}_x{x}_y{y}.png"
+        lines.append(f"| `3.7_crops/{fname}` | {name} | ({x},{y}) | {', '.join(variants)} | {why} |")
+        if (out / fname).is_file():
+            continue
+        d = C.load(name)
+        raw = (C.to_rgb(d["channel"]) * 0.85).astype(np.uint8)
+        r0, r1 = max(0, y - half), min(1024, y + half)
+        c0, c1 = max(0, x - half), min(1024, x + half)
+        sl = (slice(r0, r1), slice(c0, c1))
+        panels = [raw[sl], _panel(raw, d["lacuna_id_map"], d["skeleton"], d["skeleton"], sl, (0, 255, 0), False)]
+        titles = [f"{name} ({x},{y}) raw", "default"]
+        for v in variants:
+            with np.load(C.OUT_ROOT / "_cache" / "variants" / f"{name}__{v}.npz") as z:
+                idm, sk = z["lacuna_id_map"], z["skeleton"]
+            panels.append(_panel(raw, idm, sk, d["skeleton"], sl, (255, 0, 255), True))
+            titles.append(v)
+        C.write_png(out / fname, C.panel_row(panels, titles, scale=2))
+        print(fname, "done")
+    C.write_text_once(OUT / "3.7_crops.md", "\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
 ITEMS = {"3.0": item_3_0, "3.1": item_3_1, "3.2": item_3_2, "3.3": item_3_3, "3.4": item_3_4, "3.5": item_3_5,
-         "3.6": item_3_6}
+         "3.6": item_3_6, "3.7": item_3_7}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
