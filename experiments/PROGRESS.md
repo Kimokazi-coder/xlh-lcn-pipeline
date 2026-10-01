@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 15:59
-next action: 5.2 green and blue channels per image; draft bone ROI and overlays (done before 5.1, which needs the ROI).
+last update: 2026-10-01 16:04
+next action: 6.1 match lacunae across images by centroid within 25 px, field groups from data, repeatability table.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -22,9 +22,9 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 3.4 | Tails and serrated edges: opening r 2, 3, 4 (lacuna level) | DONE | 91da6e7 | median loss 0.5/1.2/1.8% at r 2/3/4; none lost; 543_3 (877,545) loses 47% because its dropped 124 px middle crumb leaves two lobes, with 8 skeleton px inside the gap; leaked outline 22 to 27%; serrated 682_z08 (210,434) perimeter -21% for area -6% |
 | 3.5 | Unfilled holes up to 200 px^2 (lacuna level) | DONE | 2566730 | one lacuna affected: 542_z06 (783,581), 146 px hole, area +4.3%, solidity 0.829 to 0.865, no skeleton in the hole |
 | 4.1 | Size confound: ring area, in-frame fraction, normalised measures | DONE | 4aff1d9 | confirmed: image-level roots vs median area rho 0.838, ring30 0.881 (n=8); per lacuna pooled 0.69/0.68, positive within all 8 images; roots per 100 px perimeter and ring density L30/A30 remove it (pooled -0.13 and 0.03, between -0.24 and -0.02); 85 of 86 interior cells in-frame >= 0.9 |
-| 5.1 | Field density three ways | TODO |  |  |
-| 5.2 | Green and blue channels; draft bone ROI | TODO |  |  |
-| 5.3 | 542_z06 vertical trace near x 525, y 590 to 900 | TODO |  |  |
+| 5.1 | Field density three ways | DONE | 8084d88 | done after 5.2; canal mask removed: -1.6 to +1.1%; draft ROI: 0 to +3.1%; both: -0.6 to +4.5% (682_z08); ordering of images unchanged |
+| 5.2 | Green and blue channels; draft bone ROI | DONE | 2fb0e69 | green empty; blue = weak copy of red structures, brighter in canal regions, purple regions in 542_z06, 542_z18, 682_z08, no-tissue corners in the 682 images; draft ROI removes 0 to 4.2%; purple threshold has no gap (anchor 0.72) |
+| 5.3 | 542_z06 vertical trace near x 525, y 590 to 900 | DONE | b8a0859 | 382 skeleton px in corridor x 515-541 y 590-900, 1.1% of the skeleton, 310 of 311 rows; canal mask covers only the top; removing it lowers density 1.1% |
 | 6.1 | Repeatability across matched cells; field groups from data | TODO |  |  |
 | 7.1 | Draft docs/OVERNIGHT_REPORT.md | TODO |  |  |
 | 1.4 | Notch filter variant | TODO |  |  |
