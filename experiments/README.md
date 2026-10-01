@@ -58,7 +58,7 @@ installed as dependencies of skan, so nothing new is needed.
 
 1. Read `PROGRESS.md`: the "next action" line names the next sub-item.
 2. `git status` and `git log -5`. Make the tree clean: commit a finished
-   item, or discard a half-finished one with `git checkout -- .` for
+   item, or discard a half-finished one with `git restore .` for
    tracked files (untracked outputs of a half item can stay, the scripts
    skip only complete outputs).
 3. Continue from the first item that is not DONE. PARTIAL items continue
