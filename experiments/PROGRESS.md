@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 15:34
-next action: 1.3 axis-aligned skeleton runs per image and per tile, lattice and control crops for 682_z08, local FFT, conclusion.
+last update: 2026-10-01 15:35
+next action: 2.1 replay the lacuna stages at 543_3 (40,310), 542_z06 (230,300) and (5,930); name the rejecting stage; crops.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -12,7 +12,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 0.2 | Default-result cache on all 8 images, and timing | DONE | a40e8ce | pipeline alone: 8.7 s (543-2) to 77.5 s (542_z06) per image, 275 s for all 8 in sequence (540 s with the cache step). Lacuna stage dominates (watershed and re-merge loops); network stage from cache 2 to 4 s. common.lacuna_stage and network_stage reproduce the pipeline exactly on all 8 (task0/verify.csv). (x,y)=(col,row) confirmed. |
 | 1.1 | TIFF tags of all 8 images | DONE | 060adfa | all 8 are 8-bit RGB exports with no microscope metadata; 7 by ImageJ 1.54p without resolution; 542_z06 RGBA LZW 300 dpi from another program; no histogram combing |
 | 1.2 | 2D FFT peaks and row and column banding, raw and preprocessed | DONE | 05c67c0 | no lattice-scale peak above the noise reference (about 18); pixel-scale artefacts in all 8 raw images: alternating columns (period 2 px, 0.10 grey levels) and period 4 px along x (0.15 grey levels); both shrink after preprocessing |
-| 1.3 | Axis-aligned skeleton runs; 682_z08 lattice crops; where the lattice comes from | TODO |  |  |
+| 1.3 | Axis-aligned skeleton runs; 682_z08 lattice crops; where the lattice comes from | DONE | a65e531 | lattice is in the raw data (visible threads), not made by preprocessing; no lattice-scale period; orientations broad (no spike at 0 or 90 deg); same box elevated in all three 682 images (0.33 to 0.36 vs 0.21 to 0.23); most likely tissue; what the horizontal threads are is for Karim |
 | 2.1 | Which stage rejects the visibly missed bodies | TODO |  |  |
 | 2.2 | t_hi and t_lo against image brightness statistics | TODO |  |  |
 | 2.3 | Quick sensitivity, both cuts x0.9 and x1.1, on 3 images | TODO |  |  |
