@@ -115,8 +115,46 @@ def cmd_verify() -> None:
     C.write_text(OUT / "coordinates.md", "\n".join(lines) + "\n")
 
 
+def _fast_one(args) -> dict:
+    """Fast copies against the pipeline functions for one image at one
+    scale of t_hi."""
+    import lacunae
+    from scipy import ndimage as ndi
+    path_str, scale = args
+    p = Path(path_str)
+    d = C.load(p)
+    if scale == 1.0:
+        mask = d["topmask"]
+        ws_ref, lab_ref = d["ws_labels"], d["labels"]
+    else:
+        mask = C.lacuna_mask_at(d["channel"], d["t_hi"] * scale)
+        ws_ref = lacunae.watershed_split(mask)
+        lab_ref = lacunae.merge_shallow_splits(ws_ref, mask, ndi.distance_transform_edt(mask))
+    t0 = time.time()
+    ws = C.watershed_fast(mask)
+    lab = C.merge_fast(ws, mask, ndi.distance_transform_edt(mask))
+    return {"image": C.short(p), "t_hi_scale": scale,
+            "watershed_identical": bool(np.array_equal(ws, ws_ref)),
+            "merge_identical": bool(np.array_equal(lab, lab_ref)),
+            "fast_s": round(time.time() - t0, 2)}
+
+
+def cmd_fastcheck() -> None:
+    path = OUT / "fast_copies_check.csv"
+    if path.is_file():
+        print(path.read_text())
+        return
+    jobs = [(str(p), 1.0) for p in C.IMAGE_PATHS]
+    jobs += [(str(C.image_path(n)), s) for n in ("542_z06", "543-2", "682_z29") for s in (0.9, 1.1)]
+    with ProcessPoolExecutor(max_workers=8) as ex:
+        rows = list(ex.map(_fast_one, jobs))
+    df = pd.DataFrame(rows)
+    C.write_csv(path, df)
+    print(df.to_string(index=False))
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "build"
     item = "0.2"
-    ok = C.run_item(item, {"build": cmd_build, "verify": cmd_verify}[cmd])
+    ok = C.run_item(item, {"build": cmd_build, "verify": cmd_verify, "fastcheck": cmd_fastcheck}[cmd])
     sys.exit(0 if ok else 1)
