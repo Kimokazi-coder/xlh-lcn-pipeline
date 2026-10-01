@@ -32,15 +32,14 @@ import lacunae  # noqa: E402
 OUT = C.OUT_ROOT / "task3"
 
 
-# Copied merge (from src/lacunae.py merge_shallow_splits) -----------------------------
-# Same logic, worked per component inside its bounding box for speed, with two
-# hooks: min_area (the pipeline uses MIN_AREA_PX2 = 400) and the ratio
-# function (the pipeline uses the straight-line saddle). Checked to reproduce
-# the pipeline's labels exactly on all 8 images (item 3.0).
+# Re-merge variants ---------------------------------------------------------------
+# The re-merge itself is common.merge_fast, a bounding-box copy of
+# lacunae.merge_shallow_splits with hooks for min_area and the ratio
+# function, checked to reproduce the pipeline's labels on all 8 images
+# (item 3.0 here and results_experiments/task0/fast_copies_check.csv).
 
-def straight_ratio(distance, comp_mask_crop, offset, pa, pb, peak_a, peak_b) -> float:
-    saddle = lacunae._sample_line_min(distance, pa[0], pa[1], pb[0], pb[1])
-    return saddle / min(peak_a, peak_b)
+merge_copy = C.merge_fast
+straight_ratio = C.straight_ratio
 
 
 def widest_saddle(dist_crop: np.ndarray, comp_crop: np.ndarray, a: tuple, b: tuple) -> float:
@@ -71,55 +70,6 @@ def widest_ratio(distance, comp_mask_crop, offset, pa, pb, peak_a, peak_b) -> fl
     a = (pa[0] - r0, pa[1] - c0)
     b = (pb[0] - r0, pb[1] - c0)
     return widest_saddle(dc, comp_mask_crop, a, b) / min(peak_a, peak_b)
-
-
-def merge_copy(labels: np.ndarray, mask: np.ndarray, distance: np.ndarray, min_area: int = lacunae.MIN_AREA_PX2,
-               ratio_fn=straight_ratio, ratio_min: float = lacunae.MERGE_SADDLE_RATIO_MIN, record: list | None = None):
-    components = measure.label(mask, connectivity=2)
-    merged = labels.copy()
-    slices = ndi.find_objects(components)
-    for comp_id, sl in enumerate(slices, start=1):
-        if sl is None:
-            continue
-        r0, c0 = sl[0].start, sl[1].start
-        comp_mask = components[sl] == comp_id
-        m = merged[sl]
-        piece_labels = np.unique(m[comp_mask])
-        piece_labels = piece_labels[piece_labels != 0]
-        substantial = [lbl for lbl in piece_labels if (m == lbl).sum() >= min_area]
-        if len(substantial) < 2:
-            continue
-        peaks, peak_locs = {}, {}
-        for lbl in substantial:
-            pm = m == lbl
-            peaks[lbl] = distance[sl][pm].max()
-            rr, cc = np.unravel_index(np.argmax(np.where(pm, distance[sl], -1)), pm.shape)
-            peak_locs[lbl] = (rr + r0, cc + c0)
-        parent = {lbl: lbl for lbl in substantial}
-
-        def find(x):
-            while parent[x] != x:
-                x = parent[x]
-            return x
-
-        for i in range(len(substantial)):
-            for j in range(i + 1, len(substantial)):
-                a, b = substantial[i], substantial[j]
-                ratio = ratio_fn(distance, comp_mask, (r0, c0), peak_locs[a], peak_locs[b], peaks[a], peaks[b])
-                if record is not None:
-                    record.append({"component": comp_id, "a": int(a), "b": int(b), "ratio": float(ratio),
-                                   "peak_a": float(peaks[a]), "peak_b": float(peaks[b]),
-                                   "pa": peak_locs[a], "pb": peak_locs[b]})
-                if ratio >= ratio_min:
-                    ra, rb = find(a), find(b)
-                    if ra != rb:
-                        parent[ra] = rb
-        for lbl in substantial:
-            root = find(lbl)
-            if root != lbl:
-                m[m == lbl] = root
-        merged[sl] = m
-    return merged
 
 
 def item_3_0() -> None:
@@ -193,34 +143,46 @@ def item_3_1() -> None:
                     lost_here += a
                     why = lacunae_reason(regs[q], labels.shape)
                     lost_list.append(f"{a} ({why})")
+            kept_sum = int(sum(regs[k].area for k in kept_in_comp))
+            unlabelled = int((comp_mask & (labels[sl] == 0)).sum())
+            dropped_total = int(sum(regs[q].area for q in dropped))
             rows.append({
                 "image": d["short"], "lacuna_id": lid, "at_xy": xy(lrow), "on_border": border,
                 "area_px2": int(region.area), "component_area_px2": comp_area,
                 "kept_lacunae_in_component": len(kept_in_comp),
+                "component_minus_kept_px2": comp_area - kept_sum,
+                "missing_pct_of_component": 100.0 * (comp_area - kept_sum) / comp_area,
                 "dropped_pieces_in_component": len(dropped),
-                "lost_to_this_lacuna_px2": lost_here,
-                "lost_pct_of_area": 100.0 * lost_here / region.area,
-                "lost_pieces": "; ".join(lost_list),
-                "component_minus_kept_px2": comp_area - int(sum(regs[k].area for k in kept_in_comp)),
+                "dropped_px2": dropped_total,
+                "unlabelled_by_watershed_px2": unlabelled,
+                "adjacent_dropped_px2": lost_here,
+                "adjacent_pct_of_area": 100.0 * lost_here / region.area,
+                "adjacent_pieces": "; ".join(lost_list),
             })
         print(d["short"], "done")
     df = pd.DataFrame(rows)
     C.write_csv(path, df)
-    big = df[df.lost_pct_of_area > 3].sort_values("lost_pct_of_area", ascending=False)
+    big = df[df.missing_pct_of_component > 3].sort_values("missing_pct_of_component", ascending=False)
     md = ["# 3.1 Crumb loss audit", "",
           "Pre-validation, px. For every kept lacuna: its pre-watershed component (the lacuna mask after",
-          "the cut, hole fill and r=1 opening), and the pieces of that component that the filters dropped.",
-          "Each dropped piece is assigned to the kept lacuna it shares the most boundary with. Lost % is",
-          "that area over the kept lacuna's own area.", "",
-          f"Kept lacunae: {len(df)}. With any dropped piece attached: {(df.lost_to_this_lacuna_px2 > 0).sum()}. "
-          f"Missing more than 3%: {len(big)}.", "",
+          "the cut, hole fill and r=1 opening) against what the pipeline keeps of it. missing % is the",
+          "share of the component in no kept lacuna. It splits into dropped pieces (watershed pieces",
+          "removed by a filter, almost always area < 400 px^2) and pixels the watershed never labels (it",
+          "floods with 4-connectivity, while components are 8-connected, so pixels joined only",
+          "diagonally stay 0). adjacent is the part of the dropped pieces that shares its longest boundary",
+          "with this lacuna, as a share of the lacuna's own area. When a component holds more than one",
+          "kept lacuna, its missing % is shared by all of them.", "",
+          f"Kept lacunae: {len(df)}. Whose component misses more than 3%: {len(big)}. With any adjacent",
+          f"dropped piece: {(df.adjacent_dropped_px2 > 0).sum()}. With unlabelled pixels: "
+          f"{(df.unlabelled_by_watershed_px2 > 0).sum()}.", "",
           C.md_table(big[["image", "lacuna_id", "at_xy", "on_border", "area_px2", "component_area_px2",
-                          "kept_lacunae_in_component", "lost_to_this_lacuna_px2", "lost_pct_of_area", "lost_pieces"]],
-                     floatfmt="{:.1f}"),
+                          "kept_lacunae_in_component", "missing_pct_of_component", "dropped_px2",
+                          "unlabelled_by_watershed_px2", "adjacent_dropped_px2", "adjacent_pct_of_area",
+                          "adjacent_pieces"]], floatfmt="{:.1f}"),
           "",
-          "Distribution of lost % over all kept lacunae (count per bin):", "",
-          bins_md(df.lost_pct_of_area, [0, 0.0001, 1, 3, 5, 10, 20, 50, 1000]), ""]
-    C.write_text(OUT / "3.1_crumb_loss.md", "\n".join(md))
+          "Distribution of missing % of the component over all kept lacunae (count per bin):", "",
+          bins_md(df.missing_pct_of_component, [0, 0.0001, 1, 3, 5, 10, 20, 50, 1000]), ""]
+    C.write_text_once(OUT / "3.1_crumb_loss.md", "\n".join(md))
     print("\n".join(md))
 
 
