@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 15:49
-next action: 2.3 fast-copy check is running; then both cuts x0.9 and x1.1 on 542_z06, 543-2, 682_z29.
+last update: 2026-10-01 15:51
+next action: 2.3 both cuts x0.9 and x1.1 on 542_z06, 543-2, 682_z29 with the fast lacuna copies.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -16,7 +16,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 2.1 | Which stage rejects the visibly missed bodies | DONE | e5cbc4f | none lost at the cut: 543_3 (40,310) aspect 6.03 > 6.0 (body plus tail); 542_z06 (230,300) solidity 0.452 < 0.5; 542_z06 (5,930) area 301 < 400 at the frame edge |
 | 2.2 | t_hi and t_lo against image brightness statistics | DONE | 1141c49 | t_hi 0.523 to 0.647, tracks saturated fraction (rho 0.98) and p99, not mean; t_lo is 0.18 to 0.20 of the preprocessed p99 in every image, i.e. 2.7 fold range in raw units |
 | 2.3 | Quick sensitivity, both cuts x0.9 and x1.1, on 3 images | TODO |  |  |
-| 3.1 | Crumb loss audit: kept lacuna against its pre-watershed component | TODO |  |  |
+| 3.1 | Crumb loss audit: kept lacuna against its pre-watershed component | DONE | 04b3a10 | 93 of 98 lose nothing; 4 miss > 3% of their component: 542_z06 (555,149) band object 64%, 542_z06 (106,67) leaked outline 42%, 542_z18 (938,990) 32%, 543_3 (877,545) 8%; all dropped for area; plus 23 px unlabelled by 4-connected watershed in 542_z06 (909,17) |
 | 3.2 | Saddle audit: straight line against widest path | TODO |  |  |
 | 3.3 | Band objects: minor axis, flagged overlap, solidity | TODO |  |  |
 | 3.4 | Tails and serrated edges: opening r 2, 3, 4 (lacuna level) | TODO |  |  |
