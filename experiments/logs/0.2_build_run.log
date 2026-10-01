@@ -1,0 +1,46 @@
+542_z06: pipeline 77.5 s, with cache 151.8 s
+542_z18: pipeline 58.3 s, with cache 114.7 s
+543-2: pipeline 8.7 s, with cache 16.8 s
+543_3: pipeline 12.1 s, with cache 23.5 s
+543_z13: pipeline 9.3 s, with cache 17.7 s
+682_z08: pipeline 27.2 s, with cache 53.5 s
+682_z23: pipeline 41.3 s, with cache 82.0 s
+682_z29: pipeline 40.5 s, with cache 79.6 s
+{
+  "per_image": {
+    "542_z06": {
+      "full_pipeline_s": 77.45,
+      "full_pipeline_plus_cache_s": 151.82
+    },
+    "542_z18": {
+      "full_pipeline_s": 58.28,
+      "full_pipeline_plus_cache_s": 114.71
+    },
+    "543-2": {
+      "full_pipeline_s": 8.73,
+      "full_pipeline_plus_cache_s": 16.76
+    },
+    "543_3": {
+      "full_pipeline_s": 12.11,
+      "full_pipeline_plus_cache_s": 23.54
+    },
+    "543_z13": {
+      "full_pipeline_s": 9.27,
+      "full_pipeline_plus_cache_s": 17.74
+    },
+    "682_z08": {
+      "full_pipeline_s": 27.16,
+      "full_pipeline_plus_cache_s": 53.49
+    },
+    "682_z23": {
+      "full_pipeline_s": 41.3,
+      "full_pipeline_plus_cache_s": 82.01
+    },
+    "682_z29": {
+      "full_pipeline_s": 40.47,
+      "full_pipeline_plus_cache_s": 79.57
+    }
+  },
+  "all_8_sequential_s": 539.65,
+  "note": "One process, images one after another, on this machine (20 logical cores). full_pipeline_s is canaliculi.analyse_image alone; the cache step adds the recomputed intermediates and the write."
+}
