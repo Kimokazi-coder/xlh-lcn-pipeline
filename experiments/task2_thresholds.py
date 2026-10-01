@@ -129,7 +129,7 @@ def item_2_1() -> None:
                                  "verdict": v})
         lines += tbl + [""]
         # crop: raw | cut | final (kept green, rejected pieces red)
-        half = 70
+        half = 100
         raw_c, (x0, y0) = C.crop(C.to_rgb(ch), x, y, half)
         cut_c, _ = C.crop(C.to_rgb(cut), x, y, half)
         kept_ids = set(int(v) for v in d["kept_labels"])
@@ -153,8 +153,22 @@ def item_2_1() -> None:
 def item_2_2() -> None:
     import canaliculi
     path = OUT / "2.2_cuts_vs_brightness.csv"
-    if path.is_file():
-        print(pd.read_csv(path).to_string(index=False))
+    if path.is_file() and (OUT / "2.2_correlations.csv").is_file():
+        df, cdf = pd.read_csv(path), pd.read_csv(OUT / "2.2_correlations.csv")
+        cols = ["image", "t_hi", "red_mean", "red_median", "red_p99", "red_saturated_fraction", "t_hi_over_p99",
+                "fraction_above_t_hi", "t_lo", "prep_p99", "t_lo_over_prep_p99", "fraction_above_t_lo",
+                "prep_peak_raw_units", "t_lo_raw_units"]
+        md = ["# 2.2 The two cuts against image brightness", "",
+              "Pre-validation. Raw red is in [0, 1] (8-bit / 255). t_hi is the lacuna cut on raw red. t_lo is",
+              "the network strict cut on the preprocessed channel, which the pipeline divides by its own",
+              "maximum; prep_peak_raw_units is that maximum before the division, so t_lo_raw_units = t_lo x",
+              "peak is the cut in raw units.", "",
+              C.md_table(df[cols], floatfmt="{:.4f}"), "",
+              "Spearman and Pearson correlations over the 8 images (red_p999 is 1.0 in every image, so its",
+              "correlation is undefined):", "",
+              C.md_table(cdf, floatfmt="{:.3f}"), ""]
+        C.write_text_once(OUT / "2.2_cuts_vs_brightness.md", "\n".join(md))
+        print("\n".join(md))
         return
     rows = []
     for p in C.IMAGE_PATHS:
