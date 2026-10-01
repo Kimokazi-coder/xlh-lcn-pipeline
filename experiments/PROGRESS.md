@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 16:14
-next action: 3.7 before and after crops for the named worst cases, serrated 682 cells, flipped splits and crumb-variant changes.
+last update: 2026-10-01 16:16
+next action: 5.4 ROI overlays for all 8 images and hand-edited ROI mask support check.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -30,6 +30,6 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 1.4 | Notch filter variant | DONE | dede1ff | null result: notch removes both x peaks; density -0.03 to +0.05%, roots unchanged in 6 of 8 (max 1.4%), ring30 within 0.3%, counts unchanged, bridges +-1 or 2; 682_z08 lattice share 0.333 to 0.330 |
 | 2.4 | Full threshold sensitivity grid on all 8 images | DONE | f0e940f | t_lo drives density about 1:1 (+11/-8% at 0.8/1.2), t_hi drives count and area and via size roots and ring30 (+19/-13%); counts change in every image under some t_hi scale; a pooled raw-unit network cut flips the field ordering (543 densest to least dense) |
 | 3.6 | Network-level effect of variants 3.1 to 3.5 | DONE | 851bcfc | crumbs: fixes 543_3 gap, also admits 682_z29 (862,728) and 682_z23 (74,8); widest: 682_z29 (100,835) one cell, band object gone; band filter rejects exactly the 2 band objects; opening r3 roots -8 to 0%, ring30 -12 to -1%, density +0.5% max; holes only 542_z06 (783,581) |
-| 3.7 | Before and after crops for the worst cases | TODO |  |  |
+| 3.7 | Before and after crops for the worst cases | DONE | 2915595 | 14 crops; opening does not fix the named tails or lobes and worsens 543_3 (877,545); crumb variant fixes that gap; band object removal adds band-wall skeleton; 682_z29 (100,835) reads as one cell by eye (Karim) |
 | 5.4 | ROI overlays for all 8 images; per-image ROI support | TODO |  |  |
 | 7.2 | Final report, METHODS section, checks, ALL DONE | TODO |  |  |
