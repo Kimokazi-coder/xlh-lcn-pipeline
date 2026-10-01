@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 15:56
-next action: 3.4 opening r 2, 3, 4 of each lacuna, largest piece; area, aspect, perimeter changes; lost lacunae.
+last update: 2026-10-01 15:57
+next action: 3.5 fill enclosed holes up to 200 px^2 per kept lacuna; check 542_z06 (783,581); list all affected.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -19,7 +19,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 3.1 | Crumb loss audit: kept lacuna against its pre-watershed component | DONE | 04b3a10 | 93 of 98 lose nothing; 4 miss > 3% of their component: 542_z06 (555,149) band object 64%, 542_z06 (106,67) leaked outline 42%, 542_z18 (938,990) 32%, 543_3 (877,545) 8%; all dropped for area; plus 23 px unlabelled by 4-connected watershed in 542_z06 (909,17) |
 | 3.2 | Saddle audit: straight line against widest path | DONE | 65a310c | 15 tested pairs in 8 images; widest path flips 3 pair tests and 2 final states: 542_z06 band pair (band object then rejected, 16 to 15) and 682_z29 (100,835), the calibration's two-lobe split (13 to 12); 682_z08 points are separate components, not splits |
 | 3.3 | Band objects: minor axis, flagged overlap, solidity | DONE | 1028176 | minor axis, flagged overlap (0 or 1 for all; 8 kept lacunae fully inside) and solidity do not separate; share left after r=5 opening does (0.207, 0.348 vs 0.681 next; gap 0.333); variant threshold 0.515 in the gap |
-| 3.4 | Tails and serrated edges: opening r 2, 3, 4 (lacuna level) | TODO |  |  |
+| 3.4 | Tails and serrated edges: opening r 2, 3, 4 (lacuna level) | DONE | 91da6e7 | median loss 0.5/1.2/1.8% at r 2/3/4; none lost; 543_3 (877,545) loses 47% because its dropped 124 px middle crumb leaves two lobes, with 8 skeleton px inside the gap; leaked outline 22 to 27%; serrated 682_z08 (210,434) perimeter -21% for area -6% |
 | 3.5 | Unfilled holes up to 200 px^2 (lacuna level) | TODO |  |  |
 | 4.1 | Size confound: ring area, in-frame fraction, normalised measures | TODO |  |  |
 | 5.1 | Field density three ways | TODO |  |  |
