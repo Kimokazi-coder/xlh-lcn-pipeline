@@ -148,6 +148,39 @@ def item_2_1() -> None:
     print("\n".join(lines))
 
 
+def item_2_1_scaled() -> None:
+    """The three cases of 2.1 at 0.8 to 1.2 times t_hi (lacuna stage only,
+    fast copies)."""
+    path = OUT / "2.1_scaled_cut.md"
+    if path.is_file():
+        print(path.read_text())
+        return
+    lines = ["# 2.1 addendum: the missed bodies at scaled lacuna cuts", "",
+             "Pre-validation, px. Lacuna stage only, t_hi times the scale. Pieces of at least 50 px^2 within",
+             f"{SEARCH_RADIUS_PX} px of the named point.", "",
+             "| case | t_hi scale | pieces near the point |", "|---|---|---|"]
+    yy, xx = np.mgrid[0:1024, 0:1024]
+    for name, x, y in CASES_2_1:
+        d = C.load(name)
+        near = np.hypot(xx - x, yy - y) <= SEARCH_RADIUS_PX
+        for s in (0.8, 0.9, 1.0, 1.1, 1.2):
+            lac = C.lacuna_stage(d["channel"], t_hi=d["t_hi"] * s, fast=True)
+            lab = lac["labels"]
+            kept = {r.label for r, _b in lac["kept"]}
+            regs = {r.label: r for r in measure.regionprops(lab)}
+            desc = []
+            for i in [i for i in np.unique(lab[near]) if i]:
+                r = regs[i]
+                if r.area < 50:
+                    continue
+                v = "KEPT" if i in kept else verdict(r, lab.shape)
+                desc.append(f"{r.area} px^2, solidity {r.solidity:.3f}, aspect "
+                            f"{r.axis_major_length / max(r.axis_minor_length, 1e-9):.2f}: {v}")
+            lines.append(f"| {name} ({x},{y}) | {s:g} | " + "; ".join(desc) + " |")
+    C.write_text(path, "\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
 # 2.2 cuts against brightness ----------------------------------------------------
 
 def item_2_2() -> None:
@@ -235,7 +268,7 @@ def run_setting(args) -> str:
     if hi_value is None and hi_scale == 1.0:
         labels, kept, lac_rows = d["labels"], d["kept"], d["lacuna_rows"]
     else:
-        lac = C.lacuna_stage(d["channel"], t_hi=t_hi)
+        lac = C.lacuna_stage(d["channel"], t_hi=t_hi, fast=True)
         labels, kept, lac_rows = lac["labels"], lac["kept"], lac["rows"]
     if lo_value is None and lo_scale == 1.0 and hi_value is None and hi_scale == 1.0:
         cell_rows, dens, nb = d["cell_rows"], d["field"]["canalicular_length_density_per_px"], d["n_bridges"]
@@ -306,7 +339,7 @@ def item_2_3() -> None:
     print(rel[["image", "setting"] + [c + "_pct" for c in cols[2:]]].to_string(index=False))
 
 
-ITEMS = {"2.1": item_2_1, "2.2": item_2_2, "2.3": item_2_3}
+ITEMS = {"2.1": item_2_1, "2.1s": item_2_1_scaled, "2.2": item_2_2, "2.3": item_2_3}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
