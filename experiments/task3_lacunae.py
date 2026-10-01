@@ -536,7 +536,168 @@ def item_3_5() -> None:
     print("\n".join(lines))
 
 
-ITEMS = {"3.0": item_3_0, "3.1": item_3_1, "3.2": item_3_2, "3.3": item_3_3, "3.4": item_3_4, "3.5": item_3_5}
+# 3.6 network-level effect of the variants (pass 2) ---------------------------------
+
+# 3.3 variant: reject a kept object whose share of area left after an
+# opening with the top-hat disk (r = 5) is below this. The middle of the gap
+# between the two band objects (0.207, 0.348) and the next kept lacuna
+# (0.681); see 3.3_band_objects.md. Rests on 2 objects.
+BAND_OPENING_SHARE_MIN = 0.515
+BAND_OPENING_RADIUS = 5
+
+VARIANTS = ["crumbs_join_merge", "widest_path_merge", "band_filter", "open_r2", "open_r3", "open_r4", "fill_holes_200"]
+
+
+def opening_share(region) -> float:
+    m = np.pad(region.image, 6)
+    return float(morphology.binary_opening(m, morphology.disk(BAND_OPENING_RADIUS)).sum() / m.sum())
+
+
+def band_filter_regions(label_image: np.ndarray, rejected: list | None = None) -> list[tuple]:
+    """lacunae.filter_regions plus one extra test (the 3.3 variant)."""
+    kept = []
+    for region, b in lacunae.filter_regions(label_image):
+        share = opening_share(region)
+        if share < BAND_OPENING_SHARE_MIN:
+            if rejected is not None:
+                cy, cx = region.centroid
+                rejected.append({"x": round(cx), "y": round(cy), "area_px2": int(region.area),
+                                 "opening_share": round(share, 3), "on_border": bool(b)})
+            continue
+        kept.append((region, b))
+    return kept
+
+
+def variant_lacunae(d: dict, variant: str, rejected: list | None = None) -> tuple[np.ndarray, list]:
+    """(labels, kept) for one lacuna variant, from the cached default stages."""
+    topmask, ws = d["topmask"], d["ws_labels"]
+    if variant == "crumbs_join_merge":
+        dist = ndi.distance_transform_edt(topmask)
+        labels = C.merge_fast(ws, topmask, dist, min_area=0)
+        return labels, lacunae.filter_regions(labels)
+    if variant == "widest_path_merge":
+        dist = ndi.distance_transform_edt(topmask)
+        labels = C.merge_fast(ws, topmask, dist, ratio_fn=widest_ratio)
+        return labels, lacunae.filter_regions(labels)
+    if variant == "band_filter":
+        return d["labels"], band_filter_regions(d["labels"], rejected)
+    new = np.zeros_like(d["labels"])
+    for lbl in d["kept_labels"]:
+        lbl = int(lbl)
+        if variant.startswith("open_r"):
+            m = opened_largest(d["labels"], lbl, int(variant[-1]))
+        elif variant == "fill_holes_200":
+            m = d["labels"] == lbl
+            for h in holes_of(d["labels"], lbl):
+                if h.sum() <= HOLE_MAX_PX2 and not (d["labels"][h] != 0).any():
+                    m = m | h
+        else:
+            raise ValueError(variant)
+        new[m] = lbl
+    # The changed shapes go through the pipeline's own filters again.
+    return new, lacunae.filter_regions(new)
+
+
+def _variant_run(args) -> str:
+    name, variant = args
+    path = OUT / "3.6_runs" / f"{name}__{variant}.json"
+    if path.is_file():
+        return str(path)
+    d = C.load(name)
+    rejected: list = []
+    labels, kept = variant_lacunae(d, variant, rejected)
+    rows = lacunae.measurements_for(kept, C.PRECISION)
+    net = C.network_stage(d["channel"], labels, kept, preprocessed=d["preprocessed"], flagged=d["flagged"],
+                          signal=d["signal"], t_lo=d["t_lo"])
+    h = C.headline(rows, net["cell_rows"], net["density"], len(net["bridges"]))
+    C.write_npz(OUT / "_variant_masks" / f"{name}__{variant}.npz", lacuna_id_map=net["lacuna_id_map"],
+                skeleton=net["skeleton"])
+    C.write_json(path, {"image": name, "variant": variant, "headline": h, "skeleton_px": int(net["skeleton"].sum()),
+                        "rejected_by_band_filter": rejected, "lacuna_rows": rows, "cell_rows": net["cell_rows"]})
+    return str(path)
+
+
+def item_3_6() -> None:
+    from concurrent.futures import ProcessPoolExecutor
+    names = [C.short(p) for p in C.IMAGE_PATHS]
+    jobs = [(n, v) for v in VARIANTS for n in names]
+    with ProcessPoolExecutor(max_workers=8) as ex:
+        for pth in ex.map(_variant_run, jobs):
+            print("done", Path(pth).name, flush=True)
+    meas = ["lacuna_count", "interior_count", "median_area_px2", "roots_per_cell", "ring30_per_cell_px",
+            "ring60_per_cell_px", "field_density_per_px", "bridges"]
+    rows, rejected = [], []
+    for n in names:
+        d = C.load(n)
+        base = C.headline(d["lacuna_rows"], d["cell_rows"], d["field"]["canalicular_length_density_per_px"], d["n_bridges"])
+        rows.append({"image": n, "variant": "default", **base, **{f"{m}_pct": 0.0 for m in meas}})
+        for v in VARIANTS:
+            j = json.loads((OUT / "3.6_runs" / f"{n}__{v}.json").read_text())
+            r = {"image": n, "variant": v, **j["headline"]}
+            for m in meas:
+                r[f"{m}_pct"] = 100 * (r[m] - base[m]) / base[m] if base[m] else float("nan")
+            # Cells whose own roots or ring 30 changed: match by centroid within 10 px.
+            changed = []
+            for lr, cr in zip(j["lacuna_rows"], j["cell_rows"]):
+                best = None
+                for dl, dc in zip(d["lacuna_rows"], d["cell_rows"]):
+                    dd = np.hypot(lr["centroid_col_px"] - dl["centroid_col_px"], lr["centroid_row_px"] - dl["centroid_row_px"])
+                    if dd <= 10 and (best is None or dd < best[0]):
+                        best = (dd, dl, dc)
+                if best is None:
+                    changed.append(f"new ({lr['centroid_col_px']:.0f},{lr['centroid_row_px']:.0f})")
+                elif (best[2]["roots_count"] != cr["roots_count"] or best[2]["ring_length_r30_px"] != cr["ring_length_r30_px"]
+                      or best[1]["area_px2"] != lr["area_px2"]):
+                    changed.append(f"({lr['centroid_col_px']:.0f},{lr['centroid_row_px']:.0f})")
+            r["cells_changed"] = len(changed)
+            r["cells_changed_at"] = " ".join(changed)
+            rows.append(r)
+            for rej in j["rejected_by_band_filter"]:
+                rejected.append({"image": n, **rej})
+    df = pd.DataFrame(rows)
+    C.write_csv(OUT / "3.6_variants.csv", df)
+    rej = pd.DataFrame(rejected)
+    C.write_csv(OUT / "3.6_band_filter_rejected.csv", rej)
+    summ = []
+    for v in VARIANTS:
+        g = df[df.variant == v]
+        row = {"variant": v, "images_with_any_change": int((g.cells_changed > 0).sum()),
+               "cells_changed": int(g.cells_changed.sum()),
+               "lacuna_count_change": int((g.lacuna_count - df[df.variant == "default"].set_index("image").loc[g.image, "lacuna_count"].values).sum())}
+        for m in ("roots_per_cell", "ring30_per_cell_px", "field_density_per_px", "bridges", "median_area_px2"):
+            row[f"{m}_pct_min"] = g[f"{m}_pct"].min()
+            row[f"{m}_pct_max"] = g[f"{m}_pct"].max()
+        summ.append(row)
+    summ = pd.DataFrame(summ)
+    C.write_csv(OUT / "3.6_summary.csv", summ)
+    cols = ["image", "variant", "lacuna_count", "interior_count", "roots_per_cell", "roots_per_cell_pct",
+            "ring30_per_cell_px", "ring30_per_cell_px_pct", "field_density_per_px", "field_density_per_px_pct",
+            "bridges", "cells_changed", "cells_changed_at"]
+    md = ["# 3.6 Network-level effect of the lacuna variants", "",
+          "Pre-validation, px. Each variant changes the lacunae only; the network stage then runs as in the",
+          "pipeline (canal mask, preprocessed channel and hysteresis mask from the default run, which do not",
+          "depend on the lacunae; lacuna removal, skeleton, bridging, graph, roots and rings recomputed).",
+          "Changed shapes (opening, hole fill) go through the pipeline's own filters again.", "",
+          "- crumbs_join_merge (3.1): watershed pieces under 400 px^2 may join the re-merge test.",
+          "- widest_path_merge (3.2): the re-merge uses the widest-path saddle instead of the straight line.",
+          f"- band_filter (3.3): also reject objects keeping less than {BAND_OPENING_SHARE_MIN} of their area after an",
+          "  r = 5 opening.",
+          "- open_r2, open_r3, open_r4 (3.4): each kept lacuna replaced by the largest piece of its opening.",
+          "- fill_holes_200 (3.5): enclosed holes up to 200 px^2 filled.", "",
+          "## Range over the 8 images (percent change against the default)", "",
+          C.md_table(summ, floatfmt="{:+.2f}"), "",
+          "## Objects the band filter rejects (all 8 images)", "",
+          C.md_table(rej) if len(rej) else "None.", "",
+          "## Every image and variant", "",
+          "cells_changed counts lacunae whose area, roots or ring 30 differ from the default (matched by",
+          "centroid within 10 px), or that are new.", "",
+          C.md_table(df[df.variant != "default"][cols], floatfmt="{:.4g}")]
+    C.write_text_once(OUT / "3.6_variants.md", "\n".join(md) + "\n")
+    print("\n".join(md))
+
+
+ITEMS = {"3.0": item_3_0, "3.1": item_3_1, "3.2": item_3_2, "3.3": item_3_3, "3.4": item_3_4, "3.5": item_3_5,
+         "3.6": item_3_6}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
