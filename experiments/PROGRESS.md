@@ -8,7 +8,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 
 | id | description | status | commit SHA | note |
 |---|---|---|---|---|
-| 0.1 | Branch, experiments/README.md and PROGRESS.md | DONE |  | branch created from main 677ccd6 |
+| 0.1 | Branch, experiments/README.md and PROGRESS.md | DONE | b74daea | branch created from main 677ccd6 |
 | 0.2 | Default-result cache on all 8 images, and timing | TODO |  |  |
 | 1.1 | TIFF tags of all 8 images | TODO |  |  |
 | 1.2 | 2D FFT peaks and row and column banding, raw and preprocessed | TODO |  |  |
