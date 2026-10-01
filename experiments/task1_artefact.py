@@ -492,7 +492,92 @@ def lattice_crops() -> None:
     print(odf.iloc[:, :8].to_string(index=False))
 
 
-ITEMS = {"1.1": item_1_1, "1.2": item_1_2, "1.3": item_1_3}
+# 1.4 notch filter (pass 2) --------------------------------------------------------
+
+# The peaks of 1.2 that rise above noise in every image: period 2 px and
+# period 4 px along x, constant along y, i.e. the bins (u, v) = (512, 0) and
+# (+-256, 0) of a 1024 px axis. Each is removed with a Gaussian notch of this
+# width (bins); at the bin itself the gain is 0.
+NOTCH_BINS = [(512, 0), (256, 0), (-256, 0)]
+NOTCH_SIGMA_BINS = 1.0
+
+
+def notch(channel: np.ndarray) -> np.ndarray:
+    n0, n1 = channel.shape
+    F = np.fft.fft2(channel)
+    v = np.fft.fftfreq(n0) * n0
+    u = np.fft.fftfreq(n1) * n1
+    uu, vv = np.meshgrid(u, v)
+    H = np.ones_like(channel)
+    for du, dv in NOTCH_BINS:
+        for su, sv in ((du, dv), (-du, -dv)):
+            dist_u = np.minimum(abs(uu - su), n1 - abs(uu - su))
+            dist_v = np.minimum(abs(vv - sv), n0 - abs(vv - sv))
+            H *= 1 - np.exp(-(dist_u ** 2 + dist_v ** 2) / (2 * NOTCH_SIGMA_BINS ** 2))
+    out = np.real(np.fft.ifft2(F * H))
+    return np.clip(out, 0.0, 1.0)
+
+
+def _notch_run(args) -> str:
+    name, variant = args
+    path = OUT / "1.4_runs" / f"{name}__{variant}.json"
+    if path.is_file():
+        return str(path)
+    d = C.load(name)
+    ch = notch(d["channel"])
+    if variant == "notch_network_only":
+        labels, kept, lac_rows = d["labels"], d["kept"], d["lacuna_rows"]
+    else:  # notch_both_stages
+        lac = C.lacuna_stage(ch, fast=True)
+        labels, kept, lac_rows = lac["labels"], lac["kept"], lac["rows"]
+    net = C.network_stage(ch, labels, kept)
+    h = C.headline(lac_rows, net["cell_rows"], net["density"], len(net["bridges"]))
+    changed = int((net["skeleton"] ^ d["skeleton"]).sum())
+    P = power_spectrum(ch * 255)
+    _pk, ratio_log = spectrum_peaks(P)
+    n0, n1 = P.shape
+    after = {f"bin_{t}_after": round(float(10 ** ratio_log[(n0 // 2 + dv) % n0, (n1 // 2 + du) % n1]), 1)
+             for t, (du, dv) in (("x2", (512, 0)), ("x4", (256, 0)))}
+    C.write_json(path, {"image": name, "variant": variant, "headline": h, "skeleton_px": int(net["skeleton"].sum()),
+                        "skeleton_px_changed_vs_default": changed, "max_abs_change_grey": float(abs(ch - d["channel"]).max() * 255),
+                        **after, "lacuna_rows": lac_rows, "cell_rows": net["cell_rows"]})
+    return str(path)
+
+
+def item_1_4() -> None:
+    from concurrent.futures import ProcessPoolExecutor
+    order = ["682_z08", "682_z23", "682_z29", "542_z06", "542_z18", "543-2", "543_3", "543_z13"]
+    jobs = [(n, v) for n in order for v in ("notch_network_only", "notch_both_stages")]
+    with ProcessPoolExecutor(max_workers=8) as ex:
+        for pth in ex.map(_notch_run, jobs):
+            print("done", Path(pth).name, flush=True)
+    rows = []
+    for n, v in jobs:
+        j = json.loads((OUT / "1.4_runs" / f"{n}__{v}.json").read_text())
+        d = C.load(n)
+        base = C.headline(d["lacuna_rows"], d["cell_rows"], d["field"]["canalicular_length_density_per_px"], d["n_bridges"])
+        row = {"image": n, "variant": v, "skeleton_px_default": int(d["skeleton"].sum()), "skeleton_px": j["skeleton_px"],
+               "skeleton_px_changed": j["skeleton_px_changed_vs_default"],
+               "max_abs_change_grey": j["max_abs_change_grey"], "bin_x2_after": j["bin_x2_after"], "bin_x4_after": j["bin_x4_after"]}
+        for k in ("lacuna_count", "roots_per_cell", "ring30_per_cell_px", "field_density_per_px", "bridges"):
+            row[k] = j["headline"][k]
+            row[f"{k}_pct"] = 100 * (j["headline"][k] - base[k]) / base[k] if base[k] else float("nan")
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    C.write_csv(OUT / "1.4_notch.csv", df)
+    md = ["# 1.4 Notch filter variant", "",
+          "Pre-validation, px. The raw red channel is filtered in the Fourier domain before anything else:",
+          "Gaussian notches (sigma 1 bin) at period 2 px and period 4 px along x, the two peaks of 1.2 that",
+          "stand above noise in every image. notch_network_only keeps the default lacunae and runs the",
+          "network stage (canal mask, preprocessing, threshold, bridging, graph) on the filtered channel.",
+          "notch_both_stages runs the lacuna stage on it as well. bin_x2_after and bin_x4_after are the",
+          "two bins' power over their local spectrum after the notch (before: 290 to 870 and 10 to 30).", "",
+          C.md_table(df, floatfmt="{:.4g}"), ""]
+    C.write_text_once(OUT / "1.4_notch.md", "\n".join(md))
+    print(df.to_string(index=False))
+
+
+ITEMS = {"1.1": item_1_1, "1.2": item_1_2, "1.3": item_1_3, "1.4": item_1_4}
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
