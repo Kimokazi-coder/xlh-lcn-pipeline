@@ -1,7 +1,9 @@
 # Overnight progress
 
+ALL DONE
+
 last update: 2026-10-01 16:23
-next action: none all items done.
+next action: none. Every item is done; see docs/OVERNIGHT_REPORT.md.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
