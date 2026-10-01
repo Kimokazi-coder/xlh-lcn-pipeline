@@ -1,7 +1,7 @@
 # Overnight progress
 
-last update: 2026-10-01 16:04
-next action: 6.1 match lacunae across images by centroid within 25 px, field groups from data, repeatability table.
+last update: 2026-10-01 16:06
+next action: 7.1 draft docs/OVERNIGHT_REPORT.md from all pass 1 outputs, with Decisions needed.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -25,7 +25,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 5.1 | Field density three ways | DONE | 8084d88 | done after 5.2; canal mask removed: -1.6 to +1.1%; draft ROI: 0 to +3.1%; both: -0.6 to +4.5% (682_z08); ordering of images unchanged |
 | 5.2 | Green and blue channels; draft bone ROI | DONE | 2fb0e69 | green empty; blue = weak copy of red structures, brighter in canal regions, purple regions in 542_z06, 542_z18, 682_z08, no-tissue corners in the 682 images; draft ROI removes 0 to 4.2%; purple threshold has no gap (anchor 0.72) |
 | 5.3 | 542_z06 vertical trace near x 525, y 590 to 900 | DONE | b8a0859 | 382 skeleton px in corridor x 515-541 y 590-900, 1.1% of the skeleton, 310 of 311 rows; canal mask covers only the top; removing it lowers density 1.1% |
-| 6.1 | Repeatability across matched cells; field groups from data | TODO |  |  |
+| 6.1 | Repeatability across matched cells; field groups from data | DONE | 997e10b | groups from data: 542_z06+542_z18, 543-2+543_3+543_z13, 682_z23+682_z29, 682_z08 alone (4 matches with 682_z23, 15x chance); field density within a group 1.7 to 3.0%; per matched cell rel diff roots 0.40, ring30 0.25, ring60 0.14, owned 0.86, edges 0.86; cell area also differs 40% |
 | 7.1 | Draft docs/OVERNIGHT_REPORT.md | TODO |  |  |
 | 1.4 | Notch filter variant | TODO |  |  |
 | 2.4 | Full threshold sensitivity grid on all 8 images | TODO |  |  |
