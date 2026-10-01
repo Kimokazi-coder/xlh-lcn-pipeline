@@ -285,7 +285,7 @@ def item_1_2() -> None:
           "x, in 8-bit grey levels (the preprocessed channel is scaled by 255 for this). The banding columns",
           "come from the row and column mean profiles after removing a 31 px moving mean.", "",
           C.md_table(band, floatfmt="{:.2f}"), ""]
-    C.write_text(OUT / "1.2_fft.md", "\n".join(md))
+    C.write_text_once(OUT / "1.2_fft.md", "\n".join(md))
     print(peaks.to_string(index=False))
     print(band.to_string(index=False))
 

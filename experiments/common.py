@@ -100,6 +100,13 @@ def write_text(path: Path, text: str) -> None:
     os.replace(tmp, path)
 
 
+def write_text_once(path: Path, text: str) -> None:
+    """Write a report file only if it does not exist yet, so a reading
+    appended by hand is never overwritten by a rerun."""
+    if not path.is_file():
+        write_text(path, text)
+
+
 def write_json(path: Path, obj) -> None:
     write_text(path, json.dumps(obj, indent=2, default=_json_default))
 
@@ -284,6 +291,102 @@ def load(path_or_short) -> dict:
     return out
 
 
+# Fast copies of two lacuna functions
+# lacunae.watershed_split and lacunae.merge_shallow_splits loop over every
+# component with full-frame arrays, which takes 10 to 120 s per image. The
+# copies below do the same work inside each component's bounding box (plus
+# a 1 px margin). They are checked to give identical labels on all 8 images
+# at the default cut and at scaled cuts (task 2.3 log and
+# results_experiments/task0/fast_copies_check.csv).
+
+def watershed_fast(mask: np.ndarray) -> np.ndarray:
+    from skimage import segmentation
+    distance = ndi.distance_transform_edt(mask)
+    components = measure.label(mask, connectivity=2)
+    markers = np.zeros_like(components, dtype=np.int32)
+    next_id = 1
+    H, W = mask.shape
+    for comp_id, sl in enumerate(ndi.find_objects(components), start=1):
+        if sl is None:
+            continue
+        r0, r1 = max(sl[0].start - 1, 0), min(sl[0].stop + 1, H)
+        c0, c1 = max(sl[1].start - 1, 0), min(sl[1].stop + 1, W)
+        comp_mask = components[r0:r1, c0:c1] == comp_id
+        d_local = np.where(comp_mask, distance[r0:r1, c0:c1], 0.0)
+        peak = d_local.max()
+        if peak <= 0:
+            continue
+        h = max(lacunae.SEED_PROMINENCE_FRACTION * peak, 1e-6)
+        seeds = morphology.h_maxima(d_local, h) & comp_mask
+        seed_labels = measure.label(seeds, connectivity=2)
+        n = seed_labels.max()
+        if n == 0:
+            continue
+        sub = markers[r0:r1, c0:c1]
+        sub[seed_labels > 0] = seed_labels[seed_labels > 0] + next_id - 1
+        next_id += n
+    return segmentation.watershed(-distance, markers=markers, mask=mask)
+
+
+def straight_ratio(distance, comp_mask_crop, offset, pa, pb, peak_a, peak_b) -> float:
+    """The pipeline's saddle ratio: lowest distance value on the straight
+    line between the two peaks, over the smaller peak."""
+    saddle = lacunae._sample_line_min(distance, pa[0], pa[1], pb[0], pb[1])
+    return saddle / min(peak_a, peak_b)
+
+
+def merge_fast(labels: np.ndarray, mask: np.ndarray, distance: np.ndarray, min_area: int = lacunae.MIN_AREA_PX2,
+               ratio_fn=straight_ratio, ratio_min: float = lacunae.MERGE_SADDLE_RATIO_MIN,
+               record: list | None = None) -> np.ndarray:
+    """lacunae.merge_shallow_splits per component bounding box, with hooks:
+    min_area (pipeline 400), ratio_fn (pipeline straight line), ratio_min
+    (pipeline 0.35), and `record`, a list that receives every tested pair."""
+    components = measure.label(mask, connectivity=2)
+    merged = labels.copy()
+    for comp_id, sl in enumerate(ndi.find_objects(components), start=1):
+        if sl is None:
+            continue
+        r0, c0 = sl[0].start, sl[1].start
+        comp_mask = components[sl] == comp_id
+        m = merged[sl]
+        piece_labels = np.unique(m[comp_mask])
+        piece_labels = piece_labels[piece_labels != 0]
+        substantial = [lbl for lbl in piece_labels if (m == lbl).sum() >= min_area]
+        if len(substantial) < 2:
+            continue
+        peaks, peak_locs = {}, {}
+        for lbl in substantial:
+            pm = m == lbl
+            peaks[lbl] = distance[sl][pm].max()
+            rr, cc = np.unravel_index(np.argmax(np.where(pm, distance[sl], -1)), pm.shape)
+            peak_locs[lbl] = (rr + r0, cc + c0)
+        parent = {lbl: lbl for lbl in substantial}
+
+        def find(x):
+            while parent[x] != x:
+                x = parent[x]
+            return x
+
+        for i in range(len(substantial)):
+            for j in range(i + 1, len(substantial)):
+                a, b = substantial[i], substantial[j]
+                ratio = ratio_fn(distance, comp_mask, (r0, c0), peak_locs[a], peak_locs[b], peaks[a], peaks[b])
+                if record is not None:
+                    record.append({"component": comp_id, "a": int(a), "b": int(b), "ratio": float(ratio),
+                                   "peak_a": float(peaks[a]), "peak_b": float(peaks[b]),
+                                   "pa": peak_locs[a], "pb": peak_locs[b]})
+                if ratio >= ratio_min:
+                    ra, rb = find(a), find(b)
+                    if ra != rb:
+                        parent[ra] = rb
+        for lbl in substantial:
+            root = find(lbl)
+            if root != lbl:
+                m[m == lbl] = root
+        merged[sl] = m
+    return merged
+
+
 # Pipeline stages with hooks
 
 def lacuna_mask_at(channel: np.ndarray, t_hi: float) -> np.ndarray:
@@ -296,17 +399,19 @@ def lacuna_mask_at(channel: np.ndarray, t_hi: float) -> np.ndarray:
     return mask
 
 
-def lacuna_stage(channel: np.ndarray, t_hi: float | None = None, merge_fn=None, filter_fn=None) -> dict:
+def lacuna_stage(channel: np.ndarray, t_hi: float | None = None, merge_fn=None, filter_fn=None,
+                 fast: bool = False) -> dict:
     """lacunae.segment() with hooks: a fixed t_hi, a replacement re-merge
     function and a replacement filter function. With no hooks it is
-    lacunae.segment() step for step."""
+    lacunae.segment() step for step. fast=True uses watershed_fast and
+    merge_fast (checked identical) instead of the pipeline's own loops."""
     if t_hi is None:
         mask, t_hi = lacunae.multiotsu_lacuna_mask(channel)
     else:
         mask = lacuna_mask_at(channel, t_hi)
-    ws = lacunae.watershed_split(mask)
+    ws = watershed_fast(mask) if fast else lacunae.watershed_split(mask)
     distance = ndi.distance_transform_edt(mask)
-    merged = (merge_fn or lacunae.merge_shallow_splits)(ws, mask, distance)
+    merged = (merge_fn or (merge_fast if fast else lacunae.merge_shallow_splits))(ws, mask, distance)
     kept = (filter_fn or lacunae.filter_regions)(merged)
     rows = lacunae.measurements_for(kept, PRECISION)
     return {"mask": mask, "ws_labels": ws, "labels": merged, "kept": kept, "t_hi": t_hi, "rows": rows}
