@@ -712,6 +712,26 @@ def scale_bar_at(ax, length_px: int, colour: str = "white", fs: float = FONT_SIZ
             path_effects=halo(1.2), zorder=7)
 
 
+def legend_rows(items: list, w_mm: float, fs: float = FONT_SIZE - 1) -> int:
+    """How many rows legend_strip needs for these items at this width."""
+    fig = plt.figure(figsize=(2, 1))
+    renderer = fig.canvas.get_renderer()
+    sw, pad, gap = 6.0, 1.0, 3.0
+    rows, x = 1, 0.0
+    for it in items:
+        t = fig.text(0, 0, it["label"], fontsize=fs)
+        tw = t.get_window_extent(renderer=renderer).width / fig.dpi * 25.4
+        if x > 0 and x + sw + pad + tw > w_mm:
+            rows, x = rows + 1, 0.0
+        x += sw + pad + tw + gap
+    plt.close(fig)
+    return rows
+
+
+def legend_height(items: list, w_mm: float) -> float:
+    return 4.0 * legend_rows(items, w_mm) + 1.0
+
+
 def legend_strip(fig, x_mm: float, y_mm: float, w_mm: float, h_mm: float, fig_w: float, fig_h: float,
                  items: list, fs: float = FONT_SIZE - 1) -> None:
     """A row (or rows) of colour keys with labels, drawn inside the figure.
@@ -1202,35 +1222,42 @@ def choose_inset_cell(out: dict) -> tuple[int, str]:
     return best[0], f"interior median roots {med:g}; lacuna {best[0]} has {best[1]} roots (closest, ties to smallest id)"
 
 
-def figure_image(name: str, cell: int | None = None) -> None:
-    fig_name = f"F1_{name}"
+def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> None:
+    """The per-image overview (F1): (A) red channel; (B) kept lacunae with
+    numbers ("c": in a flagged canal region) and the rejected lacuna-scale
+    candidates, grey dashed with their reason; (C) the skeleton with the
+    inset box; and the inset lacuna at 3x. With low_cut, objects kept only at
+    0.8 t_hi are added to B (dotted), written to a separate file."""
+    d = image_data(name)
+    name = d["short"]
+    fig_name = f"F1_{name}" + ("_low_cut_layer" if low_cut else "")
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
-    path = path_of(name)
-    out = pipeline_output(path)
+    out = pipeline_output(d["path"])
     if cell is None:
         cell, why = choose_inset_cell(out)
     else:
         why = f"set with -c {cell}"
-    row = next(r for r in out["lacuna_rows"] if r["lacuna_id"] == cell)
-    write_json(OUT / f"{fig_name}_inset.json", {"image": name, "inset_lacuna": cell, "rule": why})
     print(f"{fig_name}: inset lacuna {cell} ({why})")
 
     # Inset crop: a square around the lacuna's bounding box plus a margin.
-    ys, xs = np.nonzero(out["lacuna_id_map"] == cell)
+    ys, xs = np.nonzero(d["lacuna_id_map"] == cell)
     side = int(max(ys.max() - ys.min(), xs.max() - xs.min()) + 1 + 2 * INSET_MARGIN_PX)
     cx, cy = (xs.min() + xs.max()) / 2, (ys.min() + ys.max()) / 2
-    H, W = out["lacuna_id_map"].shape
+    H, W = d["lacuna_id_map"].shape
     x0 = int(np.clip(round(cx - side / 2), 0, W - side))
     y0 = int(np.clip(round(cy - side / 2), 0, H - side))
 
     # Layout in mm: three square panels and an inset column at 3x the
-    # panel scale, filling 180 mm.
+    # panel scale, filling 180 mm; count line, legend and caption below.
     margin, gap = 1.0, 2.5
     panel = (FIG_WIDTH_MM - 2 * margin - 3 * gap) / (3 + INSET_ZOOM * side / W)
     inset = INSET_ZOOM * side / W * panel
-    top, bottom = 5.0, 7.0
+    items = lacuna_legend_items(d, rejected=True, low_cut=low_cut)
+    top, count_h, cap_h = 5.0, 5.0, 4.5
+    legend_h = legend_height(items, FIG_WIDTH_MM - 2 * margin)
+    bottom = cap_h + legend_h + count_h
     fig_h = bottom + panel + top
     fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
     axA = mm_axes(fig, margin, bottom, panel, panel, FIG_WIDTH_MM, fig_h)
@@ -1238,18 +1265,19 @@ def figure_image(name: str, cell: int | None = None) -> None:
     axC = mm_axes(fig, margin + 2 * (panel + gap), bottom, panel, panel, FIG_WIDTH_MM, fig_h)
     axI = mm_axes(fig, margin + 3 * (panel + gap), bottom + panel - inset, inset, inset, FIG_WIDTH_MM, fig_h)
 
-    raw = windowed(out["channel"])
+    raw = windowed(d["channel"])
     image_axes(axA, raw)
     axA.set_title(f"{name}, red channel", pad=2)
     scale_bar(axA, W)
 
-    image_axes(axB, raw)
-    draw_outlines(axB, out["lacuna_id_map"], out["lacuna_rows"], numbers=True)
-    axB.set_title("lacunae", pad=2)
-    axB.text(0.5, -0.03, f"n = {out['lacuna_count']} lacunae ({out['interior_count']} interior)",
-             transform=axB.transAxes, ha="center", va="top")
+    show_image(axB, raw)
+    draw_lacunae(axB, d, numbers=True, number_size=FONT_SIZE - 2)
+    draw_rejected(axB, d)
+    low = draw_low_cut(axB, d) if low_cut else 0
+    axB.set_title("lacunae and rejected candidates", pad=2)
+    axB.text(0.0, -0.02, count_line(d), transform=axB.transAxes, ha="left", va="top", fontsize=FONT_SIZE - 0.5)
 
-    sk = skeleton_rgb(out["channel"], out["skeleton"])
+    sk = skeleton_rgb(d["channel"], d["skeleton"])
     image_axes(axC, sk)
     axC.set_title("skeleton (white) on the image at 60%", pad=2)
     axC.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), side, side, fill=False, ec=ROOT_COLOUR, lw=0.8))
@@ -1261,33 +1289,125 @@ def figure_image(name: str, cell: int | None = None) -> None:
     for sp in axI.spines.values():
         sp.set_edgecolor(ROOT_COLOUR)
         sp.set_linewidth(0.8)
-    draw_outlines(axI, out["lacuna_id_map"][y0:y0 + side, x0:x0 + side],
-                  [r for r in out["lacuna_rows"] if r["lacuna_id"] == cell], offset=(0, 0))
-    pts = np.array(out["roots_xy"][str(cell)])
+    draw_outlines(axI, d["lacuna_id_map"][y0:y0 + side, x0:x0 + side],
+                  [r for r in d["lacuna_rows"] if r["lacuna_id"] == cell], offset=(0, 0))
+    pts = np.array(d["roots_xy"][str(cell)])
     if len(pts):
         axI.scatter(pts[:, 0] - x0, pts[:, 1] - y0, s=6, c=ROOT_COLOUR, edgecolors="black", linewidths=0.3, zorder=5)
     axI.set_xlim(-0.5, side - 0.5)
     axI.set_ylim(side - 0.5, -0.5)
     axI.set_title(f"lacuna {cell}, 3x", pad=2)
-    roots_n = next(c["roots_count"] for c in out["cell_rows"] if c["lacuna_id"] == cell)
+    roots_n = next(c["roots_count"] for c in d["cell_rows"] if c["lacuna_id"] == cell)
     axI.text(0.0, -0.04, f"{roots_n} roots (dots)", transform=axI.transAxes, ha="left", va="top")
 
     for ax, letter in ((axA, "A"), (axB, "B"), (axC, "C")):
         panel_letter(fig, ax, letter)
-    fig.text(0.995, 0.005, "pre-validation, pixel units", ha="right", va="bottom", fontsize=FONT_SIZE - 1, color="0.35")
+    legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h, items)
+    cap = ("Dim out-of-plane cells are not detected and are not drawn. "
+           + (f"Dotted: {low} object{'s' if low != 1 else ''} kept only at 0.8 times t_hi (not the default output). "
+              if low_cut else "")
+           + "Fixed display window. Pre-validation, pixel units.")
+    fig.text(margin / FIG_WIDTH_MM, 1.5 / fig_h, cap, ha="left", va="bottom", fontsize=FONT_SIZE - 0.5)
     save(fig, fig_name)
     print(fig_name, "written")
 
 
+def draw_rejected(ax, d: dict, lw: float = V2_OUTLINE_PT, letters: bool = True, fs: float = FONT_SIZE - 2) -> None:
+    """Rejected lacuna-scale candidates (at least REJECTED_MIN_DRAW_PX2) as
+    grey dashed outlines with the one-letter reason beside them: A aspect,
+    S solidity, a area."""
+    labels = d["labels"]
+    H, W = labels.shape
+    for r in d["rejected"]:
+        for c in region_contours(labels == r["label"]):
+            ax.plot(c[:, 0], c[:, 1], color=PALETTE["rejected"], lw=lw, ls=(0, (2.5, 1.5)), zorder=3.5,
+                    path_effects=[patheffects.withStroke(linewidth=lw + 0.9, foreground="black")])
+        if letters:
+            r0, c0, r1, c1 = r["bbox"]
+            tx, ha = (c1 + 4, "left") if c1 + 30 < W else (c0 - 4, "right")
+            ty = float(np.clip((r0 + r1) / 2, 16, H - 16))
+            ax.text(tx, ty, r["letter"], color=PALETTE["rejected"], ha=ha, va="center", fontsize=fs,
+                    fontweight="bold", path_effects=halo(1.2), zorder=6)
+
+
+LOW_CUT_SCALE = 0.8
+
+
+def low_cut_objects(d: dict) -> np.ndarray:
+    """Label image of the objects that the lacuna stage keeps at 0.8 t_hi and
+    that overlap no lacuna kept at the default cut (option -r only)."""
+    lac = lacunae.analyse_image(d["path"], d["t_hi"] * LOW_CUT_SCALE)
+    out = np.zeros(lac["labels"].shape, dtype=np.int32)
+    k = 0
+    for region, _b in lac["kept"]:
+        rr, cc = region.coords[:, 0], region.coords[:, 1]
+        if (d["lacuna_id_map"][rr, cc] > 0).any():
+            continue
+        k += 1
+        out[rr, cc] = k
+    return out
+
+
+def draw_low_cut(ax, d: dict) -> int:
+    lab = low_cut_objects(d)
+    for k in range(1, int(lab.max()) + 1):
+        for c in region_contours(lab == k):
+            ax.plot(c[:, 0], c[:, 1], color=PALETTE["low_cut"], lw=0.8, ls=(0, (0.8, 1.2)), zorder=3.6,
+                    path_effects=[patheffects.withStroke(linewidth=1.7, foreground="black")])
+    return int(lab.max())
+
+
+def lacuna_legend_items(d: dict, rejected: bool = True, low_cut: bool = False, canal: bool | None = None) -> list:
+    items = [
+        {"kind": "outline", "colour": PALETTE["interior"], "label": "interior lacuna (in per-cell means)"},
+        {"kind": "outline", "colour": PALETTE["edge"], "label": "lacuna touching the frame (not in per-cell means)"},
+    ]
+    if rejected:
+        items.append({"kind": "outline", "colour": PALETTE["rejected"], "ls": (0, (2.5, 1.5)),
+                      "label": "rejected candidate: A aspect, S solidity, a area"})
+    if low_cut:
+        items.append({"kind": "outline", "colour": PALETTE["low_cut"], "lw": 0.8, "ls": (0, (0.8, 1.2)),
+                      "label": "kept only at 0.8 times t_hi"})
+    if (d["canal_ids"] if canal is None else canal):
+        items.append({"kind": "text", "text": "c", "colour": PALETTE["interior"],
+                      "label": "inside a flagged canal region, may be vascular"})
+    return items
+
+
 # F2 contact sheet ----------------------------------------------------------------
 
-def figure_contact(key_path: Path | None = None) -> None:
-    """All images, 2 rows by 4 columns, raw with thin outlines and the count
-    under each, one display window. With a blinding key, panels are labelled
-    with the codes and ordered by code."""
+def contact_count_lines(d: dict) -> str:
+    """The count line in two lines, for a small panel."""
+    n_int, n_edge, n_rej = len(d["interior_ids"]), len(d["edge_ids"]), len(d["rejected"])
+    return (f"{n_int} interior lacunae used in per-cell means\n"
+            f"({n_edge} touching the frame, {n_rej} rejected candidate{'s' if n_rej != 1 else ''})")
+
+
+def draw_canal_marks(ax, d: dict, fs: float = FONT_SIZE - 2) -> None:
+    """A "c" beside each kept lacuna in a flagged canal region, for panels
+    that show no lacuna numbers."""
+    idm = d["lacuna_id_map"]
+    for row in d["lacuna_rows"]:
+        lid = row["lacuna_id"]
+        if lid not in d["canal_ids"]:
+            continue
+        colour = PALETTE["edge"] if row["on_border"] else PALETTE["interior"]
+        cols = np.nonzero((idm == lid).any(axis=0))[0]
+        tx, ha = (cols.max() + 8, "left") if cols.max() + 60 < idm.shape[1] else (cols.min() - 8, "right")
+        ty = float(np.clip(row["centroid_row_px"], 30, idm.shape[0] - 30))
+        ax.text(tx, ty, "c", color=colour, ha=ha, va="center", fontsize=fs, fontweight="bold",
+                path_effects=halo(1.2), zorder=6)
+
+
+def figure_contact(key_path: Path | None = None, rejected: bool = False) -> None:
+    """All images, 2 rows by 4 columns, raw with thin outlines ("c" beside
+    a lacuna in a flagged canal region) and the count lines under each, one
+    display window. With rejected, the rejected candidates are drawn too.
+    With a blinding key, panels are labelled with the codes and ordered by
+    code."""
     import csv
 
-    fig_name = "F2_contact_sheet" + ("_coded" if key_path else "")
+    fig_name = "F2_contact_sheet" + ("_rejected" if rejected else "") + ("_coded" if key_path else "")
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
@@ -1299,23 +1419,34 @@ def figure_contact(key_path: Path | None = None) -> None:
         labels = {p: code_of[p.name] for p in paths}
         paths = sorted(paths, key=lambda p: labels[p])
     n_cols, n_rows = 4, int(np.ceil(len(paths) / 4))
-    margin, gap, text_h, top, foot = 1.0, 2.0, 7.0, 2.0, 3.0
+    data = {p: image_data(short(p)) for p in paths}
+    any_canal = any(data[p]["canal_ids"] for p in paths)
+    items = lacuna_legend_items(data[paths[0]], rejected=rejected, canal=any_canal)
+    margin, gap, text_h, top, cap_h = 1.0, 2.0, 8.0, 5.0, 5.0
+    legend_h = legend_height(items, FIG_WIDTH_MM - 2 * margin)
     panel = (FIG_WIDTH_MM - 2 * margin - (n_cols - 1) * gap) / n_cols
-    fig_h = top + n_rows * (panel + text_h) + foot
+    fig_h = top + n_rows * (panel + text_h) + (n_rows - 1) * 3.5 + legend_h + cap_h
     fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
     for i, p in enumerate(paths):
         r, c = divmod(i, n_cols)
-        out = pipeline_output(p)
+        d = data[p]
         x = margin + c * (panel + gap)
-        y = fig_h - top - (r + 1) * panel - r * text_h
+        y = fig_h - top - (r + 1) * panel - r * (text_h + 3.5)
         ax = mm_axes(fig, x, y, panel, panel, FIG_WIDTH_MM, fig_h)
-        image_axes(ax, windowed(out["channel"]))
-        draw_outlines(ax, out["lacuna_id_map"], out["lacuna_rows"], lw=0.6)
-        ax.text(0.5, -0.025, f"{labels[p]}: n = {out['lacuna_count']} ({out['interior_count']} interior)",
-                transform=ax.transAxes, ha="center", va="top")
+        show_image(ax, windowed(d["channel"]))
+        draw_lacunae(ax, d, lw=0.6)
+        draw_canal_marks(ax, d)
+        if rejected:
+            draw_rejected(ax, d, lw=0.6, fs=FONT_SIZE - 2.5)
+        ax.set_title(labels[p], pad=1.5, fontsize=FONT_SIZE, fontweight="bold")
+        ax.text(0.5, -0.02, contact_count_lines(d), transform=ax.transAxes, ha="center", va="top",
+                fontsize=FONT_SIZE - 1.5, linespacing=1.15)
         if i == 0:
-            scale_bar(ax, out["lacuna_id_map"].shape[1])
-    fig.text(0.995, 0.003, "pre-validation, pixel units", ha="right", va="bottom", fontsize=FONT_SIZE - 1, color="0.35")
+            scale_bar(ax, d["lacuna_id_map"].shape[1])
+    legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h, items)
+    fig.text(margin / FIG_WIDTH_MM, 1.2 / fig_h, "Dim out-of-plane cells are not detected and are not drawn. "
+             "Fixed display window for all panels. Pre-validation, pixel units.",
+             ha="left", va="bottom", fontsize=FONT_SIZE - 0.5)
     save(fig, fig_name)
     print(fig_name, "written")
 
@@ -1524,7 +1655,10 @@ def main() -> int:
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q.add_argument("-c", dest="cell", type=int, default=None, help="Lacuna id for the inset (default: the rule).")
+    q.add_argument("-r", dest="low_cut", action="store_true",
+                   help="Also draw objects kept only at 0.8 t_hi (dotted), into a separate file. Off by default.")
     q = sub.add_parser("contact", help="Contact sheet of all images (F2).")
+    q.add_argument("-r", dest="rejected", action="store_true", help="Also draw the rejected candidates.")
     q.add_argument("-b", dest="blind", action="store_true", help="Label with blinding codes instead of names.")
     q.add_argument("-k", dest="key", type=Path, default=None, help="Blinding key (needed with -b).")
     sub.add_parser("thresholds", help="Lacuna cut sensitivity figure (F3).")
@@ -1559,12 +1693,12 @@ def main() -> int:
         return run("F0", lambda: print(display_window()))
     if args.cmd == "image":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
-        return max(run("F1", figure_image, n, args.cell) for n in names)
+        return max(run("F1", figure_image, n, args.cell, args.low_cut) for n in names)
     if args.cmd == "contact":
         if args.blind and not args.key:
             print("-b needs the blinding key: -k KEY")
             return 2
-        return run("F2", figure_contact, args.key if args.blind else None)
+        return run("F2", figure_contact, args.key if args.blind else None, args.rejected)
     if args.cmd == "thresholds":
         return run("F3", figure_thresholds)
     if args.cmd == "fields":

@@ -1,8 +1,8 @@
 # Figures v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (publication-fixes tip)
-last update: 2026-10-02 15:40
-next action: P1 rejected candidates in the overview and contact sheet
+last update: 2026-10-02 16:20
+next action: P2 one colour per meaning in every figure
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -13,8 +13,8 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | N0 | Shared drawing code: palette, vector skeleton, ring classifier, legend strip | DONE | b70e6f7 | PALETTE, skeleton_segments (8-neighbour forward segments, 3 to 10 lone px per image drawn as 1 px dashes), ring_classes (canaliculi.nearest_lacuna_map, same rule), legend_strip, image_data cache checked against results/; make_figures.py check PASS on all 8 |
 | N1 | Network overlay figure per image (543-2 first, then 7) | DONE | 46e73db | per_image/<image>/network.png and .pdf for all 8, inset.json, network_check.json; vermillion px = ring_length_r30_px and dots = roots_count asserted per lacuna; 0.3 pt full field, 0.5 pt insets; two review rounds (count line, letter corners); comparison with the old verification image in figures/REVIEW_V2.md |
 | N2 | Cell gallery per image | DONE | 380d0e9 | per_image/<image>/gallery.png and .pdf for all 8 (one page each, 8 to 13 tiles), gallery_check.json; dots = roots_count and vermillion px = ring_length_r30_px asserted per tile; 257 mm wide at true 3x; two review rounds (legend rows, c key) |
-| N3 | Hand-count validation tiles | DONE | | 86 raw red tiles T001 to T086 in random order (system random source), annotation_template.csv, README.md; key outside the repo at F:/lcn-quant-keys/validation_tiles_key.csv; in-repo key path refused; PNG pixel data only; pixels equal the raw files |
-| P1 | Rejected candidates in overview and contact sheet | TODO | | |
+| N3 | Hand-count validation tiles | DONE | 08d0a14 | 86 raw red tiles T001 to T086 in random order (system random source), annotation_template.csv, README.md; key outside the repo at F:/lcn-quant-keys/validation_tiles_key.csv; in-repo key path refused; PNG pixel data only; pixels equal the raw files |
+| P1 | Rejected candidates in overview and contact sheet | DONE | | overview panel B and F2_contact_sheet_rejected (S02 in O1) draw rejected pieces >= 150 px2 grey dashed with A/S/a; 543_3 (40,310) A, 542_z06 (230,300) S, (5,930) a as expected; count line in the P6 wording; -r layer (0.8 t_hi) to a separate file, made for 543_3; captions say dim out-of-plane cells are not drawn; plain contact sheet keeps kept lacunae only (Decisions needed) |
 | P2 | One colour per meaning in every figure | TODO | | |
 | P3 | Names: Field 1 to 4, Fig01 and S01 ids | TODO | | |
 | P4 | Per-field plot: zero axes, labels, 682_z08 diamond, -m merged | TODO | | |

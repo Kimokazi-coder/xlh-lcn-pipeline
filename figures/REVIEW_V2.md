@@ -97,3 +97,27 @@ chunks (no text, time or dpi); six tiles compared with crops of the raw files: i
 skipped all 86. Eight tiles viewed: the centre lacuna is clear, padding is black. The order comes from
 the operating system's random source, so it cannot be rebuilt from the repository. The key is at
 `F:/lcn-quant-keys/validation_tiles_key.csv`, outside the repository.
+
+## P1 rejected candidates (overview F1, contact sheets F2)
+
+Rejected pieces of at least 150 px² after the re-merge, with the filter that rejects each by the stage
+replay of `experiments/task2_thresholds.py` (verdict): 542_z06 12, 542_z18 2, 543-2 0, 543_3 4,
+543_z13 1, 682_z08 10, 682_z23 6, 682_z29 7. The three named cases come out as expected: 543_3 near
+(40,310) A (aspect 6.03), 542_z06 near (230,300) S (solidity 0.452), 542_z06 near (5,930) a (301 px²).
+
+Round 1 (542_z06 overview at 1000 px and 100%): the grey dashed outlines (0.6 pt) were nearly invisible
+over bright structures; only the letters showed. Fix: a thin black halo under the dashes (also under
+the dotted `-r` layer). An empty band above the caption: smaller. Contact sheet with rejected
+candidates: the count lines of neighbouring panels ran into each other, and the second legend row was
+cut by the caption. Fix: the image name as a bold title above each panel, the two count lines below,
+and every legend strip sized from its measured number of rows.
+
+Round 2: the 542_z06 overview, the 682_z08 overview and the contact sheet with rejected candidates are
+clear at 1000 px.
+
+`-r` on 543_3 (`F1_543_3_low_cut_layer`): 4 objects are kept only at 0.8 times t_hi; three coincide with
+rejected candidates (the A body at (40,310) among them). The dim star-shaped cells of 543_3 are not
+found even at 0.8 times t_hi.
+
+Remaining: in the 682 images several small "a" pieces sit along the top frame edge and their letters
+crowd there. Panel C and the inset of the overview are still in the old style (P2, P5, P7).
