@@ -1,7 +1,7 @@
 # Publication fixes progress
 
-last update: 2026-10-02 12:49
-next action: F3 threshold sensitivity figure (3 images x 5 cuts), then F4 per-field plot.
+last update: 2026-10-02 12:54
+next action: F6 review every exported PNG at 1000 px, fix, write figures/captions.md.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -23,8 +23,8 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | B3 | Subcommand field-summary | DONE | 105535f | fields from centroid matching (25 px, largest-gap cut 0.58, guard 0.5): 542 pair, 543 triple, 682_z23+z29, 682_z08 alone, as overnight 6.1; per-field means incl. normalised measures; same result with and without -r |
 | F1b | Per-image figures for the other 7 images | DONE | 7f24b11 | 7 more per-image figures, inset by rule; two review rounds (edge numbers kept inside the frame); figures use the fast lacuna stage (identical output) |
 | F2 | Contact sheet of all 8 images | DONE | 45e8ee9 | 2 x 4 sheet, fixed window, 0.6 pt outlines and counts; -b -k labels with codes; two review rounds |
-| F3 | Threshold sensitivity figure | TODO |  |  |
-| F4 | Per-field plot | TODO |  |  |
+| F3 | Threshold sensitivity figure | DONE | d79dbd6 | 3 images x t_hi 0.8 to 1.2, default boxed, counts equal the overnight grid; two review rounds |
+| F4 | Per-field plot | DONE | d79dbd6 | 5 panels (roots, roots per 100 px, ring 30, ring density 30, field density) by data-derived field, dots images, bar mean, n images; no test; two review rounds |
 | F5 | Supplementary figure: crumb rule and hole fill | DONE | 45e8ee9 | 543_3 (877,545) crumb rule off/on and 542_z06 (783,581) hole fill off/on beside raw crops; values equal switch-check; two review rounds |
 | F6 | Self-review of every figure; captions | TODO |  |  |
 | 7.1 | Final report, METHODS and README sections, checks, ALL DONE | TODO |  |  |
