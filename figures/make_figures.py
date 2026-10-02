@@ -785,10 +785,10 @@ def legend_strip(fig, x_mm: float, y_mm: float, w_mm: float, h_mm: float, fig_w:
         x += sw + pad + tw + gap
 
 
-def save_to(fig, stem: Path) -> None:
-    """Write stem.png (300 dpi) and stem.pdf atomically."""
+def save_to(fig, stem: Path, exts: tuple = ("png", "pdf")) -> None:
+    """Write stem.png (300 dpi) and stem.pdf atomically (or only `exts`)."""
     stem.parent.mkdir(parents=True, exist_ok=True)
-    for ext in ("png", "pdf"):
+    for ext in exts:
         final = stem.with_name(f"{stem.name}.{ext}")
         tmp = stem.with_name(f"{stem.name}.tmp.{ext}")
         fig.savefig(tmp, dpi=300)
@@ -796,8 +796,25 @@ def save_to(fig, stem: Path) -> None:
     plt.close(fig)
 
 
-def done_at(stem: Path) -> bool:
-    return stem.with_name(stem.name + ".png").is_file() and stem.with_name(stem.name + ".pdf").is_file()
+def done_at(stem: Path, exts: tuple = ("png", "pdf")) -> bool:
+    return all(stem.with_name(f"{stem.name}.{ext}").is_file() for ext in exts)
+
+
+# Display windows (P8). The main per-image figures use the fixed dataset
+# window; their variants in per_image/<image>/display_variants/ use the 1st
+# and 99.8th percentile of that image's own red channel (PNG only, to keep
+# the repository small). Display only; no measurement uses either window.
+FIXED_WINDOW_NOTE = "Fixed display window for the dataset."
+IMAGE_WINDOW_NOTE = "Display window: this image only, display only."
+
+
+def image_window(d: dict) -> tuple[float, float]:
+    lo, hi = (float(v) for v in np.percentile(d["channel"], WINDOW_PERCENTILES))
+    return lo, hi
+
+
+def exts_for(window) -> tuple:
+    return ("png", "pdf") if window is None else ("png",)
 
 
 def update_inset_log(name: str, key: str, entry: dict) -> None:
@@ -909,7 +926,8 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
     d = image_data(name)
     name = d["short"]
     stem = stem or PER_IMAGE / name / "network"
-    if done_at(stem):
+    window_note = window_note or (FIXED_WINDOW_NOTE if window is None else IMAGE_WINDOW_NOTE)
+    if done_at(stem, exts_for(window)):
         print(stem.relative_to(ROOT), "exists, skipped")
         return
     if cells is None:
@@ -927,7 +945,7 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
     margin, gap_ab, panel, gap_in = 1.0, 2.0, 88.0, 3.0
     side = int(round(((FIG_WIDTH_MM - 2 * margin - 2 * gap_in) / 3) * W / (3 * panel)))
     inset = 3 * panel * side / W
-    cap_h, legend_h, title_h, count_h = 5.0, 9.0, 4.5, 5.0
+    cap_h, legend_h, title_h, count_h = 7.5, 9.0, 4.5, 5.0
     y_inset = cap_h + legend_h + 1.0
     y_panel = y_inset + inset + title_h + count_h
     fig_h = y_panel + panel + title_h
@@ -986,9 +1004,9 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
 
     legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h,
                  network_legend_items(d))
-    fig.text(margin / FIG_WIDTH_MM, 1.6 / fig_h, NETWORK_CAPTION + (" " + window_note if window_note else ""),
+    fig.text(margin / FIG_WIDTH_MM, 1.6 / fig_h, NETWORK_CAPTION + "\n" + window_note,
              ha="left", va="bottom", fontsize=FONT_SIZE - 0.5)
-    save_to(fig, stem)
+    save_to(fig, stem, exts_for(window))
     print(stem.relative_to(ROOT), "written; insets", cells)
 
 
@@ -1053,7 +1071,8 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
     ids = list(d["interior_ids"])
     pages = [ids[i:i + GALLERY_PER_PAGE] for i in range(0, len(ids), GALLERY_PER_PAGE)]
     stems = [stem] if len(pages) == 1 else [stem.with_name(f"{stem.name}_p{k + 1}") for k in range(len(pages))]
-    if all(done_at(s) for s in stems):
+    window_note = window_note or (FIXED_WINDOW_NOTE if window is None else IMAGE_WINDOW_NOTE)
+    if all(done_at(s, exts_for(window)) for s in stems):
         print(stem.relative_to(ROOT), "exists, skipped")
         return
     tile = GALLERY_TILE_PX * GALLERY_ZOOM / 300 * 25.4
@@ -1079,9 +1098,9 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
         n_edge = len(d["edge_ids"])
         note = (f"{n_edge} lacuna{'e' if n_edge != 1 else ''} touching the frame not shown (left out of per-cell means). "
                 "Tiles: 240 px squares centred on each interior lacuna, zero padded outside the frame, one scale. "
-                + NETWORK_CAPTION + (" " + window_note if window_note else ""))
+                + NETWORK_CAPTION + " " + window_note)
         fig.text(margin / fig_w, 1.5 / fig_h, note, ha="left", va="bottom", fontsize=FONT_SIZE - 0.5, wrap=True)
-        save_to(fig, s)
+        save_to(fig, s, exts_for(window))
         print(s.relative_to(ROOT), "written")
     if window is None:
         write_json(PER_IMAGE / name / "gallery_check.json",
@@ -1204,6 +1223,24 @@ def make_validation_tiles(key_path: Path) -> None:
     print(f"{written} tiles written, {len(key) - written} existed; {TILES_DIR.relative_to(ROOT)}")
 
 
+def figure_display_variants(name: str) -> None:
+    """P8: the overview, network and gallery of one image with the image's own
+    display window, PNG only, in per_image/<image>/display_variants/."""
+    d = image_data(name)
+    name = d["short"]
+    win = image_window(d)
+    folder = PER_IMAGE / name / "display_variants"
+    write_json(folder / "display_window.json",
+               {"image": name, "lo": win[0], "hi": win[1], "lo_8bit": win[0] * 255, "hi_8bit": win[1] * 255,
+                "percentiles": list(WINDOW_PERCENTILES),
+                "note": "Display window of this image only: the 1st and 99.8th percentile of its red channel. "
+                        "Display only; no measurement uses it. The main figures use the fixed dataset window "
+                        "(figures_out/display_window.json)."})
+    figure_image(name, window=win, stem=folder / "overview_image_window")
+    figure_network(name, window=win, stem=folder / "network_image_window")
+    figure_gallery(name, window=win, stem=folder / "gallery_image_window")
+
+
 FIG02_IMAGE = "543-2"
 
 
@@ -1291,7 +1328,8 @@ def choose_overview_inset(d: dict) -> tuple[int, dict]:
                             "frame_margin_px": frame_margin(d, best)}}
 
 
-def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> None:
+def figure_image(name: str, cell: int | None = None, low_cut: bool = False, window=None,
+                 stem: Path | None = None) -> None:
     """The per-image overview (F1): (A) red channel; (B) kept lacunae with
     numbers ("c": in a flagged canal region) and the rejected lacuna-scale
     candidates, grey dashed with their reason; (C) the skeleton with the
@@ -1300,8 +1338,9 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
     d = image_data(name)
     name = d["short"]
     fig_name = f"F1_{name}" + ("_low_cut_layer" if low_cut else "")
-    if done(fig_name):
-        print(fig_name, "exists, skipped")
+    stem = stem or OUT / fig_name
+    if done_at(stem, exts_for(window)):
+        print(stem.relative_to(ROOT), "exists, skipped")
         return
     if cell is not None:
         log = {"rule": f"set with -c {cell}", "inset": {"lacuna_id": cell}}
@@ -1312,7 +1351,7 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
         cell, log = choose_overview_inset(d)
     if cell not in d["interior_ids"]:
         raise ValueError(f"{name}: inset lacuna {cell} is not an interior lacuna")
-    if not low_cut:
+    if not low_cut and window is None:
         update_inset_log(name, "overview", log)
     print(f"{fig_name}: inset lacuna {cell} ({log['rule']})")
 
@@ -1346,7 +1385,7 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
     axC = mm_axes(fig, margin + 2 * (panel + gap), bottom, panel, panel, FIG_WIDTH_MM, fig_h)
     axI = mm_axes(fig, margin + 3 * (panel + gap), bottom + panel - inset, inset, inset, FIG_WIDTH_MM, fig_h)
 
-    raw = windowed(d["channel"])
+    raw = windowed_with(d["channel"], window)
     image_axes(axA, raw)
     axA.set_title(f"{name}, red channel", pad=2)
     scale_bar(axA, W)
@@ -1360,7 +1399,7 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
 
     # C: the network overlay of the network figure at small size. Every
     # skeleton pixel is drawn, not only the threads attached to counted cells.
-    over = overlay_image(d)
+    over = overlay_image(d, window)
     show_image(axC, over)
     draw_skeleton(axC, d["segments"], lw=0.25)
     draw_lacunae(axC, d, lw=0.5)
@@ -1391,10 +1430,10 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
            "Dim out-of-plane cells are not detected and are not drawn. "
            + (f"Dotted: {low} object{'s' if low != 1 else ''} kept only at 0.8 times t_hi (not the default output). "
               if low_cut else "")
-           + "Fixed display window. Pre-validation, pixel units.")
+           + (FIXED_WINDOW_NOTE if window is None else IMAGE_WINDOW_NOTE) + " Pre-validation, pixel units.")
     fig.text(margin / FIG_WIDTH_MM, 1.5 / fig_h, cap, ha="left", va="bottom", fontsize=FONT_SIZE - 0.5)
-    save(fig, fig_name)
-    print(fig_name, "written")
+    save_to(fig, stem, exts_for(window))
+    print(stem.relative_to(ROOT), "written")
 
 
 def draw_rejected(ax, d: dict, lw: float = V2_OUTLINE_PT, letters: bool = True, fs: float = FONT_SIZE - 2) -> None:
@@ -1923,6 +1962,10 @@ def main() -> int:
     g = q.add_mutually_exclusive_group(required=True)
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
+    q = sub.add_parser("variants", help="Per-image figures with the image's own display window (PNG).")
+    g = q.add_mutually_exclusive_group(required=True)
+    g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
+    g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q = sub.add_parser("tiles", help="Hand-count tiles (raw red, random codes); key outside the repository.")
     q.add_argument("-k", dest="key", type=Path, required=True, help="Key path, outside the repository.")
     args = p.parse_args()
@@ -1930,6 +1973,9 @@ def main() -> int:
         return run("N0", _selftest_n0)
     if args.cmd == "tiles":
         return run("N3", make_validation_tiles, args.key)
+    if args.cmd == "variants":
+        names = [short(x) for x in image_paths()] if args.all else [args.image]
+        return max(run("P8", figure_display_variants, n) for n in names)
     if args.cmd == "gallery":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
         return max(run("N2", figure_gallery, n) for n in names)

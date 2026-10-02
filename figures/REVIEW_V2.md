@@ -210,3 +210,16 @@ was the dim lacuna at the left frame edge (39,297); the new one is L6 (7 roots, 
 medians are 7.5 roots and 2066 px²), 257 px from the frame.
 
 Round 1 (543-2 and 682_z08 at 1000 px, 543-2 inset at 100%): clear.
+
+## P8 display windows
+
+The main per-image figures keep the fixed dataset window and now say so in their caption line ("Fixed
+display window for the dataset."). `variants` writes `overview_image_window`, `network_image_window` and
+`gallery_image_window` (PNG only) with the image's own 1st and 99.8th percentile into
+`per_image/<image>/display_variants/`, with its window in `display_window.json` there and "Display
+window: this image only, display only." in the figure. The comparison figures keep the fixed window.
+
+Round 1 (543_3 variants at 1000 px): the network caption line ran off the right edge once the window
+note was added. Fix: the window note on its own line (main and variant network figures). Round 2: the
+network, overview and gallery variants are clear. All main per-image figures and Fig02 were redrawn for
+the new caption line; every assertion passed again.

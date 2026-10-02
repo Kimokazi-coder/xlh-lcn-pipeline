@@ -1,8 +1,8 @@
 # Figures v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (publication-fixes tip)
-last update: 2026-10-02 19:00
-next action: P8 per-image display window variants
+last update: 2026-10-02 19:40
+next action: O1 reorganize figures_out/
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -20,8 +20,8 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | P4 | Per-field plot: zero axes, labels, 682_z08 diamond, -m merged | DONE | 5d9811c | y from zero, image labels with leaders, 682_z08 open diamond with the caption sentence, -m writes Fig04_per_field_merged; dots asserted against results/summary_table.csv and the default run, bars against field_summary.csv; two review rounds |
 | P5 | Skeleton panel of the overview in the N1 style | DONE | 5fdc27e | panel C and the inset in the network overlay style (dots asserted), caption line states all skeleton pixels are drawn; captions.md updated; two review rounds |
 | P6 | Count line and canal mark "c" | DONE | 8bee8d7 | count line in overview, network, gallery header, contact sheets, Fig03 (per cut, with rejected counts); c marks 8 lacunae incl. 682_z08 L1 top edge, 542_z06 (555,149), 682_z23 (363,7); classification unchanged; two review rounds |
-| P7 | Inset rule with frame margin and overrides file | DONE | | eligibility as N1 (bbox >= 60 px from the frame), roots closest to the median, then area closest to the median area, then smallest id; figures/inset_overrides.csv header only, read when present (tested); logged in per_image/<image>/inset.json; 543-2 inset L4 (edge) to L6 |
-| P8 | Per-image display window variants | TODO | | |
+| P7 | Inset rule with frame margin and overrides file | DONE | c93151e | eligibility as N1 (bbox >= 60 px from the frame), roots closest to the median, then area closest to the median area, then smallest id; figures/inset_overrides.csv header only, read when present (tested); logged in per_image/<image>/inset.json; 543-2 inset L4 (edge) to L6 |
+| P8 | Per-image display window variants | DONE | | variants command: overview, network, gallery with the image's own 1st and 99.8th percentile window into per_image/<image>/display_variants/ (PNG only, Decisions needed) with the note in the figure; main per-image figures keep the fixed window and state it; captions.md window section; two review rounds |
 | O1 | Reorganize figures_out/ with README and INDEX | TODO | | |
 | O2 | results_experiments/INDEX.md | TODO | | |
 | O3 | docs/START_HERE.md and README pointer | TODO | | |

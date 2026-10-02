@@ -13,10 +13,19 @@ lie partly outside the focal plane are not detected by the pipeline and are not 
 
 ## Display window
 
-Every image panel uses one fixed display window, computed once over the whole dataset: the 1st and
-99.8th percentile of the pooled red channel of all 8 WT images, 20 to 255 grey levels of 255
-(`figures_out/display_window.json`). Images are not stretched one by one, so their brightness can be
-compared by eye. The window is for display only; no measurement uses it.
+**Fixed dataset window** (every main figure): the 1st and 99.8th percentile of the pooled red channel
+of all 8 WT images, 20 to 255 grey levels of 255 (`figures_out/display_window.json`). Images are not
+stretched one by one, so their brightness can be compared by eye. The comparison figures (Fig01, S02,
+S03 contact sheets, Fig03 threshold figure, S01 switch examples; Fig04 shows no image) use only this
+window, and so do the main per-image figures (`per_image/<image>/overview`, `network`, `gallery`).
+
+**Per-image window** (only in `per_image/<image>/display_variants/`): the same overview, network and
+gallery drawn with the 1st and 99.8th percentile of that image's own red channel
+(`display_variants/display_window.json`), PNG only, with "Display window: this image only, display
+only" printed in the figure. These show faint structure in dark images better, but their brightness
+cannot be compared between images.
+
+Either window is for display only; no measurement uses it.
 
 ## Colours
 
