@@ -18,6 +18,9 @@ Subcommands:
                       image and list what changes against results/
     fast-check        the fast lacuna stage against the original one: identical
                       labels at t_hi scaled 0.8 to 1.2, and the timing
+    blind             copy a folder of images under random codes (S001, ...),
+                      pixel data only, with the key written outside the repository
+    unblind           join a blinding key to a summary table
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -28,6 +31,8 @@ Usage (from the repo root):
     python src/diagnostics.py regression
     python src/diagnostics.py switch-check
     python src/diagnostics.py fast-check
+    python src/diagnostics.py blind -s data/WT -o CODED_FOLDER -k KEY_OUTSIDE_REPO.csv
+    python src/diagnostics.py unblind -s CODED_RESULTS/summary_table.csv -k KEY.csv -o UNBLINDED.csv
 """
 
 from __future__ import annotations
@@ -653,6 +658,100 @@ def cmd_fast_check(args) -> int:
     return 0 if ok else 1
 
 
+# blind and unblind ----------------------------------------------------------------
+# Blinding: the images are copied under random codes, pixel data only, so a
+# person (or the pipeline) working on the coded folder cannot see which image
+# is which. The pipeline itself writes only the file name it is given, so on a
+# coded folder every output carries codes only. The key, the one file that
+# links codes to names, must live outside the repository so it is never
+# committed. Neither command prints an original name.
+
+BLIND_PATTERNS = ("*.tif", "*.tiff")
+
+
+def _inside(path: Path, folder: Path) -> bool:
+    path, folder = path.resolve(), folder.resolve()
+    return path == folder or folder in path.parents
+
+
+def cmd_blind(args) -> int:
+    import csv
+    import random
+
+    import tifffile
+
+    src, out, key = args.src, args.out, args.key
+    if _inside(key, config.PROJECT_ROOT):
+        print("Refused: the key path is inside the repository. Put the key outside it, so it can never be committed.")
+        return 2
+    if key.exists():
+        print("Refused: the key file already exists. Choose a new path; an existing key is never overwritten.")
+        return 2
+    files = sorted(f for pattern in BLIND_PATTERNS for f in src.glob(pattern))
+    if not files:
+        print("No .tif or .tiff images in the source folder.")
+        return 1
+    out.mkdir(parents=True, exist_ok=True)
+    if any(out.iterdir()):
+        print("Refused: the output folder is not empty.")
+        return 2
+    seed = random.SystemRandom().randrange(2 ** 32)
+    order = list(range(len(files)))
+    random.Random(seed).shuffle(order)
+    key_rows = []
+    for i, index in enumerate(order, start=1):
+        code = f"S{i:03d}"
+        data = tifffile.imread(files[index])
+        # A constant fourth (alpha) channel carries no information but would
+        # mark the one image that has it, so it is dropped and the drop is
+        # recorded in the key. The pipeline never reads it.
+        alpha_dropped = False
+        if data.ndim == 3 and data.shape[-1] == 4 and (data[..., 3] == data[..., 3].flat[0]).all():
+            data = data[..., :3]
+            alpha_dropped = True
+        extras = {}
+        if data.ndim == 3 and data.shape[-1] in (3, 4):
+            extras["photometric"] = "rgb"
+            if data.shape[-1] == 4:
+                extras["extrasamples"] = ["unassalpha"]
+        else:
+            extras["photometric"] = "minisblack"
+        # Pixel data only: no description, no metadata, no software tag.
+        tifffile.imwrite(out / f"{code}.tif", data, metadata=None, software=False, **extras)
+        key_rows.append([code, files[index].name, str(files[index].parent.resolve()), seed, alpha_dropped])
+    key.parent.mkdir(parents=True, exist_ok=True)
+    with open(key, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["code", "original_name", "original_folder", "seed", "constant_alpha_dropped"])
+        w.writerows(sorted(key_rows))
+    print(f"{len(files)} images coded S001 to S{len(files):03d} into {out}. Key written to {key}.")
+    return 0
+
+
+def cmd_unblind(args) -> int:
+    import csv
+
+    with open(args.key, newline="") as f:
+        key = {row["code"]: row for row in csv.DictReader(f)}
+    with open(args.src, newline="") as f:
+        rows = list(csv.reader(f))
+    header, body = rows[0], [r for r in rows[1:] if r]
+    out_rows, missing = [], 0
+    for r in body:
+        code = Path(r[0]).stem
+        k = key.get(code)
+        if k is None:
+            missing += 1
+        out_rows.append([code, k["original_name"] if k else "", k["original_folder"] if k else ""] + r)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    with open(args.out, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["code", "original_name", "original_folder"] + header)
+        w.writerows(out_rows)
+    print(f"{len(out_rows)} rows unblinded into {args.out}; {missing} without a key entry.")
+    return 0 if missing == 0 else 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -701,6 +800,18 @@ def main() -> None:
     p.add_argument("-c", dest="csv", type=Path, default=None, help="Also write the table to this CSV file.")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_fast_check)
+
+    p = sub.add_parser("blind", help="Copy images under random codes, key written outside the repository.")
+    p.add_argument("-s", dest="src", type=Path, required=True, help="Folder of .tif images to code.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Empty folder for the coded copies.")
+    p.add_argument("-k", dest="key", type=Path, required=True, help="Key file (CSV) to write, outside the repository.")
+    p.set_defaults(func=cmd_blind)
+
+    p = sub.add_parser("unblind", help="Join a blinding key to a summary table.")
+    p.add_argument("-s", dest="src", type=Path, required=True, help="Summary table (CSV) of a coded run.")
+    p.add_argument("-k", dest="key", type=Path, required=True, help="The key written by blind.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Unblinded table (CSV) to write.")
+    p.set_defaults(func=cmd_unblind)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

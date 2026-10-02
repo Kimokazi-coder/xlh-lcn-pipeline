@@ -4,3 +4,10 @@ venv/
 __pycache__/
 .ipynb_checkpoints/
 .DS_Store
+
+# Blinding keys (added 2026-10-02, publication-fixes B1): a key links coded
+# image names to the originals and must never be committed. The blind
+# subcommand refuses to write one inside the repository; these patterns are a
+# second guard. Listed under Decisions needed in docs/FIXES_REPORT.md.
+code_key*
+*_key.csv
