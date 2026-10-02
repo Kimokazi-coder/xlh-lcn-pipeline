@@ -360,7 +360,7 @@ def regression_allowlist() -> dict:
     """Fields allowed to exist only in the regenerated output, because they
     were appended after results/ was made. Any other new field fails the
     regression. Json paths use "[*]" for a list index."""
-    per_cell = [f for f, _u, _x in canaliculi.NORMALISED_METRICS + canaliculi.NETWORK_V2_METRICS]
+    per_cell = [m[0] for m in canaliculi.NORMALISED_METRICS + canaliculi.NETWORK_V2_METRICS]
     json_fields = {"canaliculi_measurements.json:normalised_measures[*]",
                    "canaliculi_measurements.json:network_v2_measures[*]"}
     for f in per_cell:
