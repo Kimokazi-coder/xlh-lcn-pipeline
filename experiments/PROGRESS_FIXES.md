@@ -1,7 +1,7 @@
 # Publication fixes progress
 
-last update: 2026-10-02 11:35
-next action: F0 figures/make_figures.py with the shared style (fixed window, fonts, colours, scale bar).
+last update: 2026-10-02 11:40
+next action: F1a per-image figure for 543-2, view at 1000 px, note defects in figures/REVIEW.md.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -11,7 +11,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 0.1 | Branch publication-fixes and this file | DONE | 506de42 | branch from overnight-fixes ef04398 |
 | A2 | Output-directory option -o for both features and the summary writer | DONE | 00f5ff1 | -o added as short name for --out; folder run writes the summary there; check run into _cache identical to results/543-2 |
 | A6 | Subcommand regression: regenerate all 8 and compare with results/ at tolerance 0 | DONE | a34ef0a | PASS before any other change: 3861 numbers over 8 images at tolerance 0, 2 min; catches planted differences; now part of the pre-push check |
-| F0 | figures/make_figures.py with the shared style | TODO |  |  |
+| F0 | figures/make_figures.py with the shared style | DONE | 43e4f4b | figures/make_figures.py: Arial, 7 to 9 pt at 180 mm, fonttype 42, PNG 300 dpi plus PDF, cyan/yellow outlines 0.7 pt, white skeleton on raw at 60%, 200 px bar; window 20 to 255 of 255 (1st and 99.8th percentile pooled) |
 | F1a | Per-image figure for 543-2, viewed and reviewed | TODO |  |  |
 | A1 | Provenance block in every json output; requirements.txt | TODO |  |  |
 | A3 | Normalised measures as appended columns | TODO |  |  |
