@@ -14,3 +14,12 @@ Reading, not a defect: in 682_z23 L3 several radial threads below the cell end m
 body (a gap in the mask next to the bright rim) and are counted as passing. So the attached length
 leaves out passing threads but also threads that are broken near the cell; it depends on the attach gap
 of 10 px, the same constant as the roots.
+
+## C3_crops.png
+
+543-2 L6 (746,472), the 543-2 cell closest to the median roots among cells at least 100 px from the
+frame, and 543-2 L4 (39,297), the cell with the largest drop from 10 to 30 px. Round 1: the first draft
+picked L4 twice (it is both the median cell and the largest drop); fix: the first pick at least 100 px
+from the frame, the second excluding the first. The band tint at 35% was too dim to read at 1000 px; fix:
+70%. Round 2: bands, crossing pixels and outline are clear at 1000 px and 100%. The counts in the crops
+equal the pipeline columns (asserted). L4 is cut by the left frame edge, which is why its crop is narrower.

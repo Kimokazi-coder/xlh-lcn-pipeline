@@ -310,13 +310,31 @@ NORMALISED_METRICS = [
 #                               belongs to the ring of its first pixel in
 #                               raster order. ring_length_rR_px counts pixels,
 #                               so a diagonal step counts 1 there.
+#   sholl_crossings_rR          8-connected skeleton components inside the band
+#                               of the cell's nearest-lacuna partition whose
+#                               distance to the lacuna masks lies in
+#                               [R - 0.75, R + 0.75): threads crossing a circle
+#                               around the cell. No graph, no bridging test, no
+#                               attach gap (sholl_crossings).
 # (name, unit, extra decimals beyond config.CSV_FLOAT_PRECISION, summary table column)
 NETWORK_V2_METRICS = [
     ("ring_attached_length_r30_px", "px", 0, "ring attached length 30 px per cell (px)"),
     ("ring_attached_length_r60_px", "px", 0, "ring attached length 60 px per cell (px)"),
     ("ring_length_w_r30_px", "px", 0, "ring length weighted 30 px per cell (px)"),
     ("ring_length_w_r60_px", "px", 0, "ring length weighted 60 px per cell (px)"),
+    ("sholl_crossings_r10", "count", 0, "Sholl crossings 10 px per cell"),
+    ("sholl_crossings_r20", "count", 0, "Sholl crossings 20 px per cell"),
+    ("sholl_crossings_r30", "count", 0, "Sholl crossings 30 px per cell"),
 ]
+
+# Sholl crossings. Radii (px) from the lacuna masks: 30 px is the ring of the
+# headline measure; 10 px is the attach gap of the roots, so a crossing there is
+# a thread at root distance; 20 px is midway. Half width of the band: the
+# distance map changes by at most the step length between neighbouring pixels
+# (1 or sqrt(2) = 1.414), so a band 1.5 px wide holds at least one pixel of
+# every thread that crosses it. Definitions, not tuned values.
+SHOLL_RADII_PX = (10, 20, 30)
+SHOLL_HALF_WIDTH_PX = 0.75
 
 # Field measures appended on branch canaliculi-v2, after every existing key of
 # the field block: (key, unit, summary table column).
@@ -1026,12 +1044,39 @@ def ring_weighted_lengths(links: dict, dist_to_lacuna: np.ndarray, nearest_id: n
     return out
 
 
+def sholl_crossings(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                    n_lacunae: int) -> dict:
+    """{radius: array indexed by lacuna id} of crossing counts. The band of
+    lacuna i at radius R is the set of pixels of its nearest-lacuna partition
+    (nearest_id == i) whose distance to the lacuna masks lies in
+    [R - SHOLL_HALF_WIDTH_PX, R + SHOLL_HALF_WIDTH_PX); the image frame
+    bounds it. The count is the number of 8-connected components of the
+    skeleton inside that band, components taken per lacuna. A thread running
+    along the band counts once; a branch point inside the band can join two
+    threads into one component or a thread can wander out and back in and
+    count twice."""
+    out = {}
+    for radius in SHOLL_RADII_PX:
+        band = (skeleton & (dist_to_lacuna >= radius - SHOLL_HALF_WIDTH_PX)
+                & (dist_to_lacuna < radius + SHOLL_HALF_WIDTH_PX) & (nearest_id > 0))
+        counts = np.zeros(n_lacunae + 1, dtype=np.int64)
+        boxes = ndi.find_objects(np.where(band, nearest_id, 0).astype(np.int32), max_label=n_lacunae)
+        for lacuna_id in range(1, n_lacunae + 1):
+            box = boxes[lacuna_id - 1]
+            if box is None:
+                continue
+            counts[lacuna_id] = int(measure.label(band[box] & (nearest_id[box] == lacuna_id), connectivity=2).max())
+        out[radius] = counts
+    return out
+
+
 def add_network_v2_measures(rows: list[dict], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
                             nearest_id: np.ndarray, precision: int) -> None:
     """Append the NETWORK_V2_METRICS to each per-lacuna row, in place."""
     n = max((row["lacuna_id"] for row in rows), default=0)
     attached = ring_attached_lengths(skeleton, dist_to_lacuna, nearest_id, n)
     weighted = ring_weighted_lengths(skeleton_links(skeleton), dist_to_lacuna, nearest_id, n)
+    sholl = sholl_crossings(skeleton, dist_to_lacuna, nearest_id, n)
     for row in rows:
         for radius in RING_RADII_PX:
             value = int(attached[radius][row["lacuna_id"]])
@@ -1040,6 +1085,8 @@ def add_network_v2_measures(rows: list[dict], skeleton: np.ndarray, dist_to_lacu
             row[f"ring_attached_length_r{radius}_px"] = value
         for radius in RING_RADII_PX:
             row[f"ring_length_w_r{radius}_px"] = round(float(weighted[radius][row["lacuna_id"]]), precision)
+        for radius in SHOLL_RADII_PX:
+            row[f"sholl_crossings_r{radius}"] = int(sholl[radius][row["lacuna_id"]])
 
 
 def summarize_interior(rows: list[dict], precision: int) -> dict:
@@ -1368,7 +1415,9 @@ SUMMARY_NOTES = [
     "length on lacuna size (docs/OVERNIGHT_REPORT.md, task 4.1).",
     "Appended on branch canaliculi-v2: ring attached length 30 / 60 px, the ring length pixels in threads that",
     "reach within 10 px of the lacuna (passing threads left out); ring length weighted 30 / 60 px and field",
-    "length density weighted, chain code lengths (sqrt(2) per diagonal step); see docs/CANALICULI_V2_REPORT.md.",
+    "length density weighted, chain code lengths (sqrt(2) per diagonal step); Sholl crossings 10 / 20 / 30 px,",
+    "skeleton components crossing a 1.5 px band at that distance from the lacuna (no graph); see",
+    "docs/CANALICULI_V2_REPORT.md.",
 ]
 
 
