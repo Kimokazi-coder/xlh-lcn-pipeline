@@ -391,6 +391,68 @@ def analyse_image(image_path: Path) -> dict:
     }
 
 
+# Provenance
+
+# Libraries whose versions are recorded in every json output.
+PROVENANCE_PACKAGES = ["numpy", "scipy", "scikit-image", "skan", "networkx", "pandas"]
+
+
+def config_values() -> dict:
+    """Every upper-case setting in config.py except the paths, which differ
+    between machines and do not change any number."""
+    out = {}
+    for name in sorted(dir(config)):
+        if not name.isupper():
+            continue
+        value = getattr(config, name)
+        if isinstance(value, Path):
+            continue
+        out[name] = value
+    return out
+
+
+def config_hash() -> str:
+    """Short SHA-256 of config_values(), so two outputs made with different
+    settings can be told apart."""
+    import hashlib
+
+    text = json.dumps(config_values(), sort_keys=True, default=repr)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def provenance() -> dict:
+    """Which code, settings and libraries produced an output. No timestamps,
+    so the same code on the same data writes the same file. git_dirty is True
+    when tracked files differ from the commit (untracked files are ignored);
+    both git fields are None when git is not available."""
+    import platform
+    import subprocess
+    from importlib import metadata
+
+    def git(*args):
+        try:
+            done = subprocess.run(["git", *args], cwd=config.PROJECT_ROOT, capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return done.stdout.strip() if done.returncode == 0 else None
+
+    commit = git("rev-parse", "HEAD")
+    status = git("status", "--porcelain", "--untracked-files=no")
+    versions = {"python": platform.python_version()}
+    for package in PROVENANCE_PACKAGES:
+        try:
+            versions[package] = metadata.version(package)
+        except metadata.PackageNotFoundError:
+            versions[package] = None
+    return {
+        "git_commit": commit,
+        "git_dirty": None if status is None else bool(status),
+        "versions": versions,
+        "config_hash": config_hash(),
+        "config_hash_covers": sorted(config_values()),
+    }
+
+
 # Output
 
 def save_overlay(display_uint8: np.ndarray, label_image: np.ndarray, kept: list[tuple], out_path: Path) -> None:
@@ -437,6 +499,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "summary": result["summary"],
         "parameters": {**parameters(), "computed_threshold_t_hi": result["t_hi"]},
         "lacunae": result["rows"],
+        "provenance": provenance(),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:

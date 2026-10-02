@@ -1034,6 +1034,7 @@ def save_json(result: dict, out_path: Path) -> None:
         ],
         "parameters": parameters(result),
         "lacunae": result["rows"],
+        "provenance": lacunae.provenance(),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
