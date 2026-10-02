@@ -189,3 +189,26 @@ Report: `docs/OVERNIGHT_REPORT.md`; outputs in `results_experiments/<task>/`.
 - `experiments/task4_size.py`: size dependence of roots and ring lengths, and normalised forms.
 - `experiments/task5_density.py`: green and blue channels, draft bone ROI, field density three ways, the 542_z06 vertical line.
 - `experiments/task6_repeat.py`: field groups from centroid matches and repeatability across sections.
+
+## 9. Additions on branch publication-fixes (2026-10-02)
+
+Pre-validation, pixel units. With every switch off, the pipeline reproduces `results/` exactly
+(`python src/diagnostics.py regression`).
+
+### Normalised per-cell measures (appended columns)
+
+Appended after all existing columns of the per-lacuna rows (`canaliculi_measurements.json` and the
+`per_lacuna` sheet) and of `summary_table.csv` and `.xlsx` (as interior means). No existing column
+changes name, order or value. They answer the size dependence found overnight (roots and ring length
+rise with lacuna area; `docs/OVERNIGHT_REPORT.md`, task 4.1).
+
+| column | definition |
+|---|---|
+| `perimeter_px` | regionprops perimeter of the lacuna, $P$ |
+| `ring_area_r30_px2`, `ring_area_r60_px2` | $A_r$: pixels of the nearest-lacuna partition within $r$ px of the body, lacunae excluded |
+| `in_frame_fraction_r30`, `in_frame_fraction_r60` | in-frame share of the full $r$ px annulus around this lacuna alone |
+| `ring_density_r30`, `ring_density_r60` | $L_r / A_r$, with $L_r$ the ring length (px$^{-1}$) |
+| `roots_per_100px_perimeter` | $100 \cdot \text{roots} / P$ |
+
+Definitions as in `experiments/task4_size.py`; the 784 per-lacuna values of the 8 WT images equal
+that script's values to the stored digits.

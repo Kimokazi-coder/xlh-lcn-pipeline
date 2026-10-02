@@ -270,6 +270,31 @@ CELL_METRICS = [
     ("mean_edge_length_px", "px", "ownership-dependent"),
 ]
 
+# Size-normalised per-cell measures, appended after every existing column so
+# no existing column changes name, order or value. From the overnight report
+# (docs/OVERNIGHT_REPORT.md, task 4.1): roots and ring lengths rise with
+# lacuna size (Spearman 0.84 and 0.88 across images, positive within every
+# image), and these forms remove that dependence. Definitions as in
+# experiments/task4_size.py:
+#   perimeter_px                skimage regionprops perimeter of the lacuna
+#   ring_area_rR_px2            pixels of the nearest-lacuna partition within R
+#                               px of the body, other lacunae excluded (A_R)
+#   in_frame_fraction_rR        in-frame share of the full annulus of radius R
+#                               around this lacuna alone, in an unbounded plane
+#   ring_density_rR             ring_length_rR_px / ring_area_rR_px2 (L_R / A_R)
+#   roots_per_100px_perimeter   100 x roots_count / perimeter_px
+# (name, unit, extra decimals beyond config.CSV_FLOAT_PRECISION)
+NORMALISED_METRICS = [
+    ("perimeter_px", "px", 0),
+    ("ring_area_r30_px2", "px^2", 0),
+    ("ring_area_r60_px2", "px^2", 0),
+    ("in_frame_fraction_r30", "unitless", 0),
+    ("in_frame_fraction_r60", "unitless", 0),
+    ("ring_density_r30", "px^-1", 4),
+    ("ring_density_r60", "px^-1", 4),
+    ("roots_per_100px_perimeter", "per 100 px", 0),
+]
+
 
 # Network mask
 
@@ -834,6 +859,45 @@ def measure_cells(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.nd
     }
 
 
+def add_normalised_measures(rows: list[dict], lacuna_id_map: np.ndarray, dist_to_lacuna: np.ndarray,
+                            nearest_id: np.ndarray, precision: int) -> None:
+    """Append the NORMALISED_METRICS to each per-lacuna row, in place."""
+    regions = {r.label: r for r in measure.regionprops(lacuna_id_map)}
+    n_rows, n_cols = lacuna_id_map.shape
+    areas = {}
+    for radius in RING_RADII_PX:
+        ring = (dist_to_lacuna > 0) & (dist_to_lacuna <= radius)
+        areas[radius] = np.bincount(nearest_id[ring], minlength=lacuna_id_map.max() + 1)
+    for row in rows:
+        region = regions[row["lacuna_id"]]
+        perimeter = float(region.perimeter)
+        row["perimeter_px"] = round(perimeter, precision)
+        fractions, densities = {}, {}
+        for radius in RING_RADII_PX:
+            area = int(areas[radius][row["lacuna_id"]])
+            row[f"ring_area_r{radius}_px2"] = area
+            # Full annulus around this lacuna alone: its mask in a box padded
+            # beyond the radius, so the frame cannot cut it.
+            pad = radius + 2
+            r0, c0, r1, c1 = region.bbox
+            box = np.zeros((r1 - r0 + 2 * pad, c1 - c0 + 2 * pad), dtype=bool)
+            box[pad:pad + r1 - r0, pad:pad + c1 - c0] = region.image
+            dist = ndi.distance_transform_edt(~box)
+            ann_r, ann_c = np.nonzero((dist > 0) & (dist <= radius))
+            ann_r = ann_r + r0 - pad
+            ann_c = ann_c + c0 - pad
+            inside = (ann_r >= 0) & (ann_r < n_rows) & (ann_c >= 0) & (ann_c < n_cols)
+            fractions[radius] = round(float(inside.mean()), precision)
+            length = row[f"ring_length_r{radius}_px"]
+            densities[radius] = round(length / area, precision + 4) if area else None
+        for radius in RING_RADII_PX:
+            row[f"in_frame_fraction_r{radius}"] = fractions[radius]
+        for radius in RING_RADII_PX:
+            row[f"ring_density_r{radius}"] = densities[radius]
+        row["roots_per_100px_perimeter"] = (
+            round(100.0 * row["roots_count"] / perimeter, precision) if perimeter > 0 else None)
+
+
 def summarize_interior(rows: list[dict], precision: int) -> dict:
     """Mean, median and sample SD over interior lacunae for every per-cell
     measure. SD is None below 2 values."""
@@ -847,6 +911,18 @@ def summarize_interior(rows: list[dict], precision: int) -> dict:
             mean = round(float(values.mean()), precision)
             median = round(float(np.median(values)), precision)
             sd = round(float(values.std(ddof=1)), precision) if values.size >= 2 else None
+        stats[field] = {"mean": mean, "median": median, "sd": sd}
+    for field, _unit, extra in NORMALISED_METRICS:
+        if not interior or field not in interior[0]:
+            continue
+        values = np.array([m[field] for m in interior if m.get(field) is not None], dtype=float)
+        digits = precision + extra
+        if values.size == 0:
+            mean = median = sd = None
+        else:
+            mean = round(float(values.mean()), digits)
+            median = round(float(np.median(values)), digits)
+            sd = round(float(values.std(ddof=1)), digits) if values.size >= 2 else None
         stats[field] = {"mean": mean, "median": median, "sd": sd}
     return stats
 
@@ -915,6 +991,7 @@ def analyse_image(image_path: Path) -> dict:
 
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
     cells = measure_cells(kept, skeleton, dist_to_lacuna, nearest_id, precision)
+    add_normalised_measures(cells["rows"], lacuna_id_map, dist_to_lacuna, nearest_id, precision)
     return {
         "image_path": image_path,
         "lacunae": lac,
@@ -1020,6 +1097,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "n_bridges": len(result["bridges"]),
         "headline_measures": ["roots_count", "ring_length_r30_px", "field.canalicular_length_density_per_px"],
         "ownership_dependent_measures": ["owned_length_px", "edge_count", "mean_edge_length_px"],
+        "normalised_measures": [f for f, _u, _x in NORMALISED_METRICS],
         "summary": result["summary"],
         "field": result["field"],
         "bridges": [
@@ -1059,6 +1137,10 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     for field, unit, kind in CELL_METRICS:
         s = stats[field]
         summary.append([field, kind, s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
+    for field, unit, _extra in NORMALISED_METRICS:
+        if field in stats:
+            s = stats[field]
+            summary.append([field, "normalised", s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
 
     field_sheet = wb.create_sheet("field")
     field_sheet.append(["metric", "kind", "value", "units"])
@@ -1068,6 +1150,7 @@ def save_xlsx(result: dict, out_path: Path) -> None:
 
     per_lacuna = wb.create_sheet("per_lacuna")
     columns = ["lacuna_id", "on_border"] + [f for f, _u, _k in CELL_METRICS]
+    columns += [f for f, _u, _x in NORMALISED_METRICS if result["rows"] and f in result["rows"][0]]
     per_lacuna.append(columns)
     for m in result["rows"]:
         per_lacuna.append([m[c] for c in columns])
@@ -1099,6 +1182,15 @@ SUMMARY_COLUMNS = [
     "ring length 30 px per cell (px)",
     "ring length 60 px per cell (px)",
     "field length density (px^-1)",
+    # Appended (normalised measures, means over interior cells).
+    "perimeter per cell (px)",
+    "ring area 30 px per cell (px^2)",
+    "ring area 60 px per cell (px^2)",
+    "in-frame fraction 30 px per cell",
+    "in-frame fraction 60 px per cell",
+    "ring density 30 px per cell (px^-1)",
+    "ring density 60 px per cell (px^-1)",
+    "roots per 100 px perimeter per cell",
 ]
 
 SUMMARY_NOTES = [
@@ -1110,6 +1202,10 @@ SUMMARY_NOTES = [
     "for its nearest lacuna only (mean over interior cells). Neither depends on network ownership.",
     "field length density: all skeleton px divided by the analysed field area (field minus lacunae).",
     "Headline measures: roots per cell, ring length 30 px, field length density.",
+    "Appended columns (normalised measures, means over interior cells): perimeter; ring area A_r, the pixels",
+    "of the nearest-lacuna partition within r px of the body; in-frame fraction of the full r px annulus;",
+    "ring density L_r / A_r; roots per 100 px of perimeter. They remove the dependence of roots and ring",
+    "length on lacuna size (docs/OVERNIGHT_REPORT.md, task 4.1).",
 ]
 
 
@@ -1128,7 +1224,7 @@ def write_summary_table(results: list[dict], out_root: Path) -> None:
             r["summary"]["ring_length_r30_px"]["mean"],
             r["summary"]["ring_length_r60_px"]["mean"],
             r["field"]["canalicular_length_density_per_px"],
-        ])
+        ] + [r["summary"].get(f, {}).get("mean") for f, _u, _x in NORMALISED_METRICS])
 
     out_root.mkdir(parents=True, exist_ok=True)
     with open(out_root / "summary_table.csv", "w", newline="") as f:
