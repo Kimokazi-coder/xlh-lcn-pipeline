@@ -42,3 +42,14 @@ square. What the L 40 sheets show: vertical wall pieces inside the canal masks o
 (these may be band wall), and ordinary threads that only touch a canal mask, many of them the
 horizontal and vertical lattice threads of 682_z08, 682_z23 and 682_z29. This is the reason no value is
 recommended.
+
+## S2_bridges_<image>.png (8 sheets)
+
+One tile per bridge (143 over the 8 images), 48 px at 4x, skeleton white, bridge pixels sky blue.
+Round 1 (543-2 at 1000 px and 100%, the other 7 as a contact view): tiles near the frame were padded on
+the wrong side, so the gap was off centre (543-2 B1 at y 12, B20 and B21 at y 1023). Fix: a centred crop,
+zero padded on the frame side. Round 2: every gap sits at the tile centre.
+
+Reading, not a defect: in some tiles (543-2 B6) the blue gap does not lie exactly on the final white
+skeleton, because the gap is drawn into the mask and the mask is skeletonized again; the final thread
+can run a pixel beside the drawn gap.
