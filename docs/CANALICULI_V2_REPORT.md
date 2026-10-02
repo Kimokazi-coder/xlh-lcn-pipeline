@@ -181,3 +181,42 @@ Not edited on this branch, so that it merges with figures-v2 without conflicts.
   pipeline against blind hand counts and traces (`-s` self-test)."
 - README, checks: "`python src/diagnostics.py validate-network -s`" and a pointer to
   `docs/NETWORK_TUNING_PROTOCOL.md`.
+
+## Final commit and links
+
+Final content commit: `6d6ed81c4f57e78c63c8dd39af298dad31aae8b8`. It is the last commit that changed any code, table, crop or report text; the
+commit after it only adds this list, and the next one marks PROGRESS_CANAL.md done. Every link below is
+pinned to it.
+
+- [docs/CANALICULI_V2_REPORT.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/docs/CANALICULI_V2_REPORT.md)
+- [results_experiments/canal_v2/INDEX.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/INDEX.md)
+- [docs/CANALICULI_AUDIT.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/docs/CANALICULI_AUDIT.md)
+- [docs/NETWORK_TUNING_PROTOCOL.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/docs/NETWORK_TUNING_PROTOCOL.md)
+- [experiments/PROGRESS_CANAL.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/experiments/PROGRESS_CANAL.md)
+- [config.py](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/config.py)
+- [results_experiments/canal_v2/R1_checks.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/R1_checks.md)
+- [results_experiments/canal_v2/REVIEW.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/REVIEW.md)
+- [results_experiments/canal_v2/C1_attached_ring.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C1_attached_ring.md)
+- [results_experiments/canal_v2/C1_attached_ring.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C1_attached_ring.csv)
+- [results_experiments/canal_v2/C2_chain_length.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C2_chain_length.md)
+- [results_experiments/canal_v2/C2_chain_length.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C2_chain_length.csv)
+- [results_experiments/canal_v2/C3_sholl.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C3_sholl.md)
+- [results_experiments/canal_v2/C3_sholl.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C3_sholl.csv)
+- [results_experiments/canal_v2/C4_density.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C4_density.md)
+- [results_experiments/canal_v2/C4_density.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C4_density.csv)
+- [results_experiments/canal_v2/B1_straight_runs.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/B1_straight_runs.md)
+- [results_experiments/canal_v2/B1_straight_runs.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/B1_straight_runs.csv)
+- [results_experiments/canal_v2/B1_filter.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/B1_filter.md)
+- [results_experiments/canal_v2/B1_filter_components.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/B1_filter_components.csv)
+- [results_experiments/canal_v2/B1_switch_check.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/B1_switch_check.md)
+- [results_experiments/canal_v2/S1_network_sweep.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/S1_network_sweep.md)
+- [results_experiments/canal_v2/S1_network_sweep.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/S1_network_sweep.csv)
+- [results_experiments/canal_v2/S2_bridging.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/S2_bridging.md)
+- [results_experiments/canal_v2/S2_bridges.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/S2_bridges.csv)
+- [results_experiments/canal_v2/V1_validate_network.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/V1_validate_network.md)
+- [results_experiments/canal_v2/C1_crops.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C1_crops.png)
+- [results_experiments/canal_v2/C3_crops.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/C3_crops.png)
+- [results_experiments/canal_v2/B1_crops_L97_reach66_1.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/B1_crops_L97_reach66_1.png)
+- [results_experiments/canal_v2/B1_crops_L40_reach0_1.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/B1_crops_L40_reach0_1.png)
+- [results_experiments/canal_v2/S2_bridges_542_z06.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/S2_bridges_542_z06.png)
+- [results_experiments/canal_v2/S2_bridges_543-2.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/6d6ed81c4f57e78c63c8dd39af298dad31aae8b8/results_experiments/canal_v2/S2_bridges_543-2.png)
