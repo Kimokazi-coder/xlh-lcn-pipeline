@@ -195,3 +195,18 @@ fully inside a canal mask. The classification is unchanged.
 Round 1 (Fig03 at 1000 px): the two-line count text of neighbouring 34 mm panels ran into each other.
 Fix: three lines in Fig03. Round 2: clear; the first lines of neighbouring panels come close without
 touching. Gallery headers (542_z06 viewed): clear. The Fig03 lacuna counts equal the earlier log.
+
+## P7 overview inset rule
+
+New rule (as the network figure, then a tie break on size): interior lacunae with the bounding box at
+least 60 px from the frame; roots closest to the interior median; then area closest to the interior
+median area; then the smallest id. `figures/inset_overrides.csv` (header only) is read when present;
+`-c` still overrides both. Tested: an override row for 543-2 was read, then the file was emptied again.
+The choice is logged under "overview" in `per_image/<image>/inset.json`.
+
+Old and new inset lacunae: 542_z06 L7 to L10, 542_z18 L3 to L10, 543-2 L4 to L6, 543_3 L3 to L5,
+543_z13 L2 to L9, 682_z08 L2 to L5, 682_z23 L10 (unchanged), 682_z29 L5 to L8. For 543-2 the old inset
+was the dim lacuna at the left frame edge (39,297); the new one is L6 (7 roots, 2066 px², the interior
+medians are 7.5 roots and 2066 px²), 257 px from the frame.
+
+Round 1 (543-2 and 682_z08 at 1000 px, 543-2 inset at 100%): clear.

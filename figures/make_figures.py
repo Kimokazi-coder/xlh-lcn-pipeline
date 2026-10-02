@@ -1253,6 +1253,44 @@ def choose_inset_cell(out: dict) -> tuple[int, str]:
     return best[0], f"interior median roots {med:g}; lacuna {best[0]} has {best[1]} roots (closest, ties to smallest id)"
 
 
+INSET_OVERRIDES = ROOT / "figures" / "inset_overrides.csv"
+
+
+def inset_override(name: str) -> int | None:
+    """The lacuna id set for an image in figures/inset_overrides.csv (columns
+    image, lacuna_id), or None. The file is empty (header only) by default."""
+    import csv
+
+    if not INSET_OVERRIDES.is_file():
+        return None
+    with open(INSET_OVERRIDES, newline="") as f:
+        for row in csv.DictReader(f):
+            if row.get("image", "").strip() == name and row.get("lacuna_id", "").strip():
+                return int(row["lacuna_id"])
+    return None
+
+
+def choose_overview_inset(d: dict) -> tuple[int, dict]:
+    """The overview inset: among interior lacunae whose bounding box is at
+    least INSET_FRAME_MARGIN_PX from the frame (the network figure's rule),
+    the roots closest to the interior median, then the area closest to the
+    interior median area, then the smallest id."""
+    roots = {c["lacuna_id"]: c["roots_count"] for c in d["cell_rows"]}
+    areas = {r["lacuna_id"]: r["area_px2"] for r in d["lacuna_rows"]}
+    med_r = float(np.median([roots[i] for i in d["interior_ids"]]))
+    med_a = float(np.median([areas[i] for i in d["interior_ids"]]))
+    eligible = [i for i in d["interior_ids"] if frame_margin(d, i) >= INSET_FRAME_MARGIN_PX]
+    pool = eligible or list(d["interior_ids"])
+    best = min(pool, key=lambda i: (abs(roots[i] - med_r), abs(areas[i] - med_a), i))
+    return best, {"rule": f"interior lacunae with the bounding box at least {INSET_FRAME_MARGIN_PX} px from the "
+                          "frame; roots closest to the interior median, then area closest to the interior median "
+                          "area, then the smallest id"
+                          + ("" if eligible else "; no lacuna was eligible, so all interior lacunae were used"),
+                  "interior_median_roots": med_r, "interior_median_area_px2": med_a, "eligible": eligible,
+                  "inset": {"lacuna_id": best, "roots": roots[best], "area_px2": areas[best],
+                            "frame_margin_px": frame_margin(d, best)}}
+
+
 def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> None:
     """The per-image overview (F1): (A) red channel; (B) kept lacunae with
     numbers ("c": in a flagged canal region) and the rejected lacuna-scale
@@ -1265,12 +1303,18 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
-    out = pipeline_output(d["path"])
-    if cell is None:
-        cell, why = choose_inset_cell(out)
+    if cell is not None:
+        log = {"rule": f"set with -c {cell}", "inset": {"lacuna_id": cell}}
+    elif inset_override(name) is not None:
+        cell = inset_override(name)
+        log = {"rule": f"set in {INSET_OVERRIDES.relative_to(ROOT).as_posix()}", "inset": {"lacuna_id": cell}}
     else:
-        why = f"set with -c {cell}"
-    print(f"{fig_name}: inset lacuna {cell} ({why})")
+        cell, log = choose_overview_inset(d)
+    if cell not in d["interior_ids"]:
+        raise ValueError(f"{name}: inset lacuna {cell} is not an interior lacuna")
+    if not low_cut:
+        update_inset_log(name, "overview", log)
+    print(f"{fig_name}: inset lacuna {cell} ({log['rule']})")
 
     # Inset crop: a square around the lacuna's bounding box plus a margin.
     ys, xs = np.nonzero(d["lacuna_id_map"] == cell)

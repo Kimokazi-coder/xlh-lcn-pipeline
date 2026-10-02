@@ -48,8 +48,11 @@ figure at small size: the image at 85%, every skeleton pixel as a vector line, v
 of an interior lacuna and white elsewhere, roots of interior lacunae as magenta dots. The white and
 vermillion lines are all skeleton pixels, not only the threads attached to counted cells. The white box
 marks the inset: one lacuna at 3x with the same overlay, its roots and the dashed contour of its 30 px
-ring; the text gives its roots and ring length 30 px. Inset lacuna by a fixed rule, logged in
-`per_image/<image>/inset.json`. Scale bar 200 px (uncalibrated). Fixed
+ring; the text gives its roots and ring length 30 px. Inset lacuna by a fixed rule: among interior
+lacunae whose bounding box is at least 60 px from the frame (as in the network figure), the roots
+closest to the interior median, then the area closest to the interior median area, then the smallest
+id. `figures/inset_overrides.csv` (image, lacuna_id; empty by default) or option `-c` sets another
+lacuna. The choice is logged in `per_image/<image>/inset.json` ("overview"). Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT.
 
 `per_image/543_3/overview_low_cut_layer` is the same figure with option `-r`: objects that the lacuna stage keeps only
