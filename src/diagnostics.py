@@ -23,6 +23,8 @@ Subcommands:
     unblind           join a blinding key to a summary table
     sensitivity       both Otsu cuts scaled 0.8 to 1.2, alone and together,
                       plus one pooled cut: percent changes of the measures
+    field-summary     group images into fields by matching lacuna centroids,
+                      and write per-field means (the field is the unit)
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -36,6 +38,7 @@ Usage (from the repo root):
     python src/diagnostics.py blind -s data/WT -o CODED_FOLDER -k KEY_OUTSIDE_REPO.csv
     python src/diagnostics.py unblind -s CODED_RESULTS/summary_table.csv -k KEY.csv -o UNBLINDED.csv
     python src/diagnostics.py sensitivity -d data/WT -o OUT_FOLDER
+    python src/diagnostics.py field-summary -d data/WT -o OUT_FOLDER [-r RESULTS_FOLDER]
 """
 
 from __future__ import annotations
@@ -871,6 +874,162 @@ def cmd_sensitivity(args) -> int:
     return 0
 
 
+# field-summary --------------------------------------------------------------------
+# Optical sections of one field repeat the same cells, so they are not
+# independent samples (overnight report 6.1). Images are grouped into fields
+# from the data: lacunae are matched between every pair of images by centroid,
+# one to one (mutual nearest neighbours) within FIELD_MATCH_PX, with no shift.
+# Two images are linked when the share of the smaller image's lacunae that
+# match lies above the largest gap in the sorted shares (0 included as the
+# floor) and is at least FIELD_MIN_MATCH_SHARE; linked images form a field.
+# On the 8 WT images this gives the groups of the overnight report.
+
+FIELD_MATCH_PX = 25.0  # overnight report 6.1; matched centroids sat a median 5 to 13 px apart
+# A conservative guard: at least half of the smaller image's lacunae must
+# match, so a few chance matches never join two fields. Not tuned: on the WT
+# images the linked shares are 0.77 to 0.92 and the largest unlinked one 0.40.
+FIELD_MIN_MATCH_SHARE = 0.5
+FIELD_MEASURES = [
+    ("roots_per_cell", "roots per cell", ("summary", "roots_count")),
+    ("roots_per_100px_perimeter", "roots per 100 px perimeter", ("summary", "roots_per_100px_perimeter")),
+    ("ring30_per_cell", "ring 30 px per cell (px)", ("summary", "ring_length_r30_px")),
+    ("ring_density_r30", "ring density 30 px (px^-1)", ("summary", "ring_density_r30")),
+    ("ring_density_r60", "ring density 60 px (px^-1)", ("summary", "ring_density_r60")),
+    ("field_density", "field density (px^-1)", ("field", "canalicular_length_density_per_px")),
+]
+
+
+def _field_inputs(job: tuple) -> dict:
+    path_str, results_dir = job
+    image_path = Path(path_str)
+    name = lacunae.clean_name(image_path)
+    folder = Path(results_dir) / name if results_dir else None
+    if folder and (folder / "lacunae.json").is_file() and (folder / "canaliculi_measurements.json").is_file():
+        lac = json.load(open(folder / "lacunae.json"))
+        can = json.load(open(folder / "canaliculi_measurements.json"))
+        rows, summary, field = lac["lacunae"], can["summary"], can["field"]
+    else:
+        config.FAST_LACUNA_STAGE = True
+        result = canaliculi.analyse_image(image_path)
+        rows, summary, field = result["lacunae"]["rows"], result["summary"], result["field"]
+    values = {}
+    for key, _label, (block, field_key) in FIELD_MEASURES:
+        source = summary if block == "summary" else field
+        v = source.get(field_key)
+        values[key] = v.get("mean") if isinstance(v, dict) else v
+    return {"image": name, "xy": [(r["centroid_col_px"], r["centroid_row_px"]) for r in rows],
+            "lacuna_count": len(rows), "interior_count": sum(1 for r in rows if not r["on_border"]), **values}
+
+
+def _mutual_matches(a: list, b: list, radius: float) -> list:
+    if not a or not b:
+        return []
+    pa, pb = np.array(a, dtype=float), np.array(b, dtype=float)
+    dist = np.hypot(pa[:, None, 0] - pb[None, :, 0], pa[:, None, 1] - pb[None, :, 1])
+    out = []
+    for i in range(len(pa)):
+        j = int(np.argmin(dist[i]))
+        if dist[i, j] <= radius and int(np.argmin(dist[:, j])) == i:
+            out.append((i, j, float(dist[i, j])))
+    return out
+
+
+def field_groups(inputs: list) -> tuple:
+    """(groups as lists of image names, pair table, the cut used)."""
+    import itertools
+
+    names = [d["image"] for d in inputs]
+    by = {d["image"]: d for d in inputs}
+    pairs = []
+    for a, b in itertools.combinations(names, 2):
+        m = _mutual_matches(by[a]["xy"], by[b]["xy"], FIELD_MATCH_PX)
+        smaller = min(len(by[a]["xy"]), len(by[b]["xy"])) or 1
+        pairs.append({"image_a": a, "image_b": b, "matches": len(m), "share_of_smaller": len(m) / smaller,
+                      "median_distance_px": float(np.median([t[2] for t in m])) if m else None})
+    shares = sorted({0.0} | {p["share_of_smaller"] for p in pairs})
+    cut = 0.0
+    if len(shares) > 1:
+        gaps = np.diff(shares)
+        k = int(np.argmax(gaps))
+        cut = (shares[k] + shares[k + 1]) / 2
+    parent = {n: n for n in names}
+
+    def find(x):
+        while parent[x] != x:
+            x = parent[x]
+        return x
+
+    for p in pairs:
+        p["linked"] = p["share_of_smaller"] > cut and p["share_of_smaller"] >= FIELD_MIN_MATCH_SHARE
+        if p["linked"]:
+            parent[find(p["image_a"])] = find(p["image_b"])
+    groups = {}
+    for n in names:
+        groups.setdefault(find(n), []).append(n)
+    return sorted(groups.values(), key=lambda g: g[0]), pairs, cut
+
+
+def cmd_field_summary(args) -> int:
+    import csv
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = lacunae.image_paths(args)
+    res = str(args.results) if args.results else None
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(images)))) as ex:
+        inputs = list(ex.map(_field_inputs, [(str(p), res) for p in images]))
+    groups, pairs, cut = field_groups(inputs)
+    by = {d["image"]: d for d in inputs}
+    out = args.out
+    out.mkdir(parents=True, exist_ok=True)
+    field_rows, image_rows = [], []
+    for i, g in enumerate(groups, start=1):
+        fid = f"F{i}"
+        row = {"field": fid, "images": " + ".join(g), "n_images": len(g)}
+        for key, _label, _src in FIELD_MEASURES:
+            vals = [by[n][key] for n in g if by[n][key] is not None]
+            row[f"{key}_mean"] = float(np.mean(vals)) if vals else None
+            row[f"{key}_min"] = float(np.min(vals)) if vals else None
+            row[f"{key}_max"] = float(np.max(vals)) if vals else None
+        field_rows.append(row)
+        for n in g:
+            image_rows.append({"field": fid, "image": n, "lacuna_count": by[n]["lacuna_count"],
+                               "interior_count": by[n]["interior_count"],
+                               **{key: by[n][key] for key, _l, _s in FIELD_MEASURES}})
+    for fname, rows in (("field_summary.csv", field_rows), ("field_images.csv", image_rows), ("field_pairs.csv", pairs)):
+        with open(out / fname, "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
+    lines = ["# Field summary", "",
+             "PRE-VALIDATION, pixel units. **The field is the unit of analysis.** Optical sections of one field",
+             "repeat the same cells, so they are not independent samples; the value of a field is the mean over",
+             "its images.", "",
+             f"Fields derived from the data: lacunae matched one to one by centroid within {FIELD_MATCH_PX:g} px, no",
+             f"shift; two images are linked when the matched share of the smaller image lies above the largest gap",
+             f"in the sorted shares (cut {cut:.2f}) and is at least {FIELD_MIN_MATCH_SHARE:g}. An image with no link is its own field.", ""]
+    for r in field_rows:
+        lines.append(f"- {r['field']}: {r['images']} ({r['n_images']} image{'s' if r['n_images'] != 1 else ''})")
+    lines += ["", "| field | images | " + " | ".join(label for _k, label, _s in FIELD_MEASURES) + " |",
+              "|---|---|" + "---|" * len(FIELD_MEASURES)]
+    for r in field_rows:
+        cells = []
+        for key, _label, _src in FIELD_MEASURES:
+            m = r[f"{key}_mean"]
+            cells.append("" if m is None else (f"{m:.5f}" if abs(m) < 1 else f"{m:.2f}"))
+        lines.append(f"| {r['field']} | {r['n_images']} | " + " | ".join(cells) + " |")
+    lines += ["", "Pairs (field_pairs.csv):", "", "| image a | image b | matches | share of smaller | linked |",
+              "|---|---|---|---|---|"]
+    for p in sorted(pairs, key=lambda q: -q["share_of_smaller"]):
+        if p["matches"]:
+            lines.append(f"| {p['image_a']} | {p['image_b']} | {p['matches']} | {p['share_of_smaller']:.2f} | {p['linked']} |")
+    lines.append("")
+    lines.append("Pairs not listed share no lacuna.")
+    text = "\n".join(lines) + "\n"
+    (out / "field_summary.md").write_text(text, encoding="utf-8")
+    print(text)
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -937,6 +1096,14 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_sensitivity, image=None)
+
+    p = sub.add_parser("field-summary", help="Group images into fields and write per-field means.")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR, help="Folder of .tif images.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.add_argument("-r", dest="results", type=Path, default=None,
+                   help="Read existing outputs from this results folder instead of running the pipeline.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_field_summary, image=None)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
