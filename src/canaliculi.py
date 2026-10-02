@@ -461,6 +461,93 @@ def network_candidate_mask(
     return candidate, t_lo
 
 
+# Straight runs (used by the band-wall filter, config.BAND_LINE_FILTER, off by
+# default; docs/CANALICULI_V2_REPORT.md, item B1)
+
+# The skeleton is widened to this width (a 3 x 3 dilation) before the line
+# openings, so a straight thread that wobbles by one pixel still holds a line.
+STRAIGHT_RUN_DILATION_PX = 3
+# Line orientations tested: 24, in steps of 7.5 degrees over 180 degrees.
+STRAIGHT_RUN_ORIENTATIONS = 24
+
+
+def line_offsets(length: int, angle_deg: float) -> np.ndarray:
+    """(row, col) offsets of a one-pixel digital line of `length` pixels at
+    `angle_deg` (0 along x, 90 along y), centred on the origin, unique."""
+    t = np.arange(length) - (length - 1) / 2.0
+    a = np.deg2rad(angle_deg)
+    # Round half up, not to even: np.round would put an even-length line on
+    # every second pixel. Consecutive offsets then differ by at most 1 in each
+    # coordinate, so the line is 8-connected and has `length` distinct pixels.
+    offs = np.stack([np.floor(t * np.sin(a) + 0.5), np.floor(t * np.cos(a) + 0.5)], axis=1).astype(int)
+    return np.unique(offs, axis=0)
+
+
+def _shift_and(mask: np.ndarray, offsets: np.ndarray, sign: int) -> np.ndarray:
+    """AND (sign = +1, erosion) or OR (sign = -1, dilation) of the mask
+    shifted by each offset; pixels shifted in from outside the frame are
+    False."""
+    H, W = mask.shape
+    out = np.ones_like(mask) if sign > 0 else np.zeros_like(mask)
+    for dr, dc in offsets:
+        dr, dc = int(dr) * sign, int(dc) * sign
+        shifted = np.zeros_like(mask)
+        rs, re = max(0, -dr), min(H, H - dr)
+        cs, ce = max(0, -dc), min(W, W - dc)
+        if rs < re and cs < ce:
+            shifted[rs:re, cs:ce] = mask[rs + dr:re + dr, cs + dc:ce + dc]
+        if sign > 0:
+            out &= shifted
+        else:
+            out |= shifted
+    return out
+
+
+def straight_run_mask(skeleton: np.ndarray, length: int) -> np.ndarray:
+    """Pixels of the widened skeleton that lie under a straight line of
+    `length` pixels fitting entirely inside it, at any of the tested
+    orientations (the union of the openings with line structuring
+    elements)."""
+    half = STRAIGHT_RUN_DILATION_PX // 2
+    wide = ndi.binary_dilation(skeleton, structure=np.ones((2 * half + 1, 2 * half + 1), bool))
+    out = np.zeros_like(wide)
+    for k in range(STRAIGHT_RUN_ORIENTATIONS):
+        offs = line_offsets(length, 180.0 * k / STRAIGHT_RUN_ORIENTATIONS)
+        eroded = _shift_and(wide, offs, +1)
+        if eroded.any():
+            out |= _shift_and(eroded, offs, -1)
+    return out
+
+
+def band_wall_zone(skeleton: np.ndarray, flagged: np.ndarray) -> np.ndarray:
+    """The band-wall filter (config.BAND_LINE_FILTER): the zone within
+    config.BAND_LINE_REMOVE_PX of every 8-connected object of straight-run
+    pixels (straight_run_mask at config.BAND_LINE_MIN_LEN_PX) that comes within
+    config.BAND_LINE_REACH_PX of the flagged canal mask. Both values are None by
+    default because no value is recommended (docs/CANALICULI_V2_REPORT.md, B1);
+    turning the switch on without them is an error."""
+    length, reach = config.BAND_LINE_MIN_LEN_PX, config.BAND_LINE_REACH_PX
+    if length is None or reach is None:
+        raise ValueError("BAND_LINE_FILTER is on but BAND_LINE_MIN_LEN_PX or BAND_LINE_REACH_PX is None; "
+                         "no value is recommended, set both deliberately (see docs/CANALICULI_V2_REPORT.md, B1)")
+    zone = np.zeros(skeleton.shape, dtype=bool)
+    if not flagged.any():
+        return zone
+    runs = straight_run_mask(skeleton, int(length))
+    labels = measure.label(runs, connectivity=2)
+    if labels.max() == 0:
+        return zone
+    dist = ndi.distance_transform_edt(~flagged)
+    nearest = ndi.minimum(dist, labels, index=np.arange(1, labels.max() + 1))
+    keep = np.nonzero(np.asarray(nearest) <= reach)[0] + 1
+    if keep.size == 0:
+        return zone
+    zone = np.isin(labels, keep)
+    if config.BAND_LINE_REMOVE_PX > 0:
+        zone = morphology.dilation(zone, morphology.disk(config.BAND_LINE_REMOVE_PX))
+    return zone
+
+
 # Gap bridging
 
 def skeleton_endpoints(skeleton: np.ndarray) -> np.ndarray:
@@ -1207,10 +1294,24 @@ def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | Non
     candidate, t_lo = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
     skeleton = morphology.skeletonize(candidate)
 
-    bridges = find_bridges(skeleton, preprocessed, t_lo, lacuna_mask | flagged)
+    # Band-wall filter (switch, off by default): where the canal blocking works,
+    # the skeleton inside the straight wall zone is removed, before bridging and
+    # again after the re-skeletonization that follows it, and no bridge may
+    # enter the zone, like the flagged region itself. The network mask is not
+    # cut, so re-thinning leaves no stubs along the cut.
+    band_wall = None
+    forbidden = lacuna_mask | flagged
+    if config.BAND_LINE_FILTER:
+        band_wall = band_wall_zone(skeleton, flagged)
+        skeleton = skeleton & ~band_wall
+        forbidden = forbidden | band_wall
+
+    bridges = find_bridges(skeleton, preprocessed, t_lo, forbidden)
     if bridges:
         candidate = apply_bridges(candidate, bridges)
         skeleton = morphology.skeletonize(candidate)
+        if band_wall is not None:
+            skeleton = skeleton & ~band_wall
 
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
     cells = measure_cells(kept, skeleton, dist_to_lacuna, nearest_id, precision)
@@ -1233,6 +1334,7 @@ def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | Non
         "edge_owner": cells["edge_owner"],
         "node_dist": cells["node_dist"],
         "owner_map": cells["owner_map"],
+        "band_wall": band_wall,
     }
 
 
@@ -1297,7 +1399,15 @@ def parameters(result: dict) -> dict:
         "ownership": "graph connectivity, no distance cap",
         "root_merge_dist_px": ROOT_MERGE_DIST_PX,
         "ring_radii_px": list(RING_RADII_PX),
+        # Appended on branch canaliculi-v2 (PARAMETERS_V2_KEYS).
+        "band_line_filter": config.BAND_LINE_FILTER,
+        "band_line_min_len_px": config.BAND_LINE_MIN_LEN_PX,
+        "band_line_reach_px": config.BAND_LINE_REACH_PX,
+        "band_line_remove_px": config.BAND_LINE_REMOVE_PX,
     }
+
+
+PARAMETERS_V2_KEYS = ["band_line_filter", "band_line_min_len_px", "band_line_reach_px", "band_line_remove_px"]
 
 
 NOTE = (

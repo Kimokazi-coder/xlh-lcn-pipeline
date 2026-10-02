@@ -574,6 +574,19 @@ SWITCHES_ON = [
     ("FILL_ENCLOSED_HOLES_MAX_PX2", 200),
     ("BAND_FILTER_MIN_OPENING_SHARE", 0.515),
 ]
+# The band-wall filter has no recommended value (docs/CANALICULI_V2_REPORT.md,
+# B1), so it is run at the two evidence settings of B1, labelled as such:
+# the only line length that separates any part of the 542_z06 line (97 px, in
+# the gap from 95 to 100) with the reach that the line needs there (66 px: its
+# straight piece lies 65.01 px from the canal mask), and
+# the only length at which the line's straight part touches the canal mask
+# (40 px, reach 0). Neither is a recommendation.
+SWITCH_SETTINGS_EXTRA = [
+    ("BAND_LINE_FILTER on, evidence setting L 97 px, reach 66 px (not a recommendation)",
+     {"BAND_LINE_FILTER": True, "BAND_LINE_MIN_LEN_PX": 97, "BAND_LINE_REACH_PX": 66}),
+    ("BAND_LINE_FILTER on, evidence setting L 40 px, reach 0 px (not a recommendation)",
+     {"BAND_LINE_FILTER": True, "BAND_LINE_MIN_LEN_PX": 40, "BAND_LINE_REACH_PX": 0}),
+]
 MATCH_PX = 10.0  # a lacuna in two runs is the same object if the centroids lie this close
 
 
@@ -623,10 +636,13 @@ def cmd_switch_check(args) -> int:
              "Pre-validation, px. Each switch of config.py on alone, all others off, every image",
              f"regenerated into {args.out} and compared with {args.ref}. Lacunae are matched by centroid",
              f"within {MATCH_PX:g} px; a lacuna is listed when its area, roots or ring 30 px change.", ""]
-    for name, value in SWITCHES_ON:
-        out = args.out / f"{name}={value}"
-        regenerate(images, out, {name: value}, args.workers)
-        lines += [f"## {name} = {value}", ""]
+    settings = [(f"{name} = {value}", {name: value}, f"{name}={value}") for name, value in SWITCHES_ON]
+    settings += [(label, overrides, "__".join(f"{k}={v}" for k, v in overrides.items()))
+                 for label, overrides in SWITCH_SETTINGS_EXTRA]
+    for label, overrides, folder in settings:
+        out = args.out / folder
+        regenerate(images, out, overrides, args.workers)
+        lines += [f"## {label}", ""]
         any_change = False
         for p in images:
             n = lacunae.clean_name(p)
