@@ -67,3 +67,24 @@ raw threads it traces, so panel A is needed to judge the tracing; vermillion on 
 than the old saturated colours; the overlay says nothing about ownership-dependent measures (owned
 length, edge count), which is intended but means the old image stays the only view of ownership; and
 dim out-of-plane cells and rejected candidates are not drawn here.
+
+## N2 cell galleries
+
+One page per image (at most 13 interior lacunae, so no image needs a second page). Tiles are 240 px
+crops at 3 output pixels per image pixel at 300 dpi (61 mm), so a row of 4 tiles makes the page 257 mm
+wide, wider than a 180 mm column (listed under Decisions needed). Per tile, the magenta dots equal
+`roots_count` and the vermillion pixels equal `ring_length_r30_px` (asserted;
+`per_image/<image>/gallery_check.json`). Only the tile lacuna's roots are drawn, so the dots in a tile
+are the number in its title; neighbouring lacunae keep their outlines and their vermillion ring.
+
+Round 1 (543-2 at 1000 px and 100%; then all 8 at 1000 px): an empty band between the legend and the
+footnote (fix: smaller strips); the second legend row ("c") overlapped the footnote in 542_z06, 682_z08
+and 682_z23 (fix: a taller strip when the legend has two rows); 682_z08 showed the "c" key although no
+tile carries a "c" (its canal-marked lacuna touches the frame and is not shown; fix: the key only when a
+tile title has it).
+
+Round 2: footers clear on all 8.
+
+Remaining, left as is: in three tiles part of the ring lies outside the 240 px crop (542_z18 L2 28 px,
+L9 11 px; 682_z08 L4 3 px), logged in `gallery_check.json`; every root dot lies inside its tile. Tiles
+near the frame are zero padded (black), for example 543-2 L1 and L4, 542_z06 L3.

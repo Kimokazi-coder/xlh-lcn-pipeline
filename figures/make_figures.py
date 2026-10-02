@@ -961,6 +961,103 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
     print(stem.relative_to(ROOT), "written; insets", cells)
 
 
+GALLERY_TILE_PX = 240  # fixed crop per lacuna, the same for every tile
+GALLERY_ZOOM = 3  # 3 output pixels per image pixel at 300 dpi
+GALLERY_COLS, GALLERY_PER_PAGE = 4, 16
+
+
+def gallery_tiles(d: dict, ids: list, fig, x_mm: float, top_mm: float, fig_w: float, fig_h: float,
+                  window=None) -> list:
+    """Draw one tile per lacuna id in a 4 column grid. Returns the per-tile
+    check rows."""
+    tile = GALLERY_TILE_PX * GALLERY_ZOOM / 300 * 25.4
+    gap, title_h = 3.0, 4.5
+    img = overlay_image(d, window)
+    checks = []
+    cells = {c["lacuna_id"]: c for c in d["cell_rows"]}
+    areas = {r["lacuna_id"]: r["area_px2"] for r in d["lacuna_rows"]}
+    for k, lid in enumerate(ids):
+        r, c = divmod(k, GALLERY_COLS)
+        ax = mm_axes(fig, x_mm + c * (tile + gap), fig_h - top_mm - title_h - r * (tile + title_h + gap) - tile,
+                     tile, tile, fig_w, fig_h)
+        cx, cy = bbox_centre(d, lid)
+        crop, x0, y0 = padded_crop(img, cx, cy, GALLERY_TILE_PX)
+        show_image(ax, crop, x0, y0, interpolation="nearest")
+        view = (x0, x0 + GALLERY_TILE_PX, y0, y0 + GALLERY_TILE_PX)
+        draw_skeleton(ax, d["segments"], window=view, lw=0.5)
+        draw_lacunae(ax, d)
+        for cc in ring_contours(d, lid):
+            ax.plot(cc[:, 0], cc[:, 1], color="white", lw=0.6, ls=(0, (3, 2)), zorder=4.5)
+        n_dots = draw_roots(ax, d, [lid], size=14.0, edge_lw=0.4)
+        cell = cells[lid]
+        if n_dots != cell["roots_count"] or int(d["ring_interior_count"][lid]) != cell["ring_length_r30_px"]:
+            raise AssertionFailed(f"{d['short']} L{lid}: drawn {n_dots} dots, {int(d['ring_interior_count'][lid])} "
+                                  f"vermillion px; results/ {cell['roots_count']}, {cell['ring_length_r30_px']}")
+        ax.set_xlim(x0 - 0.5, x0 + GALLERY_TILE_PX - 0.5)
+        ax.set_ylim(y0 + GALLERY_TILE_PX - 0.5, y0 - 0.5)
+        ax.set_title(f"L{lacuna_label(d, lid)}  {cell['roots_count']} roots  ring30 {cell['ring_length_r30_px']} px  "
+                     f"{areas[lid]:.0f} px²", pad=2)
+        if k == 0:
+            scale_bar_at(ax, 50)
+        pts = np.array(d["roots_xy"][str(lid)]).reshape(-1, 2)
+        ring_pix = (d["classes"] == CLS_RING) & (d["nearest"] == lid)
+        rr, cc2 = np.nonzero(ring_pix)
+        checks.append({"lacuna_id": lid, "roots_count": cell["roots_count"], "magenta_dots": n_dots,
+                       "dots_inside_tile": int(((pts[:, 0] >= x0) & (pts[:, 0] < x0 + GALLERY_TILE_PX) &
+                                                (pts[:, 1] >= y0) & (pts[:, 1] < y0 + GALLERY_TILE_PX)).sum()),
+                       "ring_length_r30_px": cell["ring_length_r30_px"], "vermillion_px": int(ring_pix.sum()),
+                       "vermillion_px_inside_tile": int(((cc2 >= x0) & (cc2 < x0 + GALLERY_TILE_PX) &
+                                                         (rr >= y0) & (rr < y0 + GALLERY_TILE_PX)).sum()),
+                       "tile_x0": x0, "tile_y0": y0})
+    return checks
+
+
+def figure_gallery(name: str, window=None, stem: Path | None = None, window_note: str | None = None) -> None:
+    """N2: one tile per interior lacuna, a fixed 240 px crop centred on it
+    (zero padded outside the frame), all at 3x, with the N1 colours, its
+    roots and the dashed contour of its 30 px ring."""
+    d = image_data(name)
+    name = d["short"]
+    stem = stem or PER_IMAGE / name / "gallery"
+    ids = list(d["interior_ids"])
+    pages = [ids[i:i + GALLERY_PER_PAGE] for i in range(0, len(ids), GALLERY_PER_PAGE)]
+    stems = [stem] if len(pages) == 1 else [stem.with_name(f"{stem.name}_p{k + 1}") for k in range(len(pages))]
+    if all(done_at(s) for s in stems):
+        print(stem.relative_to(ROOT), "exists, skipped")
+        return
+    tile = GALLERY_TILE_PX * GALLERY_ZOOM / 300 * 25.4
+    margin, gap, title_h = 2.0, 3.0, 4.5
+    fig_w = 2 * margin + GALLERY_COLS * tile + (GALLERY_COLS - 1) * gap
+    all_checks = []
+    for page, s in zip(pages, stems):
+        rows = int(np.ceil(len(page) / GALLERY_COLS))
+        items = network_legend_items(d, inset_ring=False, inset_box=False)
+        items[4] = {"kind": "dot", "colour": PALETTE["root"], "label": "root of the tile lacuna"}
+        items.insert(5, {"kind": "line", "colour": "white", "lw": 0.6, "ls": (0, (3, 2)),
+                         "label": "30 px ring of the tile lacuna"})
+        if not any(i in d["canal_ids"] for i in page):
+            items = [it for it in items if it.get("text") != "c"]
+        head, legend_h, foot_h = 6.0, (10.0 if len(items) > 6 else 6.0), 7.5
+        fig_h = head + rows * (tile + title_h + gap) + legend_h + foot_h
+        fig = plt.figure(figsize=(fig_w * MM, fig_h * MM))
+        fig.text(margin / fig_w, 1 - 1.5 / fig_h, f"{name}: interior lacunae at 3x (240 px tiles)", ha="left", va="top",
+                 fontsize=FONT_SIZE + 1, fontweight="bold")
+        all_checks += gallery_tiles(d, page, fig, margin, head, fig_w, fig_h, window)
+        legend_strip(fig, margin, foot_h, fig_w - 2 * margin, legend_h, fig_w, fig_h, items)
+        n_edge = len(d["edge_ids"])
+        note = (f"{n_edge} lacuna{'e' if n_edge != 1 else ''} touching the frame not shown (left out of per-cell means). "
+                "Tiles: 240 px squares centred on each interior lacuna, zero padded outside the frame, one scale. "
+                + NETWORK_CAPTION + (" " + window_note if window_note else ""))
+        fig.text(margin / fig_w, 1.5 / fig_h, note, ha="left", va="bottom", fontsize=FONT_SIZE - 0.5, wrap=True)
+        save_to(fig, s)
+        print(s.relative_to(ROOT), "written")
+    if window is None:
+        write_json(PER_IMAGE / name / "gallery_check.json",
+                   {"image": name, "status": "pre-validation", "units": "px",
+                    "check": "per tile: magenta_dots == roots_count and vermillion_px == ring_length_r30_px",
+                    "tiles": all_checks})
+
+
 def _selftest_n0() -> None:
     """N0 checks on every image: the data equal results/, the vermillion
     pixels equal ring_length_r30_px per interior lacuna, the dots equal
@@ -1326,9 +1423,16 @@ def main() -> int:
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q.add_argument("-c", dest="cells", default=None, help="Three lacuna ids for the insets, as ID1,ID2,ID3.")
+    q = sub.add_parser("gallery", help="Cell gallery per image (v2): one 3x tile per interior lacuna.")
+    g = q.add_mutually_exclusive_group(required=True)
+    g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
+    g.add_argument("-a", dest="all", action="store_true", help="All images.")
     args = p.parse_args()
     if args.cmd == "check":
         return run("N0", _selftest_n0)
+    if args.cmd == "gallery":
+        names = [short(x) for x in image_paths()] if args.all else [args.image]
+        return max(run("N2", figure_gallery, n) for n in names)
     if args.cmd == "network":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
         cells = [int(v) for v in args.cells.split(",")] if args.cells else None
