@@ -74,8 +74,8 @@ and 50 px. Fixed display window. Pre-validation, pixel units, WT.
 
 **Every interior lacuna at the same scale.** One tile per interior lacuna: a 240 px square centred on
 the lacuna (zero padded outside the frame) at 3x, with the overlay of the network figure, the tile
-lacuna's roots (magenta) and the dashed contour of its 30 px ring. Title: lacuna number, roots, ring
-length 30 px, area. Dots and vermillion pixels equal the pipeline numbers (asserted,
+lacuna's roots (magenta) and the dashed contour of its 30 px ring. Title: lacuna number ("c": in a
+flagged canal region), roots, ring length 30 px, area. The header gives the count line of the image. Dots and vermillion pixels equal the pipeline numbers (asserted,
 `gallery_check.json`). Lacunae touching the frame are not shown; the footnote gives how many. Scale bar
 50 px. Fixed display window. Pre-validation, pixel units, WT.
 
@@ -98,9 +98,11 @@ orders them by code; it hides the names, not the appearance. Pre-validation, pix
 
 **Lacuna count against the lacuna threshold.** Rows: three sections (542_z06, 543-2, 682_z29). Columns:
 the lacuna cut $t_\mathrm{hi}$ (upper three-class Otsu cut of each image's own red histogram) scaled by
-0.8, 0.9, 1.0 (the default, black frame), 1.1 and 1.2. Outlines as in Fig01; n = lacunae (interior). A
-lower cut lowers the count in 542_z06 (16 to 11; bodies fuse or fail a shape filter) and raises it in
-543-2 and 682_z29 (12 to 13, 13 to 15). No default is changed. Scale bar 200 px (uncalibrated). Fixed
+0.8, 0.9, 1.0 (the default, black frame), 1.1 and 1.2. Outlines and "c" marks as in Fig01; under each
+panel the count line at that cut: interior lacunae used in per-cell means, lacunae touching the frame,
+rejected candidates of at least 150 px² (`Fig03_threshold_sensitivity_counts.json`). A lower cut lowers
+the total count in 542_z06 (16 to 11; bodies fuse or fail a shape filter) and raises it in 543-2 and
+682_z29 (12 to 13, 13 to 15). No default is changed. Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT. Full grid, both cuts:
 `results_experiments/fixes/B2_sensitivity.md`.
 

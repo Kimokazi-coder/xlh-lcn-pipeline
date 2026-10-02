@@ -1073,6 +1073,7 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
         fig = plt.figure(figsize=(fig_w * MM, fig_h * MM))
         fig.text(margin / fig_w, 1 - 1.5 / fig_h, f"{name}: interior lacunae at 3x (240 px tiles)", ha="left", va="top",
                  fontsize=FONT_SIZE + 1, fontweight="bold")
+        fig.text(1 - margin / fig_w, 1 - 1.5 / fig_h, count_line(d), ha="right", va="top", fontsize=FONT_SIZE)
         all_checks += gallery_tiles(d, page, fig, margin, head, fig_w, fig_h, window)
         legend_strip(fig, margin, foot_h, fig_w - 2 * margin, legend_h, fig_w, fig_h, items)
         n_edge = len(d["edge_ids"])
@@ -1416,11 +1417,12 @@ def lacuna_legend_items(d: dict, rejected: bool = True, low_cut: bool = False, c
 
 # F2 contact sheet ----------------------------------------------------------------
 
-def contact_count_lines(d: dict) -> str:
-    """The count line in two lines, for a small panel."""
+def contact_count_lines(d: dict, three: bool = False) -> str:
+    """The count line in two lines (three for a very small panel)."""
     n_int, n_edge, n_rej = len(d["interior_ids"]), len(d["edge_ids"]), len(d["rejected"])
     return (f"{n_int} interior lacunae used in per-cell means\n"
-            f"({n_edge} touching the frame, {n_rej} rejected candidate{'s' if n_rej != 1 else ''})")
+            f"({n_edge} touching the frame,{chr(10) if three else ' '}"
+            f"{n_rej} rejected candidate{'s' if n_rej != 1 else ''})")
 
 
 def draw_canal_marks(ax, d: dict, fs: float = FONT_SIZE - 2) -> None:
@@ -1503,8 +1505,11 @@ THRESHOLD_SCALES = [0.8, 0.9, 1.0, 1.1, 1.2]
 
 def figure_thresholds() -> None:
     """Rows: three images. Columns: the lacuna cut t_hi at 0.8 to 1.2 times
-    the image's own cut (1.0, the default, boxed). Outlines and counts. The
-    defaults are not changed; the scaled cut is passed to the lacuna stage."""
+    the image's own cut (1.0, the default, boxed). Outlines, canal marks and
+    count lines. The defaults are not changed; the scaled cut is passed to
+    the lacuna stage."""
+    from skimage import measure
+
     fig_name = "Fig03_threshold_sensitivity"
     if done(fig_name):
         print(fig_name, "exists, skipped")
@@ -1512,7 +1517,9 @@ def figure_thresholds() -> None:
     items = [{"kind": "outline", "colour": PALETTE["interior"], "label": "interior lacuna (in per-cell means)"},
              {"kind": "outline", "colour": PALETTE["edge"], "label": "lacuna touching the frame (not in per-cell means)"},
              {"kind": "frame", "label": "default cut"}]
-    margin, gap, text_h, top, left, cap_h = 1.0, 1.5, 5.5, 5.0, 6.0, 4.5
+    items.append({"kind": "text", "text": "c", "colour": PALETTE["interior"],
+                  "label": "inside a flagged canal region, may be vascular"})
+    margin, gap, text_h, top, left, cap_h = 1.0, 1.5, 9.0, 5.0, 6.0, 4.5
     legend_h = legend_height(items, FIG_WIDTH_MM - 2 * margin)
     n_cols = len(THRESHOLD_SCALES)
     panel = (FIG_WIDTH_MM - left - margin - (n_cols - 1) * gap) / n_cols
@@ -1524,18 +1531,31 @@ def figure_thresholds() -> None:
         _display, channel = lacunae.load_channel(path)
         _mask, t_hi = lacunae.multiotsu_lacuna_mask(channel)
         raw = windowed(channel)
+        flagged = image_data(name)["flagged"]
         for c, scale in enumerate(THRESHOLD_SCALES):
             lac = lacunae.analyse_image(path, t_hi * scale) if scale != 1.0 else lacunae.analyse_image(path)
             id_map = np.zeros(lac["labels"].shape, dtype=np.int32)
             for lid, (region, _b) in enumerate(lac["kept"], start=1):
                 id_map[lac["labels"] == region.label] = lid
+            kept_labels = {region.label for region, _b in lac["kept"]}
+            n_rej = sum(1 for rg in measure.regionprops(lac["labels"])
+                        if rg.label not in kept_labels and rg.area >= REJECTED_MIN_DRAW_PX2)
+            areas = np.bincount(id_map.ravel(), minlength=len(lac["rows"]) + 1)
+            inside = np.bincount(id_map[flagged].ravel(), minlength=len(lac["rows"]) + 1)
+            canal = [rr["lacuna_id"] for rr in lac["rows"]
+                     if inside[rr["lacuna_id"]] / areas[rr["lacuna_id"]] >= CANAL_MARK_MIN_SHARE]
+            dd = {"lacuna_id_map": id_map, "lacuna_rows": lac["rows"], "canal_ids": canal,
+                  "interior_ids": [rr["lacuna_id"] for rr in lac["rows"] if not rr["on_border"]],
+                  "edge_ids": [rr["lacuna_id"] for rr in lac["rows"] if rr["on_border"]],
+                  "rejected": [None] * n_rej}
             x = left + c * (panel + gap)
             y = fig_h - top - (r + 1) * panel - r * text_h
             ax = mm_axes(fig, x, y, panel, panel, FIG_WIDTH_MM, fig_h)
             image_axes(ax, raw)
             draw_outlines(ax, id_map, lac["rows"], lw=0.6)
-            ax.text(0.5, -0.03, f"n = {lac['lacuna_count']} ({lac['interior_lacuna_count']} interior)",
-                    transform=ax.transAxes, ha="center", va="top")
+            draw_canal_marks(ax, dd, fs=FONT_SIZE - 2.5)
+            ax.text(0.5, -0.02, contact_count_lines(dd, three=True), transform=ax.transAxes, ha="center", va="top",
+                    fontsize=FONT_SIZE - 2.0, linespacing=1.15)
             if scale == 1.0:
                 for sp in ax.spines.values():
                     sp.set_linewidth(2.0)
@@ -1548,7 +1568,9 @@ def figure_thresholds() -> None:
             if r == 0 and c == 0:
                 scale_bar(ax, id_map.shape[1])
             log[f"{name} x{scale:g}"] = {"t_hi": lac["t_hi"], "lacuna_count": lac["lacuna_count"],
-                                         "interior": lac["interior_lacuna_count"]}
+                                         "interior": lac["interior_lacuna_count"],
+                                         "touching_frame": len(dd["edge_ids"]), "rejected_candidates": n_rej,
+                                         "canal_marked": canal}
     legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h, items)
     fig.text(margin / FIG_WIDTH_MM, 1.2 / fig_h, "Dim out-of-plane cells are not detected and are not drawn. "
              "Fixed display window for all panels. Pre-validation, pixel units.", ha="left", va="bottom",

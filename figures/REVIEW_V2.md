@@ -177,3 +177,21 @@ smaller. Round 2 (543-2 and 682_z08): clear.
 
 Remaining: the root dots in C are tiny at column width (they are legible in the inset); the 682_z08
 inset still sits at the frame edge (the old inset rule; P7).
+
+## P6 count lines and the canal mark
+
+Count line "<n> interior lacunae used in per-cell means (<m> touching the frame, <k> rejected
+candidates)" in the overview (one line), the network figure (one line), the gallery header, the contact
+sheets (two lines) and Fig03 (three lines, one per scaled cut, with the rejected candidates at that
+cut). S01 shows single lacunae and Fig04 image means, so they have no count line.
+
+"c" after the number of a kept lacuna with at least half its pixels in the flagged canal mask (shares
+are 0 or 1 for every kept lacuna): 542_z06 L2 (555,149) and L9 (573,482); 542_z18 L2 (639,130);
+682_z08 L1 (428,32), the large top-edge object; 682_z23 L1 (107,13), L2 (363,7) and L3 (472,61);
+682_z29 L1 (99,13). The three named objects are marked: the 682_z08 top-edge object, 542_z06 (555,149)
+and 682_z23 (363,7). Five other lacunae are marked too, as the overnight report found ordinary lacunae
+fully inside a canal mask. The classification is unchanged.
+
+Round 1 (Fig03 at 1000 px): the two-line count text of neighbouring 34 mm panels ran into each other.
+Fix: three lines in Fig03. Round 2: clear; the first lines of neighbouring panels come close without
+touching. Gallery headers (542_z06 viewed): clear. The Fig03 lacuna counts equal the earlier log.
