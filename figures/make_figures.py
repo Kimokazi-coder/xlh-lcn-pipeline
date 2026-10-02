@@ -52,6 +52,11 @@ import config  # noqa: E402
 import canaliculi  # noqa: E402
 import lacunae  # noqa: E402
 
+# The fast lacuna stage gives labels identical to the original one (python
+# src/diagnostics.py fast-check, 40 of 40; regression passes with it on), so
+# the figures use it for speed. Every other setting is the default.
+config.FAST_LACUNA_STAGE = True
+
 OUT = ROOT / "figures_out"
 CACHE = ROOT / "results_experiments" / "_cache" / "figures"
 LOG_DIR = ROOT / "experiments" / "logs"
@@ -285,7 +290,9 @@ def draw_outlines(ax, lacuna_id_map: np.ndarray, rows: list, numbers: bool = Fal
                 tx, ha = cols.min() - 6, "right"
             else:
                 tx, ha = right, "left"
-            ax.text(tx - x0, row["centroid_row_px"] - y0, str(lid), color=colour, ha=ha, va="center",
+            # Kept at least 14 px inside the top and bottom frame edges.
+            ty = float(np.clip(row["centroid_row_px"], 14, lacuna_id_map.shape[0] - 14))
+            ax.text(tx - x0, ty - y0, str(lid), color=colour, ha=ha, va="center",
                     fontsize=number_size, fontweight="bold", path_effects=halo())
 
 
