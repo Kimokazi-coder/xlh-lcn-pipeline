@@ -162,3 +162,18 @@ the merged figure now says that 682_z08 is merged by hand.
 
 Remaining: from zero, the field differences in field density and ring density look small, which is the
 intended reading; the labels of three close values (Field 2) need their leaders to be read.
+
+## P5 overview panel C
+
+Panel C of the overview is the network overlay at small size (vector skeleton 0.25 pt, vermillion
+within 30 px of an interior lacuna, white elsewhere, outlines, roots of interior lacunae); the inset uses
+the same overlay at 0.4 pt with the dashed 30 px ring. The dots in C and in the inset are asserted
+against `roots_count`. The figure states that the white and vermillion lines are all skeleton pixels,
+not only the threads attached to counted cells.
+
+Round 1 (543-2 at 1000 px and 100%): the caption line ran off the right edge, and the inset text "ring
+30 px = 305 px" was cut at the right edge. Fix: the caption on two lines; the inset text shorter and
+smaller. Round 2 (543-2 and 682_z08): clear.
+
+Remaining: the root dots in C are tiny at column width (they are legible in the inset); the 682_z08
+inset still sits at the frame edge (the old inset rule; P7).

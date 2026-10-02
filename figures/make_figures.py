@@ -1285,10 +1285,13 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
     panel = (FIG_WIDTH_MM - 2 * margin - 3 * gap) / (3 + INSET_ZOOM * side / W)
     inset = INSET_ZOOM * side / W * panel
     items = lacuna_legend_items(d, rejected=True, low_cut=low_cut) + [
-        {"kind": "line", "colour": PALETTE["skeleton"], "lw": 1.0, "label": "skeleton (C)"},
-        {"kind": "dot", "colour": PALETTE["root"], "label": "root of the inset lacuna"},
+        {"kind": "line", "colour": PALETTE["ring"], "lw": 1.2, "label": "skeleton within 30 px of an interior lacuna"},
+        {"kind": "line", "colour": PALETTE["skeleton"], "alpha": SKELETON_ALPHA, "lw": 1.2,
+         "label": "rest of the skeleton"},
+        {"kind": "dot", "colour": PALETTE["root"], "label": "root of an interior lacuna"},
+        {"kind": "line", "colour": "white", "lw": 0.6, "ls": (0, (3, 2)), "label": "30 px ring of the inset lacuna"},
         {"kind": "box", "colour": PALETTE["box"], "label": "inset region"}]
-    top, count_h, cap_h = 5.0, 5.0, 4.5
+    top, count_h, cap_h = 5.0, 5.0, 7.5
     legend_h = legend_height(items, FIG_WIDTH_MM - 2 * margin)
     bottom = cap_h + legend_h + count_h
     fig_h = bottom + panel + top
@@ -1310,34 +1313,37 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
     axB.set_title("lacunae and rejected candidates", pad=2)
     axB.text(0.0, -0.02, count_line(d), transform=axB.transAxes, ha="left", va="top", fontsize=FONT_SIZE - 0.5)
 
-    sk = skeleton_rgb(d["channel"], d["skeleton"])
-    image_axes(axC, sk)
-    axC.set_title("skeleton (white) on the image at 60%", pad=2)
-    axC.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), side, side, fill=False, ec=PALETTE["box"], lw=0.8))
+    # C: the network overlay of the network figure at small size. Every
+    # skeleton pixel is drawn, not only the threads attached to counted cells.
+    over = overlay_image(d)
+    show_image(axC, over)
+    draw_skeleton(axC, d["segments"], lw=0.25)
+    draw_lacunae(axC, d, lw=0.5)
+    n_dots = draw_roots(axC, d, d["interior_ids"], size=1.2, edge_lw=0.15)
+    if n_dots != sum(c["roots_count"] for c in d["cell_rows"] if c["lacuna_id"] in d["interior_ids"]):
+        raise AssertionFailed(f"{name}: {n_dots} root dots in C differ from results/")
+    axC.set_title("skeleton, all pixels, and roots", pad=2)
+    axC.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), side, side, fill=False, ec=PALETTE["box"], lw=0.8, zorder=6))
 
-    crop = sk[y0:y0 + side, x0:x0 + side]
-    axI.imshow(crop, interpolation="nearest")
-    axI.set_xticks([])
-    axI.set_yticks([])
-    for sp in axI.spines.values():
-        sp.set_edgecolor("black")
-        sp.set_linewidth(0.6)
-    draw_outlines(axI, d["lacuna_id_map"][y0:y0 + side, x0:x0 + side],
-                  [r for r in d["lacuna_rows"] if r["lacuna_id"] == cell], offset=(0, 0))
-    pts = np.array(d["roots_xy"][str(cell)])
-    if len(pts):
-        axI.scatter(pts[:, 0] - x0, pts[:, 1] - y0, s=6, c=PALETTE["root"], edgecolors="black", linewidths=0.3,
-                    zorder=5)
-    axI.set_xlim(-0.5, side - 0.5)
-    axI.set_ylim(side - 0.5, -0.5)
-    axI.set_title(f"lacuna {cell}, 3x", pad=2)
-    roots_n = next(c["roots_count"] for c in d["cell_rows"] if c["lacuna_id"] == cell)
-    axI.text(0.0, -0.04, f"{roots_n} roots (dots)", transform=axI.transAxes, ha="left", va="top")
+    show_image(axI, over[y0:y0 + side, x0:x0 + side], x0, y0, interpolation="nearest")
+    draw_skeleton(axI, d["segments"], window=(x0, x0 + side, y0, y0 + side), lw=0.4)
+    draw_lacunae(axI, d, lw=V2_OUTLINE_PT)
+    for cc in ring_contours(d, cell):
+        axI.plot(cc[:, 0], cc[:, 1], color="white", lw=0.5, ls=(0, (3, 2)), zorder=4.5)
+    cellrow = next(c for c in d["cell_rows"] if c["lacuna_id"] == cell)
+    if draw_roots(axI, d, [cell], size=6.0, edge_lw=0.3) != cellrow["roots_count"]:
+        raise AssertionFailed(f"{name} L{cell}: inset dots differ from roots_count")
+    axI.set_xlim(x0 - 0.5, x0 + side - 0.5)
+    axI.set_ylim(y0 + side - 0.5, y0 - 0.5)
+    axI.set_title(f"L{cell}, 3x", pad=2)
+    axI.text(0.0, -0.04, f"{cellrow['roots_count']} roots (dots)\nring 30: {cellrow['ring_length_r30_px']} px",
+             transform=axI.transAxes, ha="left", va="top", linespacing=1.2, fontsize=FONT_SIZE - 1.5)
 
     for ax, letter in ((axA, "A"), (axB, "B"), (axC, "C")):
         panel_letter(fig, ax, letter)
     legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h, items)
-    cap = ("Dim out-of-plane cells are not detected and are not drawn. "
+    cap = ("White and vermillion lines in C are all skeleton pixels, not only the threads attached to counted cells.\n"
+           "Dim out-of-plane cells are not detected and are not drawn. "
            + (f"Dotted: {low} object{'s' if low != 1 else ''} kept only at 0.8 times t_hi (not the default output). "
               if low_cut else "")
            + "Fixed display window. Pre-validation, pixel units.")

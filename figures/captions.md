@@ -43,9 +43,13 @@ the hue was free to choose.
 **Lacunae, rejected candidates and the skeleton in one optical section.** (A) Red channel. (B) Kept
 lacunae with their numbers ("c": in a flagged canal region) and the rejected lacuna-scale candidates
 (grey dashed; A aspect, S solidity, a area). The count line gives the interior lacunae used in per-cell
-means, the lacunae touching the frame and the rejected candidates. (C) Skeleton (white) over the image
-dimmed to 60%; the white box marks the inset: one lacuna at 3x with its roots as magenta dots. Inset
-lacuna by a fixed rule, logged in `per_image/<image>/inset.json`. Scale bar 200 px (uncalibrated). Fixed
+means, the lacunae touching the frame and the rejected candidates. (C) The overlay of the network
+figure at small size: the image at 85%, every skeleton pixel as a vector line, vermillion within 30 px
+of an interior lacuna and white elsewhere, roots of interior lacunae as magenta dots. The white and
+vermillion lines are all skeleton pixels, not only the threads attached to counted cells. The white box
+marks the inset: one lacuna at 3x with the same overlay, its roots and the dashed contour of its 30 px
+ring; the text gives its roots and ring length 30 px. Inset lacuna by a fixed rule, logged in
+`per_image/<image>/inset.json`. Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT.
 
 `per_image/543_3/overview_low_cut_layer` is the same figure with option `-r`: objects that the lacuna stage keeps only
