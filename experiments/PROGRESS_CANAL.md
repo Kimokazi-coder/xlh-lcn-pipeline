@@ -1,8 +1,10 @@
 # Canaliculi v2 progress
 
+ALL DONE
+
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (origin/publication-fixes tip; tag before-canaliculi-v2)
-last update: 2026-10-03 05:20
-next action: R2 pinned links and ALL DONE
+last update: 2026-10-03 05:40
+next action: none. Every item is done; see docs/CANALICULI_V2_REPORT.md.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -21,4 +23,4 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | V1 | Subcommand validate-network and self-test | DONE | 2977216 | -a -k -r -o, optional -t -b, -s; key outside the repo enforced; stats per lacuna, image, field; Bland-Altman PNG; trace precision, recall, F1 at 3 px; self-test 8 of 8 PASS (bias -0.023, F1 1.000, negative control 0.257, key refusal); outputs only in the cache |
 | V2 | docs/NETWORK_TUNING_PROTOCOL.md | DONE | d446f50 | tuning forbidden before blind counts; the S1 grid; metrics fixed (MAE and bias of roots, skeleton F1); whole fields held out (at most one of 3 or 4 now); decision rule before looking; held-out once; repo contents; Hyp check; lacuna stage separate; ImageJ tracing and blind annotation |
 | R1 | Checks and switch comments | DONE | 440e25b | config comment names section, default and 'Recommended value: none'; allowlist printed by regression (75 json paths, 18 table columns, generated from the code); reference-check PASS, regression PASS (both stages), fast-check 40 of 40, switch-check identical to B1, self-test 8 of 8; R1_checks.md |
-| R2 | INDEX, docs/CANALICULI_V2_REPORT.md, links, ALL DONE | PARTIAL | | INDEX.md and the report written; final checks, then pinned links |
+| R2 | INDEX, docs/CANALICULI_V2_REPORT.md, links, ALL DONE | DONE | 6d6ed81 | INDEX.md and the report (new columns, switch table, band-wall findings with crops, sweep reading, bridging audit, harness, blocked items, Decisions needed, METHODS and README lines for later); all rule 11 checks passed before the push; 32 links pinned to 6d6ed81 added in ce1cd43 |
