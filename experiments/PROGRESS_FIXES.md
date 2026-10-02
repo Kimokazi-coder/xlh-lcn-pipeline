@@ -1,7 +1,9 @@
 # Publication fixes progress
 
-last update: 2026-10-02 12:57
-next action: 7.1 final report, METHODS and README sections, SHA-pinned links, checks, ALL DONE.
+ALL DONE
+
+last update: 2026-10-02 13:02
+next action: none. Every item is done; see docs/FIXES_REPORT.md.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -27,4 +29,4 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | F4 | Per-field plot | DONE | d79dbd6 | 5 panels (roots, roots per 100 px, ring 30, ring density 30, field density) by data-derived field, dots images, bar mean, n images; no test; two review rounds |
 | F5 | Supplementary figure: crumb rule and hole fill | DONE | 45e8ee9 | 543_3 (877,545) crumb rule off/on and 542_z06 (783,581) hole fill off/on beside raw crops; values equal switch-check; two review rounds |
 | F6 | Self-review of every figure; captions | DONE | 6670a44 | all 13 PNG reviewed at 1000 px (two rounds where defects were found); PDFs embed TrueType, no Type 3; captions.md with window, colours, fields, pre-validation, px, WT |
-| 7.1 | Final report, METHODS and README sections, checks, ALL DONE | TODO |  |  |
+| 7.1 | Final report, METHODS and README sections, checks, ALL DONE | DONE | 57bcc7e | FIXES_REPORT final with switch table, commands, blocked items and Decisions needed; METHODS section 9 and README usage appended; links pinned to 57bcc7e added in the next commit; all checks passed before the final push |
