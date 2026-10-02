@@ -24,10 +24,11 @@ Shared style (one place, used by every figure):
                      image and panel (figures_out/display_window.json)
     fonts            Arial (Helvetica if present, else DejaVu Sans), 7 to 9 pt
                      at 180 mm figure width; PDF fonts embedded (TrueType)
-    colours          interior lacuna outlines cyan; frame-edge lacunae yellow
-                     (they are left out of every per-cell mean); skeleton one
-                     colour (white) over the raw image dimmed to 60%; roots as
-                     yellow dots
+    colours          one colour, one meaning (PALETTE): interior lacuna
+                     outlines cyan; frame-edge lacunae yellow (left out of
+                     every per-cell mean); rejected candidates grey dashed;
+                     skeleton within 30 px of an interior lacuna vermillion,
+                     the rest white; roots magenta dots; inset boxes white
     outlines         at least 0.6 pt wide in the exported figure
     scale bar        in pixels ("200 px"); the images are uncalibrated. In
                      micrometres only if config.PIXEL_SIZE_UM is set.
@@ -82,9 +83,10 @@ FONT_SIZE = 7.0
 LETTER_SIZE = 9.0
 OUTLINE_PT = 0.7  # at least 0.6 pt
 SKELETON_COLOUR = "white"
-INTERIOR_COLOUR = "#00FFFF"  # cyan
-BORDER_COLOUR = "#FFE000"  # yellow
-ROOT_COLOUR = "#FFE000"
+# Since figures v2 (P2) these equal PALETTE below: one colour, one meaning.
+INTERIOR_COLOUR = "#00FFFF"  # cyan: interior lacuna
+BORDER_COLOUR = "#F0E442"  # Okabe-Ito yellow: lacuna touching the frame
+ROOT_COLOUR = "#FF00FF"  # magenta: root
 DIM_FACTOR = 0.6  # raw image dimmed to 60% under the skeleton
 WINDOW_PERCENTILES = (1.0, 99.8)
 SCALE_BAR_PX = 200
@@ -733,7 +735,7 @@ def legend_height(items: list, w_mm: float) -> float:
 
 
 def legend_strip(fig, x_mm: float, y_mm: float, w_mm: float, h_mm: float, fig_w: float, fig_h: float,
-                 items: list, fs: float = FONT_SIZE - 1) -> None:
+                 items: list, fs: float = FONT_SIZE - 1, dark: bool = True) -> None:
     """A row (or rows) of colour keys with labels, drawn inside the figure.
     Each key is drawn on a small black swatch, as it looks over the image.
     items: dicts with kind in line, outline, dot, box, text and the style."""
@@ -752,9 +754,13 @@ def legend_strip(fig, x_mm: float, y_mm: float, w_mm: float, h_mm: float, fig_w:
         tw = bb.width / fig.dpi * 25.4
         if x > 0 and x + sw + pad + tw > w_mm:
             x, y = 0.0, y - row_h
-        ax.add_patch(Rectangle((x, y - sh / 2), sw, sh, facecolor="black", edgecolor="none"))
-        cx = x + sw / 2
         k = it["kind"]
+        if k == "frame":
+            ax.add_patch(Rectangle((x + 0.4, y - sh / 2 + 0.2), sw - 0.8, sh - 0.4, facecolor="0.85", edgecolor="black",
+                                   lw=1.4))
+        elif dark:
+            ax.add_patch(Rectangle((x, y - sh / 2), sw, sh, facecolor="black", edgecolor="none"))
+        cx = x + sw / 2
         if k == "line":
             ax.plot([x + 0.8, x + sw - 0.8], [y, y], color=it["colour"], lw=it.get("lw", 1.0), ls=it.get("ls", "-"),
                     alpha=it.get("alpha", 1.0), solid_capstyle="butt")
@@ -770,6 +776,11 @@ def legend_strip(fig, x_mm: float, y_mm: float, w_mm: float, h_mm: float, fig_w:
                                    lw=it.get("lw", 0.6)))
         elif k == "text":
             ax.text(cx, y, it["text"], color=it["colour"], fontsize=fs, fontweight="bold", ha="center", va="center")
+        elif k == "marker":
+            ax.scatter([cx], [y], s=it.get("s", 9), marker=it.get("marker", "o"), facecolors=it.get("face", "black"),
+                       edgecolors=it.get("edge", "black"), linewidths=0.6, zorder=3)
+        elif k == "bar":
+            ax.plot([x + 0.8, x + sw - 0.8], [y, y], color=it["colour"], lw=1.6, solid_capstyle="butt")
         ax.text(x + sw + pad, y, it["label"], fontsize=fs, va="center", ha="left")
         x += sw + pad + tw + gap
 
@@ -1254,7 +1265,10 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
     margin, gap = 1.0, 2.5
     panel = (FIG_WIDTH_MM - 2 * margin - 3 * gap) / (3 + INSET_ZOOM * side / W)
     inset = INSET_ZOOM * side / W * panel
-    items = lacuna_legend_items(d, rejected=True, low_cut=low_cut)
+    items = lacuna_legend_items(d, rejected=True, low_cut=low_cut) + [
+        {"kind": "line", "colour": PALETTE["skeleton"], "lw": 1.0, "label": "skeleton (C)"},
+        {"kind": "dot", "colour": PALETTE["root"], "label": "root of the inset lacuna"},
+        {"kind": "box", "colour": PALETTE["box"], "label": "inset region"}]
     top, count_h, cap_h = 5.0, 5.0, 4.5
     legend_h = legend_height(items, FIG_WIDTH_MM - 2 * margin)
     bottom = cap_h + legend_h + count_h
@@ -1280,20 +1294,21 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False) -> N
     sk = skeleton_rgb(d["channel"], d["skeleton"])
     image_axes(axC, sk)
     axC.set_title("skeleton (white) on the image at 60%", pad=2)
-    axC.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), side, side, fill=False, ec=ROOT_COLOUR, lw=0.8))
+    axC.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), side, side, fill=False, ec=PALETTE["box"], lw=0.8))
 
     crop = sk[y0:y0 + side, x0:x0 + side]
     axI.imshow(crop, interpolation="nearest")
     axI.set_xticks([])
     axI.set_yticks([])
     for sp in axI.spines.values():
-        sp.set_edgecolor(ROOT_COLOUR)
-        sp.set_linewidth(0.8)
+        sp.set_edgecolor("black")
+        sp.set_linewidth(0.6)
     draw_outlines(axI, d["lacuna_id_map"][y0:y0 + side, x0:x0 + side],
                   [r for r in d["lacuna_rows"] if r["lacuna_id"] == cell], offset=(0, 0))
     pts = np.array(d["roots_xy"][str(cell)])
     if len(pts):
-        axI.scatter(pts[:, 0] - x0, pts[:, 1] - y0, s=6, c=ROOT_COLOUR, edgecolors="black", linewidths=0.3, zorder=5)
+        axI.scatter(pts[:, 0] - x0, pts[:, 1] - y0, s=6, c=PALETTE["root"], edgecolors="black", linewidths=0.3,
+                    zorder=5)
     axI.set_xlim(-0.5, side - 0.5)
     axI.set_ylim(side - 0.5, -0.5)
     axI.set_title(f"lacuna {cell}, 3x", pad=2)
@@ -1465,10 +1480,14 @@ def figure_thresholds() -> None:
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
-    margin, gap, text_h, top, left, foot = 1.0, 1.5, 5.5, 5.0, 6.0, 3.0
+    items = [{"kind": "outline", "colour": PALETTE["interior"], "label": "interior lacuna (in per-cell means)"},
+             {"kind": "outline", "colour": PALETTE["edge"], "label": "lacuna touching the frame (not in per-cell means)"},
+             {"kind": "frame", "label": "default cut"}]
+    margin, gap, text_h, top, left, cap_h = 1.0, 1.5, 5.5, 5.0, 6.0, 4.5
+    legend_h = legend_height(items, FIG_WIDTH_MM - 2 * margin)
     n_cols = len(THRESHOLD_SCALES)
     panel = (FIG_WIDTH_MM - left - margin - (n_cols - 1) * gap) / n_cols
-    fig_h = top + len(THRESHOLD_IMAGES) * (panel + text_h) + foot
+    fig_h = top + len(THRESHOLD_IMAGES) * (panel + text_h) + legend_h + cap_h
     fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
     log = {}
     for r, name in enumerate(THRESHOLD_IMAGES):
@@ -1501,7 +1520,10 @@ def figure_thresholds() -> None:
                 scale_bar(ax, id_map.shape[1])
             log[f"{name} x{scale:g}"] = {"t_hi": lac["t_hi"], "lacuna_count": lac["lacuna_count"],
                                          "interior": lac["interior_lacuna_count"]}
-    fig.text(0.995, 0.003, "pre-validation, pixel units", ha="right", va="bottom", fontsize=FONT_SIZE - 1, color="0.35")
+    legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h, items)
+    fig.text(margin / FIG_WIDTH_MM, 1.2 / fig_h, "Dim out-of-plane cells are not detected and are not drawn. "
+             "Fixed display window for all panels. Pre-validation, pixel units.", ha="left", va="bottom",
+             fontsize=FONT_SIZE - 0.5)
     write_json(OUT / f"{fig_name}_counts.json", log)
     save(fig, fig_name)
     print(fig_name, "written")
@@ -1516,57 +1538,93 @@ SWITCH_CASES = [
 
 
 def switched_output(path: Path, switch: str, value) -> dict:
-    """canaliculi.analyse_image with one switch on, the rest default."""
+    """canaliculi.analyse_image with one switch on, the rest default, in the
+    form the v2 drawing code takes; ring pixels and root dots are checked
+    against that run's own numbers."""
     old = getattr(config, switch)
     setattr(config, switch, value)
     try:
         res = canaliculi.analyse_image(path)
     finally:
         setattr(config, switch, old)
-    return {"lacuna_id_map": res["lacuna_id_map"], "skeleton": res["skeleton"], "lacuna_rows": res["lacunae"]["rows"],
-            "cell_rows": res["rows"]}
+    return state_data(res, lacunae.load_channel(path)[1], short(path))
+
+
+def state_data(res: dict, channel: np.ndarray, name: str) -> dict:
+    """One pipeline run (any setting) as the dict the v2 drawing code takes."""
+    lac_rows, cell_rows = res["lacunae"]["rows"], res["rows"]
+    d = {"short": name, "channel": channel, "lacuna_id_map": res["lacuna_id_map"], "skeleton": res["skeleton"],
+         "lacuna_rows": lac_rows, "cell_rows": cell_rows, "flagged": res["flagged"],
+         "interior_ids": [r["lacuna_id"] for r in lac_rows if not r["on_border"]],
+         "edge_ids": [r["lacuna_id"] for r in lac_rows if r["on_border"]], "rejected": [], "canal_ids": []}
+    d["roots_xy"] = {str(r["lacuna_id"]): root_clusters(res["graph"], r["lacuna_id"]) for r in cell_rows}
+    d.update(ring_classes(d["skeleton"], d["lacuna_id_map"], d["interior_ids"]))
+    for cr in cell_rows:
+        i = cr["lacuna_id"]
+        if int(d["ring_count"][i]) != cr["ring_length_r30_px"] or len(d["roots_xy"][str(i)]) != cr["roots_count"]:
+            raise AssertionFailed(f"{name} lacuna {i}: drawn ring or roots differ from the run")
+    d["segments"] = skeleton_segments(d["skeleton"], d["classes"])
+    return d
 
 
 def figure_switches() -> None:
-    """Two rows (one per switch): raw crop | switch off | switch on, outlines
-    and the white skeleton over the image at 60%."""
+    """Two rows (one per switch): raw crop | switch off | switch on, in the
+    network overlay style: outline, skeleton (vermillion within 30 px of an
+    interior lacuna), the lacuna's roots and its dashed 30 px ring."""
     fig_name = "F5_switch_examples"
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
-    margin, gap, text_h, top, left = 1.0, 3.0, 9.0, 5.0, 2.0
+    items = [{"kind": "outline", "colour": PALETTE["interior"], "label": "interior lacuna"},
+             {"kind": "line", "colour": PALETTE["ring"], "lw": 1.2, "label": "skeleton within 30 px of an interior lacuna"},
+             {"kind": "line", "colour": PALETTE["skeleton"], "alpha": SKELETON_ALPHA, "lw": 1.2,
+              "label": "rest of the skeleton"},
+             {"kind": "dot", "colour": PALETTE["root"], "label": "root of the lacuna shown"},
+             {"kind": "line", "colour": "white", "lw": 0.6, "ls": (0, (3, 2)), "label": "its 30 px ring"}]
+    margin, gap, text_h, top, left, cap_h = 1.0, 3.0, 9.0, 5.0, 2.0, 8.0
     panel = 45.0
     width = left + 3 * panel + 2 * gap + margin
-    fig_h = top + len(SWITCH_CASES) * (panel + text_h)
+    legend_h = legend_height(items, width - 2 * margin)
+    fig_h = top + len(SWITCH_CASES) * (panel + text_h) + legend_h + cap_h
     fig = plt.figure(figsize=(width * MM, fig_h * MM))
     log = {}
     for r, (name, x, y, half, switch, value, label) in enumerate(SWITCH_CASES):
-        path = path_of(name)
-        off = pipeline_output(path)
-        on = switched_output(path, switch, value)
-        sl = (slice(y - half, y + half), slice(x - half, x + half))
-        raw = windowed(off["channel"])[sl]
+        off = image_data(name)
+        on = switched_output(off["path"], switch, value)
+        x0, y0, side = x - half, y - half, 2 * half
+        view = (x0, x0 + side, y0, y0 + side)
         y_ax = fig_h - top - (r + 1) * panel - r * text_h
         for c, (title, data) in enumerate(((f"{name} ({x},{y}), red channel", None), (f"{label} off (default)", off),
                                             (f"{label} on", on))):
             ax = mm_axes(fig, left + c * (panel + gap), y_ax, panel, panel, width, fig_h)
             if data is None:
-                image_axes(ax, raw)
-                scale_bar(ax, 2 * half, length_px=20)
+                show_image(ax, windowed(off["channel"])[y0:y0 + side, x0:x0 + side], x0, y0, interpolation="nearest")
+                scale_bar_at(ax, 20)
             else:
-                image_axes(ax, skeleton_rgb(off["channel"], data["skeleton"])[sl])
-                lid = int(data["lacuna_id_map"][y, x]) or int(data["lacuna_id_map"][sl].max())
-                rows = [rr for rr in data["lacuna_rows"] if rr["lacuna_id"] == lid]
-                draw_outlines(ax, data["lacuna_id_map"][sl], rows, lw=0.8)
+                show_image(ax, overlay_image(data)[y0:y0 + side, x0:x0 + side], x0, y0, interpolation="nearest")
+                draw_skeleton(ax, data["segments"], window=view, lw=0.5)
+                lid = int(data["lacuna_id_map"][y, x]) or int(data["lacuna_id_map"][y0:y0 + side, x0:x0 + side].max())
+                draw_lacunae(ax, data, lw=0.8, only=[lid])
+                for cc in ring_contours(data, lid):
+                    ax.plot(cc[:, 0], cc[:, 1], color="white", lw=0.6, ls=(0, (3, 2)), zorder=4.5)
+                n_dots = draw_roots(ax, data, [lid], size=14.0, edge_lw=0.4)
+                row = next(rr for rr in data["lacuna_rows"] if rr["lacuna_id"] == lid)
                 cell = next(cr for cr in data["cell_rows"] if cr["lacuna_id"] == lid)
-                ax.text(0.5, -0.03, f"{rows[0]['area_px2']:.0f} px\u00b2, {cell['roots_count']} roots, "
+                if n_dots != cell["roots_count"] or int(data["ring_interior_count"][lid]) != cell["ring_length_r30_px"]:
+                    raise AssertionFailed(f"{name} {title}: drawn values differ from the run")
+                ax.set_xlim(x0 - 0.5, x0 + side - 0.5)
+                ax.set_ylim(y0 + side - 0.5, y0 - 0.5)
+                ax.text(0.5, -0.03, f"{row['area_px2']:.0f} px², {cell['roots_count']} roots, "
                         f"ring 30: {cell['ring_length_r30_px']} px", transform=ax.transAxes, ha="center", va="top")
-                log[f"{name} {title}"] = {"area_px2": rows[0]["area_px2"], "roots": cell["roots_count"],
+                log[f"{name} {title}"] = {"area_px2": row["area_px2"], "roots": cell["roots_count"],
                                           "ring30": cell["ring_length_r30_px"]}
             ax.set_title(title, pad=2)
             if c == 0:
                 panel_letter(fig, ax, "AB"[r])
-    fig.text(0.995, 0.003, "pre-validation, pixel units", ha="right", va="bottom", fontsize=FONT_SIZE - 1, color="0.35")
+    legend_strip(fig, margin, cap_h, width - 2 * margin, legend_h, width, fig_h, items)
+    fig.text(margin / width, 1.2 / fig_h, "Middle and right: the image at 85% with the overlay. Each switch is off by "
+             "default.\nFixed display window. Pre-validation, pixel units.", ha="left", va="bottom",
+             fontsize=FONT_SIZE - 0.5)
     write_json(OUT / f"{fig_name}_values.json", log)
     save(fig, fig_name)
     print(fig_name, "written")
@@ -1598,7 +1656,7 @@ def figure_fields(field_dir: Path) -> None:
     fields = sorted({r["field"] for r in rows}, key=lambda v: int(v[1:]))
     members = {fid: [SHORT.get(r["image"], r["image"]) for r in rows if r["field"] == fid] for fid in fields}
     n_pan = len(FIELD_PANELS)
-    left, gap, right, bottom, top = 12.0, 11.0, 2.0, 12.0, 9.0
+    left, gap, right, bottom, top = 12.0, 11.0, 2.0, 17.0, 9.0
     w = (FIG_WIDTH_MM - left - right - (n_pan - 1) * gap) / n_pan
     h = 38.0
     fig_h = bottom + h + top
@@ -1611,7 +1669,7 @@ def figure_fields(field_dir: Path) -> None:
                 continue
             offsets = np.linspace(-0.12, 0.12, len(vals)) if len(vals) > 1 else [0.0]
             ax.scatter(np.array(offsets) + j, vals, s=9, c="black", zorder=3, linewidths=0)
-            ax.plot([j - 0.28, j + 0.28], [np.mean(vals)] * 2, color="#0072B2", lw=1.6, zorder=2)
+            ax.plot([j - 0.28, j + 0.28], [np.mean(vals)] * 2, color=PALETTE["field_mean"], lw=1.6, zorder=2)
         ax.set_xticks(range(len(fields)))
         ax.set_xticklabels([f"{fid}\nn={len(members[fid])}" for fid in fields])
         ax.set_xlim(-0.6, len(fields) - 0.4)
@@ -1625,8 +1683,11 @@ def figure_fields(field_dir: Path) -> None:
             ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.3f"))
         panel_letter(fig, ax, "ABCDE"[i], dx=-0.05)
     legend = "; ".join(f"{fid}: {' + '.join(members[fid])}" for fid in fields)
+    legend_strip(fig, 2.0, 7.0, FIG_WIDTH_MM - 4.0, 4.5, FIG_WIDTH_MM, fig_h, dark=False, items=[
+        {"kind": "marker", "label": "image (mean over its interior lacunae)"},
+        {"kind": "bar", "colour": PALETTE["field_mean"], "label": "field mean"}])
     fig.text(0.01, 0.01, "Fields from field-summary (lacuna centroids matched across images). " + legend
-             + ". Dots: images; bar: field mean; n: images per field. Pre-validation, pixel units, no test.",
+             + ". n: images per field. Pre-validation, pixel units, no test.",
              ha="left", va="bottom", fontsize=FONT_SIZE - 1, wrap=True)
     save(fig, fig_name)
     print(fig_name, "written")

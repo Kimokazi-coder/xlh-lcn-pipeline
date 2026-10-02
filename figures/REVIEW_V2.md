@@ -121,3 +121,17 @@ found even at 0.8 times t_hi.
 
 Remaining: in the 682 images several small "a" pieces sit along the top frame edge and their letters
 crowd there. Panel C and the inset of the overview are still in the old style (P2, P5, P7).
+
+## P2 one colour, one meaning
+
+Changed: frame-edge yellow is Okabe-Ito #F0E442 everywhere; root dots are magenta (were yellow); the
+overview inset box is white (was yellow) and the inset frame black; the switch examples (F5) use the
+network overlay (raw at 85%, vermillion and white vector skeleton, magenta roots, dashed 30 px ring)
+instead of the white skeleton on the image at 60%; F3, F4 and F5 have a legend inside the figure (F3 a
+key for the black default frame, F4 the image dot and the blue field-mean bar). The F5 values (area,
+roots, ring 30) are unchanged and equal the switch-check output; the drawn dots and vermillion pixels of
+both states are asserted against each run.
+
+Round 1 (F5, F3, F4 and the 543-2 overview at 1000 px): no overlap or clipping; every key in each
+legend matches what is drawn. The F3 count lines still use the old wording (P6). Remaining: panel C of
+the overview is still the old white skeleton on the image at 60% (P5).
