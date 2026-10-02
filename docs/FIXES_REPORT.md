@@ -169,3 +169,51 @@ All are in `config.py` and off by default. With all off, `results/` is reproduce
     figures and experiments use and which were already installed with skan.
 11. **Order of work.** F1b, F2 and F5 were done while the B1 coded run was in progress, before B1 was
     committed; every item was still checked and pushed on its own.
+
+## Final commit and links
+
+Final content commit: `57bcc7ee16a6abab1b1b99c19ee78b17f2f51279`. It is the last commit that changed any code, figure, table or report
+text; the commit after it only adds this list, and the next one marks PROGRESS_FIXES.md done. Every
+link below is pinned to it.
+
+- [docs/FIXES_REPORT.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/docs/FIXES_REPORT.md)
+- [experiments/PROGRESS_FIXES.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/experiments/PROGRESS_FIXES.md)
+- [figures/captions.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures/captions.md)
+- [figures/REVIEW.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures/REVIEW.md)
+- [figures_out/display_window.json](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/display_window.json)
+- [results_experiments/fixes/A4_switch_check.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/A4_switch_check.md)
+- [results_experiments/fixes/A5_fast_stage.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/A5_fast_stage.md)
+- [results_experiments/fixes/A5_fast_check.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/A5_fast_check.csv)
+- [results_experiments/fixes/A6_regression.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/A6_regression.md)
+- [results_experiments/fixes/B1_blinding.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/B1_blinding.md)
+- [results_experiments/fixes/B2_sensitivity.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/B2_sensitivity.md)
+- [results_experiments/fixes/B2_sensitivity.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/B2_sensitivity.csv)
+- [results_experiments/fixes/B3_field_summary/field_summary.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/B3_field_summary/field_summary.md)
+- [results_experiments/fixes/B3_field_summary/field_summary.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/B3_field_summary/field_summary.csv)
+- [results_experiments/fixes/B3_field_summary/field_images.csv](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/results_experiments/fixes/B3_field_summary/field_images.csv)
+- [figures_out/F1_542_z06.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_542_z06.pdf)
+- [figures_out/F1_542_z06.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_542_z06.png)
+- [figures_out/F1_542_z18.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_542_z18.pdf)
+- [figures_out/F1_542_z18.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_542_z18.png)
+- [figures_out/F1_543-2.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_543-2.pdf)
+- [figures_out/F1_543-2.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_543-2.png)
+- [figures_out/F1_543_3.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_543_3.pdf)
+- [figures_out/F1_543_3.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_543_3.png)
+- [figures_out/F1_543_z13.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_543_z13.pdf)
+- [figures_out/F1_543_z13.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_543_z13.png)
+- [figures_out/F1_682_z08.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_682_z08.pdf)
+- [figures_out/F1_682_z08.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_682_z08.png)
+- [figures_out/F1_682_z23.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_682_z23.pdf)
+- [figures_out/F1_682_z23.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_682_z23.png)
+- [figures_out/F1_682_z29.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_682_z29.pdf)
+- [figures_out/F1_682_z29.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F1_682_z29.png)
+- [figures_out/F2_contact_sheet.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F2_contact_sheet.pdf)
+- [figures_out/F2_contact_sheet.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F2_contact_sheet.png)
+- [figures_out/F2_contact_sheet_coded.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F2_contact_sheet_coded.pdf)
+- [figures_out/F2_contact_sheet_coded.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F2_contact_sheet_coded.png)
+- [figures_out/F3_threshold_sensitivity.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F3_threshold_sensitivity.pdf)
+- [figures_out/F3_threshold_sensitivity.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F3_threshold_sensitivity.png)
+- [figures_out/F4_per_field.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F4_per_field.pdf)
+- [figures_out/F4_per_field.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F4_per_field.png)
+- [figures_out/F5_switch_examples.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F5_switch_examples.pdf)
+- [figures_out/F5_switch_examples.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/57bcc7ee16a6abab1b1b99c19ee78b17f2f51279/figures_out/F5_switch_examples.png)
