@@ -183,3 +183,43 @@ From `figures/REVIEW_V2.md`:
     output.
 12. **Repository size and visibility.** `figures_out/` holds 249 files, 145 MB, including the
     thumbnails (full colour, because a 256-colour palette turned the edge yellow orange).
+
+## Final commit and links
+
+Final content commit: `becb291d1254016aba3c315dc50b173464abf657`. It is the last commit that changed any code, figure or report text; the
+commit after it only adds this list, and the next one marks PROGRESS_FIGS2.md done. Every link below is
+pinned to it.
+
+- [docs/FIGURES_V2_REPORT.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/docs/FIGURES_V2_REPORT.md)
+- [figures_out/INDEX.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/INDEX.md)
+- [figures_out/README.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/README.md)
+- [docs/START_HERE.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/docs/START_HERE.md)
+- [results_experiments/INDEX.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/results_experiments/INDEX.md)
+- [figures/captions.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures/captions.md)
+- [figures/REVIEW_V2.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures/REVIEW_V2.md)
+- [experiments/PROGRESS_FIGS2.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/experiments/PROGRESS_FIGS2.md)
+- [figures_out/validation_tiles/README.md](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/validation_tiles/README.md)
+- [figures_out/main/Fig01_contact_sheet.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig01_contact_sheet.pdf)
+- [figures_out/main/Fig01_contact_sheet.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig01_contact_sheet.png)
+- [figures_out/main/Fig02_network_overlay_543-2.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig02_network_overlay_543-2.pdf)
+- [figures_out/main/Fig02_network_overlay_543-2.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig02_network_overlay_543-2.png)
+- [figures_out/main/Fig03_threshold_sensitivity.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig03_threshold_sensitivity.pdf)
+- [figures_out/main/Fig03_threshold_sensitivity.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig03_threshold_sensitivity.png)
+- [figures_out/main/Fig04_per_field.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig04_per_field.pdf)
+- [figures_out/main/Fig04_per_field.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig04_per_field.png)
+- [figures_out/main/Fig04_per_field_merged.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig04_per_field_merged.pdf)
+- [figures_out/main/Fig04_per_field_merged.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/main/Fig04_per_field_merged.png)
+- [figures_out/supplement/S01_switch_examples.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/supplement/S01_switch_examples.pdf)
+- [figures_out/supplement/S01_switch_examples.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/supplement/S01_switch_examples.png)
+- [figures_out/supplement/S02_contact_sheet_with_rejected_candidates.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/supplement/S02_contact_sheet_with_rejected_candidates.pdf)
+- [figures_out/supplement/S02_contact_sheet_with_rejected_candidates.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/supplement/S02_contact_sheet_with_rejected_candidates.png)
+- [figures_out/supplement/S03_contact_sheet_coded.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/supplement/S03_contact_sheet_coded.pdf)
+- [figures_out/supplement/S03_contact_sheet_coded.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/supplement/S03_contact_sheet_coded.png)
+- [figures_out/per_image/543-2/network.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/543-2/network.pdf)
+- [figures_out/per_image/543-2/network.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/543-2/network.png)
+- [figures_out/per_image/542_z06/network.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/542_z06/network.pdf)
+- [figures_out/per_image/542_z06/network.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/542_z06/network.png)
+- [figures_out/per_image/543-2/overview.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/543-2/overview.pdf)
+- [figures_out/per_image/543-2/overview.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/543-2/overview.png)
+- [figures_out/per_image/543-2/gallery.pdf](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/543-2/gallery.pdf)
+- [figures_out/per_image/543-2/gallery.png](https://raw.githubusercontent.com/Kimokazi-coder/xlh-lcn-pipeline/becb291d1254016aba3c315dc50b173464abf657/figures_out/per_image/543-2/gallery.png)
