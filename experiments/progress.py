@@ -6,6 +6,10 @@ Usage (from the repo root):
     python experiments/progress.py next ID "what is left in it"
     python experiments/progress.py show
 
+With -f fixes before the command, the same commands act on
+experiments/PROGRESS_FIXES.md (the publication-fixes session) instead:
+    python experiments/progress.py -f fixes set A2 DONE --sha abc1234
+
 STATUS is one of TODO, DONE, PARTIAL, FAILED, SKIPPED. `set` also stamps
 the "last update" line. Every write is atomic.
 """
@@ -22,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import EXP_DIR, write_text  # noqa: E402
 
 PROGRESS = EXP_DIR / "PROGRESS.md"
+PROGRESS_FIXES = EXP_DIR / "PROGRESS_FIXES.md"
 STATUSES = {"TODO", "DONE", "PARTIAL", "FAILED", "SKIPPED"}
 
 ITEMS = [
@@ -52,12 +57,44 @@ ITEMS = [
     ("7.2", "Final report, METHODS section, checks, ALL DONE"),
 ]
 
+ITEMS_FIXES = [
+    ("0.1", "Branch publication-fixes and this file"),
+    ("A2", "Output-directory option -o for both features and the summary writer"),
+    ("A6", "Subcommand regression: regenerate all 8 and compare with results/ at tolerance 0"),
+    ("F0", "figures/make_figures.py with the shared style"),
+    ("F1a", "Per-image figure for 543-2, viewed and reviewed"),
+    ("A1", "Provenance block in every json output; requirements.txt"),
+    ("A3", "Normalised measures as appended columns"),
+    ("7.0", "Draft docs/FIXES_REPORT.md"),
+    ("A4", "Switches NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2, BAND_FILTER_MIN_OPENING_SHARE; subcommand switch-check"),
+    ("A5", "Switch FAST_LACUNA_STAGE; identical labels; timing"),
+    ("B1", "Subcommands blind and unblind; leak test"),
+    ("B2", "Subcommand sensitivity"),
+    ("B3", "Subcommand field-summary"),
+    ("F1b", "Per-image figures for the other 7 images"),
+    ("F2", "Contact sheet of all 8 images"),
+    ("F3", "Threshold sensitivity figure"),
+    ("F4", "Per-field plot"),
+    ("F5", "Supplementary figure: crumb rule and hole fill"),
+    ("F6", "Self-review of every figure; captions"),
+    ("7.1", "Final report, METHODS and README sections, checks, ALL DONE"),
+]
+
 HEADER = "| id | description | status | commit SHA | note |"
 SEP = "|---|---|---|---|---|"
 
 
 def now() -> str:
     return time.strftime("%Y-%m-%d %H:%M")
+
+
+def select(which: str) -> None:
+    global PROGRESS, ITEMS, TITLE
+    if which == "fixes":
+        PROGRESS, ITEMS, TITLE = PROGRESS_FIXES, ITEMS_FIXES, "# Publication fixes progress"
+
+
+TITLE = "# Overnight progress"
 
 
 def parse() -> tuple[list[str], list[list[str]]]:
@@ -102,7 +139,7 @@ def cmd_init(_args) -> None:
         print("PROGRESS.md exists; not overwritten.")
         return
     top = [
-        "# Overnight progress",
+        TITLE,
         "",
         f"last update: {now()}",
         "next action: 0.1 create the branch, README and this file.",
@@ -155,6 +192,8 @@ def cmd_show(_args) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser()
+    p.add_argument("-f", dest="which", default="overnight", choices=["overnight", "fixes"],
+                   help="Which progress file: overnight (PROGRESS.md) or fixes (PROGRESS_FIXES.md).")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init").set_defaults(func=cmd_init)
     s = sub.add_parser("set")
@@ -173,6 +212,7 @@ def main() -> None:
     u.set_defaults(func=cmd_unpushed)
     sub.add_parser("show").set_defaults(func=cmd_show)
     args = p.parse_args()
+    select(args.which)
     args.func(args)
 
 
