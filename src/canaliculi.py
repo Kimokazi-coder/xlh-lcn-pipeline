@@ -65,6 +65,7 @@ mean edge length and 21 bridges (python src/diagnostics.py reference-check).
 Usage (from the repo root):
     python src/canaliculi.py --dir data/WT
     python src/canaliculi.py --image "data/WT/543-2.tif"
+    python src/canaliculi.py --dir data/WT -o OTHER_FOLDER    (default output: results/)
 """
 
 from __future__ import annotations

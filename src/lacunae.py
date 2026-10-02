@@ -29,6 +29,7 @@ spaces replaced by one underscore):
 Usage (from the repo root):
     python src/lacunae.py --dir data/WT
     python src/lacunae.py --image "data/WT/543-2.tif"
+    python src/lacunae.py --dir data/WT -o OTHER_FOLDER    (default output: results/)
 """
 
 from __future__ import annotations
@@ -492,8 +493,9 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     group.add_argument("--image", type=Path, help="One .tif image.")
     group.add_argument("--dir", type=Path, help="A folder of .tif images.")
     parser.add_argument(
-        "--out", type=Path, default=config.RESULTS_DIR,
-        help="Results folder (default: results/). Each image gets its own subfolder.",
+        "-o", "--out", type=Path, default=config.RESULTS_DIR,
+        help="Results folder (default: results/). Each image gets its own subfolder; "
+             "a folder run of src/canaliculi.py also writes summary_table.xlsx and .csv there.",
     )
 
 
