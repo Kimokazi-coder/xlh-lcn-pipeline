@@ -1,8 +1,8 @@
 # Canaliculi v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (origin/publication-fixes tip; tag before-canaliculi-v2)
-last update: 2026-10-03 00:00
-next action: C4 field density without flagged and the ROI option
+last update: 2026-10-03 00:30
+next action: B1 straight band-wall filter, evidence first
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -13,8 +13,8 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | C0 | docs/CANALICULI_AUDIT.md, stage by stage map | DONE | cdccb5a | 10 stages (what, names, origin, flaws F1 to F7) and a table of where each item of this branch acts |
 | C1 | Attached ring length (appended columns) | DONE | e61c6c7 | ring_attached_length_r30/r60_px appended (rows, summary, xlsx, summary table); attached <= ring asserted; pooled share 0.729 at 30 px (per cell 0.367 to 0.954), 0.547 at 60 px; regression allowlist added (unexpected new fields fail) and printed; crops reviewed |
 | C2 | Chain code length (appended columns) | DONE | 84103ec | ring_length_w_r30/r60_px and field_length_density_w_per_px appended; mixed adjacency so the asserted L gives 198 (Decisions needed); self-checks 99, 99 sqrt(2), 198 PASS; weighted/pixel 1.117 to 1.134 for field density, diagonal links 33 to 36%; image order unchanged |
-| C3 | Sholl crossings (appended columns) | DONE | | sholl_crossings_r10/r20/r30 appended (band [r-0.75, r+0.75) of the nearest-lacuna partition, 8-connected components); non-negative integers asserted; Spearman with roots 0.898, 0.718, 0.534 and with area 0.646, 0.655, 0.559; r30 below r10 in 3 of 86 cells; crops reviewed in two rounds |
-| C4 | Field density without flagged; optional ROI option | TODO | | |
+| C3 | Sholl crossings (appended columns) | DONE | b836a2c | sholl_crossings_r10/r20/r30 appended (band [r-0.75, r+0.75) of the nearest-lacuna partition, 8-connected components); non-negative integers asserted; Spearman with roots 0.898, 0.718, 0.534 and with area 0.646, 0.655, 0.559; r30 below r10 in 3 of 86 cells; crops reviewed in two rounds |
+| C4 | Field density without flagged; optional ROI option | DONE | | field_density_without_flagged_per_px (equals overnight 5.1 to rounding: -1.6 to +1.1%, 0 in the 543 images) and field_density_in_roi_per_px (None without -m); -m DIR on src/canaliculi.py, masks by clean or short name, wrong size refused; self-test through the command line with synthetic masks PASS; no ROI by default, draft not used |
 | B1 | Straight band-wall filter, switch BAND_LINE_FILTER (off) | TODO | | |
 | S1 | Subcommand network-sweep | TODO | | |
 | S2 | Bridging audit | TODO | | |

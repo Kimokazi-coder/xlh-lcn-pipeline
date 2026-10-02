@@ -341,8 +341,18 @@ SHOLL_HALF_WIDTH_PX = 0.75
 #   field_length_density_w_per_px  chain code length of the whole skeleton over
 #                                  the analysed area (as the existing density,
 #                                  which counts pixels)
+#   field_density_without_flagged_per_px
+#                                  skeleton px outside the flagged canal mask
+#                                  (as used by the pipeline, dilated by
+#                                  FLAGGED_DILATION_PX) over the analysed area
+#                                  outside it
+#   field_density_in_roi_per_px    skeleton px inside a bone ROI mask over the
+#                                  analysed area inside it; only with the -m
+#                                  option of this command, None otherwise
 FIELD_V2 = [
     ("field_length_density_w_per_px", "px^-1", "field length density weighted (px^-1)"),
+    ("field_density_without_flagged_per_px", "px^-1", "field length density without flagged regions (px^-1)"),
+    ("field_density_in_roi_per_px", "px^-1", "field length density in ROI (px^-1)"),
 ]
 FIELD_V2_KEYS = [k for k, _u, _c in FIELD_V2]
 
@@ -1118,9 +1128,12 @@ def summarize_interior(rows: list[dict], precision: int) -> dict:
     return stats
 
 
-def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_lacunae: int, precision: int) -> dict:
+def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_lacunae: int, precision: int,
+                  flagged: np.ndarray | None = None, roi: np.ndarray | None = None) -> dict:
     """Per-field measures. They use the whole skeleton and no ownership, so
-    fragmentation affects them far less than any per-cell measure."""
+    fragmentation affects them far less than any per-cell measure. The
+    appended densities without the flagged mask and in an ROI are None when
+    that mask is not given."""
     rows, cols = skeleton.shape
     analysed_area = float(rows * cols - lacuna_mask.sum())
     skel_px = float(skeleton.sum())
@@ -1147,7 +1160,20 @@ def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_
         "median_component_length_px": round(float(np.median(sizes)), precision) if sizes.size else 0.0,
         # Appended on branch canaliculi-v2 (FIELD_V2).
         "field_length_density_w_per_px": per_area(chain_length(skeleton)),
+        "field_density_without_flagged_per_px": _masked_density(skeleton, lacuna_mask, flagged, precision, inside=False),
+        "field_density_in_roi_per_px": _masked_density(skeleton, lacuna_mask, roi, precision, inside=True),
     }
+
+
+def _masked_density(skeleton: np.ndarray, lacuna_mask: np.ndarray, mask: np.ndarray | None, precision: int,
+                    inside: bool) -> float | None:
+    """Skeleton px over analysed area (field minus lacunae), both restricted
+    to the pixels inside `mask` (inside=True) or outside it (inside=False)."""
+    if mask is None:
+        return None
+    keep = mask if inside else ~mask
+    area = float((keep & ~lacuna_mask).sum())
+    return round(float((skeleton & keep).sum()) / area, precision + 4) if area > 0 else None
 
 
 FIELD_UNITS = {
@@ -1165,7 +1191,8 @@ FIELD_UNITS = {
 }
 
 
-def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | None = None) -> dict:
+def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | None = None,
+                  roi_mask: np.ndarray | None = None) -> dict:
     """Everything feature 2 computes for one image, without writing. t_hi and
     t_lo replace the two computed cuts; only the sensitivity diagnostics pass
     them, the pipeline never does."""
@@ -1201,7 +1228,7 @@ def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | Non
         "t_lo": t_lo,
         "rows": cells["rows"],
         "summary": summarize_interior(cells["rows"], precision),
-        "field": field_metrics(skeleton, cells["graph"], lacuna_mask, len(kept), precision),
+        "field": field_metrics(skeleton, cells["graph"], lacuna_mask, len(kept), precision, flagged, roi_mask),
         "graph": cells["graph"],
         "edge_owner": cells["edge_owner"],
         "node_dist": cells["node_dist"],
@@ -1460,16 +1487,52 @@ def write_summary_table(results: list[dict], out_root: Path) -> None:
     wb.save(out_root / "summary_table.xlsx")
 
 
+# Bone ROI masks (option -m). One PNG per image, white = bone, the size of the
+# image, named by the image's clean name (the results/ folder name) or by the
+# short name used in the reports and in results_experiments/task5/roi_edited
+# (the table below, for the 8 WT images). No ROI is applied without -m.
+ROI_SHORT_NAMES = {
+    "542_WT_2_z06c1-2": "542_z06", "542_WT_2_z18c1-2": "542_z18", "543_z13c1-2": "543_z13",
+    "682_z08c1-2": "682_z08", "682_z23c-2": "682_z23", "682_z29c1-3": "682_z29",
+}
+
+
+def load_roi_mask(roi_dir: Path, image_path: Path, shape: tuple) -> tuple[np.ndarray | None, str | None]:
+    """(mask, file name) of the ROI for one image, or (None, None) if the
+    folder holds none. A mask of another size is refused."""
+    from skimage.io import imread
+
+    clean = lacunae.clean_name(image_path)
+    for name in (clean, ROI_SHORT_NAMES.get(clean, clean)):
+        path = roi_dir / f"{name}.png"
+        if path.is_file():
+            data = imread(path)
+            if data.ndim == 3:
+                data = data[..., :3].max(axis=-1)
+            if data.shape != shape:
+                raise ValueError(f"ROI {path.name} is {data.shape}, the image is {shape}")
+            return data > 127, path.name
+    return None, None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Canalicular network and per-lacuna measurements (pre-validation, px)."
     )
     lacunae.add_input_arguments(parser)
+    parser.add_argument("-m", dest="roi_dir", type=Path, default=None,
+                        help="Folder of bone ROI masks (PNG, white = bone, named by the image's clean or short name). "
+                             "With it, field_density_in_roi_per_px is written; without it, no ROI is applied.")
     args = parser.parse_args()
 
     results = []
     for image_path in lacunae.image_paths(args):
-        result = analyse_image(image_path)
+        roi = None
+        if args.roi_dir is not None:
+            shape = lacunae.load_channel(image_path)[1].shape
+            roi, roi_name = load_roi_mask(args.roi_dir, image_path, shape)
+            print(f"{image_path.name}: ROI {roi_name if roi_name else 'none found, field_density_in_roi_per_px is None'}")
+        result = analyse_image(image_path, roi_mask=roi)
         out_dir = args.out / lacunae.clean_name(image_path)
         write_outputs(result, out_dir)
         s = result["summary"]
