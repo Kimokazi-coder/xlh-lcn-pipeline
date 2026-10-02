@@ -11,6 +11,9 @@ Subcommands:
                       one image
     sanity            pooled edge-length and node-degree shape checks against
                       what a real canalicular network looks like
+    regression        regenerate every image with the current config into an
+                      ignored folder and compare every json and summary number
+                      with results/ at tolerance 0
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -18,6 +21,7 @@ Usage (from the repo root):
     python src/diagnostics.py reach --dir data/WT
     python src/diagnostics.py lacuna-table --image "data/WT/543-2.tif"
     python src/diagnostics.py sanity --dir data/WT
+    python src/diagnostics.py regression
 """
 
 from __future__ import annotations
@@ -322,6 +326,168 @@ def cmd_sanity(args) -> int:
     return 0
 
 
+# regression ---------------------------------------------------------------------
+# Regenerates every image with the current config, in parallel processes, into
+# a git-ignored folder, and compares the numbers with results/ at tolerance 0.
+# With every switch off it must PASS: that is the proof that a code change left
+# the default outputs unchanged. The provenance block of the json files (code
+# and library versions) is ignored. Fields that exist only in the new output
+# (columns appended later) are counted but not compared, because results/ has
+# nothing to compare them with.
+
+REGRESSION_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "regression"
+PROVENANCE_KEY = "provenance"
+
+
+def _regenerate_one(job: tuple) -> dict:
+    """Run both features on one image and write the two json files. Returns
+    what the summary table needs (small, so it can cross processes)."""
+    image_path, out_root, overrides = job
+    for name, value in overrides.items():
+        setattr(config, name, value)
+    image_path = Path(image_path)
+    result = canaliculi.analyse_image(image_path)
+    out_dir = Path(out_root) / lacunae.clean_name(image_path)
+    lacunae.save_json(result["lacunae"], out_dir / "lacunae.json")
+    canaliculi.save_json(result, out_dir / "canaliculi_measurements.json")
+    lac = result["lacunae"]
+    return {
+        "image_path": image_path,
+        "lacunae": {k: lac[k] for k in ("lacuna_count", "interior_lacuna_count", "summary")},
+        "summary": result["summary"],
+        "field": result["field"],
+    }
+
+
+def regenerate(images: list, out_root: Path, overrides: dict | None = None, workers: int = 8) -> None:
+    """Regenerate json outputs and the summary table for `images` into
+    `out_root`, with the config attributes in `overrides` set in each worker."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    out_root.mkdir(parents=True, exist_ok=True)
+    jobs = [(str(p), str(out_root), dict(overrides or {})) for p in images]
+    with ProcessPoolExecutor(max_workers=max(1, min(workers, len(jobs)))) as ex:
+        results = list(ex.map(_regenerate_one, jobs))
+    canaliculi.write_summary_table(results, out_root)
+
+
+def flatten_all(value, prefix: str = "") -> dict:
+    """Flatten nested dicts and lists into {path: leaf}."""
+    if isinstance(value, dict):
+        out = {}
+        for k, v in value.items():
+            out.update(flatten_all(v, f"{prefix}.{k}" if prefix else str(k)))
+        return out
+    if isinstance(value, list):
+        out = {}
+        for i, v in enumerate(value):
+            out.update(flatten_all(v, f"{prefix}[{i}]"))
+        if not value:
+            out[prefix] = []
+        return out
+    return {prefix: value}
+
+
+def _equal(a, b) -> bool:
+    """Tolerance 0. Numbers compare as numbers, everything else exactly."""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a == b
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        if a != a and b != b:  # both NaN
+            return True
+        return a == b
+    return a == b
+
+
+def compare_json(ref_path: Path, new_path: Path) -> tuple:
+    """(fields compared, differences, number of fields only in the new file)."""
+    ref = json.load(open(ref_path))
+    new = json.load(open(new_path))
+    ref.pop(PROVENANCE_KEY, None)
+    new.pop(PROVENANCE_KEY, None)
+    fr, fn = flatten_all(ref), flatten_all(new)
+    diffs = []
+    for k, v in fr.items():
+        if k not in fn:
+            diffs.append((k, v, "<missing>"))
+        elif not _equal(v, fn[k]):
+            diffs.append((k, v, fn[k]))
+    return len(fr), diffs, len(set(fn) - set(fr))
+
+
+def compare_summary(ref_path: Path, new_path: Path) -> dict:
+    """Every column of the reference summary table, by name, row by image."""
+    import csv
+
+    def rows(path):
+        with open(path, newline="") as f:
+            r = list(csv.reader(f))
+        return r[0], {row[0]: dict(zip(r[0], row)) for row in r[1:] if row}
+
+    hr, rr = rows(ref_path)
+    hn, rn = rows(new_path)
+    out = {}
+    for image, row in rr.items():
+        diffs = []
+        new_row = rn.get(image)
+        for col in hr:
+            a = row[col]
+            b = None if new_row is None else new_row.get(col)
+            if b is None:
+                diffs.append((col, a, "<missing>"))
+                continue
+            try:
+                same_value = float(a) == float(b)
+            except ValueError:
+                same_value = a == b
+            if not same_value:
+                diffs.append((col, a, b))
+        out[image] = (len(hr), diffs)
+    extra = [c for c in hn if c not in hr]
+    return {"rows": out, "extra_columns": extra, "missing_rows": [i for i in rn if i not in rr]}
+
+
+def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, workers: int, label: str) -> bool:
+    regenerate(images, out_root, overrides, workers)
+    table, ok, total, shown = [], True, 0, []
+    for p in images:
+        name = lacunae.clean_name(p)
+        n_all, d_all, x_all = 0, [], 0
+        for fname in ("lacunae.json", "canaliculi_measurements.json"):
+            r, nw = ref / name / fname, out_root / name / fname
+            if not r.is_file():
+                d_all.append((fname, "<no reference file>", ""))
+                continue
+            n, d, x = compare_json(r, nw)
+            n_all += n
+            x_all += x
+            d_all += [(f"{fname}:{k}", a, b) for k, a, b in d]
+        total += n_all
+        passed = not d_all
+        ok &= passed
+        shown += [(name, *d) for d in d_all[:5]]
+        table.append([name, n_all, len(d_all), x_all, "PASS" if passed else "FAIL"])
+    summ = compare_summary(ref / "summary_table.csv", out_root / "summary_table.csv")
+    s_cells = sum(n for n, _d in summ["rows"].values())
+    s_diffs = [(img, *d) for img, (_n, ds) in summ["rows"].items() for d in ds]
+    ok &= not s_diffs
+    total += s_cells
+    print_table(["image", "json fields compared", "differ", "new fields (not compared)", "result"], table,
+                title=f"Regression, {label}: {out_root} against {ref} (tolerance 0, provenance ignored)\n")
+    print(f"\nsummary_table.csv: {s_cells} cells compared, {len(s_diffs)} differ"
+          + (f"; new columns not compared: {', '.join(summ['extra_columns'])}" if summ["extra_columns"] else ""))
+    for d in (shown + s_diffs)[:20]:
+        print("  DIFF", *d)
+    print(f"\n{'PASS' if ok else 'FAIL'}: regression, {label}, {total} numbers compared over {len(images)} images.")
+    return ok
+
+
+def cmd_regression(args) -> int:
+    images = images_from(args)
+    ok = run_regression(images, args.ref, args.out, {}, args.workers, "current config")
+    return 0 if ok else 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -348,6 +514,14 @@ def main() -> None:
     p = sub.add_parser("sanity", help="Pooled edge-length and node-degree shape checks.")
     add_images_arguments(p)
     p.set_defaults(func=cmd_sanity)
+
+    p = sub.add_parser("regression", help="Regenerate every image and compare with results/ at tolerance 0.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path, default=REGRESSION_DIR,
+                   help="Where to regenerate (default: results_experiments/_cache/regression, git-ignored).")
+    p.add_argument("-r", dest="ref", type=Path, default=config.RESULTS_DIR, help="Reference folder (default: results/).")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_regression)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
