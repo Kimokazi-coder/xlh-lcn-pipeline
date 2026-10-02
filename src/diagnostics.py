@@ -356,6 +356,38 @@ REGRESSION_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "regre
 PROVENANCE_KEY = "provenance"
 
 
+def regression_allowlist() -> dict:
+    """Fields allowed to exist only in the regenerated output, because they
+    were appended after results/ was made. Any other new field fails the
+    regression. Json paths use "[*]" for a list index."""
+    per_cell = [f for f, _u, _x in canaliculi.NORMALISED_METRICS + canaliculi.NETWORK_V2_METRICS]
+    json_fields = {"canaliculi_measurements.json:normalised_measures[*]",
+                   "canaliculi_measurements.json:network_v2_measures[*]"}
+    for f in per_cell:
+        json_fields.add(f"canaliculi_measurements.json:lacunae[*].{f}")
+        for stat in ("mean", "median", "sd"):
+            json_fields.add(f"canaliculi_measurements.json:summary.{f}.{stat}")
+    for key in getattr(canaliculi, "FIELD_V2_KEYS", []):
+        json_fields.add(f"canaliculi_measurements.json:field.{key}")
+    for key in getattr(canaliculi, "PARAMETERS_V2_KEYS", []):
+        json_fields.add(f"canaliculi_measurements.json:parameters.{key}")
+    for key in ("narrow_crumb_rule", "fill_enclosed_holes_max_px2", "band_filter_min_opening_share",
+                "fast_lacuna_stage"):
+        json_fields.add(f"lacunae.json:parameters.{key}")
+    n_ref = canaliculi.SUMMARY_COLUMNS.index("field length density (px^-1)") + 1
+    return {"json": json_fields, "summary_table": set(canaliculi.SUMMARY_COLUMNS[n_ref:])}
+
+
+def print_allowlist(allow: dict) -> None:
+    print("New fields allowed (appended after results/ was made; counted, not compared):")
+    for path in sorted(allow["json"]):
+        print(f"  json  {path}")
+    for col in canaliculi.SUMMARY_COLUMNS:
+        if col in allow["summary_table"]:
+            print(f"  table {col}")
+    print()
+
+
 def _regenerate_one(job: tuple) -> dict:
     """Run both features on one image and write the two json files. Returns
     what the summary table needs (small, so it can cross processes)."""
@@ -416,8 +448,11 @@ def _equal(a, b) -> bool:
     return a == b
 
 
-def compare_json(ref_path: Path, new_path: Path) -> tuple:
-    """(fields compared, differences, number of fields only in the new file)."""
+def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None) -> tuple:
+    """(fields compared, differences, number of fields only in the new file).
+    With `allowed` (allowlist paths), a new field outside it is a difference."""
+    import re
+
     ref = json.load(open(ref_path))
     new = json.load(open(new_path))
     ref.pop(PROVENANCE_KEY, None)
@@ -429,7 +464,13 @@ def compare_json(ref_path: Path, new_path: Path) -> tuple:
             diffs.append((k, v, "<missing>"))
         elif not _equal(v, fn[k]):
             diffs.append((k, v, fn[k]))
-    return len(fr), diffs, len(set(fn) - set(fr))
+    extra = set(fn) - set(fr)
+    if allowed is not None:
+        index = re.compile(r"\[[0-9]+\]")
+        for k in sorted(extra):
+            if new_path.name + ":" + index.sub("[*]", k) not in allowed:
+                diffs.append((k, "<not in results/>", "unexpected new field"))
+    return len(fr), diffs, len(extra)
 
 
 def compare_summary(ref_path: Path, new_path: Path) -> dict:
@@ -466,6 +507,7 @@ def compare_summary(ref_path: Path, new_path: Path) -> dict:
 
 def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, workers: int, label: str) -> bool:
     regenerate(images, out_root, overrides, workers)
+    allow = regression_allowlist()
     table, ok, total, shown = [], True, 0, []
     for p in images:
         name = lacunae.clean_name(p)
@@ -475,7 +517,7 @@ def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, wor
             if not r.is_file():
                 d_all.append((fname, "<no reference file>", ""))
                 continue
-            n, d, x = compare_json(r, nw)
+            n, d, x = compare_json(r, nw, allow["json"])
             n_all += n
             x_all += x
             d_all += [(f"{fname}:{k}", a, b) for k, a, b in d]
@@ -487,6 +529,8 @@ def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, wor
     summ = compare_summary(ref / "summary_table.csv", out_root / "summary_table.csv")
     s_cells = sum(n for n, _d in summ["rows"].values())
     s_diffs = [(img, *d) for img, (_n, ds) in summ["rows"].items() for d in ds]
+    s_diffs += [("summary_table.csv", col, "<not in results/>", "unexpected new column")
+                for col in summ["extra_columns"] if col not in allow["summary_table"]]
     ok &= not s_diffs
     total += s_cells
     print_table(["image", "json fields compared", "differ", "new fields (not compared)", "result"], table,
@@ -505,6 +549,7 @@ def cmd_regression(args) -> int:
     import time
 
     images = images_from(args)
+    print_allowlist(regression_allowlist())
     results = []
     for label, overrides, out in (("current config", {}, args.out),
                                   ("FAST_LACUNA_STAGE on", {"FAST_LACUNA_STAGE": True}, args.out / "fast_stage")):

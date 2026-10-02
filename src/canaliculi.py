@@ -296,6 +296,21 @@ NORMALISED_METRICS = [
 ]
 
 
+# Per-cell measures appended on branch canaliculi-v2 (docs/CANALICULI_V2_REPORT.md),
+# after every existing column, so no existing column changes name, order or
+# value. They add information only and change no existing number.
+#   ring_attached_length_rR_px  skeleton px of the R px ring (the same pixels as
+#                               ring_length_rR_px) that lie in an 8-connected
+#                               component of that ring which reaches within
+#                               LACUNA_ATTACH_GAP_PX of the lacuna: threads that
+#                               touch the cell, not threads that only pass by
+# (name, unit, extra decimals beyond config.CSV_FLOAT_PRECISION)
+NETWORK_V2_METRICS = [
+    ("ring_attached_length_r30_px", "px", 0),
+    ("ring_attached_length_r60_px", "px", 0),
+]
+
+
 # Network mask
 
 def _subtract_background_mode(img: np.ndarray) -> np.ndarray:
@@ -908,6 +923,49 @@ def add_normalised_measures(rows: list[dict], lacuna_id_map: np.ndarray, dist_to
             round(100.0 * row["roots_count"] / perimeter, precision) if perimeter > 0 else None)
 
 
+def ring_attached_lengths(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                          n_lacunae: int) -> dict:
+    """{radius: array indexed by lacuna id} of attached ring length. The ring
+    of lacuna i is exactly the pixel set of ring_lengths (skeleton px within
+    the radius whose nearest lacuna is i). Its 8-connected components are
+    taken within that ring only; a component is attached if one of its pixels
+    lies within LACUNA_ATTACH_GAP_PX of the lacuna masks (the constant the
+    roots use). The attached length is the pixel count of attached
+    components."""
+    out = {}
+    for radius in RING_RADII_PX:
+        ring = skeleton & (dist_to_lacuna <= radius) & (nearest_id > 0)
+        lengths = np.zeros(n_lacunae + 1, dtype=np.int64)
+        boxes = ndi.find_objects(np.where(ring, nearest_id, 0).astype(np.int32), max_label=n_lacunae)
+        for lacuna_id in range(1, n_lacunae + 1):
+            box = boxes[lacuna_id - 1]
+            if box is None:
+                continue
+            own = ring[box] & (nearest_id[box] == lacuna_id)
+            labels = measure.label(own, connectivity=2)
+            if labels.max() == 0:
+                continue
+            near = own & (dist_to_lacuna[box] <= LACUNA_ATTACH_GAP_PX)
+            attached = np.unique(labels[near])
+            attached = attached[attached > 0]
+            lengths[lacuna_id] = int(np.isin(labels, attached).sum())
+        out[radius] = lengths
+    return out
+
+
+def add_network_v2_measures(rows: list[dict], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
+                            nearest_id: np.ndarray) -> None:
+    """Append the NETWORK_V2_METRICS to each per-lacuna row, in place."""
+    n = max((row["lacuna_id"] for row in rows), default=0)
+    attached = ring_attached_lengths(skeleton, dist_to_lacuna, nearest_id, n)
+    for row in rows:
+        for radius in RING_RADII_PX:
+            value = int(attached[radius][row["lacuna_id"]])
+            if value > row[f"ring_length_r{radius}_px"]:
+                raise AssertionError(f"lacuna {row['lacuna_id']}: attached ring {value} px exceeds ring length")
+            row[f"ring_attached_length_r{radius}_px"] = value
+
+
 def summarize_interior(rows: list[dict], precision: int) -> dict:
     """Mean, median and sample SD over interior lacunae for every per-cell
     measure. SD is None below 2 values."""
@@ -922,7 +980,7 @@ def summarize_interior(rows: list[dict], precision: int) -> dict:
             median = round(float(np.median(values)), precision)
             sd = round(float(values.std(ddof=1)), precision) if values.size >= 2 else None
         stats[field] = {"mean": mean, "median": median, "sd": sd}
-    for field, _unit, extra in NORMALISED_METRICS:
+    for field, _unit, extra in NORMALISED_METRICS + NETWORK_V2_METRICS:
         if not interior or field not in interior[0]:
             continue
         values = np.array([m[field] for m in interior if m.get(field) is not None], dtype=float)
@@ -1004,6 +1062,7 @@ def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | Non
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
     cells = measure_cells(kept, skeleton, dist_to_lacuna, nearest_id, precision)
     add_normalised_measures(cells["rows"], lacuna_id_map, dist_to_lacuna, nearest_id, precision)
+    add_network_v2_measures(cells["rows"], skeleton, dist_to_lacuna, nearest_id)
     return {
         "image_path": image_path,
         "lacunae": lac,
@@ -1110,6 +1169,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "headline_measures": ["roots_count", "ring_length_r30_px", "field.canalicular_length_density_per_px"],
         "ownership_dependent_measures": ["owned_length_px", "edge_count", "mean_edge_length_px"],
         "normalised_measures": [f for f, _u, _x in NORMALISED_METRICS],
+        "network_v2_measures": [f for f, _u, _x in NETWORK_V2_METRICS],
         "summary": result["summary"],
         "field": result["field"],
         "bridges": [
@@ -1153,6 +1213,10 @@ def save_xlsx(result: dict, out_path: Path) -> None:
         if field in stats:
             s = stats[field]
             summary.append([field, "normalised", s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
+    for field, unit, _extra in NETWORK_V2_METRICS:
+        if field in stats:
+            s = stats[field]
+            summary.append([field, "network v2", s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
 
     field_sheet = wb.create_sheet("field")
     field_sheet.append(["metric", "kind", "value", "units"])
@@ -1163,6 +1227,7 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     per_lacuna = wb.create_sheet("per_lacuna")
     columns = ["lacuna_id", "on_border"] + [f for f, _u, _k in CELL_METRICS]
     columns += [f for f, _u, _x in NORMALISED_METRICS if result["rows"] and f in result["rows"][0]]
+    columns += [f for f, _u, _x in NETWORK_V2_METRICS if result["rows"] and f in result["rows"][0]]
     per_lacuna.append(columns)
     for m in result["rows"]:
         per_lacuna.append([m[c] for c in columns])
@@ -1203,6 +1268,9 @@ SUMMARY_COLUMNS = [
     "ring density 30 px per cell (px^-1)",
     "ring density 60 px per cell (px^-1)",
     "roots per 100 px perimeter per cell",
+    # Appended on branch canaliculi-v2 (means over interior cells).
+    "ring attached length 30 px per cell (px)",
+    "ring attached length 60 px per cell (px)",
 ]
 
 SUMMARY_NOTES = [
@@ -1218,6 +1286,8 @@ SUMMARY_NOTES = [
     "of the nearest-lacuna partition within r px of the body; in-frame fraction of the full r px annulus;",
     "ring density L_r / A_r; roots per 100 px of perimeter. They remove the dependence of roots and ring",
     "length on lacuna size (docs/OVERNIGHT_REPORT.md, task 4.1).",
+    "Appended on branch canaliculi-v2: ring attached length 30 / 60 px, the ring length pixels in threads that",
+    "reach within 10 px of the lacuna (passing threads left out); see docs/CANALICULI_V2_REPORT.md.",
 ]
 
 
@@ -1236,7 +1306,8 @@ def write_summary_table(results: list[dict], out_root: Path) -> None:
             r["summary"]["ring_length_r30_px"]["mean"],
             r["summary"]["ring_length_r60_px"]["mean"],
             r["field"]["canalicular_length_density_per_px"],
-        ] + [r["summary"].get(f, {}).get("mean") for f, _u, _x in NORMALISED_METRICS])
+        ] + [r["summary"].get(f, {}).get("mean") for f, _u, _x in NORMALISED_METRICS]
+          + [r["summary"].get(f, {}).get("mean") for f, _u, _x in NETWORK_V2_METRICS])
 
     out_root.mkdir(parents=True, exist_ok=True)
     with open(out_root / "summary_table.csv", "w", newline="") as f:
