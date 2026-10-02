@@ -1,8 +1,8 @@
 # Figures v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (publication-fixes tip)
-last update: 2026-10-02 15:25
-next action: N3 hand-count validation tiles
+last update: 2026-10-02 15:40
+next action: P1 rejected candidates in the overview and contact sheet
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -12,8 +12,8 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 0.1 | Branch figures-v2 and this file | DONE | 33bb648 | branch from publication-fixes 8673380 |
 | N0 | Shared drawing code: palette, vector skeleton, ring classifier, legend strip | DONE | b70e6f7 | PALETTE, skeleton_segments (8-neighbour forward segments, 3 to 10 lone px per image drawn as 1 px dashes), ring_classes (canaliculi.nearest_lacuna_map, same rule), legend_strip, image_data cache checked against results/; make_figures.py check PASS on all 8 |
 | N1 | Network overlay figure per image (543-2 first, then 7) | DONE | 46e73db | per_image/<image>/network.png and .pdf for all 8, inset.json, network_check.json; vermillion px = ring_length_r30_px and dots = roots_count asserted per lacuna; 0.3 pt full field, 0.5 pt insets; two review rounds (count line, letter corners); comparison with the old verification image in figures/REVIEW_V2.md |
-| N2 | Cell gallery per image | DONE | | per_image/<image>/gallery.png and .pdf for all 8 (one page each, 8 to 13 tiles), gallery_check.json; dots = roots_count and vermillion px = ring_length_r30_px asserted per tile; 257 mm wide at true 3x; two review rounds (legend rows, c key) |
-| N3 | Hand-count validation tiles | TODO | | |
+| N2 | Cell gallery per image | DONE | 380d0e9 | per_image/<image>/gallery.png and .pdf for all 8 (one page each, 8 to 13 tiles), gallery_check.json; dots = roots_count and vermillion px = ring_length_r30_px asserted per tile; 257 mm wide at true 3x; two review rounds (legend rows, c key) |
+| N3 | Hand-count validation tiles | DONE | | 86 raw red tiles T001 to T086 in random order (system random source), annotation_template.csv, README.md; key outside the repo at F:/lcn-quant-keys/validation_tiles_key.csv; in-repo key path refused; PNG pixel data only; pixels equal the raw files |
 | P1 | Rejected candidates in overview and contact sheet | TODO | | |
 | P2 | One colour per meaning in every figure | TODO | | |
 | P3 | Names: Field 1 to 4, Fig01 and S01 ids | TODO | | |

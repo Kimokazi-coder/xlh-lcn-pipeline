@@ -88,3 +88,12 @@ Round 2: footers clear on all 8.
 Remaining, left as is: in three tiles part of the ring lies outside the 240 px crop (542_z18 L2 28 px,
 L9 11 px; 682_z08 L4 3 px), logged in `gallery_check.json`; every root dot lies inside its tile. Tiles
 near the frame are zero padded (black), for example 543-2 L1 and L4, 542_z06 L3.
+
+## N3 hand-count tiles
+
+86 tiles (every interior lacuna of the 8 images), 240 x 240 px, 8-bit. Checks: a key path inside the
+repository was refused before anything was written; every tile holds only the IHDR, IDAT and IEND
+chunks (no text, time or dpi); six tiles compared with crops of the raw files: identical; a second run
+skipped all 86. Eight tiles viewed: the centre lacuna is clear, padding is black. The order comes from
+the operating system's random source, so it cannot be rebuilt from the repository. The key is at
+`F:/lcn-quant-keys/validation_tiles_key.csv`, outside the repository.
