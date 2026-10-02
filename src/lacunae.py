@@ -99,6 +99,20 @@ MAX_AREA_FRACTION_OF_IMAGE = 0.05
 MIN_SOLIDITY = 0.5
 MAX_ASPECT_RATIO = 6.0
 
+# Used only when a switch in config.py is on (all off by default).
+
+# Narrow crumb rule (config.NARROW_CRUMB_RULE): least share of a dropped piece
+# that must lie inside the kept lacuna's convex hull. Over the 8 WT images
+# only 4 dropped pieces touch a kept lacuna, with shares 0.000, 0.000, 0.009
+# and 1.000 (overnight report 3.6b); any value between 0.009 and 1.000 gives
+# the same result, and 0.5 is the middle. Rests on 4 pieces.
+CRUMB_INSIDE_HULL_MIN = 0.5
+
+# Band filter (config.BAND_FILTER_MIN_OPENING_SHARE): radius (px) of the
+# opening, the top-hat disk of src/canaliculi.py (TOPHAT_RADIUS_PX), the
+# width above which a structure is broader than any canaliculus.
+BAND_FILTER_OPENING_RADIUS_PX = 5
+
 LACUNA_MEASUREMENT_FIELDS = [
     "lacuna_id",
     "area_px2",
@@ -304,13 +318,87 @@ def filter_regions(label_image: np.ndarray) -> list[tuple]:
     return kept
 
 
+def join_enclosed_crumbs(labels: np.ndarray, kept: list[tuple]) -> np.ndarray:
+    """Narrow crumb rule (config.NARROW_CRUMB_RULE). Every piece that the
+    filters dropped joins a kept lacuna if it touches exactly that one kept
+    lacuna (8-neighbourhood) and at least CRUMB_INSIDE_HULL_MIN of it lies
+    inside that lacuna's convex hull. Pieces are visited in label order."""
+    labels = labels.copy()
+    rows, cols = labels.shape
+    regions = {r.label: r for r in measure.regionprops(labels)}
+    kept_labels = {region.label for region, _ in kept}
+    for label, region in regions.items():
+        if label in kept_labels:
+            continue
+        r0, c0, r1, c1 = region.bbox
+        r0, c0, r1, c1 = max(r0 - 1, 0), max(c0 - 1, 0), min(r1 + 1, rows), min(c1 + 1, cols)
+        sub = labels[r0:r1, c0:c1]
+        piece = sub == label
+        ring = morphology.binary_dilation(piece, np.ones((3, 3), bool)) & ~piece
+        touched = {int(v) for v in np.unique(sub[ring])} & kept_labels
+        if len(touched) != 1:
+            continue
+        target = regions[touched.pop()]
+        k0, kc0, k1, kc1 = target.bbox
+        rr, cc = region.coords[:, 0], region.coords[:, 1]
+        inside = (rr >= k0) & (rr < k1) & (cc >= kc0) & (cc < kc1)
+        hull = np.zeros(rr.shape, dtype=bool)
+        hull[inside] = target.image_convex[rr[inside] - k0, cc[inside] - kc0]
+        if hull.mean() >= CRUMB_INSIDE_HULL_MIN:
+            labels[rr, cc] = target.label
+    return labels
+
+
+def fill_enclosed_holes(labels: np.ndarray, kept: list[tuple], max_px2: int) -> np.ndarray:
+    """Hole fill (config.FILL_ENCLOSED_HOLES_MAX_PX2): fill every hole fully
+    enclosed by one kept lacuna (4-connected background, as
+    remove_small_holes counts holes) of at most max_px2, if no other piece
+    lies in it."""
+    labels = labels.copy()
+    for region, _on_border in kept:
+        r0, c0, _r1, _c1 = region.bbox
+        holes = ndi.binary_fill_holes(region.image) & ~region.image
+        hole_labels = measure.label(holes, connectivity=1)
+        for hole in measure.regionprops(hole_labels):
+            if hole.area > max_px2:
+                continue
+            rr, cc = hole.coords[:, 0] + r0, hole.coords[:, 1] + c0
+            if (labels[rr, cc] != 0).any():
+                continue
+            labels[rr, cc] = region.label
+    return labels
+
+
+def opening_share(region) -> float:
+    """Share of an object's area left after an opening with a disk of
+    BAND_FILTER_OPENING_RADIUS_PX."""
+    m = np.pad(region.image, BAND_FILTER_OPENING_RADIUS_PX + 1)
+    opened = morphology.binary_opening(m, morphology.disk(BAND_FILTER_OPENING_RADIUS_PX))
+    return float(opened.sum() / m.sum())
+
+
+def band_filter(kept: list[tuple], min_share: float) -> list[tuple]:
+    """Band filter (config.BAND_FILTER_MIN_OPENING_SHARE): drop kept objects
+    that keep less than min_share of their area after the opening."""
+    return [(region, b) for region, b in kept if opening_share(region) >= min_share]
+
+
 def segment(channel: np.ndarray) -> tuple[np.ndarray, list[tuple], float]:
-    """(label_image, kept, t_hi) for one signal channel."""
+    """(label_image, kept, t_hi) for one signal channel. The switch steps run
+    only when their switch in config.py is on."""
     mask, t_hi = multiotsu_lacuna_mask(channel)
     labels = watershed_split(mask)
     distance = ndi.distance_transform_edt(mask)
     labels = merge_shallow_splits(labels, mask, distance)
     kept = filter_regions(labels)
+    if config.NARROW_CRUMB_RULE:
+        labels = join_enclosed_crumbs(labels, kept)
+        kept = filter_regions(labels)
+    if config.FILL_ENCLOSED_HOLES_MAX_PX2 and config.FILL_ENCLOSED_HOLES_MAX_PX2 > 0:
+        labels = fill_enclosed_holes(labels, kept, config.FILL_ENCLOSED_HOLES_MAX_PX2)
+        kept = filter_regions(labels)
+    if config.BAND_FILTER_MIN_OPENING_SHARE is not None:
+        kept = band_filter(kept, config.BAND_FILTER_MIN_OPENING_SHARE)
     return labels, kept, t_hi
 
 
@@ -480,6 +568,9 @@ def parameters() -> dict:
         "max_area_fraction_of_image": MAX_AREA_FRACTION_OF_IMAGE,
         "min_solidity": MIN_SOLIDITY,
         "max_aspect_ratio": MAX_ASPECT_RATIO,
+        "narrow_crumb_rule": config.NARROW_CRUMB_RULE,
+        "fill_enclosed_holes_max_px2": config.FILL_ENCLOSED_HOLES_MAX_PX2,
+        "band_filter_min_opening_share": config.BAND_FILTER_MIN_OPENING_SHARE,
     }
 
 

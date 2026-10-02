@@ -14,6 +14,8 @@ Subcommands:
     regression        regenerate every image with the current config into an
                       ignored folder and compare every json and summary number
                       with results/ at tolerance 0
+    switch-check      turn each switch of config.py on alone, regenerate every
+                      image and list what changes against results/
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -22,6 +24,7 @@ Usage (from the repo root):
     python src/diagnostics.py lacuna-table --image "data/WT/543-2.tif"
     python src/diagnostics.py sanity --dir data/WT
     python src/diagnostics.py regression
+    python src/diagnostics.py switch-check
 """
 
 from __future__ import annotations
@@ -488,6 +491,92 @@ def cmd_regression(args) -> int:
     return 0 if ok else 1
 
 
+# switch-check -------------------------------------------------------------------
+# Each switch of config.py turned on alone, at the value the overnight report
+# names (docs/OVERNIGHT_REPORT.md), every image regenerated into an ignored
+# folder, and every change against results/ listed. Nothing is tuned here.
+
+SWITCH_CHECK_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "switch_check"
+SWITCHES_ON = [
+    ("NARROW_CRUMB_RULE", True),
+    ("FILL_ENCLOSED_HOLES_MAX_PX2", 200),
+    ("BAND_FILTER_MIN_OPENING_SHARE", 0.515),
+]
+MATCH_PX = 10.0  # a lacuna in two runs is the same object if the centroids lie this close
+
+
+def lacuna_changes(ref_dir: Path, new_dir: Path) -> tuple[list, dict]:
+    """Per-lacuna changes between two output folders of one image, matched by
+    centroid; and the headline values of both runs."""
+    def load(d):
+        lac = json.load(open(d / "lacunae.json"))
+        can = json.load(open(d / "canaliculi_measurements.json"))
+        rows = []
+        for lr, cr in zip(lac["lacunae"], can["lacunae"]):
+            rows.append({"x": lr["centroid_col_px"], "y": lr["centroid_row_px"], "area": lr["area_px2"],
+                         "border": lr["on_border"], "roots": cr["roots_count"], "ring30": cr["ring_length_r30_px"]})
+        head = {"lacuna_count": lac["lacuna_count"], "interior_count": lac["interior_lacuna_count"],
+                "roots_per_cell": can["summary"]["roots_count"]["mean"],
+                "ring30_per_cell": can["summary"]["ring_length_r30_px"]["mean"],
+                "field_density": can["field"]["canalicular_length_density_per_px"], "bridges": can["n_bridges"]}
+        return rows, head
+
+    ref, head_ref = load(ref_dir)
+    new, head_new = load(new_dir)
+    used, changes = set(), []
+    for r in ref:
+        best, bd = None, MATCH_PX
+        for j, n in enumerate(new):
+            d = float(np.hypot(r["x"] - n["x"], r["y"] - n["y"]))
+            if j not in used and d <= bd:
+                best, bd = j, d
+        if best is None:
+            changes.append(f"removed: lacuna at ({r['x']:.0f},{r['y']:.0f}), {r['area']:.0f} px^2"
+                           + (", frame edge" if r["border"] else ""))
+            continue
+        used.add(best)
+        n = new[best]
+        parts = [f"{k} {r[k]:g} to {n[k]:g}" for k in ("area", "roots", "ring30") if r[k] != n[k]]
+        if parts:
+            changes.append(f"changed: lacuna at ({r['x']:.0f},{r['y']:.0f}): " + ", ".join(parts))
+    for j, n in enumerate(new):
+        if j not in used:
+            changes.append(f"new: lacuna at ({n['x']:.0f},{n['y']:.0f}), {n['area']:.0f} px^2")
+    return changes, {"before": head_ref, "after": head_new}
+
+
+def cmd_switch_check(args) -> int:
+    images = images_from(args)
+    lines = ["# switch-check", "",
+             "Pre-validation, px. Each switch of config.py on alone, all others off, every image",
+             f"regenerated into {args.out} and compared with {args.ref}. Lacunae are matched by centroid",
+             f"within {MATCH_PX:g} px; a lacuna is listed when its area, roots or ring 30 px change.", ""]
+    for name, value in SWITCHES_ON:
+        out = args.out / f"{name}={value}"
+        regenerate(images, out, {name: value}, args.workers)
+        lines += [f"## {name} = {value}", ""]
+        any_change = False
+        for p in images:
+            n = lacunae.clean_name(p)
+            changes, head = lacuna_changes(args.ref / n, out / n)
+            moved = {k: (head["before"][k], head["after"][k]) for k in head["before"]
+                     if head["before"][k] != head["after"][k]}
+            if not changes and not moved:
+                continue
+            any_change = True
+            lines.append(f"- **{n}**")
+            lines += [f"  - {c}" for c in changes]
+            if moved:
+                lines.append("  - image values: " + "; ".join(f"{k} {a} to {b}" for k, (a, b) in moved.items()))
+        if not any_change:
+            lines.append("No change in any image.")
+        lines.append("")
+    text = "\n".join(lines)
+    print(text)
+    (args.out / "switch_check.md").write_text(text, encoding="utf-8")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -522,6 +611,14 @@ def main() -> None:
     p.add_argument("-r", dest="ref", type=Path, default=config.RESULTS_DIR, help="Reference folder (default: results/).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_regression)
+
+    p = sub.add_parser("switch-check", help="Each switch on alone: what changes against results/.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path, default=SWITCH_CHECK_DIR,
+                   help="Where to regenerate (default: results_experiments/_cache/switch_check, git-ignored).")
+    p.add_argument("-r", dest="ref", type=Path, default=config.RESULTS_DIR, help="Reference folder (default: results/).")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_switch_check)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
