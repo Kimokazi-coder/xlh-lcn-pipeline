@@ -1663,45 +1663,120 @@ FIELD_PANELS = [
     ("field_density", "field length density", r"px$^{-1}$"),
 ]
 
+# Overnight report 6.1: 682_z08 is alone in its field by the data-derived
+# grouping (4 of its 10 lacunae matched with 682_z23, 15 times chance), so it
+# is probably the same field as 682_z23 and 682_z29 at another depth. Option
+# -m of the fields command merges it into their field in a second figure; the
+# grouping of field-summary itself is not changed.
+MERGE_IMAGE, MERGE_WITH = "682_z08", "682_z23"
 
-def figure_fields(field_dir: Path) -> None:
-    """One small panel per measure: x is the field (groups derived from the
-    data by field-summary), dots are images, a bar marks the field mean, and
-    the number of images per field is printed. No statistical test."""
+# Per-image values checked against the pipeline: the summary table of
+# results/ for the three columns it has, and the mean over interior lacunae
+# of the cached default run for the two normalised columns.
+SUMMARY_COLUMN = {"roots_per_cell": "roots per cell", "ring30_per_cell": "ring length 30 px per cell (px)",
+                  "field_density": "field length density (px^-1)"}
+CELL_COLUMN = {"roots_per_100px_perimeter": "roots_per_100px_perimeter", "ring_density_r30": "ring_density_r30"}
+
+
+def check_field_values(rows: list, summary_rows: dict) -> None:
+    """Every image value drawn must equal the pipeline number (rule 11)."""
+    for r in rows:
+        name = SHORT.get(r["image"], r["image"])
+        for key, col in SUMMARY_COLUMN.items():
+            if abs(float(r[key]) - float(summary_rows[r["image"]][col])) > 1e-9:
+                raise AssertionFailed(f"{name} {key}: {r[key]} drawn, {summary_rows[r['image']][col]} in results/")
+        meta = json.loads((CACHE2 / f"{name}.json").read_text(encoding="utf-8"))
+        cells = [c for c in meta["cell_rows"] if not c["on_border"]]
+        for key, col in CELL_COLUMN.items():
+            mean = float(np.mean([c[col] for c in cells]))
+            if abs(float(r[key]) - mean) > 1e-4 * max(abs(mean), 1e-12) + 1e-8:
+                raise AssertionFailed(f"{name} {key}: {r[key]} drawn, {mean} from the pipeline run")
+
+
+def place_labels(ys: list, min_gap: float) -> list:
+    """Label heights (data units) at least min_gap apart, as close as
+    possible to ys, in the same order."""
+    order = np.argsort(ys)
+    out = np.array(ys, dtype=float)
+    placed = []
+    for k in order:
+        y = out[k]
+        if placed and y < placed[-1] + min_gap:
+            y = placed[-1] + min_gap
+        out[k] = y
+        placed.append(y)
+    shift = (np.array(ys)[order] - out[order]).mean()
+    return list(out + shift)
+
+
+def figure_fields(field_dir: Path, merged: bool = False) -> None:
+    """One panel per measure, y from zero: x is the field (groups derived
+    from the data by field-summary), dots are images with their short name,
+    a bar marks the field mean, n is the number of images. An image alone in
+    its field is an open diamond. With merged, 682_z08 joins the field of
+    682_z23 (Fig04_per_field_merged). No statistical test."""
     import csv
 
-    fig_name = "Fig04_per_field"
+    fig_name = "Fig04_per_field" + ("_merged" if merged else "")
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
     with open(field_dir / "field_images.csv", newline="") as f:
         rows = list(csv.DictReader(f))
-    fields = sorted({r["field"] for r in rows}, key=lambda v: int(v[1:]))
-    members = {fid: [SHORT.get(r["image"], r["image"]) for r in rows if r["field"] == fid] for fid in fields}
+    with open(config.RESULTS_DIR / "summary_table.csv", newline="") as f:
+        summary_rows = {r["image"]: r for r in csv.DictReader(f)}
+    with open(field_dir / "field_summary.csv", newline="") as f:
+        field_means = {r["field"]: r for r in csv.DictReader(f)}
+    check_field_values(rows, summary_rows)
     # field-summary names fields F1, F2, ...; figures call them Field 1, Field 2, ... so that no field name
     # looks like a figure name.
+    field_of = {SHORT.get(r["image"], r["image"]): r["field"] for r in rows}
+    alone = {n for n, fid in field_of.items() if list(field_of.values()).count(fid) == 1}
+    if merged:
+        field_of[MERGE_IMAGE] = field_of[MERGE_WITH]
+    fields = sorted(set(field_of.values()), key=lambda v: int(v[1:]))
     field_name = {fid: f"Field {int(fid[1:])}" for fid in fields}
-    # Two rows (3 + 2 panels), so the field names fit under each panel.
+    members = {fid: [n for n, f in field_of.items() if f == fid] for fid in fields}
+    values = {SHORT.get(r["image"], r["image"]): r for r in rows}
+
     n_cols = 3
-    left, gap, right, bottom, top, row_gap = 13.0, 13.0, 2.0, 17.0, 8.0, 16.0
+    left, gap, right, bottom, top, row_gap = 13.0, 13.0, 2.0, 25.0, 8.0, 16.0
     w = (FIG_WIDTH_MM - left - right - (n_cols - 1) * gap) / n_cols
     h = 40.0
     n_rows = int(np.ceil(len(FIELD_PANELS) / n_cols))
     fig_h = bottom + n_rows * h + (n_rows - 1) * row_gap + top
     fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
+    log = {}
     for i, (key, title, unit) in enumerate(FIELD_PANELS):
         rr, cc = divmod(i, n_cols)
         ax = mm_axes(fig, left + cc * (w + gap), bottom + (n_rows - 1 - rr) * (h + row_gap), w, h, FIG_WIDTH_MM, fig_h)
+        top_val = max(float(values[n][key]) for n in values)
+        ax.set_ylim(0, top_val * 1.18)
+        min_gap = top_val * 1.18 * 0.075
         for j, fid in enumerate(fields):
-            vals = [float(r[key]) for r in rows if r["field"] == fid and r[key] not in ("", "None")]
-            if not vals:
-                continue
+            names = sorted(members[fid], key=lambda n: float(values[n][key]))
+            vals = [float(values[n][key]) for n in names]
             offsets = np.linspace(-0.12, 0.12, len(vals)) if len(vals) > 1 else [0.0]
-            ax.scatter(np.array(offsets) + j, vals, s=9, c="black", zorder=3, linewidths=0)
-            ax.plot([j - 0.28, j + 0.28], [np.mean(vals)] * 2, color=PALETTE["field_mean"], lw=1.6, zorder=2)
+            mean = float(np.mean(vals))
+            if not merged:
+                ref = float(field_means[fid][f"{key}_mean"])
+                if abs(mean - ref) > 1e-6 * max(abs(ref), 1e-12):
+                    raise AssertionFailed(f"{field_name[fid]} {key}: mean {mean} drawn, {ref} in field_summary.csv")
+            log[f"{field_name[fid]} {key}"] = {"images": names, "values": vals, "mean": mean}
+            ax.plot([j - 0.22, j + 0.22], [mean] * 2, color=PALETTE["field_mean"], lw=1.6, zorder=2)
+            label_y = place_labels(vals, min_gap)
+            for x, v, ly, n in zip(np.array(offsets) + j, vals, label_y, names):
+                if n in alone:
+                    ax.scatter([x], [v], s=16, marker="D", facecolors="white", edgecolors="black", linewidths=0.8,
+                               zorder=3)
+                else:
+                    ax.scatter([x], [v], s=9, c="black", zorder=3, linewidths=0)
+                # Label right of the mean bar, joined to its dot by a thin leader.
+                ax.plot([x, j + 0.25], [v, ly], color="0.6", lw=0.3, zorder=1)
+                ax.text(j + 0.27, ly, n, fontsize=FONT_SIZE - 2.5, ha="left", va="center", color="0.25", zorder=4)
         ax.set_xticks(range(len(fields)))
         ax.set_xticklabels([f"{field_name[fid]}\nn={len(members[fid])}" for fid in fields])
-        ax.set_xlim(-0.6, len(fields) - 0.4)
+        ax.set_xlim(-0.45, len(fields) - 0.2)
         ax.set_title(title, pad=3)
         ax.set_ylabel(unit, labelpad=1)
         ax.spines["top"].set_visible(False)
@@ -1711,13 +1786,22 @@ def figure_fields(field_dir: Path) -> None:
             ax.ticklabel_format(axis="y", style="plain")
             ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.3f"))
         panel_letter(fig, ax, "ABCDE"[i], dx=-0.06)
-    legend = "; ".join(f"{field_name[fid]}: {' + '.join(members[fid])}" for fid in fields)
-    legend_strip(fig, 2.0, 7.0, FIG_WIDTH_MM - 4.0, 4.5, FIG_WIDTH_MM, fig_h, dark=False, items=[
+    legend_strip(fig, 2.0, 11.5, FIG_WIDTH_MM - 4.0, 4.5, FIG_WIDTH_MM, fig_h, dark=False, items=[
         {"kind": "marker", "label": "image (mean over its interior lacunae)"},
+        {"kind": "marker", "marker": "D", "face": "white", "s": 14,
+         "label": "682_z08, alone in its field by field-summary" + (", merged here by hand" if merged else "")},
         {"kind": "bar", "colour": PALETTE["field_mean"], "label": "field mean"}])
-    fig.text(0.01, 0.01, "Fields from field-summary (lacuna centroids matched across images). " + legend
-             + ". n: images per field. Pre-validation, pixel units, no test.",
+    groups = "; ".join(f"{field_name[fid]}: {' + '.join(members[fid])}" for fid in fields)
+    if merged:
+        note = (f"{MERGE_IMAGE} (open diamond) is merged by hand into the field of 682_z23 and 682_z29 (option -m); "
+                "field-summary keeps it alone, and the merged means are computed here, not by field-summary.")
+    else:
+        note = (f"{MERGE_IMAGE} (open diamond) is alone in its field by the data-derived grouping, probably the same "
+                "field as 682_z23 and 682_z29 at another depth.")
+    fig.text(0.01, 0.01, "Fields from field-summary (lacuna centroids matched across images). " + groups + ". " + note
+             + " n: images per field. All y axes start at zero. Pre-validation, pixel units, no test.",
              ha="left", va="bottom", fontsize=FONT_SIZE - 1, wrap=True)
+    write_json(OUT / f"{fig_name}_values.json", log)
     save(fig, fig_name)
     print(fig_name, "written")
 
@@ -1754,6 +1838,8 @@ def main() -> int:
     sub.add_parser("thresholds", help="Lacuna cut sensitivity figure (Fig03).")
     q = sub.add_parser("fields", help="Per-field plot (Fig04).")
     q.add_argument("-f", dest="field_dir", type=Path, required=True, help="Output folder of field-summary.")
+    q.add_argument("-m", dest="merged", action="store_true",
+                   help="Merge 682_z08 into the field of 682_z23 and 682_z29 (Fig04_per_field_merged).")
     sub.add_parser("switches", help="Crumb rule and hole fill, off and on (S01).")
     sub.add_parser("check", help="v2 drawing data against results/ for every image (ring px, roots, skeleton).")
     q = sub.add_parser("network", help="Network overlay per image (v2): raw, overlay, three insets.")
@@ -1795,7 +1881,7 @@ def main() -> int:
     if args.cmd == "thresholds":
         return run("F3", figure_thresholds)
     if args.cmd == "fields":
-        return run("F4", figure_fields, args.field_dir)
+        return run("P4", figure_fields, args.field_dir, args.merged)
     if args.cmd == "switches":
         return run("F5", figure_switches)
     return 1

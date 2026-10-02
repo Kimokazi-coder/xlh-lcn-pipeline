@@ -100,16 +100,24 @@ lower cut lowers the count in 542_z06 (16 to 11; bodies fuse or fail a shape fil
 display window. Pre-validation, pixel units, WT. Full grid, both cuts:
 `results_experiments/fixes/B2_sensitivity.md`.
 
-## Fig04_per_field
+## Fig04_per_field (and Fig04_per_field_merged)
 
 **Per-cell and per-field measures by field.** (A) Roots per cell. (B) Roots per 100 px of lacuna
 perimeter. (C) Ring length 30 px per cell (skeleton px within 30 px of each lacuna, each pixel counted
 for its nearest lacuna). (D) Ring density at 30 px, $L_{30} / A_{30}$. (E) Field length density (all
 skeleton px over the field area minus lacunae). x: fields derived from the data by matching lacuna
 centroids across sections (Field 1: 542_z06 + 542_z18; Field 2: 543-2 + 543_3 + 543_z13; Field 3:
-682_z08; Field 4: 682_z23 + 682_z29); n = images per field. Black dots: images (each the mean over its interior lacunae); blue bar:
-field mean. Sections of one field repeat the same cells, so the field is the unit; with 4 fields no
-statistical test is shown. Pre-validation, pixel units, WT.
+682_z08; Field 4: 682_z23 + 682_z29); n = images per field. Black dots: images (each the mean over its
+interior lacunae), labelled with the short image name; blue bar: field mean. 682_z08 (open diamond) is
+alone in its field by the data-derived grouping, probably the same field as 682_z23 and 682_z29 at
+another depth. All y axes start at zero. Sections of one field repeat the same cells, so the field is
+the unit; with 4 fields no statistical test is shown. The dots equal `results/summary_table.csv` (roots,
+ring 30, field density) and the pipeline run (the two normalised measures), and the bars equal
+`field_summary.csv` (asserted; values in `Fig04_per_field_values.json`). Pre-validation, pixel units, WT.
+
+`Fig04_per_field_merged` (option `-m`) is the same with 682_z08 merged by hand into the field of 682_z23
+and 682_z29 (Field 4, n = 3). field-summary still keeps it alone; the merged means are computed in the
+figure, not by field-summary.
 
 ## S01_switch_examples (supplementary)
 

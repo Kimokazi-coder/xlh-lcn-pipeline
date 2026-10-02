@@ -146,3 +146,19 @@ move to `per_image/<image>/overview` in O1. Fields are Field 1 to Field 4 in Fig
 
 Round 1 (Fig04 at 1000 px): the four "Field n" tick labels ran into each other in the 25 mm panels.
 Fix: two rows of panels (3 + 2), each 49 mm wide. Round 2: clear.
+
+## P4 per-field plot
+
+All y axes start at zero; every dot carries its short image name; 682_z08 is an open diamond; `-m`
+writes `Fig04_per_field_merged` with 682_z08 in Field 4. The grouping of field-summary is not changed.
+Checks: the image values equal `results/summary_table.csv` (roots, ring 30, field density) and the means
+over interior lacunae of the default run (the two normalised measures, which results/ predates); the
+unmerged field means equal `field_summary.csv`.
+
+Round 1 (both at 1000 px and 100%): the image labels sat on the blue mean bars; the legend touched the
+tick labels of the second row. Fix: shorter bars, labels right of the bar with a thin grey leader to
+their dot (spread apart when values are close), a taller bottom margin. Round 2: clear; the legend of
+the merged figure now says that 682_z08 is merged by hand.
+
+Remaining: from zero, the field differences in field density and ring density look small, which is the
+intended reading; the labels of three close values (Field 2) need their leaders to be read.
