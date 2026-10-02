@@ -315,15 +315,21 @@ def _subtract_background_mode(img: np.ndarray) -> np.ndarray:
     return np.clip(img - background, 0.0, None)
 
 
-def preprocess_channel(channel: np.ndarray) -> np.ndarray:
-    """Gaussian, white top-hat and mode subtraction, renormalized to
-    [0, 1], so thin threads threshold as thin threads instead of fusing into
-    ribbons."""
+def preprocess_unnormalised(channel: np.ndarray) -> np.ndarray:
+    """Gaussian, white top-hat and mode subtraction, in the channel's own
+    units (before preprocess_channel divides by the maximum)."""
     img = channel
     if SMOOTH_SIGMA_PX > 0:
         img = ndi.gaussian_filter(img, SMOOTH_SIGMA_PX)
     img = morphology.white_tophat(img, morphology.disk(TOPHAT_RADIUS_PX))
-    img = _subtract_background_mode(img)
+    return _subtract_background_mode(img)
+
+
+def preprocess_channel(channel: np.ndarray) -> np.ndarray:
+    """Gaussian, white top-hat and mode subtraction, renormalized to
+    [0, 1], so thin threads threshold as thin threads instead of fusing into
+    ribbons."""
+    img = preprocess_unnormalised(channel)
     peak = float(img.max())
     return img / peak if peak > 0 else img
 
@@ -364,11 +370,15 @@ def flagged_structures(channel: np.ndarray) -> np.ndarray:
     return flagged
 
 
-def hysteresis_mask(img: np.ndarray, no_growth: np.ndarray) -> tuple[np.ndarray, float]:
+def hysteresis_mask(img: np.ndarray, no_growth: np.ndarray, t_lo: float | None = None) -> tuple[np.ndarray, float]:
     """Hysteresis threshold of the preprocessed image. Returns (mask, the
     strict cut). Inside `no_growth` only pixels already above the strict cut
-    survive, so there hysteresis can add nothing."""
-    strict_mask, t_lo = total_signal_mask(img)
+    survive, so there hysteresis can add nothing. A given t_lo replaces the
+    computed strict cut (sensitivity diagnostics only)."""
+    if t_lo is None:
+        strict_mask, t_lo = total_signal_mask(img)
+    else:
+        strict_mask = img > t_lo
     low = t_lo * HYSTERESIS_LOW_FRACTION
     mask = filters.apply_hysteresis_threshold(img, low, t_lo)
     if no_growth.any():
@@ -377,10 +387,10 @@ def hysteresis_mask(img: np.ndarray, no_growth: np.ndarray) -> tuple[np.ndarray,
 
 
 def network_candidate_mask(
-    preprocessed: np.ndarray, lacuna_mask: np.ndarray, flagged: np.ndarray
+    preprocessed: np.ndarray, lacuna_mask: np.ndarray, flagged: np.ndarray, t_lo: float | None = None
 ) -> tuple[np.ndarray, float]:
     """Threshold, remove the buffered lacuna bodies, despeckle by size."""
-    signal, t_lo = hysteresis_mask(preprocessed, flagged)
+    signal, t_lo = hysteresis_mask(preprocessed, flagged, t_lo)
     buffered_lacunae = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
     candidate = signal & ~buffered_lacunae
     candidate = morphology.remove_small_objects(candidate, min_size=MIN_THREAD_OBJECT_PX2)
@@ -971,17 +981,19 @@ FIELD_UNITS = {
 }
 
 
-def analyse_image(image_path: Path) -> dict:
-    """Everything feature 2 computes for one image, without writing."""
+def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | None = None) -> dict:
+    """Everything feature 2 computes for one image, without writing. t_hi and
+    t_lo replace the two computed cuts; only the sensitivity diagnostics pass
+    them, the pipeline never does."""
     precision = config.CSV_FLOAT_PRECISION
-    lac = lacunae.analyse_image(image_path)
+    lac = lacunae.analyse_image(image_path, t_hi)
     _display, channel = lacunae.load_channel(image_path)
     kept = lac["kept"]
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(lac["labels"], kept)
     flagged = flagged_structures(channel)
     preprocessed = preprocess_channel(channel)
-    candidate, t_lo = network_candidate_mask(preprocessed, lacuna_mask, flagged)
+    candidate, t_lo = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
     skeleton = morphology.skeletonize(candidate)
 
     bridges = find_bridges(skeleton, preprocessed, t_lo, lacuna_mask | flagged)

@@ -486,10 +486,11 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple[np.ndarray,
     return labels, kept, t_hi
 
 
-def segment_image(image_path: Path):
-    """(display, channel, label_image, kept, t_hi) for one image file."""
+def segment_image(image_path: Path, t_hi: float | None = None):
+    """(display, channel, label_image, kept, t_hi) for one image file. A given
+    t_hi replaces the computed cut (sensitivity diagnostics only)."""
     display, channel = load_channel(image_path)
-    labels, kept, t_hi = segment(channel)
+    labels, kept, t_hi = segment(channel, t_hi)
     return display, channel, labels, kept, t_hi
 
 
@@ -543,10 +544,11 @@ def summarize_interior(measurements: list[dict], precision: int) -> dict:
     return stats
 
 
-def analyse_image(image_path: Path) -> dict:
-    """Everything feature 1 computes for one image, without writing."""
+def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
+    """Everything feature 1 computes for one image, without writing. t_hi:
+    see segment_image."""
     precision = config.CSV_FLOAT_PRECISION
-    display, channel, labels, kept, t_hi = segment_image(image_path)
+    display, channel, labels, kept, t_hi = segment_image(image_path, t_hi)
     rows = measurements_for(kept, precision)
     border = sum(1 for _r, on_border in kept if on_border)
     return {

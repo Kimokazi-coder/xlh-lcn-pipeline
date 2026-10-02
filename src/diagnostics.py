@@ -21,6 +21,8 @@ Subcommands:
     blind             copy a folder of images under random codes (S001, ...),
                       pixel data only, with the key written outside the repository
     unblind           join a blinding key to a summary table
+    sensitivity       both Otsu cuts scaled 0.8 to 1.2, alone and together,
+                      plus one pooled cut: percent changes of the measures
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -33,6 +35,7 @@ Usage (from the repo root):
     python src/diagnostics.py fast-check
     python src/diagnostics.py blind -s data/WT -o CODED_FOLDER -k KEY_OUTSIDE_REPO.csv
     python src/diagnostics.py unblind -s CODED_RESULTS/summary_table.csv -k KEY.csv -o UNBLINDED.csv
+    python src/diagnostics.py sensitivity -d data/WT -o OUT_FOLDER
 """
 
 from __future__ import annotations
@@ -752,6 +755,122 @@ def cmd_unblind(args) -> int:
     return 0 if missing == 0 else 1
 
 
+# sensitivity --------------------------------------------------------------------
+# How the measures move with the two image-relative Otsu cuts: t_hi (the
+# lacuna cut on the red channel) and t_lo (the network strict cut on the
+# preprocessed channel; the hysteresis low cut and the bridging test follow
+# it). Each image's own cut is scaled by 0.8, 0.9, 1.1 and 1.2, alone and
+# together, and one pooled cut is applied to every image: the median t_hi
+# over the folder, and the median t_lo in raw units (t_lo x the image's
+# preprocessing peak) converted back to each image's scale. As in
+# experiments/task2_thresholds.py (overnight report 2.4). Nothing is tuned;
+# the defaults do not change. Runs use the fast lacuna stage, which gives
+# identical labels (fast-check).
+
+SENSITIVITY_SCALES = (0.8, 0.9, 1.1, 1.2)
+SENSITIVITY_MEASURES = [("roots_per_cell", "roots per cell"), ("ring30_per_cell", "ring 30 px per cell"),
+                        ("field_density", "field density"), ("lacuna_count", "lacuna count"), ("bridges", "bridges")]
+
+
+def _cuts_of(path_str: str) -> dict:
+    image_path = Path(path_str)
+    _display, channel = lacunae.load_channel(image_path)
+    _mask, t_hi = lacunae.multiotsu_lacuna_mask(channel)
+    raw = canaliculi.preprocess_unnormalised(channel)
+    peak = float(raw.max())
+    _strict, t_lo = canaliculi.total_signal_mask(raw / peak if peak > 0 else raw)
+    return {"t_hi": t_hi, "t_lo": t_lo, "peak": peak}
+
+
+def _sensitivity_run(job: tuple) -> dict:
+    path_str, label, t_hi, t_lo, out_path = job
+    out_path = Path(out_path)
+    if out_path.is_file():
+        return json.loads(out_path.read_text(encoding="utf-8"))
+    config.FAST_LACUNA_STAGE = True
+    result = canaliculi.analyse_image(Path(path_str), t_hi, t_lo)
+    s = result["summary"]
+    row = {"image": lacunae.clean_name(Path(path_str)), "setting": label,
+           "t_hi": result["lacunae"]["t_hi"], "t_lo": result["t_lo"],
+           "lacuna_count": result["lacunae"]["lacuna_count"],
+           "interior_count": result["lacunae"]["interior_lacuna_count"],
+           "roots_per_cell": s["roots_count"]["mean"], "ring30_per_cell": s["ring_length_r30_px"]["mean"],
+           "field_density": result["field"]["canalicular_length_density_per_px"], "bridges": len(result["bridges"])}
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out_path.with_name(out_path.name + ".tmp")
+    tmp.write_text(json.dumps(row, indent=1), encoding="utf-8")
+    tmp.replace(out_path)
+    return row
+
+
+def cmd_sensitivity(args) -> int:
+    import csv
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = lacunae.image_paths(args)
+    out = args.out
+    runs = out / "runs"
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(images)))) as ex:
+        cuts = dict(zip([str(p) for p in images], ex.map(_cuts_of, [str(p) for p in images])))
+    pooled_hi = float(np.median([c["t_hi"] for c in cuts.values()]))
+    pooled_lo_raw = float(np.median([c["t_lo"] * c["peak"] for c in cuts.values()]))
+    jobs = []
+    for p in images:
+        c = cuts[str(p)]
+        name = lacunae.clean_name(p)
+        settings = [("default", None, None)]
+        for sc in SENSITIVITY_SCALES:
+            settings += [(f"t_hi x{sc:g}", c["t_hi"] * sc, None), (f"t_lo x{sc:g}", None, c["t_lo"] * sc),
+                         (f"both x{sc:g}", c["t_hi"] * sc, c["t_lo"] * sc)]
+        lo_pooled = pooled_lo_raw / c["peak"] if c["peak"] > 0 else None
+        settings += [("t_hi pooled", pooled_hi, None), ("t_lo pooled", None, lo_pooled), ("both pooled", pooled_hi, lo_pooled)]
+        for label, hi, lo in settings:
+            fname = label.replace(" ", "_").replace("x", "")
+            jobs.append((str(p), label, hi, lo, str(runs / f"{name}__{fname}.json")))
+    with ProcessPoolExecutor(max_workers=max(1, args.workers)) as ex:
+        rows = list(ex.map(_sensitivity_run, jobs))
+    base = {r["image"]: r for r in rows if r["setting"] == "default"}
+    table = []
+    for r in rows:
+        b = base[r["image"]]
+        row = dict(r)
+        for key, _label in SENSITIVITY_MEASURES:
+            row[f"{key}_pct"] = (100.0 * (r[key] - b[key]) / b[key]) if b[key] else None
+        table.append(row)
+    out.mkdir(parents=True, exist_ok=True)
+    cols = list(table[0].keys())
+    with open(out / "sensitivity.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows(table)
+    order = [r[1] for r in jobs[: len(jobs) // len(images)]][1:]
+    lines = ["# Threshold sensitivity", "",
+             "PRE-VALIDATION, pixel units. Percent change against each image's default run, median over the "
+             f"{len(images)} images with the range in brackets. t_hi: lacuna cut; t_lo: network strict cut.",
+             f"pooled: one cut for every image, t_hi = {pooled_hi:.4f} (median over the folder) and t_lo =",
+             f"{pooled_lo_raw:.4f} in raw units (median of t_lo x preprocessing peak). Per-image values: sensitivity.csv.",
+             "", "| setting | " + " | ".join(label for _k, label in SENSITIVITY_MEASURES) + " |",
+             "|---|" + "---|" * len(SENSITIVITY_MEASURES)]
+    for setting in order:
+        sub = [r for r in table if r["setting"] == setting]
+        cells = []
+        for key, _label in SENSITIVITY_MEASURES:
+            v = np.array([r[f"{key}_pct"] for r in sub if r[f"{key}_pct"] is not None], dtype=float)
+            cells.append(f"{np.median(v):+.1f} [{v.min():+.1f}, {v.max():+.1f}]" if v.size else "")
+        lines.append(f"| {setting} | " + " | ".join(cells) + " |")
+    lines += ["", "Lacuna count per image and setting:", "",
+              "| image | default | " + " | ".join(order) + " |", "|---|---|" + "---|" * len(order)]
+    for p in images:
+        name = lacunae.clean_name(p)
+        by = {r["setting"]: r for r in table if r["image"] == name}
+        lines.append(f"| {name} | {by['default']['lacuna_count']} | "
+                     + " | ".join(str(by[s]["lacuna_count"]) for s in order) + " |")
+    text = "\n".join(lines) + "\n"
+    (out / "sensitivity.md").write_text(text, encoding="utf-8")
+    print(text)
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -812,6 +931,12 @@ def main() -> None:
     p.add_argument("-k", dest="key", type=Path, required=True, help="The key written by blind.")
     p.add_argument("-o", dest="out", type=Path, required=True, help="Unblinded table (CSV) to write.")
     p.set_defaults(func=cmd_unblind)
+
+    p = sub.add_parser("sensitivity", help="Both cuts scaled 0.8 to 1.2 and one pooled cut: percent changes.")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR, help="Folder of .tif images.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_sensitivity, image=None)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
