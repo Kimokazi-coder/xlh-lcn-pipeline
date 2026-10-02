@@ -1,6 +1,6 @@
 # Publication fixes progress
 
-last update: 2026-10-02 12:32
+last update: 2026-10-02 12:39
 next action: B1 subcommands blind and unblind; leak test on the 8 WT images; .gitignore patterns for key files.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
@@ -22,9 +22,9 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | B2 | Subcommand sensitivity | TODO |  |  |
 | B3 | Subcommand field-summary | TODO |  |  |
 | F1b | Per-image figures for the other 7 images | DONE | 7f24b11 | 7 more per-image figures, inset by rule; two review rounds (edge numbers kept inside the frame); figures use the fast lacuna stage (identical output) |
-| F2 | Contact sheet of all 8 images | TODO |  |  |
+| F2 | Contact sheet of all 8 images | DONE | 45e8ee9 | 2 x 4 sheet, fixed window, 0.6 pt outlines and counts; -b -k labels with codes; two review rounds |
 | F3 | Threshold sensitivity figure | TODO |  |  |
 | F4 | Per-field plot | TODO |  |  |
-| F5 | Supplementary figure: crumb rule and hole fill | TODO |  |  |
+| F5 | Supplementary figure: crumb rule and hole fill | DONE | 45e8ee9 | 543_3 (877,545) crumb rule off/on and 542_z06 (783,581) hole fill off/on beside raw crops; values equal switch-check; two review rounds |
 | F6 | Self-review of every figure; captions | TODO |  |  |
 | 7.1 | Final report, METHODS and README sections, checks, ALL DONE | TODO |  |  |
