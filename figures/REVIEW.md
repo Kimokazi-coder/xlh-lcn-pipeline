@@ -72,3 +72,19 @@ D and E ran into their titles; a wide empty band above the footnote. Fix: units 
 (px$^{-1}$), letters moved left of the panels, smaller bottom margin. Round 2: clear.
 Remaining, by design: F3 is a single image (682_z08), so its "mean" is that image; no statistical
 test is drawn (3 or 4 fields).
+
+## F6 final pass over every exported figure
+
+All 13 PNG files viewed at 1000 px wide after their fixes: F1 for the 8 images, F2 and its coded
+version, F3, F4, F5. Nothing illegible, overlapping or misleading remains beyond the notes above.
+
+Checks on every PDF: fonts embedded as TrueType (FontFile2), no Type 3 fonts, Arial. Outlines are 0.6
+to 0.8 pt. PNG at 300 dpi, 180 mm wide except F5 (about 142 mm, a supplementary panel).
+
+Remaining, left as is and stated in the captions:
+- At column width the one-pixel skeleton of the full-field panels renders as thin grey-white lines;
+  the PDF holds it at 300 dpi and the F1 insets show it at 3x.
+- The coded contact sheet hides names but not appearance: the fixed display window keeps brightness
+  comparable, so sections of one field still look alike. Blinding by appearance is not possible with
+  these images.
+- The F1 inset size follows the size of the chosen cell.
