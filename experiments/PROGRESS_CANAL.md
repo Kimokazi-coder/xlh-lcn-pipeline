@@ -1,16 +1,16 @@
 # Canaliculi v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (origin/publication-fixes tip; tag before-canaliculi-v2)
-last update: 2026-10-02 22:00
-next action: C0 docs/CANALICULI_AUDIT.md
+last update: 2026-10-02 22:20
+next action: C1 attached ring length
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
 
 | id | description | status | commit SHA | note |
 |---|---|---|---|---|
-| 0.1 | Branch canaliculi-v2, tag before-canaliculi-v2, this file | DONE | | branch from origin/publication-fixes 8673380; tag pushed |
-| C0 | docs/CANALICULI_AUDIT.md, stage by stage map | TODO | | |
+| 0.1 | Branch canaliculi-v2, tag before-canaliculi-v2, this file | DONE | 3d8cc0b | branch from origin/publication-fixes 8673380; tag pushed |
+| C0 | docs/CANALICULI_AUDIT.md, stage by stage map | DONE | | 10 stages (what, names, origin, flaws F1 to F7) and a table of where each item of this branch acts |
 | C1 | Attached ring length (appended columns) | TODO | | |
 | C2 | Chain code length (appended columns) | TODO | | |
 | C3 | Sholl crossings (appended columns) | TODO | | |
