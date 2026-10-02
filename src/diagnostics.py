@@ -27,6 +27,8 @@ Subcommands:
                       and write per-field means (the field is the unit)
     network-sweep     one network parameter at a time at a low and a high
                       value: percent changes of the network measures
+    validate-network  roots and Sholl crossings against blind hand counts
+                      (and the skeleton against traced threads); -s self-test
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -42,6 +44,8 @@ Usage (from the repo root):
     python src/diagnostics.py sensitivity -d data/WT -o OUT_FOLDER
     python src/diagnostics.py field-summary -d data/WT -o OUT_FOLDER [-r RESULTS_FOLDER]
     python src/diagnostics.py network-sweep -d data/WT -o OUT_FOLDER
+    python src/diagnostics.py validate-network -a ANNOTATION.csv -k KEY_OUTSIDE_REPO.csv -r RESULTS -o OUT
+    python src/diagnostics.py validate-network -s
 """
 
 from __future__ import annotations
@@ -1276,6 +1280,348 @@ def cmd_network_sweep(args) -> int:
     return 0
 
 
+# validate-network ------------------------------------------------------------------
+# The validation harness (docs/CANALICULI_V2_REPORT.md, V1; docs/NETWORK_TUNING_
+# PROTOCOL.md). Hand counts of the blinded tiles are joined to the pipeline
+# output through the key, which must lie outside the repository; unblinding
+# happens only here and only in the output tables. Optional: hand-traced thread
+# masks against the pipeline skeleton. -s runs a self-test on synthetic data in
+# the git-ignored cache. Nothing is written under results/.
+
+ANNOTATION_COLUMNS = ("code", "hand_roots")
+KEY_COLUMNS = ("code", "image", "lacuna_id")
+VALIDATION_MEASURES = ("roots_count", "sholl_crossings_r10", "sholl_crossings_r20")
+TRACE_TOLERANCE_PX = 3.0
+VALIDATE_SELFTEST_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "validate_selftest"
+
+
+def _clean_from(name: str) -> str:
+    """A clean image name (results/ folder) from a clean or a short name."""
+    short_to_clean = {v: k for k, v in canaliculi.ROI_SHORT_NAMES.items()}
+    return short_to_clean.get(name, name)
+
+
+def _read_csv_columns(path: Path, needed: tuple) -> list[dict]:
+    import csv
+
+    with open(path, newline="") as f:
+        rows = list(csv.DictReader(f))
+    missing = [c for c in needed if not rows or c not in rows[0]]
+    if missing:
+        raise ValueError(f"{path.name}: missing column(s) {', '.join(missing)}")
+    return rows
+
+
+def agreement(pipe: list, hand: list) -> dict:
+    """Agreement statistics of paired counts (pipeline minus hand)."""
+    from scipy.stats import spearmanr
+
+    a, b = np.asarray(pipe, dtype=float), np.asarray(hand, dtype=float)
+    n = int(a.size)
+    if n == 0:
+        return {"n": 0}
+    d = a - b
+    sd = float(d.std(ddof=1)) if n >= 2 else None
+    rho = None
+    if n >= 3 and np.ptp(a) > 0 and np.ptp(b) > 0:
+        rho = float(spearmanr(a, b)[0])
+    bias = float(d.mean())
+    return {"n": n, "bias": bias, "sd_diff": sd,
+            "loa_low": bias - 1.96 * sd if sd is not None else None,
+            "loa_high": bias + 1.96 * sd if sd is not None else None,
+            "mae": float(np.abs(d).mean()), "share_equal": float((d == 0).mean()),
+            "share_within_1": float((np.abs(d) <= 1).mean()), "spearman_rho": rho}
+
+
+def trace_scores(skeleton: np.ndarray, trace: np.ndarray, region: np.ndarray | None = None) -> dict:
+    """Precision, recall and F1 of a skeleton against a traced mask with a
+    TRACE_TOLERANCE_PX tolerance: a skeleton pixel is a hit if a traced pixel
+    lies within the tolerance (precision), and the reverse (recall). With
+    `region`, both are restricted to it."""
+    from scipy import ndimage as ndi
+
+    sk, tr = skeleton.astype(bool), trace.astype(bool)
+    if region is not None:
+        sk, tr = sk & region, tr & region
+    d_tr = ndi.distance_transform_edt(~tr) if tr.any() else np.full(tr.shape, np.inf)
+    d_sk = ndi.distance_transform_edt(~sk) if sk.any() else np.full(sk.shape, np.inf)
+    tp_p = int((sk & (d_tr <= TRACE_TOLERANCE_PX)).sum())
+    tp_r = int((tr & (d_sk <= TRACE_TOLERANCE_PX)).sum())
+    precision = tp_p / int(sk.sum()) if sk.any() else None
+    recall = tp_r / int(tr.sum()) if tr.any() else None
+    f1 = (2 * precision * recall / (precision + recall)) if precision and recall else None
+    return {"skeleton_px": int(sk.sum()), "trace_px": int(tr.sum()), "precision": precision, "recall": recall,
+            "f1": f1}
+
+
+def _results_lacunae(folder: Path) -> dict:
+    """{clean image name: (lacunae.json rows, canaliculi rows)} of a results folder."""
+    out = {}
+    for sub in sorted(p for p in folder.iterdir() if p.is_dir()):
+        lj, cj = sub / "lacunae.json", sub / "canaliculi_measurements.json"
+        if lj.is_file() and cj.is_file():
+            out[sub.name] = (json.load(open(lj))["lacunae"], json.load(open(cj))["lacunae"])
+    return out
+
+
+def run_validation(annotation: Path, key: Path, results: Path, out: Path, trace_dir: Path | None = None,
+                   boxes: Path | None = None, label: str = "") -> dict:
+    """The harness itself. Returns the overall statistics and trace scores."""
+    import csv
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    if _inside(key, config.PROJECT_ROOT):
+        raise PermissionError("the key path is inside the repository; keep the key outside it")
+    ann = _read_csv_columns(annotation, ANNOTATION_COLUMNS)
+    keyrows = {r["code"]: r for r in _read_csv_columns(key, KEY_COLUMNS)}
+    data = _results_lacunae(results)
+    inputs = [{"image": n, "xy": [(r["centroid_col_px"], r["centroid_row_px"]) for r in lac]}
+              for n, (lac, _c) in data.items()]
+    groups, _pairs, _cut = field_groups(inputs) if len(inputs) > 1 else ([[n] for n in data], [], 0.0)
+    field_of = {n: f"Field {i}" for i, g in enumerate(groups, start=1) for n in g}
+    joined, skipped = [], 0
+    for a in ann:
+        if a["hand_roots"].strip() == "":
+            skipped += 1
+            continue
+        k = keyrows.get(a["code"])
+        if k is None:
+            raise ValueError(f"code {a['code']} is not in the key")
+        image = _clean_from(k["image"])
+        lac, cells = data[image]
+        lid = int(k["lacuna_id"])
+        cell = next(c for c in cells if c["lacuna_id"] == lid)
+        row = {"code": a["code"], "image": image, "field": field_of.get(image, ""), "lacuna_id": lid,
+               "on_border": cell["on_border"], "hand_roots": int(a["hand_roots"])}
+        for m in VALIDATION_MEASURES:
+            row[m] = cell.get(m)
+        joined.append(row)
+    out.mkdir(parents=True, exist_ok=True)
+    stats = []
+    for scope, key_fn in (("all", lambda r: "all"), ("image", lambda r: r["image"]), ("field", lambda r: r["field"])):
+        for group in sorted({key_fn(r) for r in joined}):
+            sub = [r for r in joined if key_fn(r) == group]
+            for m in VALIDATION_MEASURES:
+                pairs = [(r[m], r["hand_roots"]) for r in sub if r[m] is not None]
+                s = agreement([p for p, _h in pairs], [h for _p, h in pairs])
+                stats.append({"scope": scope, "group": group, "measure": m, **s})
+    with open(out / "validation_per_lacuna.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(joined[0].keys()) if joined else ["code"])
+        w.writeheader()
+        w.writerows(joined)
+    cols = ["scope", "group", "measure", "n", "bias", "sd_diff", "loa_low", "loa_high", "mae", "share_equal",
+            "share_within_1", "spearman_rho"]
+    with open(out / "validation_stats.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows([{c: s.get(c) for c in cols} for s in stats])
+
+    trace_rows = []
+    if trace_dir is not None:
+        from skimage.io import imread
+
+        box_rows = _read_csv_columns(boxes, ("image", "x0", "y0", "x1", "y1")) if boxes else None
+        for image in sorted(data):
+            short = canaliculi.ROI_SHORT_NAMES.get(image, image)
+            tpath = next((trace_dir / f"{n}.png" for n in (image, short) if (trace_dir / f"{n}.png").is_file()), None)
+            spath = results / image / "canaliculi_skeleton.png"
+            if tpath is None or not spath.is_file():
+                continue
+            tr = imread(tpath)
+            tr = (tr[..., :3].max(axis=-1) if tr.ndim == 3 else tr) > 127
+            sk = imread(spath) > 127
+            if tr.shape != sk.shape:
+                raise ValueError(f"trace {tpath.name} is {tr.shape}, the skeleton is {sk.shape}")
+            region = None
+            if box_rows is not None:
+                mine = [b for b in box_rows if _clean_from(b["image"]) == image]
+                if not mine:
+                    continue
+                region = np.zeros(sk.shape, bool)
+                for b in mine:
+                    region[int(b["y0"]):int(b["y1"]) + 1, int(b["x0"]):int(b["x1"]) + 1] = True
+            trace_rows.append({"image": image, "boxes": "yes" if region is not None else "whole image",
+                               **trace_scores(sk, tr, region)})
+        if trace_rows:
+            with open(out / "validation_trace.csv", "w", newline="") as f:
+                w = csv.DictWriter(f, fieldnames=list(trace_rows[0].keys()))
+                w.writeheader()
+                w.writerows(trace_rows)
+
+    # Bland-Altman, one PNG with one panel per measure.
+    fig, axes = plt.subplots(1, len(VALIDATION_MEASURES), figsize=(12, 4))
+    for ax, m in zip(axes, VALIDATION_MEASURES):
+        pairs = np.array([(r[m], r["hand_roots"]) for r in joined if r[m] is not None], dtype=float).reshape(-1, 2)
+        s = next(x for x in stats if x["scope"] == "all" and x["measure"] == m)
+        if pairs.size:
+            mean, diff = pairs.mean(axis=1), pairs[:, 0] - pairs[:, 1]
+            ax.scatter(mean, diff, s=12, c="black", alpha=0.6, linewidths=0)
+            ax.axhline(s["bias"], color="#0072B2", lw=1.2)
+            if s.get("sd_diff") is not None:
+                for v in (s["loa_low"], s["loa_high"]):
+                    ax.axhline(v, color="#D55E00", lw=1.0, ls="--")
+            ax.set_title(f"{m} vs hand roots (n = {s['n']})", fontsize=9)
+        else:
+            ax.set_title(f"{m}: no values in this results folder", fontsize=9)
+        ax.set_xlabel("mean of pipeline and hand")
+        ax.set_ylabel("pipeline minus hand")
+    fig.suptitle(f"{label}Bland-Altman: bias (blue), limits of agreement (dashed). Pre-validation, pixel units.",
+                 fontsize=10)
+    fig.tight_layout()
+    fig.savefig(out / "validation_bland_altman.png", dpi=150)
+    plt.close(fig)
+
+    lines = [f"# {label}Network validation", "",
+             f"Pre-validation, pixel units. Hand counts: {len(joined)} lacunae joined ({skipped} codes not counted yet). "
+             "Pipeline minus hand; bias = mean difference; limits of agreement = bias plus and minus 1.96 SD.", "",
+             "| scope | group | measure | n | bias | SD | LoA low | LoA high | MAE | equal | within 1 | Spearman |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+
+    def fmt(v, p=3):
+        return "" if v is None else (f"{v:.{p}f}" if isinstance(v, float) else str(v))
+
+    for s in stats:
+        lines.append(f"| {s['scope']} | {s['group']} | {s['measure']} | {s.get('n', 0)} | {fmt(s.get('bias'))} | "
+                     f"{fmt(s.get('sd_diff'))} | {fmt(s.get('loa_low'))} | {fmt(s.get('loa_high'))} | "
+                     f"{fmt(s.get('mae'))} | {fmt(s.get('share_equal'))} | {fmt(s.get('share_within_1'))} | "
+                     f"{fmt(s.get('spearman_rho'))} |")
+    if trace_rows:
+        lines += ["", f"## Skeleton against traced threads (tolerance {TRACE_TOLERANCE_PX:g} px)", "",
+                  "| image | region | skeleton px | traced px | precision | recall | F1 |", "|---|---|---|---|---|---|---|"]
+        for t in trace_rows:
+            lines.append(f"| {t['image']} | {t['boxes']} | {t['skeleton_px']} | {t['trace_px']} | {fmt(t['precision'])} | "
+                         f"{fmt(t['recall'])} | {fmt(t['f1'])} |")
+    lines += ["", "Files: validation_per_lacuna.csv, validation_stats.csv"
+              + (", validation_trace.csv" if trace_rows else "") + ", validation_bland_altman.png.", ""]
+    (out / "validation.md").write_text("\n".join(lines), encoding="utf-8")
+    overall = {s["measure"]: s for s in stats if s["scope"] == "all"}
+    return {"overall": overall, "trace": trace_rows, "joined": len(joined)}
+
+
+def _selftest_validation(workers: int) -> int:
+    """Synthetic data in the git-ignored cache: a fresh pipeline run (fast
+    lacuna stage), hand counts equal to the pipeline roots plus fixed-seed
+    noise, a key outside the repository (system temp folder), and traces equal
+    to the skeleton shifted by 1 px with 5% of the pixels removed."""
+    import csv
+    import shutil
+    import tempfile
+    from concurrent.futures import ProcessPoolExecutor
+
+    from skimage.io import imsave
+
+    base = VALIDATE_SELFTEST_DIR
+    pipe = base / "pipeline"
+    images = lacunae.image_paths(argparse.Namespace(image=None, dir=DEFAULT_IMAGE_DIR))
+    if not all((pipe / lacunae.clean_name(p) / "canaliculi_skeleton.png").is_file() for p in images):
+        with ProcessPoolExecutor(max_workers=max(1, min(workers, len(images)))) as ex:
+            list(ex.map(_selftest_pipeline_one, [(str(p), str(pipe)) for p in images]))
+    data = _results_lacunae(pipe)
+    rng = np.random.default_rng(0)
+    rows = []
+    for image, (_lac, cells) in sorted(data.items()):
+        for c in cells:
+            if c["on_border"]:
+                continue
+            noise = int(rng.choice([-1, 0, 1], p=[0.2, 0.6, 0.2]))
+            rows.append({"image": canaliculi.ROI_SHORT_NAMES.get(image, image), "lacuna_id": c["lacuna_id"],
+                         "hand_roots": max(0, c["roots_count"] + noise)})
+    order = rng.permutation(len(rows))
+    tmp_key_dir = Path(tempfile.mkdtemp(prefix="lcn_selftest_key_"))
+    key = tmp_key_dir / "selftest_key.csv"
+    ann = base / "annotation.csv"
+    with open(key, "w", newline="") as fk, open(ann, "w", newline="") as fa:
+        wk, wa = csv.writer(fk), csv.writer(fa)
+        wk.writerow(["code", "image", "lacuna_id"])
+        wa.writerow(["code", "hand_roots", "hand_notes"])
+        for k, i in enumerate(order, start=1):
+            wk.writerow([f"T{k:03d}", rows[i]["image"], rows[i]["lacuna_id"]])
+            wa.writerow([f"T{k:03d}", rows[i]["hand_roots"], "SELFTEST SYNTHETIC"])
+    traces = base / "traces"
+    traces.mkdir(parents=True, exist_ok=True)
+    for image in data:
+        sk = imread_bool(pipe / image / "canaliculi_skeleton.png")
+        tr = np.zeros_like(sk)
+        tr[1:, :] = sk[:-1, :]
+        rr, cc = np.nonzero(tr)
+        drop = rng.random(rr.size) < 0.05
+        tr[rr[drop], cc[drop]] = False
+        imsave(traces / f"{canaliculi.ROI_SHORT_NAMES.get(image, image)}.png", (tr * 255).astype(np.uint8),
+               check_contrast=False)
+    boxes = base / "boxes.csv"
+    with open(boxes, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["image", "x0", "y0", "x1", "y1"])
+        w.writerow(["543-2", 100, 100, 400, 400])
+        w.writerow(["682_z08", 500, 500, 900, 900])
+    refused = False
+    try:
+        run_validation(ann, base / "inside_key.csv", pipe, base / "refusal_test")
+    except PermissionError:
+        refused = True
+    res_all = run_validation(ann, key, pipe, base / "out_whole", traces, None, "SELFTEST SYNTHETIC: ")
+    res_box = run_validation(ann, key, pipe, base / "out_boxes", traces, boxes, "SELFTEST SYNTHETIC: ")
+    shutil.rmtree(tmp_key_dir, ignore_errors=True)
+    roots = res_all["overall"]["roots_count"]
+    f1s = [t["f1"] for t in res_all["trace"]]
+    # Negative control: one image's skeleton against another image's trace.
+    names = sorted(data)
+    wrong = trace_scores(imread_bool(pipe / names[0] / "canaliculi_skeleton.png"),
+                         imread_bool(traces / f"{canaliculi.ROI_SHORT_NAMES.get(names[-1], names[-1])}.png"))["f1"]
+    checks = [("a key inside the repository is refused", refused, "refused"),
+              ("lacunae joined", res_all["joined"] == len(rows), f"{res_all['joined']} of {len(rows)}"),
+              ("roots bias near 0 (|bias| < 0.2)", abs(roots["bias"]) < 0.2, f"{roots['bias']:+.3f}"),
+              ("roots share within 1 = 1", roots["share_within_1"] == 1.0, f"{roots['share_within_1']:.3f}"),
+              ("roots Spearman above 0.8", roots["spearman_rho"] > 0.8, f"{roots['spearman_rho']:.3f}"),
+              ("F1 near 0.9 to 1 on every image (>= 0.9)", min(f1s) >= 0.9, f"{min(f1s):.3f} to {max(f1s):.3f}"),
+              ("negative control: another image's trace gives F1 below 0.7", wrong < 0.7, f"{wrong:.3f}"),
+              ("boxes restrict the trace comparison to 2 images", len(res_box["trace"]) == 2,
+               f"{len(res_box['trace'])} images")]
+    print("SELFTEST SYNTHETIC: validate-network on synthetic hand counts and traces "
+          f"(outputs in {base}; nothing under results/)\n")
+    print_table(["check", "value", "result"], [[c, v, "PASS" if ok else "FAIL"] for c, ok, v in checks])
+    ok = all(c[1] for c in checks)
+    print(f"\n{'PASS' if ok else 'FAIL'}: validate-network self-test, {sum(c[1] for c in checks)} of {len(checks)} checks.")
+    return 0 if ok else 1
+
+
+def imread_bool(path: Path) -> np.ndarray:
+    from skimage.io import imread
+
+    a = imread(path)
+    return (a[..., :3].max(axis=-1) if a.ndim == 3 else a) > 127
+
+
+def _selftest_pipeline_one(job: tuple) -> bool:
+    path_str, out = job
+    config.FAST_LACUNA_STAGE = True
+    path = Path(path_str)
+    result = canaliculi.analyse_image(path)
+    folder = Path(out) / lacunae.clean_name(path)
+    lacunae.save_json(result["lacunae"], folder / "lacunae.json")
+    canaliculi.write_outputs(result, folder)
+    return True
+
+
+def cmd_validate_network(args) -> int:
+    if args.selftest:
+        return _selftest_validation(args.workers)
+    for name, value in (("-a", args.annotation), ("-k", args.key), ("-r", args.results), ("-o", args.out)):
+        if value is None:
+            print(f"validate-network needs {name} (or -s for the self-test).")
+            return 2
+    if _inside(args.key, config.PROJECT_ROOT):
+        print("Refused: the key path is inside the repository. Keep the key outside it.")
+        return 2
+    res = run_validation(args.annotation, args.key, args.results, args.out, args.trace, args.boxes)
+    print((args.out / "validation.md").read_text(encoding="utf-8"))
+    return 0 if res["joined"] else 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1356,6 +1702,20 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_network_sweep, image=None)
+
+    p = sub.add_parser("validate-network", help="Pipeline roots and Sholl crossings against blind hand counts.")
+    p.add_argument("-a", dest="annotation", type=Path, default=None, help="Annotation CSV (code, hand_roots).")
+    p.add_argument("-k", dest="key", type=Path, default=None,
+                   help="Key CSV of the tiles (code, image, lacuna_id), outside the repository.")
+    p.add_argument("-r", dest="results", type=Path, default=None, help="Pipeline output folder (results layout).")
+    p.add_argument("-o", dest="out", type=Path, default=None, help="Output folder for the tables and the plot.")
+    p.add_argument("-t", dest="trace", type=Path, default=None,
+                   help="Folder of hand-traced masks (PNG, white = thread, named by the image name).")
+    p.add_argument("-b", dest="boxes", type=Path, default=None,
+                   help="Boxes CSV (image, x0, y0, x1, y1): compare traces only inside these boxes.")
+    p.add_argument("-s", dest="selftest", action="store_true", help="Self-test on synthetic data in the cache.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes for the self-test run.")
+    p.set_defaults(func=cmd_validate_network)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
