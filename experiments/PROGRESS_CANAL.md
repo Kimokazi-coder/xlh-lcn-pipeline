@@ -1,8 +1,8 @@
 # Canaliculi v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (origin/publication-fixes tip; tag before-canaliculi-v2)
-last update: 2026-10-03 03:40
-next action: V2 docs/NETWORK_TUNING_PROTOCOL.md
+last update: 2026-10-03 04:00
+next action: R1 checks and switch comments
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -18,7 +18,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | B1 | Straight band-wall filter, switch BAND_LINE_FILTER (off) | DONE | c20704f | evidence first (L 40 to 300): the 542_z06 line is straight only in pieces; touches the canal mask only at L 40, where 66 other objects touch too; length gap L 95 to 100 catches 103 of ~380 px at 65.01 px from the mask; NOT separable as intended: switch off, BAND_LINE_MIN_LEN_PX and BAND_LINE_REACH_PX None (refuses to run), no recommended value; two evidence settings run (L97/66: -103 px, 542_z06 only, density -0.29%; L40/0: -4164 px in 5 images); crops two rounds; switch-check extended |
 | S1 | Subcommand network-sweep | DONE | 5a4d9ad | network-sweep -d -o -w: lacuna stage once per image (fast, cached), network stage per setting via the new canaliculi.analyse_network (pure split, regression PASS); 9 parameters low/high (+ gap 0, t_lo 0.8 to 1.2); first run had settings leaking between jobs in a worker, fixed (restore per job, checked at job start) and rerun; t_lo rows equal the overnight grid; reading: mask and cut move all, graph params move only roots and attached ring, bridging under 1.5% on headline measures, Sholl more robust than roots |
 | S2 | Bridging audit | DONE | fda3eb5 | S2_bridges.csv: 143 bridges (endpoints, gap, angle, min and mean signal; 543-2 has 21 as the reference check); gap px 0.12 to 0.26% of the skeleton; without bridging: roots -1.35 to 0%, ring 30 0 to +0.36%, field density +0.11 to +0.23%, Sholl 10 unchanged; one crop sheet per image, two review rounds; bridging parameters unchanged |
-| V1 | Subcommand validate-network and self-test | DONE | | -a -k -r -o, optional -t -b, -s; key outside the repo enforced; stats per lacuna, image, field; Bland-Altman PNG; trace precision, recall, F1 at 3 px; self-test 8 of 8 PASS (bias -0.023, F1 1.000, negative control 0.257, key refusal); outputs only in the cache |
-| V2 | docs/NETWORK_TUNING_PROTOCOL.md | TODO | | |
+| V1 | Subcommand validate-network and self-test | DONE | 2977216 | -a -k -r -o, optional -t -b, -s; key outside the repo enforced; stats per lacuna, image, field; Bland-Altman PNG; trace precision, recall, F1 at 3 px; self-test 8 of 8 PASS (bias -0.023, F1 1.000, negative control 0.257, key refusal); outputs only in the cache |
+| V2 | docs/NETWORK_TUNING_PROTOCOL.md | DONE | | tuning forbidden before blind counts; the S1 grid; metrics fixed (MAE and bias of roots, skeleton F1); whole fields held out (at most one of 3 or 4 now); decision rule before looking; held-out once; repo contents; Hyp check; lacuna stage separate; ImageJ tracing and blind annotation |
 | R1 | Checks and switch comments | TODO | | |
 | R2 | INDEX, docs/CANALICULI_V2_REPORT.md, links, ALL DONE | TODO | | |
