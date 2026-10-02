@@ -1,8 +1,8 @@
 # Figures v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (publication-fixes tip)
-last update: 2026-10-02 21:05
-next action: 7.1 docs/FIGURES_V2_REPORT.md, METHODS section, final checks
+last update: 2026-10-02 21:30
+next action: 7.1 pinned links and ALL DONE
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -25,5 +25,5 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | O1 | Reorganize figures_out/ with README and INDEX | DONE | c7118fe | git mv into main/, supplement/, per_image/<image>/overview; stale F1_*_inset.json removed; script paths updated (fig_stem); thumbs command writes _thumbs/ (600 px, full colour) and INDEX.md; README.md by hand; every command finds its outputs |
 | O2 | results_experiments/INDEX.md | DONE | 3d7eb65 | question to file map with one-line answers for task0 to task6 and fixes/; every linked path checked to exist; folders not renamed |
 | O3 | docs/START_HERE.md and README pointer | DONE | 3c58af0 | one page: what the pipeline is, folders, reading order, the three branches (nothing merged into main, merging is Karim's decision), switch table with defaults, commands; README gains one line at the top (2 added lines, nothing else changed) |
-| O4 | make_figures.py all | DONE | | all [-k TILES_KEY] [-b BLIND_KEY] [-f FIELD_DIR] regenerates every output in its folder, then thumbs and INDEX.md, and prints step, status (written, skipped, kept, failed, missing) and file; on the full tree 122 skipped and 3 kept without keys; after deleting one gallery PNG only that gallery and its thumbnail were written |
-| 7.1 | docs/FIGURES_V2_REPORT.md, METHODS section, checks, ALL DONE | TODO | | |
+| O4 | make_figures.py all | DONE | 9797375 | all [-k TILES_KEY] [-b BLIND_KEY] [-f FIELD_DIR] regenerates every output in its folder, then thumbs and INDEX.md, and prints step, status (written, skipped, kept, failed, missing) and file; on the full tree 122 skipped and 3 kept without keys; after deleting one gallery PNG only that gallery and its thumbnail were written |
+| 7.1 | docs/FIGURES_V2_REPORT.md, METHODS section, checks, ALL DONE | PARTIAL | | report and METHODS section 10 written; final checks with regression, then pinned links |
