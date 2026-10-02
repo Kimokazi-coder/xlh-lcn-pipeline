@@ -1,8 +1,8 @@
 # Figures v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (publication-fixes tip)
-last update: 2026-10-02 20:45
-next action: O4 make_figures.py all
+last update: 2026-10-02 21:05
+next action: 7.1 docs/FIGURES_V2_REPORT.md, METHODS section, final checks
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -24,6 +24,6 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | P8 | Per-image display window variants | DONE | 215a978 | variants command: overview, network, gallery with the image's own 1st and 99.8th percentile window into per_image/<image>/display_variants/ (PNG only, Decisions needed) with the note in the figure; main per-image figures keep the fixed window and state it; captions.md window section; two review rounds |
 | O1 | Reorganize figures_out/ with README and INDEX | DONE | c7118fe | git mv into main/, supplement/, per_image/<image>/overview; stale F1_*_inset.json removed; script paths updated (fig_stem); thumbs command writes _thumbs/ (600 px, full colour) and INDEX.md; README.md by hand; every command finds its outputs |
 | O2 | results_experiments/INDEX.md | DONE | 3d7eb65 | question to file map with one-line answers for task0 to task6 and fixes/; every linked path checked to exist; folders not renamed |
-| O3 | docs/START_HERE.md and README pointer | DONE | | one page: what the pipeline is, folders, reading order, the three branches (nothing merged into main, merging is Karim's decision), switch table with defaults, commands; README gains one line at the top (2 added lines, nothing else changed) |
-| O4 | make_figures.py all | TODO | | |
+| O3 | docs/START_HERE.md and README pointer | DONE | 3c58af0 | one page: what the pipeline is, folders, reading order, the three branches (nothing merged into main, merging is Karim's decision), switch table with defaults, commands; README gains one line at the top (2 added lines, nothing else changed) |
+| O4 | make_figures.py all | DONE | | all [-k TILES_KEY] [-b BLIND_KEY] [-f FIELD_DIR] regenerates every output in its folder, then thumbs and INDEX.md, and prints step, status (written, skipped, kept, failed, missing) and file; on the full tree 122 skipped and 3 kept without keys; after deleting one gallery PNG only that gallery and its thumbnail were written |
 | 7.1 | docs/FIGURES_V2_REPORT.md, METHODS section, checks, ALL DONE | TODO | | |

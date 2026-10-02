@@ -2063,6 +2063,86 @@ def make_thumbs_and_index() -> dict:
     return report
 
 
+DEFAULT_FIELD_DIR = ROOT / "results_experiments" / "fixes" / "B3_field_summary"
+
+
+def figure_all(tiles_key: Path | None = None, blind_key: Path | None = None,
+               field_dir: Path = DEFAULT_FIELD_DIR) -> int:
+    """O4: regenerate the whole figures_out/ tree in its folders. Every step
+    skips outputs that exist; delete a file to redraw it. Prints one row per
+    output: written, skipped, failed or missing. Returns 1 if any step failed."""
+    def pair(stem):
+        return [stem.with_name(stem.name + ".png"), stem.with_name(stem.name + ".pdf")]
+
+    names = [short(p) for p in image_paths()]
+    steps = [("display window", display_window, (), [OUT / "display_window.json"])]
+    for n in names:
+        steps.append((f"overview {n}", figure_image, (n,), pair(PER_IMAGE / n / "overview")))
+    steps.append(("overview 543_3 -r", figure_image, ("543_3", None, True),
+                  pair(PER_IMAGE / "543_3" / "overview_low_cut_layer")))
+    for n in names:
+        steps.append((f"network {n}", figure_network, (n,), pair(PER_IMAGE / n / "network")))
+    steps.append(("Fig02 copy", copy_fig02, (), pair(fig_stem("Fig02").with_name(f"Fig02_network_overlay_{FIG02_IMAGE}"))))
+    for n in names:
+        steps.append((f"gallery {n}", figure_gallery, (n,), pair(PER_IMAGE / n / "gallery")))
+    for n in names:
+        folder = PER_IMAGE / n / "display_variants"
+        steps.append((f"variants {n}", figure_display_variants, (n,),
+                      [folder / f"{k}_image_window.png" for k in ("overview", "network", "gallery")]))
+    steps += [("Fig01", figure_contact, (None, False), pair(fig_stem("Fig01_contact_sheet"))),
+              ("Fig03", figure_thresholds, (), pair(fig_stem("Fig03_threshold_sensitivity"))),
+              ("Fig04", figure_fields, (field_dir, False), pair(fig_stem("Fig04_per_field"))),
+              ("Fig04 merged", figure_fields, (field_dir, True), pair(fig_stem("Fig04_per_field_merged"))),
+              ("S01", figure_switches, (), pair(fig_stem("S01_switch_examples"))),
+              ("S02", figure_contact, (None, True), pair(fig_stem("S02_contact_sheet_with_rejected_candidates")))]
+    s03 = pair(fig_stem("S03_contact_sheet_coded"))
+    if blind_key is not None:
+        steps.append(("S03", figure_contact, (blind_key, False), s03))
+    tiles = sorted(TILES_DIR.glob("T*.png")) + [TILES_DIR / "annotation_template.csv", TILES_DIR / "README.md"]
+    if tiles_key is not None:
+        steps.append(("validation tiles", make_validation_tiles, (tiles_key,), tiles))
+
+    def stamp(paths):
+        return {p: p.stat().st_mtime_ns if p.is_file() else None for p in paths}
+
+    rows, failed = [], 0
+    for label, func, args, paths in steps:
+        before = stamp(paths)
+        code = run("O4", func, *args)
+        after = stamp(paths)
+        for p in paths:
+            if code:
+                status = "failed"
+            elif after[p] is None:
+                status = "missing"
+            else:
+                status = "written" if before[p] != after[p] else "skipped"
+            rows.append((label, p, status))
+        failed += bool(code)
+    if blind_key is None:
+        rows += [("S03", p, "kept (needs -b KEY)" if p.is_file() else "missing (needs -b KEY)") for p in s03]
+    if tiles_key is None:
+        rows += [("validation tiles", TILES_DIR, f"kept, {len(list(TILES_DIR.glob('T*.png')))} tiles "
+                  "(needs -k KEY to redraw)")]
+    thumbs_before = stamp(sorted(THUMBS.glob("*.png")) + [OUT / "INDEX.md"])
+    report = make_thumbs_and_index()
+    for path_str, status in report.items():
+        rows.append(("thumbs and INDEX", OUT / path_str, status))
+    del thumbs_before
+
+    width = max(len(r[0]) for r in rows)
+    print(f"\n{'step':<{width}}  {'status':<10}  file")
+    for label, p, status in rows:
+        rel = p.relative_to(ROOT).as_posix() if p.is_absolute() else str(p)
+        print(f"{label:<{width}}  {status:<10}  {rel}")
+    counts = {}
+    for _l, _p, st in rows:
+        key = st.split(" ")[0].rstrip(",")
+        counts[key] = counts.get(key, 0) + 1
+    print("\nsummary: " + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())))
+    return 1 if failed else 0
+
+
 # Command line ----------------------------------------------------------------------------
 
 def run(item: str, func, *args) -> int:
@@ -2113,11 +2193,20 @@ def main() -> int:
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
     sub.add_parser("thumbs", help="Thumbnails in _thumbs/ and figures_out/INDEX.md.")
+    q = sub.add_parser("all", help="Regenerate the whole figures_out/ tree; prints what was written or skipped.")
+    q.add_argument("-k", dest="tiles_key", type=Path, default=None,
+                   help="Key of the hand-count tiles (outside the repository); without it the tiles are kept.")
+    q.add_argument("-b", dest="blind_key", type=Path, default=None,
+                   help="Blinding key for S03 (outside the repository); without it S03 is kept.")
+    q.add_argument("-f", dest="field_dir", type=Path, default=DEFAULT_FIELD_DIR,
+                   help="Output folder of field-summary (default: results_experiments/fixes/B3_field_summary).")
     q = sub.add_parser("tiles", help="Hand-count tiles (raw red, random codes); key outside the repository.")
     q.add_argument("-k", dest="key", type=Path, required=True, help="Key path, outside the repository.")
     args = p.parse_args()
     if args.cmd == "check":
         return run("N0", _selftest_n0)
+    if args.cmd == "all":
+        return figure_all(args.tiles_key, args.blind_key, args.field_dir)
     if args.cmd == "thumbs":
         return run("O1", make_thumbs_and_index)
     if args.cmd == "tiles":
