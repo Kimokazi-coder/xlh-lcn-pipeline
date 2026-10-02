@@ -1,8 +1,8 @@
 # Figures v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (publication-fixes tip)
-last update: 2026-10-02 20:15
-next action: O2 results_experiments/INDEX.md
+last update: 2026-10-02 20:30
+next action: O3 docs/START_HERE.md and README pointer
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -22,8 +22,8 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | P6 | Count line and canal mark "c" | DONE | 8bee8d7 | count line in overview, network, gallery header, contact sheets, Fig03 (per cut, with rejected counts); c marks 8 lacunae incl. 682_z08 L1 top edge, 542_z06 (555,149), 682_z23 (363,7); classification unchanged; two review rounds |
 | P7 | Inset rule with frame margin and overrides file | DONE | c93151e | eligibility as N1 (bbox >= 60 px from the frame), roots closest to the median, then area closest to the median area, then smallest id; figures/inset_overrides.csv header only, read when present (tested); logged in per_image/<image>/inset.json; 543-2 inset L4 (edge) to L6 |
 | P8 | Per-image display window variants | DONE | 215a978 | variants command: overview, network, gallery with the image's own 1st and 99.8th percentile window into per_image/<image>/display_variants/ (PNG only, Decisions needed) with the note in the figure; main per-image figures keep the fixed window and state it; captions.md window section; two review rounds |
-| O1 | Reorganize figures_out/ with README and INDEX | DONE | | git mv into main/, supplement/, per_image/<image>/overview; stale F1_*_inset.json removed; script paths updated (fig_stem); thumbs command writes _thumbs/ (600 px, full colour) and INDEX.md; README.md by hand; every command finds its outputs |
-| O2 | results_experiments/INDEX.md | TODO | | |
+| O1 | Reorganize figures_out/ with README and INDEX | DONE | c7118fe | git mv into main/, supplement/, per_image/<image>/overview; stale F1_*_inset.json removed; script paths updated (fig_stem); thumbs command writes _thumbs/ (600 px, full colour) and INDEX.md; README.md by hand; every command finds its outputs |
+| O2 | results_experiments/INDEX.md | DONE | | question to file map with one-line answers for task0 to task6 and fixes/; every linked path checked to exist; folders not renamed |
 | O3 | docs/START_HERE.md and README pointer | TODO | | |
 | O4 | make_figures.py all | TODO | | |
 | 7.1 | docs/FIGURES_V2_REPORT.md, METHODS section, checks, ALL DONE | TODO | | |
