@@ -277,8 +277,16 @@ def draw_outlines(ax, lacuna_id_map: np.ndarray, rows: list, numbers: bool = Fal
         for c in measure.find_contours(m.astype(float), 0.5):
             ax.plot(c[:, 1] - 1 - x0, c[:, 0] - 1 - y0, color=colour, lw=lw, solid_joinstyle="round")
         if numbers:
-            ax.text(row["centroid_col_px"] - x0, row["centroid_row_px"] - y0, str(lid), color=colour,
-                    ha="center", va="center", fontsize=number_size, fontweight="bold", path_effects=halo())
+            # Beside the lacuna, not on it: right of its bounding box, or left
+            # of it when the box is close to the right frame edge.
+            cols = np.nonzero((lacuna_id_map == lid).any(axis=0))[0]
+            right = cols.max() + 6
+            if right > lacuna_id_map.shape[1] - 40:
+                tx, ha = cols.min() - 6, "right"
+            else:
+                tx, ha = right, "left"
+            ax.text(tx - x0, row["centroid_row_px"] - y0, str(lid), color=colour, ha=ha, va="center",
+                    fontsize=number_size, fontweight="bold", path_effects=halo())
 
 
 def image_axes(ax, img: np.ndarray, cmap: str = "gray") -> None:
@@ -362,7 +370,7 @@ def figure_image(name: str, cell: int | None = None) -> None:
 
     sk = skeleton_rgb(out["channel"], out["skeleton"])
     image_axes(axC, sk)
-    axC.set_title("skeleton", pad=2)
+    axC.set_title("skeleton (white) on the image at 60%", pad=2)
     axC.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), side, side, fill=False, ec=ROOT_COLOUR, lw=0.8))
 
     crop = sk[y0:y0 + side, x0:x0 + side]
