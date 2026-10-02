@@ -80,3 +80,11 @@ FILL_ENCLOSED_HOLES_MAX_PX2 = 0
 # (0.681 and up), but that gap rests on two objects only. Removing them lets
 # the skeleton trace the band wall in their place.
 BAND_FILTER_MIN_OPENING_SHARE = None
+
+# Fast lacuna stage. The watershed split and the shallow-split re-merge of
+# src/lacunae.py loop over every component with full-frame arrays (10 to 120 s
+# per image). When True, bounding-box versions of the same two steps are used
+# instead. They give identical labels on all 8 WT images at the default cut
+# and at t_hi scaled 0.8 to 1.2 (python src/diagnostics.py fast-check), and
+# regression passes with it on. Off by default; it changes speed, not output.
+FAST_LACUNA_STAGE = False

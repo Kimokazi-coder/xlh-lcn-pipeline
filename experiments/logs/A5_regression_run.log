@@ -1,0 +1,37 @@
+Regression, current config: F:\lcn-quant\results_experiments\_cache\regression against F:\lcn-quant\results (tolerance 0, provenance ignored)
+
+image             json fields compared  differ  new fields (not compared)  result
+----------------  --------------------  ------  -------------------------  ------
+542_WT_2_z06c1-2  536                   0       164                        PASS  
+542_WT_2_z18c1-2  439                   0       132                        PASS  
+543-2             488                   0       132                        PASS  
+543_3             401                   0       116                        PASS  
+543_z13c1-2       455                   0       124                        PASS  
+682_z08c1-2       471                   0       116                        PASS  
+682_z23c-2        512                   0       148                        PASS  
+682_z29c1-3       479                   0       140                        PASS  
+
+summary_table.csv: 80 cells compared, 0 differ; new columns not compared: perimeter per cell (px), ring area 30 px per cell (px^2), ring area 60 px per cell (px^2), in-frame fraction 30 px per cell, in-frame fraction 60 px per cell, ring density 30 px per cell (px^-1), ring density 60 px per cell (px^-1), roots per 100 px perimeter per cell
+
+run result: PASS, current config, 3861 numbers compared over 8 images.
+time: 125 s
+
+Regression, FAST_LACUNA_STAGE on: F:\lcn-quant\results_experiments\_cache\regression\fast_stage against F:\lcn-quant\results (tolerance 0, provenance ignored)
+
+image             json fields compared  differ  new fields (not compared)  result
+----------------  --------------------  ------  -------------------------  ------
+542_WT_2_z06c1-2  536                   0       164                        PASS  
+542_WT_2_z18c1-2  439                   0       132                        PASS  
+543-2             488                   0       132                        PASS  
+543_3             401                   0       116                        PASS  
+543_z13c1-2       455                   0       124                        PASS  
+682_z08c1-2       471                   0       116                        PASS  
+682_z23c-2        512                   0       148                        PASS  
+682_z29c1-3       479                   0       140                        PASS  
+
+summary_table.csv: 80 cells compared, 0 differ; new columns not compared: perimeter per cell (px), ring area 30 px per cell (px^2), ring area 60 px per cell (px^2), in-frame fraction 30 px per cell, in-frame fraction 60 px per cell, ring density 30 px per cell (px^-1), ring density 60 px per cell (px^-1), roots per 100 px perimeter per cell
+
+run result: PASS, FAST_LACUNA_STAGE on, 3861 numbers compared over 8 images.
+time: 8 s
+
+PASS: regression, 2 runs (current config; FAST_LACUNA_STAGE on), 2 passed.

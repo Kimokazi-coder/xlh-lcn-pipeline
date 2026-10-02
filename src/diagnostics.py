@@ -16,6 +16,8 @@ Subcommands:
                       with results/ at tolerance 0
     switch-check      turn each switch of config.py on alone, regenerate every
                       image and list what changes against results/
+    fast-check        the fast lacuna stage against the original one: identical
+                      labels at t_hi scaled 0.8 to 1.2, and the timing
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -25,6 +27,7 @@ Usage (from the repo root):
     python src/diagnostics.py sanity --dir data/WT
     python src/diagnostics.py regression
     python src/diagnostics.py switch-check
+    python src/diagnostics.py fast-check
 """
 
 from __future__ import annotations
@@ -481,13 +484,26 @@ def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, wor
           + (f"; new columns not compared: {', '.join(summ['extra_columns'])}" if summ["extra_columns"] else ""))
     for d in (shown + s_diffs)[:20]:
         print("  DIFF", *d)
-    print(f"\n{'PASS' if ok else 'FAIL'}: regression, {label}, {total} numbers compared over {len(images)} images.")
+    print(f"\nrun result: {'PASS' if ok else 'FAIL'}, {label}, {total} numbers compared over {len(images)} images.")
     return ok
 
 
 def cmd_regression(args) -> int:
+    """Two runs: the current config, then the same with FAST_LACUNA_STAGE on,
+    which must give the same numbers."""
+    import time
+
     images = images_from(args)
-    ok = run_regression(images, args.ref, args.out, {}, args.workers, "current config")
+    results = []
+    for label, overrides, out in (("current config", {}, args.out),
+                                  ("FAST_LACUNA_STAGE on", {"FAST_LACUNA_STAGE": True}, args.out / "fast_stage")):
+        t0 = time.time()
+        ok = run_regression(images, args.ref, out, overrides, args.workers, label)
+        print(f"time: {time.time() - t0:.0f} s\n")
+        results.append(ok)
+    ok = all(results)
+    print(f"{'PASS' if ok else 'FAIL'}: regression, {len(results)} runs (current config; FAST_LACUNA_STAGE on), "
+          f"{sum(results)} passed.")
     return 0 if ok else 1
 
 
@@ -577,6 +593,66 @@ def cmd_switch_check(args) -> int:
     return 0
 
 
+# fast-check ---------------------------------------------------------------------
+# The bounding-box lacuna stage (config.FAST_LACUNA_STAGE) against the
+# original functions: labels after the watershed and after the re-merge must
+# be identical, at the default cut and at t_hi scaled 0.8 to 1.2.
+
+FAST_CHECK_SCALES = (0.8, 0.9, 1.0, 1.1, 1.2)
+
+
+def _fast_check_one(path_str: str) -> list:
+    import time
+
+    image_path = Path(path_str)
+    _display, channel = lacunae.load_channel(image_path)
+    _mask, t_hi = lacunae.multiotsu_lacuna_mask(channel)
+    rows = []
+    for scale in FAST_CHECK_SCALES:
+        mask, _t = lacunae.multiotsu_lacuna_mask(channel, t_hi * scale)
+        distance = ndi_distance(mask)
+        t0 = time.time()
+        ws = lacunae.watershed_split(mask)
+        merged = lacunae.merge_shallow_splits(ws, mask, distance)
+        t_slow = time.time() - t0
+        t0 = time.time()
+        ws_f = lacunae.watershed_split_fast(mask)
+        merged_f = lacunae.merge_shallow_splits_fast(ws_f, mask, distance)
+        t_fast = time.time() - t0
+        rows.append([lacunae.clean_name(image_path), scale, bool(np.array_equal(ws, ws_f)),
+                     bool(np.array_equal(merged, merged_f)), round(t_slow, 1), round(t_fast, 2)])
+    return rows
+
+
+def ndi_distance(mask):
+    from scipy import ndimage as ndi
+
+    return ndi.distance_transform_edt(mask)
+
+
+def cmd_fast_check(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(images)))) as ex:
+        rows = [r for part in ex.map(_fast_check_one, [str(p) for p in images]) for r in part]
+    print_table(["image", "t_hi scale", "watershed identical", "re-merge identical", "original s", "fast s"], rows,
+                title="Fast lacuna stage against the original (labels compared pixel for pixel)\n")
+    ok = all(r[2] and r[3] for r in rows)
+    slow, fast = sum(r[4] for r in rows), sum(r[5] for r in rows)
+    print(f"\nTotal time over {len(rows)} runs: original {slow:.0f} s, fast {fast:.1f} s "
+          f"(each run in its own process, {args.workers} in parallel).")
+    print(f"\n{'PASS' if ok else 'FAIL'}: fast-check, {sum(r[2] and r[3] for r in rows)} of {len(rows)} identical.")
+    if args.csv:
+        import csv
+        args.csv.parent.mkdir(parents=True, exist_ok=True)
+        with open(args.csv, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["image", "t_hi_scale", "watershed_identical", "remerge_identical", "original_s", "fast_s"])
+            w.writerows(rows)
+    return 0 if ok else 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -619,6 +695,12 @@ def main() -> None:
     p.add_argument("-r", dest="ref", type=Path, default=config.RESULTS_DIR, help="Reference folder (default: results/).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_switch_check)
+
+    p = sub.add_parser("fast-check", help="Fast lacuna stage against the original: identical labels, timing.")
+    add_images_arguments(p)
+    p.add_argument("-c", dest="csv", type=Path, default=None, help="Also write the table to this CSV file.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_fast_check)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

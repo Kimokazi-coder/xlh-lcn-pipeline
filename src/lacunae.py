@@ -185,15 +185,18 @@ def clean_name(image_path: Path) -> str:
 
 # Segmentation
 
-def multiotsu_lacuna_mask(channel: np.ndarray) -> tuple[np.ndarray, float]:
+def multiotsu_lacuna_mask(channel: np.ndarray, t_hi: float | None = None) -> tuple[np.ndarray, float]:
     """Three-class Otsu on this image's own histogram; the top class holds
-    the bright lacuna population, separate from the dimmer network."""
-    try:
-        thresholds = filters.threshold_multiotsu(channel, classes=3)
-        t_hi = float(thresholds[-1])
-    except ValueError:
-        # Degenerate histogram (for example a near-constant field).
-        t_hi = float(filters.threshold_otsu(channel))
+    the bright lacuna population, separate from the dimmer network. A given
+    t_hi replaces the computed cut (used only by the sensitivity diagnostics;
+    the pipeline never passes one)."""
+    if t_hi is None:
+        try:
+            thresholds = filters.threshold_multiotsu(channel, classes=3)
+            t_hi = float(thresholds[-1])
+        except ValueError:
+            # Degenerate histogram (for example a near-constant field).
+            t_hi = float(filters.threshold_otsu(channel))
 
     mask = channel >= t_hi
     mask = morphology.remove_small_holes(mask, area_threshold=FILL_HOLES_PX2)
@@ -228,6 +231,37 @@ def watershed_split(mask: np.ndarray) -> np.ndarray:
         markers[seed_labels > 0] = remap[seed_labels > 0]
         next_id += n
 
+    return segmentation.watershed(-distance, markers=markers, mask=mask)
+
+
+def watershed_split_fast(mask: np.ndarray) -> np.ndarray:
+    """watershed_split with the same steps done inside each component's
+    bounding box plus a 1 px margin (config.FAST_LACUNA_STAGE). Identical
+    labels (python src/diagnostics.py fast-check)."""
+    distance = ndi.distance_transform_edt(mask)
+    components = measure.label(mask, connectivity=2)
+    markers = np.zeros_like(components, dtype=np.int32)
+    next_id = 1
+    rows, cols = mask.shape
+    for comp_id, sl in enumerate(ndi.find_objects(components), start=1):
+        if sl is None:
+            continue
+        r0, r1 = max(sl[0].start - 1, 0), min(sl[0].stop + 1, rows)
+        c0, c1 = max(sl[1].start - 1, 0), min(sl[1].stop + 1, cols)
+        comp_mask = components[r0:r1, c0:c1] == comp_id
+        d_local = np.where(comp_mask, distance[r0:r1, c0:c1], 0.0)
+        peak = d_local.max()
+        if peak <= 0:
+            continue
+        h = max(SEED_PROMINENCE_FRACTION * peak, 1e-6)
+        seeds = morphology.h_maxima(d_local, h) & comp_mask
+        seed_labels = measure.label(seeds, connectivity=2)
+        n = seed_labels.max()
+        if n == 0:
+            continue
+        sub = markers[r0:r1, c0:c1]
+        sub[seed_labels > 0] = seed_labels[seed_labels > 0] + next_id - 1
+        next_id += n
     return segmentation.watershed(-distance, markers=markers, mask=mask)
 
 
@@ -290,6 +324,54 @@ def merge_shallow_splits(labels: np.ndarray, mask: np.ndarray, distance: np.ndar
             root = find(lbl)
             if root != lbl:
                 merged[merged == lbl] = root
+    return merged
+
+
+def merge_shallow_splits_fast(labels: np.ndarray, mask: np.ndarray, distance: np.ndarray) -> np.ndarray:
+    """merge_shallow_splits with the same steps done inside each component's
+    bounding box (config.FAST_LACUNA_STAGE). Same pieces, same order, same
+    saddle test; identical labels (python src/diagnostics.py fast-check)."""
+    components = measure.label(mask, connectivity=2)
+    merged = labels.copy()
+    for comp_id, sl in enumerate(ndi.find_objects(components), start=1):
+        if sl is None:
+            continue
+        r0, c0 = sl[0].start, sl[1].start
+        comp_mask = components[sl] == comp_id
+        m = merged[sl]
+        piece_labels = np.unique(m[comp_mask])
+        piece_labels = piece_labels[piece_labels != 0]
+        substantial = [lbl for lbl in piece_labels if (m == lbl).sum() >= MIN_AREA_PX2]
+        if len(substantial) < 2:
+            continue
+        peaks, peak_locs = {}, {}
+        for lbl in substantial:
+            piece = m == lbl
+            peaks[lbl] = distance[sl][piece].max()
+            rr, cc = np.unravel_index(np.argmax(np.where(piece, distance[sl], -1)), piece.shape)
+            peak_locs[lbl] = (rr + r0, cc + c0)
+        parent = {lbl: lbl for lbl in substantial}
+
+        def find(x):
+            while parent[x] != x:
+                x = parent[x]
+            return x
+
+        for i in range(len(substantial)):
+            for j in range(i + 1, len(substantial)):
+                a, b = substantial[i], substantial[j]
+                ra, ca = peak_locs[a]
+                rb, cb = peak_locs[b]
+                saddle = _sample_line_min(distance, ra, ca, rb, cb)
+                if saddle / min(peaks[a], peaks[b]) >= MERGE_SADDLE_RATIO_MIN:
+                    root_a, root_b = find(a), find(b)
+                    if root_a != root_b:
+                        parent[root_a] = root_b
+        for lbl in substantial:
+            root = find(lbl)
+            if root != lbl:
+                m[m == lbl] = root
+        merged[sl] = m
     return merged
 
 
@@ -383,13 +465,15 @@ def band_filter(kept: list[tuple], min_share: float) -> list[tuple]:
     return [(region, b) for region, b in kept if opening_share(region) >= min_share]
 
 
-def segment(channel: np.ndarray) -> tuple[np.ndarray, list[tuple], float]:
+def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple[np.ndarray, list[tuple], float]:
     """(label_image, kept, t_hi) for one signal channel. The switch steps run
-    only when their switch in config.py is on."""
-    mask, t_hi = multiotsu_lacuna_mask(channel)
-    labels = watershed_split(mask)
+    only when their switch in config.py is on. A given t_hi replaces the
+    computed cut (sensitivity diagnostics only)."""
+    mask, t_hi = multiotsu_lacuna_mask(channel, t_hi)
+    fast = config.FAST_LACUNA_STAGE
+    labels = (watershed_split_fast if fast else watershed_split)(mask)
     distance = ndi.distance_transform_edt(mask)
-    labels = merge_shallow_splits(labels, mask, distance)
+    labels = (merge_shallow_splits_fast if fast else merge_shallow_splits)(labels, mask, distance)
     kept = filter_regions(labels)
     if config.NARROW_CRUMB_RULE:
         labels = join_enclosed_crumbs(labels, kept)
@@ -571,6 +655,7 @@ def parameters() -> dict:
         "narrow_crumb_rule": config.NARROW_CRUMB_RULE,
         "fill_enclosed_holes_max_px2": config.FILL_ENCLOSED_HOLES_MAX_PX2,
         "band_filter_min_opening_share": config.BAND_FILTER_MIN_OPENING_SHARE,
+        "fast_lacuna_stage": config.FAST_LACUNA_STAGE,
     }
 
 
