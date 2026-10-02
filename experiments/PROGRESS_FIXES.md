@@ -8,7 +8,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 
 | id | description | status | commit SHA | note |
 |---|---|---|---|---|
-| 0.1 | Branch publication-fixes and this file | DONE |  | branch from overnight-fixes ef04398 |
+| 0.1 | Branch publication-fixes and this file | DONE | 506de42 | branch from overnight-fixes ef04398 |
 | A2 | Output-directory option -o for both features and the summary writer | TODO |  |  |
 | A6 | Subcommand regression: regenerate all 8 and compare with results/ at tolerance 0 | TODO |  |  |
 | F0 | figures/make_figures.py with the shared style | TODO |  |  |
