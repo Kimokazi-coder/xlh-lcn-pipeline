@@ -1,7 +1,7 @@
 # Publication fixes progress
 
-last update: 2026-10-02 12:39
-next action: B1 subcommands blind and unblind; leak test on the 8 WT images; .gitignore patterns for key files.
+last update: 2026-10-02 12:41
+next action: B2 subcommand sensitivity (t_hi, t_lo, both at 0.8 to 1.2, pooled cut), fast stage; then F3.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -18,7 +18,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | 7.0 | Draft docs/FIXES_REPORT.md | DONE | c8deab9 | docs/FIXES_REPORT.md drafted from pass 1 |
 | A4 | Switches NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2, BAND_FILTER_MIN_OPENING_SHARE; subcommand switch-check | DONE | 438a571 | NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2=0, BAND_FILTER_MIN_OPENING_SHARE=None; switch-check equals the overnight report: crumb only 543_3 (877,545), holes only 542_z06 (783,581), band only the two objects |
 | A5 | Switch FAST_LACUNA_STAGE; identical labels; timing | DONE | 0c415df | bounding-box watershed and re-merge in src/lacunae.py behind FAST_LACUNA_STAGE (off); 40 of 40 identical labels at t_hi 0.8 to 1.2; regression PASS both ways; 542_z06 70.2 s to 2.8 s, all 8 regenerated in 125 s vs 8 s |
-| B1 | Subcommands blind and unblind; leak test | TODO |  |  |
+| B1 | Subcommands blind and unblind; leak test | DONE | f378c60 | blind refuses keys inside the repo; pixel data only, constant alpha dropped so all copies look alike; 0 original names in 76 outputs and logs; unblinded numbers equal the normal run (128 cells, 4837 json fields); .gitignore key patterns added |
 | B2 | Subcommand sensitivity | TODO |  |  |
 | B3 | Subcommand field-summary | TODO |  |  |
 | F1b | Per-image figures for the other 7 images | DONE | 7f24b11 | 7 more per-image figures, inset by rule; two review rounds (edge numbers kept inside the frame); figures use the fast lacuna stage (identical output) |
