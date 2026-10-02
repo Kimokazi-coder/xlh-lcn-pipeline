@@ -38,3 +38,20 @@ Round 1 (all 7 viewed at 1000 px):
   output as it is.
 
 Round 2 (682_z23 viewed again): the edge numbers sit inside the frame. Nothing else found.
+
+## F2 contact sheet
+
+Round 1: the eight panels, outlines (0.6 pt) and counts are legible at 1000 px. The fixed display
+window shows that the 543 images have a brighter background than the 542 and 682 images; that is the
+data, not a display choice. Defect: the "pre-validation" footer sat almost on the last caption. Fix:
+a 3 mm footer strip. Round 2: clear.
+
+`-b -k KEY` writes `F2_contact_sheet_coded` (labels S001 to S008, ordered by code; made with the test
+key of B1, which lives outside the repository). `-b` without a key is refused.
+
+## F5 switch examples
+
+Round 1: both cases are clear (the thread traced across the 543_3 gap disappears with the crumb rule
+on; the 542_z06 hole is filled). Defects: "px^2" written literally in the row B titles, and the value
+lines under the off and on panels nearly touched. Fix: "px²", shorter value lines, wider gaps.
+Round 2: clear. Values (area, roots, ring 30) equal the switch-check output of A4.

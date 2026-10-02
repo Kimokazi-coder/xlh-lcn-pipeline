@@ -10,6 +10,11 @@ Usage (from the repo root):
     python -u figures/make_figures.py image -i 543-2      # per-image figure (F1)
     python -u figures/make_figures.py image -i 543-2 -c 6 # the same, inset on lacuna 6
     python -u figures/make_figures.py image -a            # per-image figures, all 8 images
+    python -u figures/make_figures.py contact             # contact sheet of all images (F2)
+    python -u figures/make_figures.py contact -b -k KEY   # the same, labelled with blinding codes
+    python -u figures/make_figures.py thresholds          # lacuna cut sensitivity figure (F3)
+    python -u figures/make_figures.py fields -f FIELD_DIR # per-field plot from field-summary (F4)
+    python -u figures/make_figures.py switches            # crumb rule and hole fill, off and on (F5)
 
 Each output is skipped if its PNG and PDF exist; delete them to redraw.
 
@@ -41,6 +46,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.ticker  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib import patheffects  # noqa: E402
 from matplotlib.patches import Rectangle  # noqa: E402
@@ -405,6 +411,228 @@ def figure_image(name: str, cell: int | None = None) -> None:
     print(fig_name, "written")
 
 
+# F2 contact sheet ----------------------------------------------------------------
+
+def figure_contact(key_path: Path | None = None) -> None:
+    """All images, 2 rows by 4 columns, raw with thin outlines and the count
+    under each, one display window. With a blinding key, panels are labelled
+    with the codes and ordered by code."""
+    import csv
+
+    fig_name = "F2_contact_sheet" + ("_coded" if key_path else "")
+    if done(fig_name):
+        print(fig_name, "exists, skipped")
+        return
+    paths = image_paths()
+    labels = {p: short(p) for p in paths}
+    if key_path:
+        with open(key_path, newline="") as f:
+            code_of = {row["original_name"]: row["code"] for row in csv.DictReader(f)}
+        labels = {p: code_of[p.name] for p in paths}
+        paths = sorted(paths, key=lambda p: labels[p])
+    n_cols, n_rows = 4, int(np.ceil(len(paths) / 4))
+    margin, gap, text_h, top, foot = 1.0, 2.0, 7.0, 2.0, 3.0
+    panel = (FIG_WIDTH_MM - 2 * margin - (n_cols - 1) * gap) / n_cols
+    fig_h = top + n_rows * (panel + text_h) + foot
+    fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
+    for i, p in enumerate(paths):
+        r, c = divmod(i, n_cols)
+        out = pipeline_output(p)
+        x = margin + c * (panel + gap)
+        y = fig_h - top - (r + 1) * panel - r * text_h
+        ax = mm_axes(fig, x, y, panel, panel, FIG_WIDTH_MM, fig_h)
+        image_axes(ax, windowed(out["channel"]))
+        draw_outlines(ax, out["lacuna_id_map"], out["lacuna_rows"], lw=0.6)
+        ax.text(0.5, -0.025, f"{labels[p]}: n = {out['lacuna_count']} ({out['interior_count']} interior)",
+                transform=ax.transAxes, ha="center", va="top")
+        if i == 0:
+            scale_bar(ax, out["lacuna_id_map"].shape[1])
+    fig.text(0.995, 0.003, "pre-validation, pixel units", ha="right", va="bottom", fontsize=FONT_SIZE - 1, color="0.35")
+    save(fig, fig_name)
+    print(fig_name, "written")
+
+
+# F3 lacuna cut sensitivity --------------------------------------------------------
+
+THRESHOLD_IMAGES = ["542_z06", "543-2", "682_z29"]
+THRESHOLD_SCALES = [0.8, 0.9, 1.0, 1.1, 1.2]
+
+
+def figure_thresholds() -> None:
+    """Rows: three images. Columns: the lacuna cut t_hi at 0.8 to 1.2 times
+    the image's own cut (1.0, the default, boxed). Outlines and counts. The
+    defaults are not changed; the scaled cut is passed to the lacuna stage."""
+    fig_name = "F3_threshold_sensitivity"
+    if done(fig_name):
+        print(fig_name, "exists, skipped")
+        return
+    margin, gap, text_h, top, left = 1.0, 1.5, 5.5, 5.0, 6.0
+    n_cols = len(THRESHOLD_SCALES)
+    panel = (FIG_WIDTH_MM - left - margin - (n_cols - 1) * gap) / n_cols
+    fig_h = top + len(THRESHOLD_IMAGES) * (panel + text_h)
+    fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
+    log = {}
+    for r, name in enumerate(THRESHOLD_IMAGES):
+        path = path_of(name)
+        _display, channel = lacunae.load_channel(path)
+        _mask, t_hi = lacunae.multiotsu_lacuna_mask(channel)
+        raw = windowed(channel)
+        for c, scale in enumerate(THRESHOLD_SCALES):
+            lac = lacunae.analyse_image(path, t_hi * scale) if scale != 1.0 else lacunae.analyse_image(path)
+            id_map = np.zeros(lac["labels"].shape, dtype=np.int32)
+            for lid, (region, _b) in enumerate(lac["kept"], start=1):
+                id_map[lac["labels"] == region.label] = lid
+            x = left + c * (panel + gap)
+            y = fig_h - top - (r + 1) * panel - r * text_h
+            ax = mm_axes(fig, x, y, panel, panel, FIG_WIDTH_MM, fig_h)
+            image_axes(ax, raw)
+            draw_outlines(ax, id_map, lac["rows"], lw=0.6)
+            ax.text(0.5, -0.03, f"n = {lac['lacuna_count']} ({lac['interior_lacuna_count']} interior)",
+                    transform=ax.transAxes, ha="center", va="top")
+            if scale == 1.0:
+                for sp in ax.spines.values():
+                    sp.set_linewidth(2.0)
+                    sp.set_edgecolor("black")
+            if r == 0:
+                ax.set_title(f"t_hi \u00d7 {scale:g}" + (" (default)" if scale == 1.0 else ""), pad=2)
+            if c == 0:
+                ax.text(-0.06, 0.5, name, transform=ax.transAxes, rotation=90, ha="right", va="center",
+                        fontsize=FONT_SIZE + 1)
+            if r == 0 and c == 0:
+                scale_bar(ax, id_map.shape[1])
+            log[f"{name} x{scale:g}"] = {"t_hi": lac["t_hi"], "lacuna_count": lac["lacuna_count"],
+                                         "interior": lac["interior_lacuna_count"]}
+    fig.text(0.995, 0.003, "pre-validation, pixel units", ha="right", va="bottom", fontsize=FONT_SIZE - 1, color="0.35")
+    write_json(OUT / f"{fig_name}_counts.json", log)
+    save(fig, fig_name)
+    print(fig_name, "written")
+
+
+# F5 switch examples ----------------------------------------------------------------
+
+SWITCH_CASES = [
+    ("543_3", 877, 545, 60, "NARROW_CRUMB_RULE", True, "narrow crumb rule"),
+    ("542_z06", 783, 581, 60, "FILL_ENCLOSED_HOLES_MAX_PX2", 200, "hole fill (up to 200 px²)"),
+]
+
+
+def switched_output(path: Path, switch: str, value) -> dict:
+    """canaliculi.analyse_image with one switch on, the rest default."""
+    old = getattr(config, switch)
+    setattr(config, switch, value)
+    try:
+        res = canaliculi.analyse_image(path)
+    finally:
+        setattr(config, switch, old)
+    return {"lacuna_id_map": res["lacuna_id_map"], "skeleton": res["skeleton"], "lacuna_rows": res["lacunae"]["rows"],
+            "cell_rows": res["rows"]}
+
+
+def figure_switches() -> None:
+    """Two rows (one per switch): raw crop | switch off | switch on, outlines
+    and the white skeleton over the image at 60%."""
+    fig_name = "F5_switch_examples"
+    if done(fig_name):
+        print(fig_name, "exists, skipped")
+        return
+    margin, gap, text_h, top, left = 1.0, 3.0, 9.0, 5.0, 2.0
+    panel = 45.0
+    width = left + 3 * panel + 2 * gap + margin
+    fig_h = top + len(SWITCH_CASES) * (panel + text_h)
+    fig = plt.figure(figsize=(width * MM, fig_h * MM))
+    log = {}
+    for r, (name, x, y, half, switch, value, label) in enumerate(SWITCH_CASES):
+        path = path_of(name)
+        off = pipeline_output(path)
+        on = switched_output(path, switch, value)
+        sl = (slice(y - half, y + half), slice(x - half, x + half))
+        raw = windowed(off["channel"])[sl]
+        y_ax = fig_h - top - (r + 1) * panel - r * text_h
+        for c, (title, data) in enumerate(((f"{name} ({x},{y}), red channel", None), (f"{label} off (default)", off),
+                                            (f"{label} on", on))):
+            ax = mm_axes(fig, left + c * (panel + gap), y_ax, panel, panel, width, fig_h)
+            if data is None:
+                image_axes(ax, raw)
+                scale_bar(ax, 2 * half, length_px=20)
+            else:
+                image_axes(ax, skeleton_rgb(off["channel"], data["skeleton"])[sl])
+                lid = int(data["lacuna_id_map"][y, x]) or int(data["lacuna_id_map"][sl].max())
+                rows = [rr for rr in data["lacuna_rows"] if rr["lacuna_id"] == lid]
+                draw_outlines(ax, data["lacuna_id_map"][sl], rows, lw=0.8)
+                cell = next(cr for cr in data["cell_rows"] if cr["lacuna_id"] == lid)
+                ax.text(0.5, -0.03, f"{rows[0]['area_px2']:.0f} px\u00b2, {cell['roots_count']} roots, "
+                        f"ring 30: {cell['ring_length_r30_px']} px", transform=ax.transAxes, ha="center", va="top")
+                log[f"{name} {title}"] = {"area_px2": rows[0]["area_px2"], "roots": cell["roots_count"],
+                                          "ring30": cell["ring_length_r30_px"]}
+            ax.set_title(title, pad=2)
+            if c == 0:
+                panel_letter(fig, ax, "AB"[r])
+    fig.text(0.995, 0.003, "pre-validation, pixel units", ha="right", va="bottom", fontsize=FONT_SIZE - 1, color="0.35")
+    write_json(OUT / f"{fig_name}_values.json", log)
+    save(fig, fig_name)
+    print(fig_name, "written")
+
+
+# F4 per-field plot -------------------------------------------------------------------
+
+FIELD_PANELS = [
+    ("roots_per_cell", "roots per cell", "roots"),
+    ("roots_per_100px_perimeter", "roots per 100 px\nperimeter", "roots / 100 px"),
+    ("ring30_per_cell", "ring length 30 px\nper cell", "px"),
+    ("ring_density_r30", "ring density 30 px", "px\u207b\u00b9"),
+    ("field_density", "field length density", "px\u207b\u00b9"),
+]
+
+
+def figure_fields(field_dir: Path) -> None:
+    """One small panel per measure: x is the field (groups derived from the
+    data by field-summary), dots are images, a bar marks the field mean, and
+    the number of images per field is printed. No statistical test."""
+    import csv
+
+    fig_name = "F4_per_field"
+    if done(fig_name):
+        print(fig_name, "exists, skipped")
+        return
+    with open(field_dir / "field_images.csv", newline="") as f:
+        rows = list(csv.DictReader(f))
+    fields = sorted({r["field"] for r in rows}, key=lambda v: int(v[1:]))
+    members = {fid: [SHORT.get(r["image"], r["image"]) for r in rows if r["field"] == fid] for fid in fields}
+    n_pan = len(FIELD_PANELS)
+    left, gap, right, bottom, top = 12.0, 11.0, 2.0, 16.0, 8.0
+    w = (FIG_WIDTH_MM - left - right - (n_pan - 1) * gap) / n_pan
+    h = 38.0
+    fig_h = bottom + h + top
+    fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
+    for i, (key, title, unit) in enumerate(FIELD_PANELS):
+        ax = mm_axes(fig, left + i * (w + gap), bottom, w, h, FIG_WIDTH_MM, fig_h)
+        for j, fid in enumerate(fields):
+            vals = [float(r[key]) for r in rows if r["field"] == fid and r[key] not in ("", "None")]
+            if not vals:
+                continue
+            offsets = np.linspace(-0.12, 0.12, len(vals)) if len(vals) > 1 else [0.0]
+            ax.scatter(np.array(offsets) + j, vals, s=9, c="black", zorder=3, linewidths=0)
+            ax.plot([j - 0.28, j + 0.28], [np.mean(vals)] * 2, color="#0072B2", lw=1.6, zorder=2)
+        ax.set_xticks(range(len(fields)))
+        ax.set_xticklabels([f"{fid}\nn={len(members[fid])}" for fid in fields])
+        ax.set_xlim(-0.6, len(fields) - 0.4)
+        ax.set_title(title, pad=3)
+        ax.set_ylabel(unit, labelpad=1)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.tick_params(length=2, pad=1)
+        if key in ("field_density", "ring_density_r30"):
+            ax.ticklabel_format(axis="y", style="plain")
+            ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.3f"))
+        panel_letter(fig, ax, "ABCDE"[i])
+    legend = "; ".join(f"{fid}: {' + '.join(members[fid])}" for fid in fields)
+    fig.text(0.01, 0.01, "Fields from field-summary (lacuna centroids matched across images). " + legend
+             + ". Dots: images; bar: field mean; n: images per field. Pre-validation, pixel units, no test.",
+             ha="left", va="bottom", fontsize=FONT_SIZE - 1, wrap=True)
+    save(fig, fig_name)
+    print(fig_name, "written")
+
+
 # Command line ----------------------------------------------------------------------------
 
 def run(item: str, func, *args) -> int:
@@ -428,12 +656,30 @@ def main() -> int:
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q.add_argument("-c", dest="cell", type=int, default=None, help="Lacuna id for the inset (default: the rule).")
+    q = sub.add_parser("contact", help="Contact sheet of all images (F2).")
+    q.add_argument("-b", dest="blind", action="store_true", help="Label with blinding codes instead of names.")
+    q.add_argument("-k", dest="key", type=Path, default=None, help="Blinding key (needed with -b).")
+    sub.add_parser("thresholds", help="Lacuna cut sensitivity figure (F3).")
+    q = sub.add_parser("fields", help="Per-field plot (F4).")
+    q.add_argument("-f", dest="field_dir", type=Path, required=True, help="Output folder of field-summary.")
+    sub.add_parser("switches", help="Crumb rule and hole fill, off and on (F5).")
     args = p.parse_args()
     if args.cmd == "window":
         return run("F0", lambda: print(display_window()))
     if args.cmd == "image":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
         return max(run("F1", figure_image, n, args.cell) for n in names)
+    if args.cmd == "contact":
+        if args.blind and not args.key:
+            print("-b needs the blinding key: -k KEY")
+            return 2
+        return run("F2", figure_contact, args.key if args.blind else None)
+    if args.cmd == "thresholds":
+        return run("F3", figure_thresholds)
+    if args.cmd == "fields":
+        return run("F4", figure_fields, args.field_dir)
+    if args.cmd == "switches":
+        return run("F5", figure_switches)
     return 1
 
 
