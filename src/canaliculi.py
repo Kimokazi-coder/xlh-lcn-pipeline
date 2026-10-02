@@ -1283,9 +1283,17 @@ def analyse_image(image_path: Path, t_hi: float | None = None, t_lo: float | Non
     """Everything feature 2 computes for one image, without writing. t_hi and
     t_lo replace the two computed cuts; only the sensitivity diagnostics pass
     them, the pipeline never does."""
-    precision = config.CSV_FLOAT_PRECISION
     lac = lacunae.analyse_image(image_path, t_hi)
     _display, channel = lacunae.load_channel(image_path)
+    return analyse_network(image_path, lac, channel, t_lo, roi_mask)
+
+
+def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: float | None = None,
+                    roi_mask: np.ndarray | None = None) -> dict:
+    """Feature 2 from a finished lacuna result onward (the part of
+    analyse_image after the lacuna stage), so a diagnostic can rerun the
+    network stage without the lacuna stage (network-sweep)."""
+    precision = config.CSV_FLOAT_PRECISION
     kept = lac["kept"]
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(lac["labels"], kept)

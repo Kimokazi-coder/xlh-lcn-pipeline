@@ -25,6 +25,8 @@ Subcommands:
                       plus one pooled cut: percent changes of the measures
     field-summary     group images into fields by matching lacuna centroids,
                       and write per-field means (the field is the unit)
+    network-sweep     one network parameter at a time at a low and a high
+                      value: percent changes of the network measures
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -39,6 +41,7 @@ Usage (from the repo root):
     python src/diagnostics.py unblind -s CODED_RESULTS/summary_table.csv -k KEY.csv -o UNBLINDED.csv
     python src/diagnostics.py sensitivity -d data/WT -o OUT_FOLDER
     python src/diagnostics.py field-summary -d data/WT -o OUT_FOLDER [-r RESULTS_FOLDER]
+    python src/diagnostics.py network-sweep -d data/WT -o OUT_FOLDER
 """
 
 from __future__ import annotations
@@ -1091,6 +1094,188 @@ def cmd_field_summary(args) -> int:
     return 0
 
 
+# network-sweep ------------------------------------------------------------------
+# One-at-a-time sensitivity of the network stage (docs/CANALICULI_V2_REPORT.md,
+# S1). The lacuna stage runs once per image (fast stage, identical labels) and is
+# cached; only the network stage reruns. Each parameter of src/canaliculi.py is
+# set to a low and a high value (about -30% and +30%, or the nearest sensible
+# integer steps) with everything else at its default; the network cut t_lo is
+# scaled 0.8 to 1.2 as in sensitivity. No default changes and no value is
+# recommended.
+
+NETWORK_SWEEP = [
+    ("TOPHAT_RADIUS_PX", (4, 6)),
+    ("HYSTERESIS_LOW_FRACTION", (0.525, 0.975)),
+    ("MAX_BRIDGE_GAP_PX", (0.0, 7.0, 13.0)),
+    ("MAX_BRIDGE_ANGLE_DEG", (28.0, 52.0)),
+    ("MIN_BRIDGE_SIGNAL_FRACTION", (0.49, 0.91)),
+    ("PRUNE_SPUR_LEN_PX", (3, 5)),
+    ("ROOT_MERGE_DIST_PX", (6.0, 10.0)),
+    ("LACUNA_ATTACH_GAP_PX", (7, 13)),
+    ("t_lo scale", (0.8, 0.9, 1.1, 1.2)),
+]
+SWEEP_DEFAULTS = {name: getattr(canaliculi, name) for name, _v in NETWORK_SWEEP if name != "t_lo scale"}
+SWEEP_MEASURES = [
+    ("roots_per_cell", "roots per cell", ("summary", "roots_count")),
+    ("ring30", "ring 30 px", ("summary", "ring_length_r30_px")),
+    ("ring30_attached", "ring attached 30 px", ("summary", "ring_attached_length_r30_px")),
+    ("ring30_weighted", "ring weighted 30 px", ("summary", "ring_length_w_r30_px")),
+    ("sholl10", "Sholl 10 px", ("summary", "sholl_crossings_r10")),
+    ("sholl20", "Sholl 20 px", ("summary", "sholl_crossings_r20")),
+    ("sholl30", "Sholl 30 px", ("summary", "sholl_crossings_r30")),
+    ("field_density", "field density", ("field", "canalicular_length_density_per_px")),
+    ("bridges", "bridges", ("bridges", None)),
+]
+
+
+def _sweep_lacunae(path_str: str, cache_dir: str) -> dict:
+    """The lacuna stage of one image, cached as labels and kept labels."""
+    from skimage import measure
+
+    image_path = Path(path_str)
+    cache = Path(cache_dir) / f"{lacunae.clean_name(image_path)}.npz"
+    if not cache.is_file():
+        config.FAST_LACUNA_STAGE = True
+        lac = lacunae.analyse_image(image_path)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache.with_name(cache.name + ".tmp.npz")
+        np.savez_compressed(tmp, labels=lac["labels"].astype(np.int32),
+                            kept=np.array([r.label for r, _b in lac["kept"]], dtype=np.int32),
+                            border=np.array([b for _r, b in lac["kept"]], dtype=bool), t_hi=lac["t_hi"])
+        tmp.replace(cache)
+    with np.load(cache) as z:
+        labels, kept_ids, border, t_hi = z["labels"], z["kept"], z["border"], float(z["t_hi"])
+    regions = {r.label: r for r in measure.regionprops(labels)}
+    kept = [(regions[int(i)], bool(b)) for i, b in zip(kept_ids, border)]
+    rows = lacunae.measurements_for(kept, config.CSV_FLOAT_PRECISION)
+    return {"labels": labels, "kept": kept, "t_hi": t_hi, "rows": rows, "display": None,
+            "lacuna_count": len(kept), "interior_lacuna_count": sum(1 for _r, b in kept if not b)}
+
+
+def _sweep_lacunae_cached(path_str: str, cache_dir: str) -> bool:
+    """Fill the lacuna cache of one image (returns only a flag, since the
+    region objects do not cross processes)."""
+    _sweep_lacunae(path_str, cache_dir)
+    return True
+
+
+def _sweep_run(job: tuple) -> dict:
+    path_str, param, value, out_path, cache_dir = job
+    out_path = Path(out_path)
+    if out_path.is_file():
+        return json.loads(out_path.read_text(encoding="utf-8"))
+    image_path = Path(path_str)
+    lac = _sweep_lacunae(path_str, cache_dir)
+    channel = lacunae.load_channel(image_path)[1]
+    t_lo = None
+    for name, _values in NETWORK_SWEEP:
+        if name != "t_lo scale" and getattr(canaliculi, name) != SWEEP_DEFAULTS[name]:
+            raise RuntimeError(f"{name} is not at its default at the start of a sweep job")
+    if param == "t_lo scale":
+        raw = canaliculi.preprocess_unnormalised(channel)
+        peak = float(raw.max())
+        _m, base = canaliculi.total_signal_mask(raw / peak if peak > 0 else raw)
+        t_lo = base * value
+    saved = None
+    if param is not None and param != "t_lo scale":
+        saved = getattr(canaliculi, param)
+        setattr(canaliculi, param, value)
+    try:
+        result = canaliculi.analyse_network(image_path, lac, channel, t_lo)
+    finally:
+        # A worker process runs many jobs: put the default back, so no setting
+        # leaks into the next job.
+        if saved is not None:
+            setattr(canaliculi, param, saved)
+    row = {"image": lacunae.clean_name(image_path), "parameter": param or "default",
+           "value": value, "t_lo": result["t_lo"]}
+    for key, _label, (block, field) in SWEEP_MEASURES:
+        if block == "bridges":
+            row[key] = len(result["bridges"])
+        elif block == "field":
+            row[key] = result["field"][field]
+        else:
+            row[key] = result["summary"][field]["mean"]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out_path.with_name(out_path.name + ".tmp")
+    tmp.write_text(json.dumps(row, indent=1), encoding="utf-8")
+    tmp.replace(out_path)
+    return row
+
+
+def cmd_network_sweep(args) -> int:
+    import csv
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = lacunae.image_paths(args)
+    out = args.out
+    runs, cache = out / "runs", out / "lacuna_cache"
+    jobs = []
+    for p in images:
+        name = lacunae.clean_name(p)
+        jobs.append((str(p), None, None, str(runs / f"{name}__default.json"), str(cache)))
+        for param, values in NETWORK_SWEEP:
+            for v in values:
+                tag = f"{param.replace(' ', '_')}={v:g}"
+                jobs.append((str(p), param, v, str(runs / f"{name}__{tag}.json"), str(cache)))
+    # The lacuna stage first, once per image, so the workers only read the cache.
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(images)))) as ex:
+        list(ex.map(_sweep_lacunae_cached, [str(p) for p in images], [str(cache)] * len(images)))
+    with ProcessPoolExecutor(max_workers=max(1, args.workers)) as ex:
+        rows = list(ex.map(_sweep_run, jobs))
+    base = {r["image"]: r for r in rows if r["parameter"] == "default"}
+    for r in rows:
+        b = base[r["image"]]
+        for key, _label, _src in SWEEP_MEASURES:
+            r[f"{key}_pct"] = (100.0 * (r[key] - b[key]) / b[key]) if b[key] else None
+    out.mkdir(parents=True, exist_ok=True)
+    cols = list(rows[0].keys())
+    with open(out / "network_sweep.csv", "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows(rows)
+    settings = [(param, v) for param, values in NETWORK_SWEEP for v in values]
+    table = []
+    for param, v in settings:
+        sub = [r for r in rows if r["parameter"] == param and r["value"] == v]
+        entry = {"setting": f"{param} = {v:g}"}
+        for key, _label, _src in SWEEP_MEASURES:
+            vals = np.array([r[f"{key}_pct"] for r in sub if r[f"{key}_pct"] is not None], dtype=float)
+            entry[key] = (float(np.median(vals)), float(vals.min()), float(vals.max())) if vals.size else None
+        table.append(entry)
+    defaults = {param: getattr(canaliculi, param) for param, _v in NETWORK_SWEEP if param != "t_lo scale"}
+    lines = ["# Network sweep", "",
+             "PRE-VALIDATION, pixel units. One parameter of the network stage at a time, everything else at its "
+             f"default, on {len(images)} images; the lacuna stage ran once per image (fast stage) and is reused. "
+             "Percent change against each image's default run: median over the images, range in brackets. "
+             "No value is recommended and no default changed.", "",
+             "Defaults: " + ", ".join(f"`{k}` = {v}" for k, v in defaults.items()) + "; t_lo is each image's own "
+             "lower Otsu cut. MAX_BRIDGE_GAP_PX = 0 means no bridging.", "",
+             "| setting | " + " | ".join(label for _k, label, _s in SWEEP_MEASURES) + " |",
+             "|---|" + "---|" * len(SWEEP_MEASURES)]
+    for e in table:
+        cells = [("" if e[k] is None else f"{e[k][0]:+.1f} [{e[k][1]:+.1f}, {e[k][2]:+.1f}]")
+                 for k, _l, _s in SWEEP_MEASURES]
+        lines.append(f"| {e['setting']} | " + " | ".join(cells) + " |")
+    lines += ["", "## Ranked by effect on each measure", "",
+              "For each parameter, the larger absolute median change of its settings, largest first.", ""]
+    effect = {}
+    for param, values in NETWORK_SWEEP:
+        for key, _label, _src in SWEEP_MEASURES:
+            meds = [abs(e[key][0]) for e in table if e["setting"].startswith(param + " =") and e[key] is not None]
+            effect[(param, key)] = max(meds) if meds else 0.0
+    for key, label, _src in SWEEP_MEASURES:
+        order = sorted((p for p, _v in NETWORK_SWEEP), key=lambda p: -effect[(p, key)])
+        lines.append(f"- **{label}**: " + ", ".join(f"{p} {effect[(p, key)]:.1f}%" for p in order))
+    spread = {key: float(np.mean([effect[(p, key)] for p, _v in NETWORK_SWEEP])) for key, _l, _s in SWEEP_MEASURES}
+    lines += ["", "Mean over the parameters of the largest median change (a rough robustness index, lower is more "
+              "robust): " + ", ".join(f"{label} {spread[key]:.1f}%" for key, label, _s in SWEEP_MEASURES) + ".", ""]
+    text = "\n".join(lines) + "\n"
+    (out / "network_sweep.md").write_text(text, encoding="utf-8")
+    print(text)
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1165,6 +1350,12 @@ def main() -> None:
                    help="Read existing outputs from this results folder instead of running the pipeline.")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_field_summary, image=None)
+
+    p = sub.add_parser("network-sweep", help="One network parameter at a time, low and high: percent changes.")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR, help="Folder of .tif images.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_network_sweep, image=None)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
