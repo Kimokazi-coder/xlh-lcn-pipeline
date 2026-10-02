@@ -1,7 +1,7 @@
 # Publication fixes progress
 
-last update: 2026-10-02 11:56
-next action: A4 three switches in config.py, all off, wired into lacunae.segment; subcommand switch-check.
+last update: 2026-10-02 12:07
+next action: A5 FAST_LACUNA_STAGE switch, fast-check at t_hi 0.8 to 1.2, regression runs twice, timing.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -16,7 +16,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | A1 | Provenance block in every json output; requirements.txt | DONE | c0e3f3e | provenance block (git commit, dirty flag, versions, config hash) in both json outputs, no timestamps; requirements.txt pinned, Python 3.9.10 |
 | A3 | Normalised measures as appended columns | DONE | 8531b3a | 8 columns appended to per-lacuna rows, per_lacuna sheet and summary table; regression PASS (existing 3861 numbers unchanged); 784 values equal experiments/task4; METHODS section 9 |
 | 7.0 | Draft docs/FIXES_REPORT.md | DONE | c8deab9 | docs/FIXES_REPORT.md drafted from pass 1 |
-| A4 | Switches NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2, BAND_FILTER_MIN_OPENING_SHARE; subcommand switch-check | TODO |  |  |
+| A4 | Switches NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2, BAND_FILTER_MIN_OPENING_SHARE; subcommand switch-check | DONE | 438a571 | NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2=0, BAND_FILTER_MIN_OPENING_SHARE=None; switch-check equals the overnight report: crumb only 543_3 (877,545), holes only 542_z06 (783,581), band only the two objects |
 | A5 | Switch FAST_LACUNA_STAGE; identical labels; timing | TODO |  |  |
 | B1 | Subcommands blind and unblind; leak test | TODO |  |  |
 | B2 | Subcommand sensitivity | TODO |  |  |
