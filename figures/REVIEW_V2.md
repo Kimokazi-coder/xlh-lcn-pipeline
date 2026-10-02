@@ -223,3 +223,14 @@ Round 1 (543_3 variants at 1000 px): the network caption line ran off the right 
 note was added. Fix: the window note on its own line (main and variant network figures). Round 2: the
 network, overview and gallery variants are clear. All main per-image figures and Fig02 were redrawn for
 the new caption line; every assertion passed again.
+
+## O1 layout
+
+`figures_out/` now holds `main/` (Fig01 to Fig04), `supplement/` (S01 to S03), `per_image/<image>/`
+(overview, network, gallery, logs, `display_variants/`), `validation_tiles/`, `_thumbs/`, `README.md`,
+`INDEX.md` and `display_window.json`. Moves were made with `git mv`; the old flat `F1_<image>_inset.json`
+files (the old inset rule) were removed, since `per_image/<image>/inset.json` replaces them. Every
+command of `make_figures.py` was run after the move and found all its outputs (skipped).
+
+Thumbnails: a 256-colour palette turned the frame-edge yellow orange in the 600 px previews, which
+blurs a colour meaning; the thumbnails are full colour instead (9.4 MB for 32).
