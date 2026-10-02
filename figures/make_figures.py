@@ -125,9 +125,11 @@ def mm_axes(fig, x_mm: float, y_mm: float, w_mm: float, h_mm: float, fig_w_mm: f
     return fig.add_axes([x_mm / fig_w_mm, y_mm / fig_h_mm, w_mm / fig_w_mm, h_mm / fig_h_mm])
 
 
-def panel_letter(fig, ax, letter: str) -> None:
+def panel_letter(fig, ax, letter: str, dx: float = 0.0) -> None:
+    """Bold letter above the panel's left edge, shifted by dx (figure
+    fraction; negative moves it left, clear of a centred title)."""
     bb = ax.get_position()
-    fig.text(bb.x0, bb.y1 + 0.01, letter, fontsize=LETTER_SIZE, fontweight="bold", va="bottom", ha="left")
+    fig.text(bb.x0 + dx, bb.y1 + 0.01, letter, fontsize=LETTER_SIZE, fontweight="bold", va="bottom", ha="left")
 
 
 def halo(width: float = 1.6):
@@ -466,10 +468,10 @@ def figure_thresholds() -> None:
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
-    margin, gap, text_h, top, left = 1.0, 1.5, 5.5, 5.0, 6.0
+    margin, gap, text_h, top, left, foot = 1.0, 1.5, 5.5, 5.0, 6.0, 3.0
     n_cols = len(THRESHOLD_SCALES)
     panel = (FIG_WIDTH_MM - left - margin - (n_cols - 1) * gap) / n_cols
-    fig_h = top + len(THRESHOLD_IMAGES) * (panel + text_h)
+    fig_h = top + len(THRESHOLD_IMAGES) * (panel + text_h) + foot
     fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
     log = {}
     for r, name in enumerate(THRESHOLD_IMAGES):
@@ -494,7 +496,7 @@ def figure_thresholds() -> None:
                     sp.set_linewidth(2.0)
                     sp.set_edgecolor("black")
             if r == 0:
-                ax.set_title(f"t_hi \u00d7 {scale:g}" + (" (default)" if scale == 1.0 else ""), pad=2)
+                ax.set_title(r"$t_\mathrm{hi}$" + f" \u00d7 {scale:g}" + (" (default)" if scale == 1.0 else ""), pad=2)
             if c == 0:
                 ax.text(-0.06, 0.5, name, transform=ax.transAxes, rotation=90, ha="right", va="center",
                         fontsize=FONT_SIZE + 1)
@@ -579,8 +581,8 @@ FIELD_PANELS = [
     ("roots_per_cell", "roots per cell", "roots"),
     ("roots_per_100px_perimeter", "roots per 100 px\nperimeter", "roots / 100 px"),
     ("ring30_per_cell", "ring length 30 px\nper cell", "px"),
-    ("ring_density_r30", "ring density 30 px", "px\u207b\u00b9"),
-    ("field_density", "field length density", "px\u207b\u00b9"),
+    ("ring_density_r30", "ring density 30 px", r"px$^{-1}$"),
+    ("field_density", "field length density", r"px$^{-1}$"),
 ]
 
 
@@ -599,7 +601,7 @@ def figure_fields(field_dir: Path) -> None:
     fields = sorted({r["field"] for r in rows}, key=lambda v: int(v[1:]))
     members = {fid: [SHORT.get(r["image"], r["image"]) for r in rows if r["field"] == fid] for fid in fields}
     n_pan = len(FIELD_PANELS)
-    left, gap, right, bottom, top = 12.0, 11.0, 2.0, 16.0, 8.0
+    left, gap, right, bottom, top = 12.0, 11.0, 2.0, 12.0, 9.0
     w = (FIG_WIDTH_MM - left - right - (n_pan - 1) * gap) / n_pan
     h = 38.0
     fig_h = bottom + h + top
@@ -624,7 +626,7 @@ def figure_fields(field_dir: Path) -> None:
         if key in ("field_density", "ring_density_r30"):
             ax.ticklabel_format(axis="y", style="plain")
             ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.3f"))
-        panel_letter(fig, ax, "ABCDE"[i])
+        panel_letter(fig, ax, "ABCDE"[i], dx=-0.05)
     legend = "; ".join(f"{fid}: {' + '.join(members[fid])}" for fid in fields)
     fig.text(0.01, 0.01, "Fields from field-summary (lacuna centroids matched across images). " + legend
              + ". Dots: images; bar: field mean; n: images per field. Pre-validation, pixel units, no test.",

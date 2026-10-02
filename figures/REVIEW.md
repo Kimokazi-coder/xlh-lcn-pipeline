@@ -55,3 +55,20 @@ Round 1: both cases are clear (the thread traced across the 543_3 gap disappears
 on; the 542_z06 hole is filled). Defects: "px^2" written literally in the row B titles, and the value
 lines under the off and on panels nearly touched. Fix: "px²", shorter value lines, wider gaps.
 Round 2: clear. Values (area, roots, ring 30) equal the switch-check output of A4.
+
+## F3 threshold sensitivity
+
+Counts per panel (`figures_out/F3_threshold_sensitivity_counts.json`) equal the overnight grid (2.4):
+542_z06 11, 13, 16, 16, 16; 543-2 13, 12, 12, 12, 11; 682_z29 15, 13, 13, 11, 11 lacunae at 0.8 to 1.2.
+
+Round 1: panels, outlines and counts legible; the default column is boxed. Defects: the footer overlapped
+the last count line; "t_hi" was plain text with an underscore. Fix: a 3 mm footer strip; the column
+titles use a subscript ($t_\mathrm{hi}$). Round 2: clear.
+
+## F4 per-field plot
+
+Round 1: defects: "px⁻¹" rendered as a missing glyph (Arial has no superscript minus); the panel letters
+D and E ran into their titles; a wide empty band above the footnote. Fix: units as mathtext
+(px$^{-1}$), letters moved left of the panels, smaller bottom margin. Round 2: clear.
+Remaining, by design: F3 is a single image (682_z08), so its "mean" is that image; no statistical
+test is drawn (3 or 4 fields).
