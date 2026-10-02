@@ -1,8 +1,8 @@
 # Figures v2 progress
 
 base SHA: 867338079ce8a9c97cd69c1551ca42e68fb1bebb (publication-fixes tip)
-last update: 2026-10-02 20:30
-next action: O3 docs/START_HERE.md and README pointer
+last update: 2026-10-02 20:45
+next action: O4 make_figures.py all
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -23,7 +23,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | P7 | Inset rule with frame margin and overrides file | DONE | c93151e | eligibility as N1 (bbox >= 60 px from the frame), roots closest to the median, then area closest to the median area, then smallest id; figures/inset_overrides.csv header only, read when present (tested); logged in per_image/<image>/inset.json; 543-2 inset L4 (edge) to L6 |
 | P8 | Per-image display window variants | DONE | 215a978 | variants command: overview, network, gallery with the image's own 1st and 99.8th percentile window into per_image/<image>/display_variants/ (PNG only, Decisions needed) with the note in the figure; main per-image figures keep the fixed window and state it; captions.md window section; two review rounds |
 | O1 | Reorganize figures_out/ with README and INDEX | DONE | c7118fe | git mv into main/, supplement/, per_image/<image>/overview; stale F1_*_inset.json removed; script paths updated (fig_stem); thumbs command writes _thumbs/ (600 px, full colour) and INDEX.md; README.md by hand; every command finds its outputs |
-| O2 | results_experiments/INDEX.md | DONE | | question to file map with one-line answers for task0 to task6 and fixes/; every linked path checked to exist; folders not renamed |
-| O3 | docs/START_HERE.md and README pointer | TODO | | |
+| O2 | results_experiments/INDEX.md | DONE | 3d7eb65 | question to file map with one-line answers for task0 to task6 and fixes/; every linked path checked to exist; folders not renamed |
+| O3 | docs/START_HERE.md and README pointer | DONE | | one page: what the pipeline is, folders, reading order, the three branches (nothing merged into main, merging is Karim's decision), switch table with defaults, commands; README gains one line at the top (2 added lines, nothing else changed) |
 | O4 | make_figures.py all | TODO | | |
 | 7.1 | docs/FIGURES_V2_REPORT.md, METHODS section, checks, ALL DONE | TODO | | |
