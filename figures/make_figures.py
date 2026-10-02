@@ -1203,6 +1203,25 @@ def make_validation_tiles(key_path: Path) -> None:
     print(f"{written} tiles written, {len(key) - written} existed; {TILES_DIR.relative_to(ROOT)}")
 
 
+FIG02_IMAGE = "543-2"
+
+
+def copy_fig02() -> None:
+    """Fig02 is a copy of the network figure of 543-2 (per_image/543-2/network)."""
+    import shutil
+
+    src = PER_IMAGE / FIG02_IMAGE / "network"
+    for ext in ("png", "pdf"):
+        a = src.with_name(f"{src.name}.{ext}")
+        b = OUT / f"Fig02_network_overlay_{FIG02_IMAGE}.{ext}"
+        if b.is_file() and b.read_bytes() == a.read_bytes():
+            continue
+        tmp = b.with_name(b.name + ".tmp")
+        shutil.copyfile(a, tmp)
+        os.replace(tmp, b)
+        print(b.relative_to(ROOT), "written")
+
+
 def _selftest_n0() -> None:
     """N0 checks on every image: the data equal results/, the vermillion
     pixels equal ring_length_r30_px per interior lacuna, the dots equal
@@ -1422,7 +1441,11 @@ def figure_contact(key_path: Path | None = None, rejected: bool = False) -> None
     code."""
     import csv
 
-    fig_name = "F2_contact_sheet" + ("_rejected" if rejected else "") + ("_coded" if key_path else "")
+    # Figure ids (figures v2, P3): Fig01 main; S02 with rejected candidates; S03 coded.
+    if key_path:
+        fig_name = "S03_contact_sheet_coded" + ("_with_rejected_candidates" if rejected else "")
+    else:
+        fig_name = "S02_contact_sheet_with_rejected_candidates" if rejected else "Fig01_contact_sheet"
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
@@ -1476,7 +1499,7 @@ def figure_thresholds() -> None:
     """Rows: three images. Columns: the lacuna cut t_hi at 0.8 to 1.2 times
     the image's own cut (1.0, the default, boxed). Outlines and counts. The
     defaults are not changed; the scaled cut is passed to the lacuna stage."""
-    fig_name = "F3_threshold_sensitivity"
+    fig_name = "Fig03_threshold_sensitivity"
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
@@ -1571,7 +1594,7 @@ def figure_switches() -> None:
     """Two rows (one per switch): raw crop | switch off | switch on, in the
     network overlay style: outline, skeleton (vermillion within 30 px of an
     interior lacuna), the lacuna's roots and its dashed 30 px ring."""
-    fig_name = "F5_switch_examples"
+    fig_name = "S01_switch_examples"
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
@@ -1634,8 +1657,8 @@ def figure_switches() -> None:
 
 FIELD_PANELS = [
     ("roots_per_cell", "roots per cell", "roots"),
-    ("roots_per_100px_perimeter", "roots per 100 px\nperimeter", "roots / 100 px"),
-    ("ring30_per_cell", "ring length 30 px\nper cell", "px"),
+    ("roots_per_100px_perimeter", "roots per 100 px perimeter", "roots / 100 px"),
+    ("ring30_per_cell", "ring length 30 px per cell", "px"),
     ("ring_density_r30", "ring density 30 px", r"px$^{-1}$"),
     ("field_density", "field length density", r"px$^{-1}$"),
 ]
@@ -1647,7 +1670,7 @@ def figure_fields(field_dir: Path) -> None:
     the number of images per field is printed. No statistical test."""
     import csv
 
-    fig_name = "F4_per_field"
+    fig_name = "Fig04_per_field"
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
@@ -1655,14 +1678,20 @@ def figure_fields(field_dir: Path) -> None:
         rows = list(csv.DictReader(f))
     fields = sorted({r["field"] for r in rows}, key=lambda v: int(v[1:]))
     members = {fid: [SHORT.get(r["image"], r["image"]) for r in rows if r["field"] == fid] for fid in fields}
-    n_pan = len(FIELD_PANELS)
-    left, gap, right, bottom, top = 12.0, 11.0, 2.0, 17.0, 9.0
-    w = (FIG_WIDTH_MM - left - right - (n_pan - 1) * gap) / n_pan
-    h = 38.0
-    fig_h = bottom + h + top
+    # field-summary names fields F1, F2, ...; figures call them Field 1, Field 2, ... so that no field name
+    # looks like a figure name.
+    field_name = {fid: f"Field {int(fid[1:])}" for fid in fields}
+    # Two rows (3 + 2 panels), so the field names fit under each panel.
+    n_cols = 3
+    left, gap, right, bottom, top, row_gap = 13.0, 13.0, 2.0, 17.0, 8.0, 16.0
+    w = (FIG_WIDTH_MM - left - right - (n_cols - 1) * gap) / n_cols
+    h = 40.0
+    n_rows = int(np.ceil(len(FIELD_PANELS) / n_cols))
+    fig_h = bottom + n_rows * h + (n_rows - 1) * row_gap + top
     fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
     for i, (key, title, unit) in enumerate(FIELD_PANELS):
-        ax = mm_axes(fig, left + i * (w + gap), bottom, w, h, FIG_WIDTH_MM, fig_h)
+        rr, cc = divmod(i, n_cols)
+        ax = mm_axes(fig, left + cc * (w + gap), bottom + (n_rows - 1 - rr) * (h + row_gap), w, h, FIG_WIDTH_MM, fig_h)
         for j, fid in enumerate(fields):
             vals = [float(r[key]) for r in rows if r["field"] == fid and r[key] not in ("", "None")]
             if not vals:
@@ -1671,7 +1700,7 @@ def figure_fields(field_dir: Path) -> None:
             ax.scatter(np.array(offsets) + j, vals, s=9, c="black", zorder=3, linewidths=0)
             ax.plot([j - 0.28, j + 0.28], [np.mean(vals)] * 2, color=PALETTE["field_mean"], lw=1.6, zorder=2)
         ax.set_xticks(range(len(fields)))
-        ax.set_xticklabels([f"{fid}\nn={len(members[fid])}" for fid in fields])
+        ax.set_xticklabels([f"{field_name[fid]}\nn={len(members[fid])}" for fid in fields])
         ax.set_xlim(-0.6, len(fields) - 0.4)
         ax.set_title(title, pad=3)
         ax.set_ylabel(unit, labelpad=1)
@@ -1681,8 +1710,8 @@ def figure_fields(field_dir: Path) -> None:
         if key in ("field_density", "ring_density_r30"):
             ax.ticklabel_format(axis="y", style="plain")
             ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.3f"))
-        panel_letter(fig, ax, "ABCDE"[i], dx=-0.05)
-    legend = "; ".join(f"{fid}: {' + '.join(members[fid])}" for fid in fields)
+        panel_letter(fig, ax, "ABCDE"[i], dx=-0.06)
+    legend = "; ".join(f"{field_name[fid]}: {' + '.join(members[fid])}" for fid in fields)
     legend_strip(fig, 2.0, 7.0, FIG_WIDTH_MM - 4.0, 4.5, FIG_WIDTH_MM, fig_h, dark=False, items=[
         {"kind": "marker", "label": "image (mean over its interior lacunae)"},
         {"kind": "bar", "colour": PALETTE["field_mean"], "label": "field mean"}])
@@ -1711,21 +1740,21 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Publication figures (pre-validation, px).")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("window", help="Compute the fixed display window.")
-    q = sub.add_parser("image", help="Per-image figure (F1).")
+    q = sub.add_parser("image", help="Per-image overview figure.")
     g = q.add_mutually_exclusive_group(required=True)
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q.add_argument("-c", dest="cell", type=int, default=None, help="Lacuna id for the inset (default: the rule).")
     q.add_argument("-r", dest="low_cut", action="store_true",
                    help="Also draw objects kept only at 0.8 t_hi (dotted), into a separate file. Off by default.")
-    q = sub.add_parser("contact", help="Contact sheet of all images (F2).")
+    q = sub.add_parser("contact", help="Contact sheet of all images (Fig01; S02 with -r; S03 with -b).")
     q.add_argument("-r", dest="rejected", action="store_true", help="Also draw the rejected candidates.")
     q.add_argument("-b", dest="blind", action="store_true", help="Label with blinding codes instead of names.")
     q.add_argument("-k", dest="key", type=Path, default=None, help="Blinding key (needed with -b).")
-    sub.add_parser("thresholds", help="Lacuna cut sensitivity figure (F3).")
-    q = sub.add_parser("fields", help="Per-field plot (F4).")
+    sub.add_parser("thresholds", help="Lacuna cut sensitivity figure (Fig03).")
+    q = sub.add_parser("fields", help="Per-field plot (Fig04).")
     q.add_argument("-f", dest="field_dir", type=Path, required=True, help="Output folder of field-summary.")
-    sub.add_parser("switches", help="Crumb rule and hole fill, off and on (F5).")
+    sub.add_parser("switches", help="Crumb rule and hole fill, off and on (S01).")
     sub.add_parser("check", help="v2 drawing data against results/ for every image (ring px, roots, skeleton).")
     q = sub.add_parser("network", help="Network overlay per image (v2): raw, overlay, three insets.")
     g = q.add_mutually_exclusive_group(required=True)
@@ -1749,7 +1778,10 @@ def main() -> int:
     if args.cmd == "network":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
         cells = [int(v) for v in args.cells.split(",")] if args.cells else None
-        return max(run("N1", figure_network, n, cells) for n in names)
+        code = max(run("N1", figure_network, n, cells) for n in names)
+        if FIG02_IMAGE in names and cells is None:
+            code = max(code, run("N1", copy_fig02))
+        return code
     if args.cmd == "window":
         return run("F0", lambda: print(display_window()))
     if args.cmd == "image":

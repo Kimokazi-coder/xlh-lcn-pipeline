@@ -1,6 +1,8 @@
 # Figure captions (draft)
 
-Drafts for every figure in `figures_out/` (PNG at 300 dpi and PDF). Every caption applies these common
+Drafts for every figure in `figures_out/` (PNG at 300 dpi and PDF). Main figures are Fig01 to Fig04,
+supplementary figures S01 to S03; fields are called Field 1 to Field 4, so no field name looks like a
+figure name. Every caption applies these common
 facts: **pre-validation** (nothing has been checked against manual counts); **pixel units** (the images
 carry no spatial calibration, so lengths are px, areas px² and densities px⁻¹, and every scale bar is
 in pixels); **wild type (WT) only**: 8 confocal optical sections, which `field-summary` groups into
@@ -33,10 +35,10 @@ the hue was free to choose.
 | white rectangle | the region shown in an inset |
 | "c" after a lacuna number | at least half of the lacuna lies in a flagged canal region; it may be vascular (the classification is unchanged) |
 | light blue dotted outline | object kept only when the lacuna cut is lowered to 0.8 times t_hi (optional layer, not the default output) |
-| black frame (F3) | the default cut |
-| blue bar (F4) | field mean |
+| black frame (Fig03) | the default cut |
+| blue bar (Fig04) | field mean |
 
-## F1_<image> (8 overview figures, one per image)
+## per_image/<image>/overview (8 figures, one per image)
 
 **Lacunae, rejected candidates and the skeleton in one optical section.** (A) Red channel. (B) Kept
 lacunae with their numbers ("c": in a flagged canal region) and the rejected lacuna-scale candidates
@@ -46,10 +48,12 @@ dimmed to 60%; the white box marks the inset: one lacuna at 3x with its roots as
 lacuna by a fixed rule, logged in `per_image/<image>/inset.json`. Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT.
 
-`F1_543_3_low_cut_layer` is the same figure with option `-r`: objects that the lacuna stage keeps only
+`per_image/543_3/overview_low_cut_layer` is the same figure with option `-r`: objects that the lacuna stage keeps only
 at 0.8 times t_hi are added in light blue dotted outlines. This layer is not the default output.
 
-## per_image/<image>/network (8 figures)
+## per_image/<image>/network (8 figures) and Fig02_network_overlay_543-2
+
+`Fig02_network_overlay_543-2` is a copy of `per_image/543-2/network`.
 
 **Network overlay.** (A) Red channel. (B) The image at 85% brightness with every skeleton pixel drawn as
 a one-pixel vector line: vermillion within 30 px of an interior lacuna (the pixels counted in ring
@@ -77,37 +81,37 @@ length 30 px, area. Dots and vermillion pixels equal the pipeline numbers (asser
 outline, skeleton, dot or number, named T001 to T086 in a random order. The key stays outside the
 repository. See `figures_out/validation_tiles/README.md`.
 
-## F2_contact_sheet (and F2_contact_sheet_rejected, F2_contact_sheet_coded)
+## Fig01_contact_sheet (and S02_contact_sheet_with_rejected_candidates, S03_contact_sheet_coded)
 
 **All 8 WT sections with the kept lacunae.** Red channel with lacuna outlines (cyan interior, yellow
 frame edge; "c" beside a lacuna in a flagged canal region) and two count lines under each panel. One
 fixed display window for all panels, so the brighter background of the 543 sections is real. Scale bar
-200 px (uncalibrated). `F2_contact_sheet_rejected` adds the rejected lacuna-scale candidates (grey
-dashed, with A, S or a). The coded version labels the panels S001 to S008 from a blinding key and
+200 px (uncalibrated). `S02_contact_sheet_with_rejected_candidates` adds the rejected lacuna-scale candidates (grey
+dashed, with A, S or a). The coded version (`S03_contact_sheet_coded`, a blinding test) labels the panels S001 to S008 from a blinding key and
 orders them by code; it hides the names, not the appearance. Pre-validation, pixel units.
 
-## F3_threshold_sensitivity
+## Fig03_threshold_sensitivity
 
 **Lacuna count against the lacuna threshold.** Rows: three sections (542_z06, 543-2, 682_z29). Columns:
 the lacuna cut $t_\mathrm{hi}$ (upper three-class Otsu cut of each image's own red histogram) scaled by
-0.8, 0.9, 1.0 (the default, black frame), 1.1 and 1.2. Outlines as in F2; n = lacunae (interior). A
+0.8, 0.9, 1.0 (the default, black frame), 1.1 and 1.2. Outlines as in Fig01; n = lacunae (interior). A
 lower cut lowers the count in 542_z06 (16 to 11; bodies fuse or fail a shape filter) and raises it in
 543-2 and 682_z29 (12 to 13, 13 to 15). No default is changed. Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT. Full grid, both cuts:
 `results_experiments/fixes/B2_sensitivity.md`.
 
-## F4_per_field
+## Fig04_per_field
 
 **Per-cell and per-field measures by field.** (A) Roots per cell. (B) Roots per 100 px of lacuna
 perimeter. (C) Ring length 30 px per cell (skeleton px within 30 px of each lacuna, each pixel counted
 for its nearest lacuna). (D) Ring density at 30 px, $L_{30} / A_{30}$. (E) Field length density (all
 skeleton px over the field area minus lacunae). x: fields derived from the data by matching lacuna
-centroids across sections (F1 542_z06 + 542_z18; F2 543-2 + 543_3 + 543_z13; F3 682_z08; F4 682_z23 +
-682_z29); n = images per field. Black dots: images (each the mean over its interior lacunae); blue bar:
+centroids across sections (Field 1: 542_z06 + 542_z18; Field 2: 543-2 + 543_3 + 543_z13; Field 3:
+682_z08; Field 4: 682_z23 + 682_z29); n = images per field. Black dots: images (each the mean over its interior lacunae); blue bar:
 field mean. Sections of one field repeat the same cells, so the field is the unit; with 4 fields no
 statistical test is shown. Pre-validation, pixel units, WT.
 
-## F5_switch_examples (supplementary)
+## S01_switch_examples (supplementary)
 
 **Two optional switches, off (default) and on.** (A) 543_3 at (877,545): with the narrow crumb rule
 off, a 124 px² middle piece of the lacuna is dropped, the outline splits in two and a thread is traced

@@ -135,3 +135,14 @@ both states are asserted against each run.
 Round 1 (F5, F3, F4 and the 543-2 overview at 1000 px): no overlap or clipping; every key in each
 legend matches what is drawn. The F3 count lines still use the old wording (P6). Remaining: panel C of
 the overview is still the old white skeleton on the image at 60% (P5).
+
+## P3 names
+
+Figure ids: Fig01 contact sheet, Fig02 network overlay of 543-2 (a copy of `per_image/543-2/network`),
+Fig03 threshold sensitivity, Fig04 per-field plot; S01 switch examples, S02 contact sheet with rejected
+candidates, S03 coded contact sheet. The flat files were renamed with `git mv`; the per-image overviews
+move to `per_image/<image>/overview` in O1. Fields are Field 1 to Field 4 in Fig04 and the captions
+(field-summary still writes F1 to F4 in its own csv; the figure maps them).
+
+Round 1 (Fig04 at 1000 px): the four "Field n" tick labels ran into each other in the 25 mm panels.
+Fix: two rows of panels (3 + 2), each 49 mm wide. Round 2: clear.

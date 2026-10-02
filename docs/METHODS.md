@@ -246,8 +246,10 @@ hash), and `requirements.txt` pins the versions.
 ### Figures
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts) to `figures_out/`: a
-per-image figure for each image (F1), a contact sheet (F2), a lacuna-cut sensitivity figure (F3), a
-per-field plot (F4) and a supplementary figure of two switches (F5). One display window for the whole
+per-image figure for each image (now `per_image/<image>/overview`), a contact sheet (now Fig01), a
+lacuna-cut sensitivity figure (now Fig03), a per-field plot (now Fig04) and a supplementary figure of two
+switches (now S01); they were called F1 to F5 on branch publication-fixes and were renamed on branch
+figures-v2 (section 10), so that no figure name looks like a field name. One display window for the whole
 dataset (1st and 99.8th percentile of the pooled red channel); interior lacunae cyan, frame-edge
 lacunae yellow; skeleton white over the image at 60%; scale bars in pixels. Captions:
 `figures/captions.md`; review notes: `figures/REVIEW.md`.
