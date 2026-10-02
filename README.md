@@ -97,3 +97,20 @@ One overlay per feature, for image 543-2:
    542_z06 at (555,149) and 682_z23 at (363,7). Both are counted now.
 
 Method, parameters, limitations and decisions: [docs/METHODS.md](docs/METHODS.md).
+
+## Checks, switches and figures (branch publication-fixes)
+
+```
+python src/diagnostics.py regression                 # every number against results/, tolerance 0
+python src/diagnostics.py switch-check               # what each switch in config.py changes
+python src/diagnostics.py sensitivity -d data/WT -o OUT
+python src/diagnostics.py field-summary -d data/WT -o OUT
+python src/diagnostics.py blind -s data/WT -o CODED -k KEY_OUTSIDE_REPO.csv
+python src/canaliculi.py --dir data/WT -o OTHER_FOLDER   # -o: any output folder; default results/
+python -u figures/make_figures.py image -a           # figures into figures_out/
+```
+
+The switches in `config.py` (`NARROW_CRUMB_RULE`, `FILL_ENCLOSED_HOLES_MAX_PX2`,
+`BAND_FILTER_MIN_OPENING_SHARE`, `FAST_LACUNA_STAGE`) are all off, so the default output is unchanged.
+Outputs also carry normalised per-cell columns and a provenance block. Details:
+[docs/FIXES_REPORT.md](docs/FIXES_REPORT.md) and [docs/METHODS.md](docs/METHODS.md) section 9.

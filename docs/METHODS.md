@@ -212,3 +212,42 @@ rise with lacuna area; `docs/OVERNIGHT_REPORT.md`, task 4.1).
 
 Definitions as in `experiments/task4_size.py`; the 784 per-lacuna values of the 8 WT images equal
 that script's values to the stored digits.
+
+### Switches (all off by default)
+
+In `config.py`; each comment names its evidence. With all off, `results/` is reproduced exactly.
+
+- `NARROW_CRUMB_RULE` (False): after the filters, a dropped watershed piece joins a kept lacuna if it
+  touches only that lacuna and at least half of it lies inside the lacuna's convex hull
+  (`lacunae.CRUMB_INSIDE_HULL_MIN` = 0.5, in a gap from 0.009 to 1.000 over 4 pieces).
+- `FILL_ENCLOSED_HOLES_MAX_PX2` (0): holes fully enclosed by one kept lacuna, up to this size, are filled.
+- `BAND_FILTER_MIN_OPENING_SHARE` (None): kept objects keeping less than this share of their area after
+  an opening with a 5 px disk are rejected (0.515 sits in a gap that rests on two objects).
+- `FAST_LACUNA_STAGE` (False): bounding-box versions of the watershed split and the re-merge; identical
+  labels, 15 to 25 times faster.
+
+`python src/diagnostics.py switch-check` shows what each changes on a folder.
+
+### New subcommands of `src/diagnostics.py`
+
+- `regression`: regenerate every image into an ignored folder and compare every json and summary number
+  with `results/` at tolerance 0 (provenance ignored), with and without the fast stage.
+- `switch-check`: each switch on alone; every lacuna whose area, roots or ring 30 px change.
+- `fast-check`: fast against original lacuna stage, labels pixel for pixel at $t_\mathrm{hi}$ 0.8 to 1.2.
+- `blind` / `unblind`: coded copies (pixel data only) with the key outside the repository; join a key to
+  a summary table.
+- `sensitivity`: both Otsu cuts scaled 0.8 to 1.2, alone and together, and one pooled cut; percent
+  changes of roots per cell, ring 30 px, field density, lacuna count and bridges.
+- `field-summary`: fields from lacuna centroid matching (25 px), per-field means; the field is the unit.
+
+Every json output also carries a `provenance` block (git commit, dirty flag, library versions, config
+hash), and `requirements.txt` pins the versions.
+
+### Figures
+
+`figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts) to `figures_out/`: a
+per-image figure for each image (F1), a contact sheet (F2), a lacuna-cut sensitivity figure (F3), a
+per-field plot (F4) and a supplementary figure of two switches (F5). One display window for the whole
+dataset (1st and 99.8th percentile of the pooled red channel); interior lacunae cyan, frame-edge
+lacunae yellow; skeleton white over the image at 60%; scale bars in pixels. Captions:
+`figures/captions.md`; review notes: `figures/REVIEW.md`.
