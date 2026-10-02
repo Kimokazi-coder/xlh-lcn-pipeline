@@ -636,6 +636,7 @@ def draw_lacunae(ax, d: dict, lw: float = V2_OUTLINE_PT, numbers: bool = False, 
             ty = float(np.clip(row["centroid_row_px"], 16, idm.shape[0] - 16))
             ax.text(tx, ty, lacuna_label(d, lid), color=colour, ha=ha, va="center", fontsize=number_size,
                     fontweight="bold", path_effects=halo(1.4), zorder=6)
+            d.setdefault("_label_xy", {})[lid] = (tx + (12 if ha == "left" else -12), ty)
 
 
 def draw_roots(ax, d: dict, ids, size: float = 7.0, edge_lw: float = 0.3) -> int:
@@ -766,6 +767,198 @@ def save_to(fig, stem: Path) -> None:
 
 def done_at(stem: Path) -> bool:
     return stem.with_name(stem.name + ".png").is_file() and stem.with_name(stem.name + ".pdf").is_file()
+
+
+def update_inset_log(name: str, key: str, entry: dict) -> None:
+    """per_image/<image>/inset.json holds one entry per figure kind."""
+    path = PER_IMAGE / name / "inset.json"
+    log = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"image": name}
+    log[key] = entry
+    write_json(path, log)
+
+
+def choose_network_insets(d: dict) -> tuple[list, dict]:
+    """Three interior lacunae whose bounding box is at least
+    INSET_FRAME_MARGIN_PX from the frame: the fewest roots, the roots
+    closest to the image median (over all interior lacunae), the most roots.
+    Ties go to the smallest id; a lacuna is used once."""
+    roots = {c["lacuna_id"]: c["roots_count"] for c in d["cell_rows"]}
+    med = float(np.median([roots[i] for i in d["interior_ids"]]))
+    eligible = [i for i in d["interior_ids"] if frame_margin(d, i) >= INSET_FRAME_MARGIN_PX]
+    picks, roles = [], []
+    for role, key in (("fewest roots", lambda i: (roots[i], i)), ("most roots", lambda i: (-roots[i], i)),
+                      ("roots closest to the median", lambda i: (abs(roots[i] - med), i))):
+        left = [i for i in eligible if i not in picks]
+        if left:
+            picks.append(min(left, key=key))
+            roles.append(role)
+    order = sorted(range(len(picks)), key=lambda k: ("fewest roots", "roots closest to the median",
+                                                     "most roots").index(roles[k]))
+    picks, roles = [picks[k] for k in order], [roles[k] for k in order]
+    log = {"rule": f"interior lacunae with the bounding box at least {INSET_FRAME_MARGIN_PX} px from the frame; "
+                   "fewest roots, roots closest to the interior median, most roots; ties to the smallest id; "
+                   "each lacuna once",
+           "interior_median_roots": med, "eligible": eligible,
+           "insets": [{"lacuna_id": i, "roots": roots[i], "role": r} for i, r in zip(picks, roles)]}
+    return picks, log
+
+
+def box_letter_corner(d: dict, x0: int, y0: int, side: int, used: list, others: tuple = ()) -> tuple:
+    """Where to put an inset letter: the inside corner of the box (top left,
+    top right, bottom left, bottom right, in that order of preference) that
+    is not inside another inset box (`others`, as (x0, y0, side)) and is
+    farthest from lacuna numbers, lacuna pixels and letters already placed.
+    Returns (x, y, ha, va)."""
+    idm = d["lacuna_id_map"]
+    labels = list(d.get("_label_xy", {}).values()) + list(used)
+    best = None
+    for k, (cx, cy, ha, va) in enumerate(((x0 + 8, y0 + 8, "left", "top"), (x0 + side - 8, y0 + 8, "right", "top"),
+                                          (x0 + 8, y0 + side - 8, "left", "bottom"),
+                                          (x0 + side - 8, y0 + side - 8, "right", "bottom"))):
+        mx = cx + (15 if ha == "left" else -15)
+        my = cy + (15 if va == "top" else -15)
+        near = min((np.hypot(mx - lx, my - ly) for lx, ly in labels), default=1e9)
+        r0, r1 = int(max(my - 20, 0)), int(min(my + 20, idm.shape[0]))
+        c0, c1 = int(max(mx - 20, 0)), int(min(mx + 20, idm.shape[1]))
+        busy = int((idm[r0:r1, c0:c1] > 0).sum())
+        inside = any(ox - 0.5 <= mx <= ox + oside - 0.5 and oy - 0.5 <= my <= oy + oside - 0.5
+                     for ox, oy, oside in others)
+        score = (inside, near < 45, busy, k)
+        if best is None or score < best[0]:
+            best = (score, (cx, cy, ha, va))
+    return best[1]
+
+
+NETWORK_CAPTION = ("Vermillion: skeleton within 30 px of an interior lacuna (the ring 30 px measure). "
+                   "White: the rest of the skeleton. Pre-validation, pixel units.")
+
+
+def network_legend_items(d: dict, inset_ring: bool = True, inset_box: bool = True) -> list:
+    items = [
+        {"kind": "outline", "colour": PALETTE["interior"], "label": "interior lacuna (in per-cell means)"},
+        {"kind": "outline", "colour": PALETTE["edge"], "label": "lacuna touching the frame (not in per-cell means)"},
+        {"kind": "line", "colour": PALETTE["ring"], "lw": 1.2, "label": "skeleton within 30 px of an interior lacuna"},
+        {"kind": "line", "colour": PALETTE["skeleton"], "alpha": SKELETON_ALPHA, "lw": 1.2, "label": "rest of the skeleton"},
+        {"kind": "dot", "colour": PALETTE["root"], "label": "root of an interior lacuna"},
+    ]
+    if inset_ring:
+        items.append({"kind": "line", "colour": "white", "lw": 0.6, "ls": (0, (3, 2)), "label": "30 px ring of the inset lacuna"})
+    if inset_box:
+        items.append({"kind": "box", "colour": PALETTE["box"], "label": "inset region"})
+    if d["canal_ids"]:
+        items.append({"kind": "text", "text": "c", "colour": PALETTE["interior"],
+                      "label": "inside a flagged canal region, may be vascular"})
+    return items
+
+
+def network_values(d: dict) -> dict:
+    """Per lacuna: the pipeline numbers and what is drawn (rule 11)."""
+    out = []
+    for cr in d["cell_rows"]:
+        i = cr["lacuna_id"]
+        interior = i in d["interior_ids"]
+        out.append({"lacuna_id": i, "on_border": cr["on_border"], "roots_count": cr["roots_count"],
+                    "magenta_dots": len(d["roots_xy"][str(i)]) if interior else 0,
+                    "ring_length_r30_px": cr["ring_length_r30_px"],
+                    "vermillion_px": int(d["ring_interior_count"][i]),
+                    "ring_px_drawn_white": 0 if interior else int(d["ring_count"][i])})
+    return {"image": d["short"], "status": "pre-validation", "units": "px",
+            "check": "per interior lacuna vermillion_px == ring_length_r30_px and magenta_dots == roots_count; "
+                     "edge lacunae: their ring is drawn white and equals ring_length_r30_px",
+            "lacunae": out}
+
+
+def figure_network(name: str, cells: list | None = None, window=None, stem: Path | None = None,
+                   window_note: str | None = None) -> None:
+    """N1: (A) raw red channel; (B) the overlay: raw at 85%, interior
+    lacunae cyan, frame-edge lacunae yellow, skeleton within 30 px of an
+    interior lacuna vermillion, the rest white at 70%, roots magenta; (C to
+    E) three lacunae at 3x with the same overlay and the dashed 30 px ring
+    contour of the inset lacuna."""
+    d = image_data(name)
+    name = d["short"]
+    stem = stem or PER_IMAGE / name / "network"
+    if done_at(stem):
+        print(stem.relative_to(ROOT), "exists, skipped")
+        return
+    if cells is None:
+        cells, log = choose_network_insets(d)
+    else:
+        log = {"rule": "set with -c", "insets": [{"lacuna_id": i} for i in cells]}
+    for i in cells:
+        if i not in d["interior_ids"]:
+            raise ValueError(f"{name}: lacuna {i} is not an interior lacuna")
+    if window is None:
+        update_inset_log(name, "network", log)
+        write_json(PER_IMAGE / name / "network_check.json", network_values(d))
+    H, W = d["lacuna_id_map"].shape
+
+    margin, gap_ab, panel, gap_in = 1.0, 2.0, 88.0, 3.0
+    side = int(round(((FIG_WIDTH_MM - 2 * margin - 2 * gap_in) / 3) * W / (3 * panel)))
+    inset = 3 * panel * side / W
+    cap_h, legend_h, title_h, count_h = 5.0, 9.0, 4.5, 5.0
+    y_inset = cap_h + legend_h + 1.0
+    y_panel = y_inset + inset + title_h + count_h
+    fig_h = y_panel + panel + title_h
+    fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
+    axA = mm_axes(fig, margin, y_panel, panel, panel, FIG_WIDTH_MM, fig_h)
+    axB = mm_axes(fig, margin + panel + gap_ab, y_panel, panel, panel, FIG_WIDTH_MM, fig_h)
+
+    show_image(axA, windowed_with(d["channel"], window))
+    axA.set_title(f"{name}, red channel", pad=2)
+    scale_bar_at(axA, SCALE_BAR_PX)
+
+    show_image(axB, overlay_image(d, window))
+    draw_skeleton(axB, d["segments"])
+    draw_lacunae(axB, d, numbers=True)
+    n_dots = draw_roots(axB, d, d["interior_ids"], size=3.0, edge_lw=0.25)
+    expected = sum(c["roots_count"] for c in d["cell_rows"] if c["lacuna_id"] in d["interior_ids"])
+    if n_dots != expected:
+        raise AssertionFailed(f"{name}: {n_dots} dots drawn, {expected} roots in results/")
+    axB.set_title("lacunae, skeleton and roots over the image at 85%", pad=2)
+    axB.text(1.0, -0.012, count_line(d), transform=axB.transAxes, ha="right", va="top")
+
+    letters = "CDE"
+    used = []
+    roots = {c["lacuna_id"]: c for c in d["cell_rows"]}
+    corners = []
+    for lid in cells:
+        cx, cy = bbox_centre(d, lid)
+        corners.append((int(np.clip(cx - side // 2, 0, W - side)), int(np.clip(cy - side // 2, 0, H - side))))
+    for k, lid in enumerate(cells):
+        x0, y0 = corners[k]
+        axB.add_patch(Rectangle((x0 - 0.5, y0 - 0.5), side, side, fill=False, ec=PALETTE["box"], lw=0.6, zorder=6))
+        others = tuple((ox, oy, side) for j, (ox, oy) in enumerate(corners) if j != k)
+        lx, ly, ha, va = box_letter_corner(d, x0, y0, side, used, others)
+        used.append((lx, ly))
+        axB.text(lx, ly, letters[k], color=PALETTE["box"], ha=ha, va=va,
+                 fontsize=FONT_SIZE, fontweight="bold", path_effects=halo(1.6), zorder=7)
+        ax = mm_axes(fig, margin + k * (inset + gap_in), y_inset, inset, inset, FIG_WIDTH_MM, fig_h)
+        img = overlay_image(d, window)[y0:y0 + side, x0:x0 + side]
+        show_image(ax, img, x0, y0, interpolation="nearest")
+        draw_skeleton(ax, d["segments"], window=(x0, x0 + side, y0, y0 + side), lw=0.5)
+        draw_lacunae(ax, d, lw=V2_OUTLINE_PT)
+        for c in ring_contours(d, lid):
+            ax.plot(c[:, 0], c[:, 1], color="white", lw=0.6, ls=(0, (3, 2)), zorder=4.5)
+        in_view = [i for i in d["interior_ids"]
+                   if any(x0 <= p[0] < x0 + side and y0 <= p[1] < y0 + side for p in d["roots_xy"][str(i)])]
+        draw_roots(ax, d, in_view, size=14.0, edge_lw=0.4)
+        ax.set_xlim(x0 - 0.5, x0 + side - 0.5)
+        ax.set_ylim(y0 + side - 0.5, y0 - 0.5)
+        c = roots[lid]
+        ax.set_title(f"L{lid}: {c['roots_count']} roots, ring 30 px = {c['ring_length_r30_px']} px", pad=2)
+        if k == 0:
+            scale_bar_at(ax, 50)
+        panel_letter(fig, ax, letters[k], dx=-0.004)
+    panel_letter(fig, axA, "A", dx=-0.004)
+    panel_letter(fig, axB, "B", dx=-0.004)
+
+    legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h,
+                 network_legend_items(d))
+    fig.text(margin / FIG_WIDTH_MM, 1.6 / fig_h, NETWORK_CAPTION + (" " + window_note if window_note else ""),
+             ha="left", va="bottom", fontsize=FONT_SIZE - 0.5)
+    save_to(fig, stem)
+    print(stem.relative_to(ROOT), "written; insets", cells)
 
 
 def _selftest_n0() -> None:
@@ -1128,9 +1321,18 @@ def main() -> int:
     q.add_argument("-f", dest="field_dir", type=Path, required=True, help="Output folder of field-summary.")
     sub.add_parser("switches", help="Crumb rule and hole fill, off and on (F5).")
     sub.add_parser("check", help="v2 drawing data against results/ for every image (ring px, roots, skeleton).")
+    q = sub.add_parser("network", help="Network overlay per image (v2): raw, overlay, three insets.")
+    g = q.add_mutually_exclusive_group(required=True)
+    g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
+    g.add_argument("-a", dest="all", action="store_true", help="All images.")
+    q.add_argument("-c", dest="cells", default=None, help="Three lacuna ids for the insets, as ID1,ID2,ID3.")
     args = p.parse_args()
     if args.cmd == "check":
         return run("N0", _selftest_n0)
+    if args.cmd == "network":
+        names = [short(x) for x in image_paths()] if args.all else [args.image]
+        cells = [int(v) for v in args.cells.split(",")] if args.cells else None
+        return max(run("N1", figure_network, n, cells) for n in names)
     if args.cmd == "window":
         return run("F0", lambda: print(display_window()))
     if args.cmd == "image":
