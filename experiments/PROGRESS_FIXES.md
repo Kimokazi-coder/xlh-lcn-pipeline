@@ -1,7 +1,7 @@
 # Publication fixes progress
 
-last update: 2026-10-02 12:07
-next action: A5 FAST_LACUNA_STAGE switch, fast-check at t_hi 0.8 to 1.2, regression runs twice, timing.
+last update: 2026-10-02 12:27
+next action: B1 subcommands blind and unblind; leak test on the 8 WT images; .gitignore patterns for key files.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -17,7 +17,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | A3 | Normalised measures as appended columns | DONE | 8531b3a | 8 columns appended to per-lacuna rows, per_lacuna sheet and summary table; regression PASS (existing 3861 numbers unchanged); 784 values equal experiments/task4; METHODS section 9 |
 | 7.0 | Draft docs/FIXES_REPORT.md | DONE | c8deab9 | docs/FIXES_REPORT.md drafted from pass 1 |
 | A4 | Switches NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2, BAND_FILTER_MIN_OPENING_SHARE; subcommand switch-check | DONE | 438a571 | NARROW_CRUMB_RULE, FILL_ENCLOSED_HOLES_MAX_PX2=0, BAND_FILTER_MIN_OPENING_SHARE=None; switch-check equals the overnight report: crumb only 543_3 (877,545), holes only 542_z06 (783,581), band only the two objects |
-| A5 | Switch FAST_LACUNA_STAGE; identical labels; timing | TODO |  |  |
+| A5 | Switch FAST_LACUNA_STAGE; identical labels; timing | DONE | 0c415df | bounding-box watershed and re-merge in src/lacunae.py behind FAST_LACUNA_STAGE (off); 40 of 40 identical labels at t_hi 0.8 to 1.2; regression PASS both ways; 542_z06 70.2 s to 2.8 s, all 8 regenerated in 125 s vs 8 s |
 | B1 | Subcommands blind and unblind; leak test | TODO |  |  |
 | B2 | Subcommand sensitivity | TODO |  |  |
 | B3 | Subcommand field-summary | TODO |  |  |
