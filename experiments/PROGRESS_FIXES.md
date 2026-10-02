@@ -1,7 +1,7 @@
 # Publication fixes progress
 
-last update: 2026-10-02 12:45
-next action: B3 subcommand field-summary (groups from centroid matching, per-field means); then F3 and F4.
+last update: 2026-10-02 12:49
+next action: F3 threshold sensitivity figure (3 images x 5 cuts), then F4 per-field plot.
 
 Status values: TODO, DONE, PARTIAL, FAILED, SKIPPED. The commit SHA is the commit that holds the
 item's code and outputs. UNPUSHED after an id means its push failed and is retried at the next commit.
@@ -20,7 +20,7 @@ item's code and outputs. UNPUSHED after an id means its push failed and is retri
 | A5 | Switch FAST_LACUNA_STAGE; identical labels; timing | DONE | 0c415df | bounding-box watershed and re-merge in src/lacunae.py behind FAST_LACUNA_STAGE (off); 40 of 40 identical labels at t_hi 0.8 to 1.2; regression PASS both ways; 542_z06 70.2 s to 2.8 s, all 8 regenerated in 125 s vs 8 s |
 | B1 | Subcommands blind and unblind; leak test | DONE | f378c60 | blind refuses keys inside the repo; pixel data only, constant alpha dropped so all copies look alike; 0 original names in 76 outputs and logs; unblinded numbers equal the normal run (128 cells, 4837 json fields); .gitignore key patterns added |
 | B2 | Subcommand sensitivity | DONE | 35c8bf1 | t_hi, t_lo, both at 0.8 to 1.2 and a pooled raw-unit cut; CSV and markdown; equals the overnight 2.4 grid; 128 runs in 32 s with the fast stage |
-| B3 | Subcommand field-summary | TODO |  |  |
+| B3 | Subcommand field-summary | DONE | 105535f | fields from centroid matching (25 px, largest-gap cut 0.58, guard 0.5): 542 pair, 543 triple, 682_z23+z29, 682_z08 alone, as overnight 6.1; per-field means incl. normalised measures; same result with and without -r |
 | F1b | Per-image figures for the other 7 images | DONE | 7f24b11 | 7 more per-image figures, inset by rule; two review rounds (edge numbers kept inside the frame); figures use the fast lacuna stage (identical output) |
 | F2 | Contact sheet of all 8 images | DONE | 45e8ee9 | 2 x 4 sheet, fixed window, 0.6 pt outlines and counts; -b -k labels with codes; two review rounds |
 | F3 | Threshold sensitivity figure | TODO |  |  |
