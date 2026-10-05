@@ -7,10 +7,9 @@
 | `src/` | the pipeline: `lacunae.py` (feature 1), `canaliculi.py` (feature 2), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, shared settings and the switches (all off by default) |
 | `data/` | the input images (`data/WT/`, 8 sections) |
-| `results/` | the default pipeline output; the reference that `regression` checks |
+| `results/` | the default pipeline output and the reference that `regression` checks; everything per image and all figures, see [`results/README.md`](results/README.md) |
 | `results_experiments/` | experiments and checks; map: `results_experiments/INDEX.md` |
 | `figures/` | the figure code, captions and review notes |
-| `figures_out/` | the figures; map: `figures_out/INDEX.md` |
 | `docs/` | method, start page and tuning protocol; the reports are in `docs/reports/` |
 | `experiments/` | the scripts behind `results_experiments/` |
 | `archive/` | history and earlier analyses, not used by the code |
