@@ -1,0 +1,369 @@
+{
+  "status": "pre-validation",
+  "units": "px",
+  "stage": "canalicular network detection",
+  "image": "543_z13c1-2.tif",
+  "image_label": "543_z13",
+  "note": "Detection record: what feature 2 did, with no measured value in it. The mask, the skeleton, the vascular mask, the bridged pixels and the graph file beside it are what it produced; every number measured from them is in results/<label>/5_quantification/ (src/quantification.py). The bridges below are the gaps this run joined, which is detection, not a measure.",
+  "outputs": {
+    "mask": "543_z13_canaliculi_mask.png",
+    "skeleton": "543_z13_canaliculi_skeleton.png",
+    "vascular_mask": "543_z13_canaliculi_vascular_mask.png",
+    "bridged_pixels": "543_z13_canaliculi_bridged_pixels.png",
+    "graph": "543_z13_canaliculi_graph.pickle",
+    "verification": "543_z13_canaliculi_verification.png"
+  },
+  "n_bridges": 19,
+  "bridges": [
+    {
+      "from_row_col": [
+        48,
+        295
+      ],
+      "to_row_col": [
+        50,
+        298
+      ],
+      "gap_len_px": 3.6056,
+      "angle_deg": 33.6901,
+      "min_signal_fraction": 0.7287
+    },
+    {
+      "from_row_col": [
+        136,
+        881
+      ],
+      "to_row_col": [
+        140,
+        879
+      ],
+      "gap_len_px": 4.4721,
+      "angle_deg": 10.3048,
+      "min_signal_fraction": 0.7452
+    },
+    {
+      "from_row_col": [
+        138,
+        773
+      ],
+      "to_row_col": [
+        139,
+        770
+      ],
+      "gap_len_px": 3.1623,
+      "angle_deg": 3.3665,
+      "min_signal_fraction": 0.7182
+    },
+    {
+      "from_row_col": [
+        141,
+        288
+      ],
+      "to_row_col": [
+        141,
+        286
+      ],
+      "gap_len_px": 2.0,
+      "angle_deg": 30.9638,
+      "min_signal_fraction": 0.7324
+    },
+    {
+      "from_row_col": [
+        258,
+        551
+      ],
+      "to_row_col": [
+        261,
+        551
+      ],
+      "gap_len_px": 3.0,
+      "angle_deg": 21.8014,
+      "min_signal_fraction": 0.7383
+    },
+    {
+      "from_row_col": [
+        286,
+        877
+      ],
+      "to_row_col": [
+        289,
+        875
+      ],
+      "gap_len_px": 3.6056,
+      "angle_deg": 15.2551,
+      "min_signal_fraction": 0.7001
+    },
+    {
+      "from_row_col": [
+        297,
+        426
+      ],
+      "to_row_col": [
+        297,
+        424
+      ],
+      "gap_len_px": 2.0,
+      "angle_deg": 11.3099,
+      "min_signal_fraction": 0.719
+    },
+    {
+      "from_row_col": [
+        415,
+        746
+      ],
+      "to_row_col": [
+        415,
+        749
+      ],
+      "gap_len_px": 3.0,
+      "angle_deg": 11.3099,
+      "min_signal_fraction": 0.7013
+    },
+    {
+      "from_row_col": [
+        571,
+        87
+      ],
+      "to_row_col": [
+        575,
+        89
+      ],
+      "gap_len_px": 4.4721,
+      "angle_deg": 8.1301,
+      "min_signal_fraction": 0.7352
+    },
+    {
+      "from_row_col": [
+        573,
+        733
+      ],
+      "to_row_col": [
+        577,
+        734
+      ],
+      "gap_len_px": 4.1231,
+      "angle_deg": 14.0362,
+      "min_signal_fraction": 0.7246
+    },
+    {
+      "from_row_col": [
+        583,
+        0
+      ],
+      "to_row_col": [
+        587,
+        0
+      ],
+      "gap_len_px": 4.0,
+      "angle_deg": 0.0,
+      "min_signal_fraction": 0.7208
+    },
+    {
+      "from_row_col": [
+        687,
+        705
+      ],
+      "to_row_col": [
+        692,
+        703
+      ],
+      "gap_len_px": 5.3852,
+      "angle_deg": 23.1986,
+      "min_signal_fraction": 0.7291
+    },
+    {
+      "from_row_col": [
+        698,
+        402
+      ],
+      "to_row_col": [
+        699,
+        404
+      ],
+      "gap_len_px": 2.2361,
+      "angle_deg": 15.2551,
+      "min_signal_fraction": 0.7063
+    },
+    {
+      "from_row_col": [
+        809,
+        765
+      ],
+      "to_row_col": [
+        805,
+        763
+      ],
+      "gap_len_px": 4.4721,
+      "angle_deg": 0.0,
+      "min_signal_fraction": 0.7207
+    },
+    {
+      "from_row_col": [
+        814,
+        983
+      ],
+      "to_row_col": [
+        815,
+        979
+      ],
+      "gap_len_px": 4.1231,
+      "angle_deg": 14.0362,
+      "min_signal_fraction": 0.7084
+    },
+    {
+      "from_row_col": [
+        894,
+        908
+      ],
+      "to_row_col": [
+        895,
+        903
+      ],
+      "gap_len_px": 5.099,
+      "angle_deg": 0.0,
+      "min_signal_fraction": 0.7044
+    },
+    {
+      "from_row_col": [
+        935,
+        749
+      ],
+      "to_row_col": [
+        935,
+        752
+      ],
+      "gap_len_px": 3.0,
+      "angle_deg": 0.0,
+      "min_signal_fraction": 0.7355
+    },
+    {
+      "from_row_col": [
+        962,
+        809
+      ],
+      "to_row_col": [
+        965,
+        805
+      ],
+      "gap_len_px": 5.0,
+      "angle_deg": 25.56,
+      "min_signal_fraction": 0.7385
+    },
+    {
+      "from_row_col": [
+        965,
+        881
+      ],
+      "to_row_col": [
+        962,
+        875
+      ],
+      "gap_len_px": 6.7082,
+      "angle_deg": 4.7636,
+      "min_signal_fraction": 0.7049
+    }
+  ],
+  "parameters": {
+    "pixel_size_um": null,
+    "smooth_sigma_px": 0.8,
+    "tophat_radius_px": 5,
+    "background_mode_subtract": true,
+    "threshold": "hysteresis, high cut = lower 3-class multi-Otsu cut",
+    "hysteresis_low_fraction": 0.75,
+    "network_threshold_t_lo": 0.072265625,
+    "lacuna_threshold_t_hi": 0.6033088235294118,
+    "lacuna_dilation_px": 2,
+    "min_thread_object_px2": 8,
+    "block_growth_in_flagged": true,
+    "broad_opening_radius_px": 8,
+    "flagged_min_span_fraction": 0.45,
+    "flagged_min_major_axis_px": 420.0,
+    "flagged_dilation_px": 4,
+    "flagged_area_px2": 0.0,
+    "gap_bridging": true,
+    "max_bridge_gap_px": 10.0,
+    "max_bridge_angle_deg": 40.0,
+    "min_bridge_signal_fraction": 0.7,
+    "direction_walk_px": 5,
+    "prune_spur_len_px": 4,
+    "min_internal_edge_len_px": 6,
+    "graph_cleanup_max_iter": 20,
+    "lacuna_attach_gap_px": 10,
+    "ownership": "graph connectivity, no distance cap",
+    "root_merge_dist_px": 8.0,
+    "ring_radii_px": [
+      30,
+      60
+    ],
+    "band_line_filter": false,
+    "band_line_min_len_px": null,
+    "band_line_reach_px": null,
+    "band_line_remove_px": 2
+  },
+  "provenance": {
+    "git_commit": "ade8bd18ebbe8cadacf9fb318c2a40b15c8c6b20",
+    "git_dirty": true,
+    "versions": {
+      "python": "3.9.10",
+      "numpy": "2.0.2",
+      "scipy": "1.13.1",
+      "scikit-image": "0.24.0",
+      "skan": "0.13.1",
+      "networkx": "3.2.1",
+      "pandas": "2.3.3"
+    },
+    "config_hash": "be57b3fa7ae5d298",
+    "config_hash_covers": [
+      "ALL_IMAGES_ARCHIVE_DIR",
+      "ALL_IMAGES_DIR",
+      "ALL_IMAGES_FIGURES_DIR",
+      "ALL_IMAGES_QUANT_DIR",
+      "BAND_FILTER_MIN_OPENING_SHARE",
+      "BAND_LINE_FILTER",
+      "BAND_LINE_MIN_LEN_PX",
+      "BAND_LINE_REACH_PX",
+      "BAND_LINE_REMOVE_PX",
+      "CHANNEL",
+      "CHANNEL_AXIS",
+      "CSV_FLOAT_PRECISION",
+      "DISPLAY_WINDOW_FILE",
+      "FAST_LACUNA_STAGE",
+      "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "IMAGE_LABELS",
+      "INVERT_SIGNAL",
+      "NARROW_CRUMB_RULE",
+      "PIXEL_SIZE_UM",
+      "QUANT_SUMMARY_NAME",
+      "RANDOM_SEED",
+      "SECTION_ARCHIVE",
+      "SECTION_CANALICULI",
+      "SECTION_FIGURES",
+      "SECTION_LACUNAE",
+      "SECTION_QUANTIFICATION",
+      "SUFFIX_CANALICULI_BRIDGED",
+      "SUFFIX_CANALICULI_DETECTION",
+      "SUFFIX_CANALICULI_GRAPH",
+      "SUFFIX_CANALICULI_MASK",
+      "SUFFIX_CANALICULI_RESULTS",
+      "SUFFIX_CANALICULI_SKELETON",
+      "SUFFIX_CANALICULI_VASCULAR",
+      "SUFFIX_CANALICULI_VERIFICATION",
+      "SUFFIX_FIGURE_GALLERY",
+      "SUFFIX_FIGURE_GALLERY_CHECKS",
+      "SUFFIX_FIGURE_INSET",
+      "SUFFIX_FIGURE_NETWORK",
+      "SUFFIX_FIGURE_NETWORK_CHECKS",
+      "SUFFIX_FIGURE_OVERVIEW",
+      "SUFFIX_LACUNAE_DETECTION",
+      "SUFFIX_LACUNAE_OUTLINES",
+      "SUFFIX_LACUNAE_RESULTS",
+      "SUFFIX_LACUNA_LABELS",
+      "SUFFIX_QUANTIFICATION",
+      "SUFFIX_VARIANT",
+      "SUMMARY_NAME",
+      "VALIDATION_TILES_DIR",
+      "VARIANTS_DIR",
+      "VARIANT_WINDOW_FILE"
+    ]
+  }
+}

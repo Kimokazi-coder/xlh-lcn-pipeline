@@ -1,0 +1,304 @@
+{
+  "status": "pre-validation",
+  "units": "px",
+  "stage": "canalicular network detection",
+  "image": "543_3.tif",
+  "image_label": "543_3",
+  "note": "Detection record: what feature 2 did, with no measured value in it. The mask, the skeleton, the vascular mask, the bridged pixels and the graph file beside it are what it produced; every number measured from them is in results/<label>/5_quantification/ (src/quantification.py). The bridges below are the gaps this run joined, which is detection, not a measure.",
+  "outputs": {
+    "mask": "543_3_canaliculi_mask.png",
+    "skeleton": "543_3_canaliculi_skeleton.png",
+    "vascular_mask": "543_3_canaliculi_vascular_mask.png",
+    "bridged_pixels": "543_3_canaliculi_bridged_pixels.png",
+    "graph": "543_3_canaliculi_graph.pickle",
+    "verification": "543_3_canaliculi_verification.png"
+  },
+  "n_bridges": 14,
+  "bridges": [
+    {
+      "from_row_col": [
+        106,
+        592
+      ],
+      "to_row_col": [
+        110,
+        588
+      ],
+      "gap_len_px": 5.6569,
+      "angle_deg": 8.1301,
+      "min_signal_fraction": 0.7337
+    },
+    {
+      "from_row_col": [
+        168,
+        244
+      ],
+      "to_row_col": [
+        162,
+        242
+      ],
+      "gap_len_px": 6.3246,
+      "angle_deg": 32.4712,
+      "min_signal_fraction": 0.7031
+    },
+    {
+      "from_row_col": [
+        179,
+        781
+      ],
+      "to_row_col": [
+        179,
+        786
+      ],
+      "gap_len_px": 5.0,
+      "angle_deg": 26.5651,
+      "min_signal_fraction": 0.7253
+    },
+    {
+      "from_row_col": [
+        228,
+        968
+      ],
+      "to_row_col": [
+        223,
+        970
+      ],
+      "gap_len_px": 5.3852,
+      "angle_deg": 23.1986,
+      "min_signal_fraction": 0.7425
+    },
+    {
+      "from_row_col": [
+        255,
+        1002
+      ],
+      "to_row_col": [
+        258,
+        1002
+      ],
+      "gap_len_px": 3.0,
+      "angle_deg": 0.0,
+      "min_signal_fraction": 0.7196
+    },
+    {
+      "from_row_col": [
+        271,
+        637
+      ],
+      "to_row_col": [
+        273,
+        633
+      ],
+      "gap_len_px": 4.4721,
+      "angle_deg": 26.5651,
+      "min_signal_fraction": 0.7067
+    },
+    {
+      "from_row_col": [
+        370,
+        914
+      ],
+      "to_row_col": [
+        373,
+        911
+      ],
+      "gap_len_px": 4.2426,
+      "angle_deg": 14.0362,
+      "min_signal_fraction": 0.7201
+    },
+    {
+      "from_row_col": [
+        476,
+        840
+      ],
+      "to_row_col": [
+        482,
+        844
+      ],
+      "gap_len_px": 7.2111,
+      "angle_deg": 11.3099,
+      "min_signal_fraction": 0.7302
+    },
+    {
+      "from_row_col": [
+        527,
+        18
+      ],
+      "to_row_col": [
+        526,
+        21
+      ],
+      "gap_len_px": 3.1623,
+      "angle_deg": 4.3987,
+      "min_signal_fraction": 0.7166
+    },
+    {
+      "from_row_col": [
+        573,
+        524
+      ],
+      "to_row_col": [
+        576,
+        531
+      ],
+      "gap_len_px": 7.6158,
+      "angle_deg": 1.3972,
+      "min_signal_fraction": 0.7109
+    },
+    {
+      "from_row_col": [
+        657,
+        856
+      ],
+      "to_row_col": [
+        660,
+        861
+      ],
+      "gap_len_px": 5.831,
+      "angle_deg": 4.3987,
+      "min_signal_fraction": 0.7276
+    },
+    {
+      "from_row_col": [
+        847,
+        666
+      ],
+      "to_row_col": [
+        846,
+        658
+      ],
+      "gap_len_px": 8.0623,
+      "angle_deg": 14.6764,
+      "min_signal_fraction": 0.7177
+    },
+    {
+      "from_row_col": [
+        939,
+        827
+      ],
+      "to_row_col": [
+        942,
+        825
+      ],
+      "gap_len_px": 3.6056,
+      "angle_deg": 25.3462,
+      "min_signal_fraction": 0.7172
+    },
+    {
+      "from_row_col": [
+        991,
+        947
+      ],
+      "to_row_col": [
+        995,
+        947
+      ],
+      "gap_len_px": 4.0,
+      "angle_deg": 11.3099,
+      "min_signal_fraction": 0.7342
+    }
+  ],
+  "parameters": {
+    "pixel_size_um": null,
+    "smooth_sigma_px": 0.8,
+    "tophat_radius_px": 5,
+    "background_mode_subtract": true,
+    "threshold": "hysteresis, high cut = lower 3-class multi-Otsu cut",
+    "hysteresis_low_fraction": 0.75,
+    "network_threshold_t_lo": 0.083984375,
+    "lacuna_threshold_t_hi": 0.5798483455882353,
+    "lacuna_dilation_px": 2,
+    "min_thread_object_px2": 8,
+    "block_growth_in_flagged": true,
+    "broad_opening_radius_px": 8,
+    "flagged_min_span_fraction": 0.45,
+    "flagged_min_major_axis_px": 420.0,
+    "flagged_dilation_px": 4,
+    "flagged_area_px2": 0.0,
+    "gap_bridging": true,
+    "max_bridge_gap_px": 10.0,
+    "max_bridge_angle_deg": 40.0,
+    "min_bridge_signal_fraction": 0.7,
+    "direction_walk_px": 5,
+    "prune_spur_len_px": 4,
+    "min_internal_edge_len_px": 6,
+    "graph_cleanup_max_iter": 20,
+    "lacuna_attach_gap_px": 10,
+    "ownership": "graph connectivity, no distance cap",
+    "root_merge_dist_px": 8.0,
+    "ring_radii_px": [
+      30,
+      60
+    ],
+    "band_line_filter": false,
+    "band_line_min_len_px": null,
+    "band_line_reach_px": null,
+    "band_line_remove_px": 2
+  },
+  "provenance": {
+    "git_commit": "ade8bd18ebbe8cadacf9fb318c2a40b15c8c6b20",
+    "git_dirty": true,
+    "versions": {
+      "python": "3.9.10",
+      "numpy": "2.0.2",
+      "scipy": "1.13.1",
+      "scikit-image": "0.24.0",
+      "skan": "0.13.1",
+      "networkx": "3.2.1",
+      "pandas": "2.3.3"
+    },
+    "config_hash": "be57b3fa7ae5d298",
+    "config_hash_covers": [
+      "ALL_IMAGES_ARCHIVE_DIR",
+      "ALL_IMAGES_DIR",
+      "ALL_IMAGES_FIGURES_DIR",
+      "ALL_IMAGES_QUANT_DIR",
+      "BAND_FILTER_MIN_OPENING_SHARE",
+      "BAND_LINE_FILTER",
+      "BAND_LINE_MIN_LEN_PX",
+      "BAND_LINE_REACH_PX",
+      "BAND_LINE_REMOVE_PX",
+      "CHANNEL",
+      "CHANNEL_AXIS",
+      "CSV_FLOAT_PRECISION",
+      "DISPLAY_WINDOW_FILE",
+      "FAST_LACUNA_STAGE",
+      "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "IMAGE_LABELS",
+      "INVERT_SIGNAL",
+      "NARROW_CRUMB_RULE",
+      "PIXEL_SIZE_UM",
+      "QUANT_SUMMARY_NAME",
+      "RANDOM_SEED",
+      "SECTION_ARCHIVE",
+      "SECTION_CANALICULI",
+      "SECTION_FIGURES",
+      "SECTION_LACUNAE",
+      "SECTION_QUANTIFICATION",
+      "SUFFIX_CANALICULI_BRIDGED",
+      "SUFFIX_CANALICULI_DETECTION",
+      "SUFFIX_CANALICULI_GRAPH",
+      "SUFFIX_CANALICULI_MASK",
+      "SUFFIX_CANALICULI_RESULTS",
+      "SUFFIX_CANALICULI_SKELETON",
+      "SUFFIX_CANALICULI_VASCULAR",
+      "SUFFIX_CANALICULI_VERIFICATION",
+      "SUFFIX_FIGURE_GALLERY",
+      "SUFFIX_FIGURE_GALLERY_CHECKS",
+      "SUFFIX_FIGURE_INSET",
+      "SUFFIX_FIGURE_NETWORK",
+      "SUFFIX_FIGURE_NETWORK_CHECKS",
+      "SUFFIX_FIGURE_OVERVIEW",
+      "SUFFIX_LACUNAE_DETECTION",
+      "SUFFIX_LACUNAE_OUTLINES",
+      "SUFFIX_LACUNAE_RESULTS",
+      "SUFFIX_LACUNA_LABELS",
+      "SUFFIX_QUANTIFICATION",
+      "SUFFIX_VARIANT",
+      "SUMMARY_NAME",
+      "VALIDATION_TILES_DIR",
+      "VARIANTS_DIR",
+      "VARIANT_WINDOW_FILE"
+    ]
+  }
+}

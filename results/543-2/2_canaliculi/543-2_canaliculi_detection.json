@@ -1,0 +1,395 @@
+{
+  "status": "pre-validation",
+  "units": "px",
+  "stage": "canalicular network detection",
+  "image": "543-2.tif",
+  "image_label": "543-2",
+  "note": "Detection record: what feature 2 did, with no measured value in it. The mask, the skeleton, the vascular mask, the bridged pixels and the graph file beside it are what it produced; every number measured from them is in results/<label>/5_quantification/ (src/quantification.py). The bridges below are the gaps this run joined, which is detection, not a measure.",
+  "outputs": {
+    "mask": "543-2_canaliculi_mask.png",
+    "skeleton": "543-2_canaliculi_skeleton.png",
+    "vascular_mask": "543-2_canaliculi_vascular_mask.png",
+    "bridged_pixels": "543-2_canaliculi_bridged_pixels.png",
+    "graph": "543-2_canaliculi_graph.pickle",
+    "verification": "543-2_canaliculi_verification.png"
+  },
+  "n_bridges": 21,
+  "bridges": [
+    {
+      "from_row_col": [
+        12,
+        939
+      ],
+      "to_row_col": [
+        12,
+        943
+      ],
+      "gap_len_px": 4.0,
+      "angle_deg": 11.3099,
+      "min_signal_fraction": 0.7077
+    },
+    {
+      "from_row_col": [
+        19,
+        428
+      ],
+      "to_row_col": [
+        23,
+        424
+      ],
+      "gap_len_px": 5.6569,
+      "angle_deg": 6.3402,
+      "min_signal_fraction": 0.7283
+    },
+    {
+      "from_row_col": [
+        80,
+        439
+      ],
+      "to_row_col": [
+        75,
+        437
+      ],
+      "gap_len_px": 5.3852,
+      "angle_deg": 37.2348,
+      "min_signal_fraction": 0.7124
+    },
+    {
+      "from_row_col": [
+        83,
+        799
+      ],
+      "to_row_col": [
+        84,
+        805
+      ],
+      "gap_len_px": 6.0828,
+      "angle_deg": 27.8973,
+      "min_signal_fraction": 0.7294
+    },
+    {
+      "from_row_col": [
+        165,
+        670
+      ],
+      "to_row_col": [
+        165,
+        674
+      ],
+      "gap_len_px": 4.0,
+      "angle_deg": 33.6901,
+      "min_signal_fraction": 0.7482
+    },
+    {
+      "from_row_col": [
+        185,
+        821
+      ],
+      "to_row_col": [
+        188,
+        819
+      ],
+      "gap_len_px": 3.6056,
+      "angle_deg": 7.125,
+      "min_signal_fraction": 0.7052
+    },
+    {
+      "from_row_col": [
+        215,
+        384
+      ],
+      "to_row_col": [
+        216,
+        380
+      ],
+      "gap_len_px": 4.1231,
+      "angle_deg": 30.9638,
+      "min_signal_fraction": 0.7204
+    },
+    {
+      "from_row_col": [
+        259,
+        661
+      ],
+      "to_row_col": [
+        262,
+        659
+      ],
+      "gap_len_px": 3.6056,
+      "angle_deg": 33.6901,
+      "min_signal_fraction": 0.7442
+    },
+    {
+      "from_row_col": [
+        274,
+        642
+      ],
+      "to_row_col": [
+        272,
+        637
+      ],
+      "gap_len_px": 5.3852,
+      "angle_deg": 33.1113,
+      "min_signal_fraction": 0.7207
+    },
+    {
+      "from_row_col": [
+        412,
+        203
+      ],
+      "to_row_col": [
+        416,
+        204
+      ],
+      "gap_len_px": 4.1231,
+      "angle_deg": 7.7652,
+      "min_signal_fraction": 0.7128
+    },
+    {
+      "from_row_col": [
+        461,
+        33
+      ],
+      "to_row_col": [
+        459,
+        34
+      ],
+      "gap_len_px": 2.2361,
+      "angle_deg": 4.7636,
+      "min_signal_fraction": 0.7071
+    },
+    {
+      "from_row_col": [
+        637,
+        664
+      ],
+      "to_row_col": [
+        643,
+        660
+      ],
+      "gap_len_px": 7.2111,
+      "angle_deg": 2.7263,
+      "min_signal_fraction": 0.7166
+    },
+    {
+      "from_row_col": [
+        643,
+        344
+      ],
+      "to_row_col": [
+        649,
+        347
+      ],
+      "gap_len_px": 6.7082,
+      "angle_deg": 26.5651,
+      "min_signal_fraction": 0.7245
+    },
+    {
+      "from_row_col": [
+        707,
+        921
+      ],
+      "to_row_col": [
+        705,
+        921
+      ],
+      "gap_len_px": 2.0,
+      "angle_deg": 30.9638,
+      "min_signal_fraction": 0.7175
+    },
+    {
+      "from_row_col": [
+        728,
+        713
+      ],
+      "to_row_col": [
+        723,
+        716
+      ],
+      "gap_len_px": 5.831,
+      "angle_deg": 4.3987,
+      "min_signal_fraction": 0.7448
+    },
+    {
+      "from_row_col": [
+        754,
+        359
+      ],
+      "to_row_col": [
+        754,
+        368
+      ],
+      "gap_len_px": 9.0,
+      "angle_deg": 0.0,
+      "min_signal_fraction": 0.7078
+    },
+    {
+      "from_row_col": [
+        811,
+        243
+      ],
+      "to_row_col": [
+        816,
+        244
+      ],
+      "gap_len_px": 5.099,
+      "angle_deg": 10.4915,
+      "min_signal_fraction": 0.7122
+    },
+    {
+      "from_row_col": [
+        925,
+        604
+      ],
+      "to_row_col": [
+        927,
+        604
+      ],
+      "gap_len_px": 2.0,
+      "angle_deg": 11.3099,
+      "min_signal_fraction": 0.7269
+    },
+    {
+      "from_row_col": [
+        949,
+        42
+      ],
+      "to_row_col": [
+        955,
+        41
+      ],
+      "gap_len_px": 6.0828,
+      "angle_deg": 9.4623,
+      "min_signal_fraction": 0.7363
+    },
+    {
+      "from_row_col": [
+        1023,
+        68
+      ],
+      "to_row_col": [
+        1023,
+        71
+      ],
+      "gap_len_px": 3.0,
+      "angle_deg": 0.0,
+      "min_signal_fraction": 0.7335
+    },
+    {
+      "from_row_col": [
+        1023,
+        628
+      ],
+      "to_row_col": [
+        1023,
+        630
+      ],
+      "gap_len_px": 2.0,
+      "angle_deg": 11.3099,
+      "min_signal_fraction": 0.7041
+    }
+  ],
+  "parameters": {
+    "pixel_size_um": null,
+    "smooth_sigma_px": 0.8,
+    "tophat_radius_px": 5,
+    "background_mode_subtract": true,
+    "threshold": "hysteresis, high cut = lower 3-class multi-Otsu cut",
+    "hysteresis_low_fraction": 0.75,
+    "network_threshold_t_lo": 0.087890625,
+    "lacuna_threshold_t_hi": 0.5969362745098039,
+    "lacuna_dilation_px": 2,
+    "min_thread_object_px2": 8,
+    "block_growth_in_flagged": true,
+    "broad_opening_radius_px": 8,
+    "flagged_min_span_fraction": 0.45,
+    "flagged_min_major_axis_px": 420.0,
+    "flagged_dilation_px": 4,
+    "flagged_area_px2": 0.0,
+    "gap_bridging": true,
+    "max_bridge_gap_px": 10.0,
+    "max_bridge_angle_deg": 40.0,
+    "min_bridge_signal_fraction": 0.7,
+    "direction_walk_px": 5,
+    "prune_spur_len_px": 4,
+    "min_internal_edge_len_px": 6,
+    "graph_cleanup_max_iter": 20,
+    "lacuna_attach_gap_px": 10,
+    "ownership": "graph connectivity, no distance cap",
+    "root_merge_dist_px": 8.0,
+    "ring_radii_px": [
+      30,
+      60
+    ],
+    "band_line_filter": false,
+    "band_line_min_len_px": null,
+    "band_line_reach_px": null,
+    "band_line_remove_px": 2
+  },
+  "provenance": {
+    "git_commit": "ade8bd18ebbe8cadacf9fb318c2a40b15c8c6b20",
+    "git_dirty": true,
+    "versions": {
+      "python": "3.9.10",
+      "numpy": "2.0.2",
+      "scipy": "1.13.1",
+      "scikit-image": "0.24.0",
+      "skan": "0.13.1",
+      "networkx": "3.2.1",
+      "pandas": "2.3.3"
+    },
+    "config_hash": "be57b3fa7ae5d298",
+    "config_hash_covers": [
+      "ALL_IMAGES_ARCHIVE_DIR",
+      "ALL_IMAGES_DIR",
+      "ALL_IMAGES_FIGURES_DIR",
+      "ALL_IMAGES_QUANT_DIR",
+      "BAND_FILTER_MIN_OPENING_SHARE",
+      "BAND_LINE_FILTER",
+      "BAND_LINE_MIN_LEN_PX",
+      "BAND_LINE_REACH_PX",
+      "BAND_LINE_REMOVE_PX",
+      "CHANNEL",
+      "CHANNEL_AXIS",
+      "CSV_FLOAT_PRECISION",
+      "DISPLAY_WINDOW_FILE",
+      "FAST_LACUNA_STAGE",
+      "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "IMAGE_LABELS",
+      "INVERT_SIGNAL",
+      "NARROW_CRUMB_RULE",
+      "PIXEL_SIZE_UM",
+      "QUANT_SUMMARY_NAME",
+      "RANDOM_SEED",
+      "SECTION_ARCHIVE",
+      "SECTION_CANALICULI",
+      "SECTION_FIGURES",
+      "SECTION_LACUNAE",
+      "SECTION_QUANTIFICATION",
+      "SUFFIX_CANALICULI_BRIDGED",
+      "SUFFIX_CANALICULI_DETECTION",
+      "SUFFIX_CANALICULI_GRAPH",
+      "SUFFIX_CANALICULI_MASK",
+      "SUFFIX_CANALICULI_RESULTS",
+      "SUFFIX_CANALICULI_SKELETON",
+      "SUFFIX_CANALICULI_VASCULAR",
+      "SUFFIX_CANALICULI_VERIFICATION",
+      "SUFFIX_FIGURE_GALLERY",
+      "SUFFIX_FIGURE_GALLERY_CHECKS",
+      "SUFFIX_FIGURE_INSET",
+      "SUFFIX_FIGURE_NETWORK",
+      "SUFFIX_FIGURE_NETWORK_CHECKS",
+      "SUFFIX_FIGURE_OVERVIEW",
+      "SUFFIX_LACUNAE_DETECTION",
+      "SUFFIX_LACUNAE_OUTLINES",
+      "SUFFIX_LACUNAE_RESULTS",
+      "SUFFIX_LACUNA_LABELS",
+      "SUFFIX_QUANTIFICATION",
+      "SUFFIX_VARIANT",
+      "SUMMARY_NAME",
+      "VALIDATION_TILES_DIR",
+      "VARIANTS_DIR",
+      "VARIANT_WINDOW_FILE"
+    ]
+  }
+}

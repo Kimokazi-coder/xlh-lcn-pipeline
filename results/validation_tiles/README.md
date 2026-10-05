@@ -15,7 +15,7 @@ any other folder of `results/` while counting.
 random source, so the order cannot be rebuilt from this repository. The key (code, image, lacuna id,
 centre x and y) stays outside the repository, at the path given with `-k` when the tiles were made; the
 command refuses a key path inside the repository. Join the key to the filled template to compare the
-hand counts with `roots_count` in `results/<image>/2_canaliculi/<image>_canaliculi_results.json` (the
+hand counts with `roots_count` in `results/<image>/5_quantification/<image>_quantification.json` (the
 image column of the key is the folder label).
 
 **Limits.** The tiles hide the pipeline result, not the image: a tile can be matched to its section by
