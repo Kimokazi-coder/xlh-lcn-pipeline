@@ -1,12 +1,13 @@
 """Publication figures for the LCN pipeline.
 
 PRE-VALIDATION, PIXEL units. Every figure shows the default pipeline output as
-it is (src/ with every switch off), unless its caption says otherwise. Nothing
-here writes into results/. Outputs go to figures_out/ as PNG (300 dpi) and PDF
-(fonts embedded). Coordinates are (x, y) = (column, row).
+it is (src/ with every switch off), unless its caption says otherwise. The
+figures go into the results layout (results/README.md) as PNG (300 dpi) and
+PDF (fonts embedded); no pipeline result file is written here. Coordinates
+are (x, y) = (column, row).
 
 Usage (from the repo root):
-    python -u figures/make_figures.py all                 # the whole figures_out/ tree, with a summary
+    python -u figures/make_figures.py all                 # every figure in results/, with a summary
     python -u figures/make_figures.py window              # the fixed display window
     python -u figures/make_figures.py check               # drawing data against results/, all images
     python -u figures/make_figures.py image -i 543-2      # per-image overview
@@ -22,17 +23,20 @@ Usage (from the repo root):
     python -u figures/make_figures.py thresholds          # lacuna cut sensitivity (Fig03)
     python -u figures/make_figures.py fields -f FIELD_DIR # per-field plot (Fig04; -m merged)
     python -u figures/make_figures.py switches            # crumb rule and hole fill (S01)
-    python -u figures/make_figures.py thumbs              # _thumbs/, README.md and INDEX.md
 
-Layout of figures_out/: main/ (Fig01 to Fig04), supplement/ (S01 to S03),
-per_image/<image>/ (overview, network, gallery, logs, display_variants/),
-validation_tiles/, _thumbs/, README.md, INDEX.md, display_window.json.
+Where the figures go (names from config.py): results/<label>/3_publication_figures/
+(overview, network, cell gallery and their logs), results/<label>/4_archive_not_used/
+(the per-image brightness variants and the low-cut overview layer, kept for
+history), results/all_images/figures/main/ (Fig01 to Fig04),
+results/all_images/figures/supplement/ (S01, S02), results/all_images/
+archive_not_used/ (S03, the coded contact sheet), results/all_images/figures/
+display_window.json and results/validation_tiles/.
 Each output is skipped if its PNG and PDF exist; delete them to redraw.
 
 Shared style (one place, used by every figure):
     display window   fixed for the whole dataset: the 1st and 99.8th percentile
                      of the pooled red channel of all images, the same for every
-                     image and panel (figures_out/display_window.json)
+                     image and panel (results/all_images/figures/display_window.json)
     fonts            Arial (Helvetica if present, else DejaVu Sans), 7 to 9 pt
                      at 180 mm figure width; PDF fonts embedded (TrueType)
     colours          one colour, one meaning (PALETTE): interior lacuna
@@ -75,7 +79,7 @@ import lacunae  # noqa: E402
 # the figures use it for speed. Every other setting is the default.
 config.FAST_LACUNA_STAGE = True
 
-OUT = ROOT / "figures_out"
+RESULTS = config.RESULTS_DIR
 CACHE = ROOT / "results_experiments" / "_cache" / "figures"
 LOG_DIR = ROOT / "experiments" / "logs"
 DATA_DIR = config.DATA_DIR / "WT"
@@ -193,13 +197,24 @@ def scale_bar(ax, image_width_px: int, length_px: int = SCALE_BAR_PX, colour: st
 
 def fig_stem(name: str) -> Path:
     """Where a numbered figure lives: main figures (Fig01, ...) in
-    figures_out/main/, supplementary figures (S01, ...) in
-    figures_out/supplement/."""
+    results/all_images/figures/main/, supplementary figures (S01, ...) in
+    results/all_images/figures/supplement/, and the coded contact sheet (S03,
+    kept for history) in results/all_images/archive_not_used/."""
+    figures = config.ALL_IMAGES_FIGURES_DIR
+    if name.startswith("S03_contact_sheet_coded"):
+        return lacunae.all_images_path(RESULTS, name, config.ALL_IMAGES_ARCHIVE_DIR)
     if name.startswith("Fig"):
-        return OUT / "main" / name
+        return lacunae.all_images_path(RESULTS, name, f"{figures}/main")
     if name[:1] == "S" and name[1:3].isdigit():
-        return OUT / "supplement" / name
-    return OUT / name
+        return lacunae.all_images_path(RESULTS, name, f"{figures}/supplement")
+    return lacunae.all_images_path(RESULTS, name, figures)
+
+
+def fig_path(label: str, suffix: str, section: str = config.SECTION_FIGURES, subfolder: str | None = None,
+             prefixed: bool = True) -> Path:
+    """A per-image figure file in the results layout (lacunae.result_path);
+    the short image name is the label."""
+    return lacunae.result_path(RESULTS, label, section, suffix, subfolder, prefixed)
 
 
 def save(fig, name: str) -> None:
@@ -244,7 +259,7 @@ def path_of(name: str) -> Path:
 
 def display_window() -> tuple[float, float]:
     """(lo, hi) on the red channel in [0, 1], fixed for the dataset."""
-    path = OUT / "display_window.json"
+    path = lacunae.all_images_path(RESULTS, config.DISPLAY_WINDOW_FILE, config.ALL_IMAGES_FIGURES_DIR)
     if path.is_file():
         w = json.loads(path.read_text(encoding="utf-8"))
         return w["lo"], w["hi"]
@@ -373,7 +388,6 @@ def skeleton_rgb(channel: np.ndarray, skeleton: np.ndarray) -> np.ndarray:
 # Figures v2: shared data and drawing code ---------------------------------------------
 
 CACHE2 = ROOT / "results_experiments" / "_cache" / "figures_v2"
-PER_IMAGE = OUT / "per_image"
 TASK2_DIR = ROOT / "experiments"
 
 # Rejected pieces smaller than this are not drawn: they are specks of the
@@ -825,7 +839,8 @@ def done_at(stem: Path, exts: tuple = ("png", "pdf")) -> bool:
 
 
 # Display windows (P8). The main per-image figures use the fixed dataset
-# window; their variants in per_image/<image>/display_variants/ use the 1st
+# window; their variants in results/<label>/4_archive_not_used/
+# variants_per_image_brightness/ use the 1st
 # and 99.8th percentile of that image's own red channel (PNG only, to keep
 # the repository small). Display only; no measurement uses either window.
 FIXED_WINDOW_NOTE = "Fixed display window for the dataset."
@@ -842,8 +857,9 @@ def exts_for(window) -> tuple:
 
 
 def update_inset_log(name: str, key: str, entry: dict) -> None:
-    """per_image/<image>/inset.json holds one entry per figure kind."""
-    path = PER_IMAGE / name / "inset.json"
+    """results/<label>/3_publication_figures/<label>_figure_inset_choice.json
+    holds one entry per figure kind."""
+    path = fig_path(name, config.SUFFIX_FIGURE_INSET)
     log = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"image": name}
     log[key] = entry
     write_json(path, log)
@@ -949,7 +965,7 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
     contour of the inset lacuna."""
     d = image_data(name)
     name = d["short"]
-    stem = stem or PER_IMAGE / name / "network"
+    stem = stem or fig_path(name, config.SUFFIX_FIGURE_NETWORK)
     window_note = window_note or (FIXED_WINDOW_NOTE if window is None else IMAGE_WINDOW_NOTE)
     if done_at(stem, exts_for(window)):
         print(stem.relative_to(ROOT), "exists, skipped")
@@ -963,7 +979,7 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
             raise ValueError(f"{name}: lacuna {i} is not an interior lacuna")
     if window is None:
         update_inset_log(name, "network", log)
-        write_json(PER_IMAGE / name / "network_check.json", network_values(d))
+        write_json(fig_path(name, config.SUFFIX_FIGURE_NETWORK_CHECKS), network_values(d))
     H, W = d["lacuna_id_map"].shape
 
     margin, gap_ab, panel, gap_in = 1.0, 2.0, 88.0, 3.0
@@ -1091,7 +1107,7 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
     roots and the dashed contour of its 30 px ring."""
     d = image_data(name)
     name = d["short"]
-    stem = stem or PER_IMAGE / name / "gallery"
+    stem = stem or fig_path(name, config.SUFFIX_FIGURE_GALLERY)
     ids = list(d["interior_ids"])
     pages = [ids[i:i + GALLERY_PER_PAGE] for i in range(0, len(ids), GALLERY_PER_PAGE)]
     stems = [stem] if len(pages) == 1 else [stem.with_name(f"{stem.name}_p{k + 1}") for k in range(len(pages))]
@@ -1127,13 +1143,13 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
         save_to(fig, s, exts_for(window))
         print(s.relative_to(ROOT), "written")
     if window is None:
-        write_json(PER_IMAGE / name / "gallery_check.json",
+        write_json(fig_path(name, config.SUFFIX_FIGURE_GALLERY_CHECKS),
                    {"image": name, "status": "pre-validation", "units": "px",
                     "check": "per tile: magenta_dots == roots_count and vermillion_px == ring_length_r30_px",
                     "tiles": all_checks})
 
 
-TILES_DIR = OUT / "validation_tiles"
+TILES_DIR = RESULTS / config.VALIDATION_TILES_DIR
 KEY_COLUMNS = ["code", "image", "lacuna_id", "centre_x", "centre_y"]
 
 TILES_README = """# Hand-count tiles
@@ -1147,7 +1163,7 @@ in any metadata).
 **Purpose.** These tiles are for counting roots by hand without seeing the pipeline result. Count the
 roots (distinct canalicular threads leaving the lacuna surface) of the lacuna at the centre of each tile
 and enter the number in `annotation_template.csv` (columns code, hand_roots, hand_notes). Do not open
-`figures_out/per_image/` or `results/` while counting.
+the image folders of `results/` (only `results/validation_tiles/`) while counting.
 
 **Codes.** The tiles are named T001, T002 and so on in a random order drawn from the operating system's
 random source, so the order cannot be rebuilt from this repository. The key (code, image, lacuna id,
@@ -1249,30 +1265,38 @@ def make_validation_tiles(key_path: Path) -> None:
 
 def figure_display_variants(name: str) -> None:
     """P8: the overview, network and gallery of one image with the image's own
-    display window, PNG only, in per_image/<image>/display_variants/."""
+    display window, PNG only, in results/<label>/4_archive_not_used/
+    variants_per_image_brightness/ (kept for history)."""
     d = image_data(name)
     name = d["short"]
     win = image_window(d)
-    folder = PER_IMAGE / name / "display_variants"
-    write_json(folder / "display_window.json",
-               {"image": name, "lo": win[0], "hi": win[1], "lo_8bit": win[0] * 255, "hi_8bit": win[1] * 255,
-                "percentiles": list(WINDOW_PERCENTILES),
-                "note": "Display window of this image only: the 1st and 99.8th percentile of its red channel. "
-                        "Display only; no measurement uses it. The main figures use the fixed dataset window "
-                        "(figures_out/display_window.json)."})
-    figure_image(name, window=win, stem=folder / "overview_image_window")
-    figure_network(name, window=win, stem=folder / "network_image_window")
-    figure_gallery(name, window=win, stem=folder / "gallery_image_window")
+
+    def variant(suffix):
+        return fig_path(name, suffix + config.SUFFIX_VARIANT, config.SECTION_ARCHIVE, config.VARIANTS_DIR)
+
+    window_file = fig_path(name, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR,
+                           prefixed=False)
+    if not window_file.is_file():  # skipped when it exists, like every other output
+        write_json(window_file,
+                   {"image": name, "lo": win[0], "hi": win[1], "lo_8bit": win[0] * 255, "hi_8bit": win[1] * 255,
+                    "percentiles": list(WINDOW_PERCENTILES),
+                    "note": "Display window of this image only: the 1st and 99.8th percentile of its red channel. "
+                            "Display only; no measurement uses it. The main figures use the fixed dataset window "
+                            "(results/all_images/figures/display_window.json)."})
+    figure_image(name, window=win, stem=variant(config.SUFFIX_FIGURE_OVERVIEW))
+    figure_network(name, window=win, stem=variant(config.SUFFIX_FIGURE_NETWORK))
+    figure_gallery(name, window=win, stem=variant(config.SUFFIX_FIGURE_GALLERY))
 
 
 FIG02_IMAGE = "543-2"
 
 
 def copy_fig02() -> None:
-    """Fig02 is a copy of the network figure of 543-2 (per_image/543-2/network)."""
+    """Fig02 is a copy of the network figure of 543-2
+    (results/543-2/3_publication_figures/543-2_figure_network)."""
     import shutil
 
-    src = PER_IMAGE / FIG02_IMAGE / "network"
+    src = fig_path(FIG02_IMAGE, config.SUFFIX_FIGURE_NETWORK)
     for ext in ("png", "pdf"):
         a = src.with_name(f"{src.name}.{ext}")
         b = fig_stem("Fig02").with_name(f"Fig02_network_overlay_{FIG02_IMAGE}.{ext}")
@@ -1363,7 +1387,9 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False, wind
     d = image_data(name)
     name = d["short"]
     fig_name = "overview" + ("_low_cut_layer" if low_cut else "")
-    stem = stem or PER_IMAGE / name / fig_name
+    # The low-cut layer (-r) is not the default output: kept in the archive section.
+    stem = stem or (fig_path(name, config.SUFFIX_FIGURE_OVERVIEW + "_low_cut_layer", config.SECTION_ARCHIVE)
+                    if low_cut else fig_path(name, config.SUFFIX_FIGURE_OVERVIEW))
     if done_at(stem, exts_for(window)):
         print(stem.relative_to(ROOT), "exists, skipped")
         return
@@ -1942,153 +1968,36 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
     print(fig_name, "written")
 
 
-THUMBS = OUT / "_thumbs"
-THUMB_WIDTH_PX = 600
-IMAGE_ORDER = ["543-2", "543_3", "543_z13", "542_z06", "542_z18", "682_z08", "682_z23", "682_z29"]
-
-# (file stem relative to figures_out/, what it shows, display window)
-INDEX_MAIN = [
-    ("main/Fig01_contact_sheet", "All 8 sections with the kept lacunae (cyan interior, yellow frame edge), canal marks "
-     "\"c\" and the count lines.", "fixed"),
-    ("main/Fig02_network_overlay_543-2", "Network overlay of 543-2: raw; overlay with vermillion ring 30 px skeleton, "
-     "white rest, magenta roots; three lacunae at 3x. A copy of per_image/543-2/network.", "fixed"),
-    ("main/Fig03_threshold_sensitivity", "Kept lacunae and count lines at 0.8 to 1.2 times the lacuna cut t_hi, three "
-     "sections; the default is framed.", "fixed"),
-    ("main/Fig04_per_field", "Roots, roots per 100 px perimeter, ring 30 px, ring density 30 px and field density by "
-     "field; y from zero; 682_z08 open diamond.", "none (no image)"),
-    ("main/Fig04_per_field_merged", "The same with 682_z08 merged by hand into Field 4 (option -m).", "none (no image)"),
-]
-INDEX_SUPPLEMENT = [
-    ("supplement/S01_switch_examples", "The narrow crumb rule (543_3) and the hole fill (542_z06), off and on, in the "
-     "network overlay style.", "fixed"),
-    ("supplement/S02_contact_sheet_with_rejected_candidates", "The contact sheet with the rejected lacuna-scale "
-     "candidates (grey dashed; A aspect, S solidity, a area).", "fixed"),
-    ("supplement/S03_contact_sheet_coded", "The contact sheet labelled with blinding codes (a blinding test).", "fixed"),
-]
-
-
-def thumb_name(rel_stem: str) -> str:
-    """_thumbs/ name: the figure id, or the kind followed by the image."""
-    parts = rel_stem.split("/")
-    if parts[0] == "per_image":
-        return f"{parts[-1]}_{parts[1]}.png"
-    return f"{parts[-1]}.png"
-
-
-def make_thumb(rel_stem: str) -> str:
-    """A 600 px wide PNG of figures_out/<rel_stem>.png in _thumbs/, redrawn
-    only when the figure is newer. Returns written, skipped or missing."""
-    from PIL import Image
-
-    src = OUT / f"{rel_stem}.png"
-    dst = THUMBS / thumb_name(rel_stem)
-    if not src.is_file():
-        return "missing"
-    if dst.is_file() and dst.stat().st_mtime >= src.stat().st_mtime:
-        return "skipped"
-    THUMBS.mkdir(parents=True, exist_ok=True)
-    im = Image.open(src).convert("RGB")
-    w, h = im.size
-    im = im.resize((THUMB_WIDTH_PX, max(1, round(h * THUMB_WIDTH_PX / w))), Image.LANCZOS)
-    tmp = dst.with_name(dst.name + ".tmp")
-    # Full colour: a 256-colour palette turned the frame-edge yellow orange.
-    im.save(tmp, format="PNG", optimize=True)
-    os.replace(tmp, dst)
-    return "written"
-
-
-def index_text() -> str:
-    def row(rel, what, window):
-        name = rel.split("/")[-1]
-        fid = name.split("_")[0] + (" merged" if name.endswith("_merged") else "")
-        return (f"| {fid} | {what} | {window} | [png]({rel}.png), [pdf]({rel}.pdf) | "
-                f"[![{name}](_thumbs/{thumb_name(rel)})]({rel}.png) |")
-
-    lines = ["# Index of figures_out", "",
-             "Pre-validation, pixel units. Every figure shows the default pipeline output (every switch off) unless "
-             "its row says otherwise. Open first: **Fig02** (the network overlay of 543-2), then the network "
-             "figure of any other image below, then Fig01 and Fig04. Captions: `figures/captions.md`. Review notes: "
-             "`figures/REVIEW_V2.md`. How to regenerate: `README.md`.", "",
-             "Display window: \"fixed\" is one window for the whole dataset (`display_window.json`), so brightness "
-             "can be compared between images; the per-image variants in `per_image/<image>/display_variants/` use "
-             "each image's own window instead.", "",
-             "## Main figures", "", "| figure | what it shows | window | file | thumbnail |", "|---|---|---|---|---|"]
-    lines += [row(*r) for r in INDEX_MAIN]
-    lines += ["", "## Supplementary figures", "", "| figure | what it shows | window | file | thumbnail |",
-              "|---|---|---|---|---|"]
-    lines += [row(*r) for r in INDEX_SUPPLEMENT]
-    lines += ["", "## Per image", "",
-              "`overview`: raw; kept lacunae with numbers, canal marks and rejected candidates; the network overlay "
-              "at small size; one inset lacuna at 3x. `network`: raw and the network overlay at full size with three "
-              "lacunae at 3x. `gallery`: every interior lacuna at 3x. All three use the fixed window; "
-              "`display_variants/` holds the same three with the image's own window (PNG). `inset.json` logs the "
-              "inset choices; `network_check.json` and `gallery_check.json` list the drawn numbers against the "
-              "pipeline numbers.", "",
-              "| image | overview | network | gallery |", "|---|---|---|---|"]
-    for n in IMAGE_ORDER:
-        cells = []
-        for kind in ("overview", "network", "gallery"):
-            rel = f"per_image/{n}/{kind}"
-            cells.append(f"[![{kind} {n}](_thumbs/{thumb_name(rel)})]({rel}.png) [pdf]({rel}.pdf)")
-        lines.append(f"| {n} | " + " | ".join(cells) + " |")
-    lines += ["", "Also: `per_image/543_3/overview_low_cut_layer` (option `-r`: objects kept only at 0.8 times "
-              "t_hi, dotted light blue; not the default output).", "",
-              "## Hand-count tiles", "",
-              "`validation_tiles/`: 86 raw red tiles, one per interior lacuna, under random codes, for counting roots "
-              "by hand without seeing the pipeline result. See `validation_tiles/README.md`. The key is outside the "
-              "repository.", ""]
-    return "\n".join(lines)
-
-
-def make_thumbs_and_index() -> dict:
-    """_thumbs/ and INDEX.md. Returns {path: written | skipped | missing}."""
-    report = {}
-    rels = [r[0] for r in INDEX_MAIN + INDEX_SUPPLEMENT]
-    rels += [f"per_image/{n}/{k}" for n in IMAGE_ORDER for k in ("overview", "network", "gallery")]
-    for rel in rels:
-        report[f"_thumbs/{thumb_name(rel)}"] = make_thumb(rel)
-    text = index_text()
-    path = OUT / "INDEX.md"
-    if path.is_file() and path.read_text(encoding="utf-8") == text:
-        report["INDEX.md"] = "skipped"
-    else:
-        tmp = path.with_name(path.name + ".tmp")
-        with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-            f.write(text)
-        os.replace(tmp, path)
-        report["INDEX.md"] = "written"
-    for k, v in report.items():
-        if v != "skipped":
-            print(k, v)
-    return report
-
-
 DEFAULT_FIELD_DIR = ROOT / "results_experiments" / "fixes" / "B3_field_summary"
 
 
 def figure_all(tiles_key: Path | None = None, blind_key: Path | None = None,
                field_dir: Path = DEFAULT_FIELD_DIR) -> int:
-    """O4: regenerate the whole figures_out/ tree in its folders. Every step
+    """O4: regenerate every figure in the results layout. Every step
     skips outputs that exist; delete a file to redraw it. Prints one row per
     output: written, skipped, failed or missing. Returns 1 if any step failed."""
     def pair(stem):
         return [stem.with_name(stem.name + ".png"), stem.with_name(stem.name + ".pdf")]
 
     names = [short(p) for p in image_paths()]
-    steps = [("display window", display_window, (), [OUT / "display_window.json"])]
+    steps = [("display window", display_window, (),
+              [lacunae.all_images_path(RESULTS, config.DISPLAY_WINDOW_FILE, config.ALL_IMAGES_FIGURES_DIR)])]
     for n in names:
-        steps.append((f"overview {n}", figure_image, (n,), pair(PER_IMAGE / n / "overview")))
+        steps.append((f"overview {n}", figure_image, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_OVERVIEW))))
     steps.append(("overview 543_3 -r", figure_image, ("543_3", None, True),
-                  pair(PER_IMAGE / "543_3" / "overview_low_cut_layer")))
+                  pair(fig_path("543_3", config.SUFFIX_FIGURE_OVERVIEW + "_low_cut_layer", config.SECTION_ARCHIVE))))
     for n in names:
-        steps.append((f"network {n}", figure_network, (n,), pair(PER_IMAGE / n / "network")))
+        steps.append((f"network {n}", figure_network, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_NETWORK))))
     steps.append(("Fig02 copy", copy_fig02, (), pair(fig_stem("Fig02").with_name(f"Fig02_network_overlay_{FIG02_IMAGE}"))))
     for n in names:
-        steps.append((f"gallery {n}", figure_gallery, (n,), pair(PER_IMAGE / n / "gallery")))
+        steps.append((f"gallery {n}", figure_gallery, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_GALLERY))))
     for n in names:
-        folder = PER_IMAGE / n / "display_variants"
         steps.append((f"variants {n}", figure_display_variants, (n,),
-                      [folder / f"{k}_image_window.png" for k in ("overview", "network", "gallery")]))
+                      [fig_path(n, k + config.SUFFIX_VARIANT + ".png", config.SECTION_ARCHIVE, config.VARIANTS_DIR)
+                       for k in (config.SUFFIX_FIGURE_OVERVIEW, config.SUFFIX_FIGURE_NETWORK,
+                                 config.SUFFIX_FIGURE_GALLERY)]
+                      + [fig_path(n, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR,
+                                  prefixed=False)]))
     steps += [("Fig01", figure_contact, (None, False), pair(fig_stem("Fig01_contact_sheet"))),
               ("Fig03", figure_thresholds, (), pair(fig_stem("Fig03_threshold_sensitivity"))),
               ("Fig04", figure_fields, (field_dir, False), pair(fig_stem("Fig04_per_field"))),
@@ -2124,11 +2033,6 @@ def figure_all(tiles_key: Path | None = None, blind_key: Path | None = None,
     if tiles_key is None:
         rows += [("validation tiles", TILES_DIR, f"kept, {len(list(TILES_DIR.glob('T*.png')))} tiles "
                   "(needs -k KEY to redraw)")]
-    thumbs_before = stamp(sorted(THUMBS.glob("*.png")) + [OUT / "INDEX.md"])
-    report = make_thumbs_and_index()
-    for path_str, status in report.items():
-        rows.append(("thumbs and INDEX", OUT / path_str, status))
-    del thumbs_before
 
     width = max(len(r[0]) for r in rows)
     print(f"\n{'step':<{width}}  {'status':<10}  file")
@@ -2192,8 +2096,7 @@ def main() -> int:
     g = q.add_mutually_exclusive_group(required=True)
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
-    sub.add_parser("thumbs", help="Thumbnails in _thumbs/ and figures_out/INDEX.md.")
-    q = sub.add_parser("all", help="Regenerate the whole figures_out/ tree; prints what was written or skipped.")
+    q = sub.add_parser("all", help="Regenerate every figure in results/; prints what was written or skipped.")
     q.add_argument("-k", dest="tiles_key", type=Path, default=None,
                    help="Key of the hand-count tiles (outside the repository); without it the tiles are kept.")
     q.add_argument("-b", dest="blind_key", type=Path, default=None,
@@ -2207,8 +2110,6 @@ def main() -> int:
         return run("N0", _selftest_n0)
     if args.cmd == "all":
         return figure_all(args.tiles_key, args.blind_key, args.field_dir)
-    if args.cmd == "thumbs":
-        return run("O1", make_thumbs_and_index)
     if args.cmd == "tiles":
         return run("N3", make_validation_tiles, args.key)
     if args.cmd == "variants":
