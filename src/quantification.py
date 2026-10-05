@@ -64,6 +64,20 @@ import canaliculi  # noqa: E402
 import lacunae  # noqa: E402
 
 
+# The measure lists. They live here because this is where the measures are.
+# While the split is in progress they still name the lists of the detection
+# modules, which the next step moves over unchanged.
+LACUNA_MEASUREMENT_FIELDS = lacunae.LACUNA_MEASUREMENT_FIELDS
+LACUNA_SUMMARY_METRICS = lacunae.LACUNA_SUMMARY_METRICS
+CELL_METRICS = canaliculi.CELL_METRICS
+NORMALISED_METRICS = canaliculi.NORMALISED_METRICS
+NETWORK_V2_METRICS = canaliculi.NETWORK_V2_METRICS
+FIELD_V2 = canaliculi.FIELD_V2
+FIELD_V2_KEYS = canaliculi.FIELD_V2_KEYS
+FIELD_UNITS = canaliculi.FIELD_UNITS
+RING_RADII_PX = canaliculi.RING_RADII_PX
+
+
 # Canalicular width
 # The local full width (px) of a thread at a skeleton pixel: twice the
 # Euclidean distance from that pixel to the nearest pixel outside the
@@ -281,6 +295,16 @@ def network_rows(kept: list[tuple], detection: dict, dist_to_lacuna: np.ndarray,
         row["mean_edge_length_px"] = round(total / count if count else 0.0, precision)
         rows.append(row)
     return rows
+
+
+def measure_cells(kept: list, skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
+                  nearest_id: np.ndarray, precision: int) -> dict:
+    """Ownership and the per-lacuna network measures from arrays in memory, for a
+    caller that has a skeleton but no results folder (the experiment scripts)."""
+    own = canaliculi.build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
+    rows = network_rows(kept, {"graph": own["graph"], "edge_owner": own["edge_owner"], "skeleton": skeleton},
+                        dist_to_lacuna, nearest_id, precision)
+    return {"rows": rows, **own}
 
 
 def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = None) -> dict:
@@ -783,8 +807,13 @@ def summary_row(result: dict) -> list:
 
 def write_summary_table(results: list, out_root: Path) -> None:
     """quantification_all_images.csv, .xlsx and .pdf: one row per image."""
-    rows = [summary_row(r) for r in results]
+    write_summary_rows([summary_row(r) for r in results], out_root, results)
 
+
+def write_summary_rows(rows: list, out_root: Path, results: list | None = None) -> None:
+    """The cross-image table from finished rows, so a caller that measured in
+    worker processes can write it without carrying the arrays back. The pdf
+    needs the distributions, so it is written only when `results` is given."""
     csv_path = summary_path(out_root, ".csv")
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with open(csv_path, "w", newline="") as f:
@@ -805,7 +834,8 @@ def write_summary_table(results: list, out_root: Path) -> None:
         notes.append([line])
     wb.save(summary_path(out_root, ".xlsx"))
 
-    save_summary_pdf(results, rows, summary_path(out_root, ".pdf"))
+    if results is not None:
+        save_summary_pdf(results, rows, summary_path(out_root, ".pdf"))
 
 
 SUMMARY_PDF_COLUMNS_PER_BLOCK = 6
@@ -817,7 +847,6 @@ def save_summary_pdf(results: list, rows: list, out_path: Path) -> None:
     from matplotlib.backends.backend_pdf import PdfPages
 
     lines = []
-    first = SUMMARY_COLUMNS.index("image")
     labels = [row[SUMMARY_COLUMNS.index("image_label")] for row in rows]
     rest = [c for c in SUMMARY_COLUMNS if c not in ("image", "file", "status", "image_label")]
     for start in range(0, len(rest), SUMMARY_PDF_COLUMNS_PER_BLOCK):
@@ -828,7 +857,6 @@ def save_summary_pdf(results: list, rows: list, out_path: Path) -> None:
             table.append([label] + values)
         lines += ["", f"Columns {start + 1} to {start + len(block)} of {len(rest)}"]
         lines += text_table(["image_label"] + block, table)
-    del first
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with PdfPages(out_path) as pdf:

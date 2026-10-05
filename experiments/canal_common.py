@@ -24,6 +24,7 @@ import common as C  # noqa: E402
 import canaliculi  # noqa: E402
 import config  # noqa: E402
 import lacunae  # noqa: E402
+import quantification  # noqa: E402
 
 OUT = C.OUT_ROOT / "canal_v2"
 CACHE = C.OUT_ROOT / "_cache" / "canal_v2"
@@ -65,7 +66,7 @@ def pipeline(name: str, overrides: dict | None = None) -> dict:
     try:
         for k, v in (overrides or {}).items():
             setattr(config, k, v)
-        res = canaliculi.analyse_image(path)
+        res = quantification.analyse_image(path)
     finally:
         config.FAST_LACUNA_STAGE = fast
         for k, v in saved.items():

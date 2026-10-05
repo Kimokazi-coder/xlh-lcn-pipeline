@@ -64,6 +64,7 @@ import config  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import canaliculi  # noqa: E402
 import lacunae  # noqa: E402
+import quantification  # noqa: E402
 
 DEFAULT_IMAGE_DIR = config.DATA_DIR / "WT"
 
@@ -109,7 +110,7 @@ REFERENCE_VALUES = [
 
 
 def cmd_reference_check(args) -> int:
-    result = canaliculi.analyse_image(args.image)
+    result = quantification.analyse_image(args.image)
     s = result["summary"]
     measured = [
         round(s["edge_count"]["mean"], 2),
@@ -129,42 +130,42 @@ def cmd_reference_check(args) -> int:
 
 # compare-outputs ---------------------------------------------------------------
 
-LACUNA_SHAPE_KEYS = [f for f in lacunae.LACUNA_MEASUREMENT_FIELDS if f != "lacuna_id"]
-LACUNA_SUMMARY_KEYS = [f for f, _u in lacunae.LACUNA_SUMMARY_METRICS]
-CELL_KEYS = [f for f, _u, _k in canaliculi.CELL_METRICS]
+LACUNA_SHAPE_KEYS = [f for f in quantification.shape_columns() if f != "lacuna_id"]
+LACUNA_SUMMARY_KEYS = [f for f, _u in quantification.LACUNA_SUMMARY_METRICS]
+CELL_KEYS = [f for f, _u, _k in quantification.CELL_METRICS]
 
 
-def result_json(root: Path, label: str, kind: str) -> Path:
-    """The results json of one image in a results folder: kind "lacunae" or
-    "canaliculi" (lacunae.result_path with the config names)."""
+def result_json(root: Path, label: str, kind: str = "quantification") -> Path:
+    """The quantification json of one image in a results folder: every measured
+    number of that image, in results/<label>/5_quantification/."""
+    return quantification.quant_path(root, label, ".json")
+
+
+def detection_json(root: Path, label: str, kind: str) -> Path:
+    """The detection record of one stage: kind "lacunae" or "canaliculi"."""
     if kind == "lacunae":
-        return lacunae.result_path(root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".json")
-    return lacunae.result_path(root, label, config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".json")
+        return lacunae.result_path(root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_DETECTION)
+    return lacunae.result_path(root, label, config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_DETECTION)
 
 
 def summary_csv(root: Path) -> Path:
-    """The summary table of a results folder."""
-    return lacunae.all_images_path(root, config.SUMMARY_NAME + ".csv")
+    """The cross-image table of a results folder."""
+    return quantification.summary_path(root, ".csv")
 
 
 def numbers_from_results(root: Path, label: str) -> dict:
     """The canonical numbers of one image in a results folder."""
-    lac = json.load(open(result_json(root, label, "lacunae")))
-    can = json.load(open(result_json(root, label, "canaliculi")))
+    q = json.load(open(result_json(root, label)))
     per_lacuna = {}
-    for lrow, crow in zip(lac["lacunae"], can["lacunae"]):
-        row = {k: lrow[k] for k in LACUNA_SHAPE_KEYS}
-        row.update({k: crow[k] for k in CELL_KEYS})
-        per_lacuna[str(lrow["lacuna_id"])] = row
-    if len(lac["lacunae"]) != len(can["lacunae"]):
-        per_lacuna["row_count_mismatch"] = [len(lac["lacunae"]), len(can["lacunae"])]
+    for row in q["lacunae"]:
+        per_lacuna[str(row["lacuna_id"])] = {k: row[k] for k in LACUNA_SHAPE_KEYS + CELL_KEYS}
     return {
-        "lacuna_count": lac["lacuna_count"],
-        "interior_lacuna_count": lac["interior_lacuna_count"],
-        "n_bridges": can["n_bridges"],
-        "lacunae_summary": {k: lac["summary"][k] for k in LACUNA_SUMMARY_KEYS},
-        "canaliculi_summary": {k: can["summary"][k] for k in CELL_KEYS},
-        "field": dict(can["field"]),
+        "lacuna_count": q["lacuna_count"],
+        "interior_lacuna_count": q["interior_lacuna_count"],
+        "n_bridges": q["n_bridges"],
+        "lacunae_summary": {k: q["lacuna_shape_summary"][k] for k in LACUNA_SUMMARY_KEYS},
+        "canaliculi_summary": {k: q["summary"][k] for k in CELL_KEYS},
+        "field": dict(q["field"]),
         "per_lacuna": per_lacuna,
     }
 
@@ -174,7 +175,7 @@ def load_numbers(folder: Path) -> dict:
     holding numbers.json (a saved reference snapshot) is read as is."""
     out = {}
     for sub in sorted(p for p in folder.iterdir() if p.is_dir()):
-        if result_json(folder, sub.name, "lacunae").is_file() and result_json(folder, sub.name, "canaliculi").is_file():
+        if result_json(folder, sub.name).is_file():
             out[sub.name] = numbers_from_results(folder, sub.name)
         elif (sub / "numbers.json").is_file():
             out[sub.name] = json.load(open(sub / "numbers.json"))
@@ -252,9 +253,9 @@ def owned_thread_distances(result: dict) -> dict:
 def cmd_reach(args) -> int:
     rows, pooled = [], []
     for path in images_from(args):
-        result = canaliculi.analyse_image(path)
+        result = quantification.analyse_image(path)
         per_cell = owned_thread_distances(result)
-        lac_rows = result["lacunae"]["rows"]
+        lac_rows = result["rows"]
         for m in lac_rows:
             d = np.array(per_cell.get(m["lacuna_id"], []))
             pooled += d.tolist()
@@ -279,12 +280,12 @@ def cmd_reach(args) -> int:
 # lacuna-table -----------------------------------------------------------------
 
 def cmd_lacuna_table(args) -> int:
-    result = canaliculi.analyse_image(args.image)
+    result = quantification.analyse_image(args.image)
     roots = {m["lacuna_id"]: m["roots_count"] for m in result["rows"]}
     rows = [
         [m["lacuna_id"], f"({m['centroid_col_px']:.0f},{m['centroid_row_px']:.0f})", f"{m['area_px2']:.0f}",
          f"{m['solidity']:.3f}", f"{m['aspect_ratio']:.2f}", roots[m["lacuna_id"]], "yes" if m["on_border"] else ""]
-        for m in result["lacunae"]["rows"]
+        for m in result["rows"]
     ]
     print_table(["lacuna", "at (x,y)", "area px^2", "solidity", "aspect", "roots", "border"], rows,
                 title=f"Kept lacunae in {args.image.name} (pre-validation, px)\n")
@@ -309,7 +310,7 @@ def cmd_sanity(args) -> int:
     tree_nodes = junction_nodes = 0
     rows = []
     for path in images_from(args):
-        result = canaliculi.analyse_image(path)
+        result = quantification.analyse_image(path)
         real = canaliculi.real_subgraph(result["graph"])
         edge_owner = result["edge_owner"]
         for u, v, w in real.edges(data="weight"):
@@ -396,8 +397,9 @@ def regression_allowlist() -> dict:
     for key in ("narrow_crumb_rule", "fill_enclosed_holes_max_px2", "band_filter_min_opening_share",
                 "fast_lacuna_stage"):
         json_fields.add(f"lacunae:parameters.{key}")
-    n_ref = canaliculi.SUMMARY_COLUMNS.index("field length density (px^-1)") + 1
-    return {"json": json_fields, "summary_table": set(canaliculi.SUMMARY_COLUMNS[n_ref:])}
+    json_fields = {f"quantification:{p.split(':', 1)[1]}" for p in json_fields}
+    n_ref = quantification.SUMMARY_COLUMNS.index("field length density (px^-1)") + 1
+    return {"json": json_fields, "summary_table": set(quantification.SUMMARY_COLUMNS[n_ref:])}
 
 
 def regression_settings(overrides: dict) -> dict:
@@ -407,37 +409,30 @@ def regression_settings(overrides: dict) -> dict:
     True where results/ holds False. It is checked against this run's switch
     and not compared with results/. Nothing else is exempt."""
     fast = bool(overrides.get("FAST_LACUNA_STAGE", config.FAST_LACUNA_STAGE))
-    return {"lacunae": {"parameters.fast_lacuna_stage": fast}}
+    return {"quantification": {"parameters.lacunae.fast_lacuna_stage": fast}}
 
 
 def print_allowlist(allow: dict) -> None:
     print("New fields allowed (appended after results/ was made; counted, not compared):")
     for path in sorted(allow["json"]):
         print(f"  json  {path}")
-    for col in canaliculi.SUMMARY_COLUMNS:
+    for col in quantification.SUMMARY_COLUMNS:
         if col in allow["summary_table"]:
             print(f"  table {col}")
     print()
 
 
 def _regenerate_one(job: tuple) -> dict:
-    """Run both features on one image and write the two json files. Returns
-    what the summary table needs (small, so it can cross processes)."""
+    """Detect and measure one image and write its quantification json. Returns
+    the row the cross-image table needs (small, so it can cross processes)."""
     image_path, out_root, overrides = job
     for name, value in overrides.items():
         setattr(config, name, value)
     image_path = Path(image_path)
-    result = canaliculi.analyse_image(image_path)
+    result = quantification.analyse_image(image_path)
     label = lacunae.image_label(image_path)
-    lacunae.save_json(result["lacunae"], result_json(Path(out_root), label, "lacunae"))
-    canaliculi.save_json(result, result_json(Path(out_root), label, "canaliculi"))
-    lac = result["lacunae"]
-    return {
-        "image_path": image_path,
-        "lacunae": {k: lac[k] for k in ("lacuna_count", "interior_lacuna_count", "summary")},
-        "summary": result["summary"],
-        "field": result["field"],
-    }
+    quantification.save_json(result, result_json(Path(out_root), label))
+    return {"row": quantification.summary_row(result)}
 
 
 def regenerate(images: list, out_root: Path, overrides: dict | None = None, workers: int = 8) -> None:
@@ -449,7 +444,7 @@ def regenerate(images: list, out_root: Path, overrides: dict | None = None, work
     jobs = [(str(p), str(out_root), dict(overrides or {})) for p in images]
     with ProcessPoolExecutor(max_workers=max(1, min(workers, len(jobs)))) as ex:
         results = list(ex.map(_regenerate_one, jobs))
-    canaliculi.write_summary_table(results, out_root)
+    quantification.write_summary_rows([r["row"] for r in results], out_root)
 
 
 def flatten_all(value, prefix: str = "") -> dict:
@@ -641,16 +636,14 @@ def lacuna_changes(ref_root: Path, new_root: Path, label: str) -> tuple[list, di
     """Per-lacuna changes of one image between two results folders, matched
     by centroid; and the headline values of both runs."""
     def load(root):
-        lac = json.load(open(result_json(root, label, "lacunae")))
-        can = json.load(open(result_json(root, label, "canaliculi")))
-        rows = []
-        for lr, cr in zip(lac["lacunae"], can["lacunae"]):
-            rows.append({"x": lr["centroid_col_px"], "y": lr["centroid_row_px"], "area": lr["area_px2"],
-                         "border": lr["on_border"], "roots": cr["roots_count"], "ring30": cr["ring_length_r30_px"]})
-        head = {"lacuna_count": lac["lacuna_count"], "interior_count": lac["interior_lacuna_count"],
-                "roots_per_cell": can["summary"]["roots_count"]["mean"],
-                "ring30_per_cell": can["summary"]["ring_length_r30_px"]["mean"],
-                "field_density": can["field"]["canalicular_length_density_per_px"], "bridges": can["n_bridges"]}
+        q = json.load(open(result_json(root, label)))
+        rows = [{"x": r["centroid_col_px"], "y": r["centroid_row_px"], "area": r["area_px2"],
+                 "border": r["on_border"], "roots": r["roots_count"], "ring30": r["ring_length_r30_px"]}
+                for r in q["lacunae"]]
+        head = {"lacuna_count": q["lacuna_count"], "interior_count": q["interior_lacuna_count"],
+                "roots_per_cell": q["summary"]["roots_count"]["mean"],
+                "ring30_per_cell": q["summary"]["ring_length_r30_px"]["mean"],
+                "field_density": q["field"]["canalicular_length_density_per_px"], "bridges": q["n_bridges"]}
         return rows, head
 
     ref, head_ref = load(ref_root)
@@ -899,7 +892,7 @@ def _sensitivity_run(job: tuple) -> dict:
     if out_path.is_file():
         return json.loads(out_path.read_text(encoding="utf-8"))
     config.FAST_LACUNA_STAGE = True
-    result = canaliculi.analyse_image(Path(path_str), t_hi, t_lo)
+    result = quantification.analyse_image(Path(path_str), t_hi, t_lo)
     s = result["summary"]
     row = {"image": lacunae.clean_name(Path(path_str)), "setting": label,
            "t_hi": result["lacunae"]["t_hi"], "t_lo": result["t_lo"],
@@ -1013,14 +1006,13 @@ def _field_inputs(job: tuple) -> dict:
     name = lacunae.clean_name(image_path)
     label = lacunae.image_label(image_path)
     root = Path(results_dir) if results_dir else None
-    if root and result_json(root, label, "lacunae").is_file() and result_json(root, label, "canaliculi").is_file():
-        lac = json.load(open(result_json(root, label, "lacunae")))
-        can = json.load(open(result_json(root, label, "canaliculi")))
-        rows, summary, field = lac["lacunae"], can["summary"], can["field"]
+    if root and result_json(root, label).is_file():
+        q = json.load(open(result_json(root, label)))
+        rows, summary, field = q["lacunae"], q["summary"], q["field"]
     else:
         config.FAST_LACUNA_STAGE = True
-        result = canaliculi.analyse_image(image_path)
-        rows, summary, field = result["lacunae"]["rows"], result["summary"], result["field"]
+        result = quantification.analyse_image(image_path)
+        rows, summary, field = result["rows"], result["summary"], result["field"]
     values = {}
     for key, _label, (block, field_key) in FIELD_MEASURES:
         source = summary if block == "summary" else field
@@ -1226,7 +1218,7 @@ def _sweep_run(job: tuple) -> dict:
         saved = getattr(canaliculi, param)
         setattr(canaliculi, param, value)
     try:
-        result = canaliculi.analyse_network(image_path, lac, channel, t_lo)
+        result = quantification.analyse_network(image_path, lac, channel, t_lo)
     finally:
         # A worker process runs many jobs: put the default back, so no setting
         # leaks into the next job.
@@ -1400,12 +1392,13 @@ def trace_scores(skeleton: np.ndarray, trace: np.ndarray, region: np.ndarray | N
 
 
 def _results_lacunae(folder: Path) -> dict:
-    """{image label: (lacuna rows, canaliculi rows)} of a results folder."""
+    """{image label: the per-lacuna rows} of a results folder. One row per
+    lacuna holds the shape and the network measures together."""
     out = {}
     for sub in sorted(p for p in folder.iterdir() if p.is_dir()):
-        lj, cj = result_json(folder, sub.name, "lacunae"), result_json(folder, sub.name, "canaliculi")
-        if lj.is_file() and cj.is_file():
-            out[sub.name] = (json.load(open(lj))["lacunae"], json.load(open(cj))["lacunae"])
+        qj = result_json(folder, sub.name)
+        if qj.is_file():
+            out[sub.name] = json.load(open(qj))["lacunae"]
     return out
 
 
@@ -1424,8 +1417,8 @@ def run_validation(annotation: Path, key: Path, results: Path, out: Path, trace_
     ann = _read_csv_columns(annotation, ANNOTATION_COLUMNS)
     keyrows = {r["code"]: r for r in _read_csv_columns(key, KEY_COLUMNS)}
     data = _results_lacunae(results)
-    inputs = [{"image": n, "xy": [(r["centroid_col_px"], r["centroid_row_px"]) for r in lac]}
-              for n, (lac, _c) in data.items()]
+    inputs = [{"image": n, "xy": [(r["centroid_col_px"], r["centroid_row_px"]) for r in rows]}
+              for n, rows in data.items()]
     groups, _pairs, _cut = field_groups(inputs) if len(inputs) > 1 else ([[n] for n in data], [], 0.0)
     field_of = {n: f"Field {i}" for i, g in enumerate(groups, start=1) for n in g}
     joined, skipped = [], 0
@@ -1437,7 +1430,7 @@ def run_validation(annotation: Path, key: Path, results: Path, out: Path, trace_
         if k is None:
             raise ValueError(f"code {a['code']} is not in the key")
         image = _label_from(k["image"])
-        lac, cells = data[image]
+        cells = data[image]
         lid = int(k["lacuna_id"])
         cell = next(c for c in cells if c["lacuna_id"] == lid)
         row = {"code": a["code"], "image": image, "field": field_of.get(image, ""), "lacuna_id": lid,
@@ -1647,9 +1640,10 @@ def _selftest_pipeline_one(job: tuple) -> bool:
     path_str, out = job
     config.FAST_LACUNA_STAGE = True
     path = Path(path_str)
-    result = canaliculi.analyse_image(path)
-    lacunae.save_json(result["lacunae"], result_json(Path(out), lacunae.image_label(path), "lacunae"))
+    result = quantification.analyse_image(path)
+    lacunae.write_outputs(result["lacunae"], Path(out))
     canaliculi.write_outputs(result, Path(out))
+    quantification.save_json(result, result_json(Path(out), lacunae.image_label(path)))
     return True
 
 

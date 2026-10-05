@@ -39,6 +39,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import config  # noqa: E402
 import canaliculi  # noqa: E402
 import lacunae  # noqa: E402
+import quantification  # noqa: E402
 
 EXP_DIR = ROOT / "experiments"
 LOG_DIR = EXP_DIR / "logs"
@@ -201,7 +202,7 @@ def build_cache(path: Path) -> dict:
     preprocessed channel, the hysteresis mask) are recomputed with the
     pipeline's own functions."""
     t0 = time.time()
-    res = canaliculi.analyse_image(path)
+    res = quantification.analyse_image(path)
     t_full = time.time() - t0
 
     _display, channel = lacunae.load_channel(path)
@@ -447,7 +448,7 @@ def network_stage(channel, labels, kept, preprocessed=None, flagged=None, t_lo: 
         candidate = canaliculi.apply_bridges(candidate, bridges)
         skeleton = morphology.skeletonize(candidate)
     dist, nearest = canaliculi.nearest_lacuna_map(lacuna_id_map)
-    cells = canaliculi.measure_cells(kept, skeleton, dist, nearest, PRECISION)
+    cells = quantification.measure_cells(kept, skeleton, dist, nearest, PRECISION)
     out = {
         "lacuna_mask": lacuna_mask,
         "lacuna_id_map": lacuna_id_map,

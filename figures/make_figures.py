@@ -73,6 +73,7 @@ sys.path.insert(0, str(ROOT / "src"))
 import config  # noqa: E402
 import canaliculi  # noqa: E402
 import lacunae  # noqa: E402
+import quantification  # noqa: E402
 
 # The fast lacuna stage gives labels identical to the original one (python
 # src/diagnostics.py fast-check, 40 of 40; regression passes with it on), so
@@ -317,7 +318,7 @@ def pipeline_output(path: Path) -> dict:
             meta["skeleton"] = z["skeleton"]
         meta["channel"] = lacunae.load_channel(path)[1]
         return meta
-    res = canaliculi.analyse_image(path)
+    res = quantification.analyse_image(path)
     roots = {}
     for row in res["rows"]:
         pts = root_clusters(res["graph"], row["lacuna_id"])
@@ -421,13 +422,13 @@ def src_hash() -> str:
 
 def results_numbers(path: Path) -> tuple[list, list]:
     """(lacuna rows, cell rows) of the committed default output in
-    results/<label>/, the pipeline numbers every drawn number must equal."""
+    results/<label>/5_quantification/, the pipeline numbers every drawn number
+    must equal. One row per lacuna now holds the shape and the network measures
+    together, so both halves are the same list."""
     label = lacunae.image_label(path)
-    lac = json.loads(lacunae.result_path(config.RESULTS_DIR, label, config.SECTION_LACUNAE,
-                                         config.SUFFIX_LACUNAE_RESULTS + ".json").read_text(encoding="utf-8"))
-    can = json.loads(lacunae.result_path(config.RESULTS_DIR, label, config.SECTION_CANALICULI,
-                                         config.SUFFIX_CANALICULI_RESULTS + ".json").read_text(encoding="utf-8"))
-    return lac["lacunae"], can["lacunae"]
+    rows = json.loads(quantification.quant_path(config.RESULTS_DIR, label, ".json")
+                      .read_text(encoding="utf-8"))["lacunae"]
+    return rows, rows
 
 
 def rejection_reason(region, shape) -> str:
@@ -450,7 +451,7 @@ def build_image_data(path: Path) -> None:
     from skimage import measure
 
     name = short(path)
-    res = canaliculi.analyse_image(path)
+    res = quantification.analyse_image(path)
     lac = res["lacunae"]
     roots = {}
     for row in res["rows"]:
@@ -1169,7 +1170,7 @@ any other folder of `results/` while counting.
 random source, so the order cannot be rebuilt from this repository. The key (code, image, lacuna id,
 centre x and y) stays outside the repository, at the path given with `-k` when the tiles were made; the
 command refuses a key path inside the repository. Join the key to the filled template to compare the
-hand counts with `roots_count` in `results/<image>/2_canaliculi/<image>_canaliculi_results.json` (the
+hand counts with `roots_count` in `results/<image>/5_quantification/<image>_quantification.json` (the
 image column of the key is the folder label).
 
 **Limits.** The tiles hide the pipeline result, not the image: a tile can be matched to its section by
@@ -1724,13 +1725,13 @@ SWITCH_CASES = [
 
 
 def switched_output(path: Path, switch: str, value) -> dict:
-    """canaliculi.analyse_image with one switch on, the rest default, in the
-    form the v2 drawing code takes; ring pixels and root dots are checked
+    """quantification.analyse_image with one switch on, the rest default, in
+    the form the v2 drawing code takes; ring pixels and root dots are checked
     against that run's own numbers."""
     old = getattr(config, switch)
     setattr(config, switch, value)
     try:
-        res = canaliculi.analyse_image(path)
+        res = quantification.analyse_image(path)
     finally:
         setattr(config, switch, old)
     return state_data(res, lacunae.load_channel(path)[1], short(path))
@@ -1738,7 +1739,7 @@ def switched_output(path: Path, switch: str, value) -> dict:
 
 def state_data(res: dict, channel: np.ndarray, name: str) -> dict:
     """One pipeline run (any setting) as the dict the v2 drawing code takes."""
-    lac_rows, cell_rows = res["lacunae"]["rows"], res["rows"]
+    lac_rows, cell_rows = res["rows"], res["rows"]
     d = {"short": name, "channel": channel, "lacuna_id_map": res["lacuna_id_map"], "skeleton": res["skeleton"],
          "lacuna_rows": lac_rows, "cell_rows": cell_rows, "flagged": res["flagged"],
          "interior_ids": [r["lacuna_id"] for r in lac_rows if not r["on_border"]],
@@ -1886,7 +1887,7 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
         return
     with open(field_dir / "field_images.csv", newline="") as f:
         rows = list(csv.DictReader(f))
-    with open(lacunae.all_images_path(config.RESULTS_DIR, config.SUMMARY_NAME + ".csv"), newline="") as f:
+    with open(quantification.summary_path(config.RESULTS_DIR, ".csv"), newline="") as f:
         summary_rows = {r["image"]: r for r in csv.DictReader(f)}
     with open(field_dir / "field_summary.csv", newline="") as f:
         field_means = {r["field"]: r for r in csv.DictReader(f)}

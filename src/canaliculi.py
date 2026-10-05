@@ -983,16 +983,31 @@ def build_owner_pixel_map(shape: tuple[int, int], skel_obj, G: nx.Graph, edge_ow
 
 # Measurements
 
-def measure_cells(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
-                  nearest_id: np.ndarray, precision: int) -> dict:
-    """Graph, ownership and every per-lacuna measure."""
+def build_ownership(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
+                    nearest_id: np.ndarray) -> dict:
+    """The graph, its cleanup, the lacuna attachment and the ownership, with the
+    pixel map the verification picture draws. Detection: no measure is taken
+    here. src/quantification.py measures from what this returns."""
     cell_ids = list(range(1, len(kept) + 1))
-
     G, skel_obj = build_network_graph(skeleton)
     clean_network_graph(G, dist_to_lacuna)
     attach_lacunae(G, dist_to_lacuna, nearest_id, cell_ids)
     owner, node_dist = assign_by_connectivity(G, cell_ids)
     edge_owner = assign_edges(G, owner, node_dist)
+    return {
+        "graph": G,
+        "owner": owner,
+        "node_dist": node_dist,
+        "edge_owner": edge_owner,
+        "owner_map": build_owner_pixel_map(skeleton.shape, skel_obj, G, edge_owner, owner),
+    }
+
+
+def measure_cells(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
+                  nearest_id: np.ndarray, precision: int) -> dict:
+    """Graph, ownership and every per-lacuna measure."""
+    own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
+    G, edge_owner, owner, node_dist = (own["graph"], own["edge_owner"], own["owner"], own["node_dist"])
     rings = ring_lengths(skeleton, dist_to_lacuna, nearest_id, len(kept))
 
     rows = []
@@ -1012,14 +1027,7 @@ def measure_cells(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.nd
         row["mean_edge_length_px"] = round(total / count if count else 0.0, precision)
         rows.append(row)
 
-    return {
-        "rows": rows,
-        "graph": G,
-        "edge_owner": edge_owner,
-        "owner": owner,
-        "node_dist": node_dist,
-        "owner_map": build_owner_pixel_map(skeleton.shape, skel_obj, G, edge_owner, owner),
-    }
+    return {"rows": rows, **own}
 
 
 def add_normalised_measures(rows: list[dict], lacuna_id_map: np.ndarray, dist_to_lacuna: np.ndarray,
