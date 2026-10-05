@@ -10,7 +10,7 @@ allowlist. There is no ground truth, so nothing here says a change is more accur
 `figures_out/`, `results/`, `docs/METHODS.md` and `README.md` are unchanged, so this branch and
 `figures-v2` can be merged without conflicts.
 
-Stage map with every parameter and its origin: `docs/CANALICULI_AUDIT.md`. Every output:
+Stage map with every parameter and its origin: `docs/reports/CANALICULI_AUDIT.md`. Every output:
 `results_experiments/canal_v2/INDEX.md`.
 
 ## Summary
@@ -86,7 +86,7 @@ lattice threads of the 682 images (682_z29 field density -4.55%). The expected r
 
 | before and after, L 97 px | one of 68 pieces at L 40 px |
 |---|---|
-| ![L97](../results_experiments/canal_v2/B1_crops_L97_reach66_1.png) | ![L40](../results_experiments/canal_v2/B1_crops_L40_reach0_1.png) |
+| ![L97](../../results_experiments/canal_v2/B1_crops_L97_reach66_1.png) | ![L40](../../results_experiments/canal_v2/B1_crops_L40_reach0_1.png) |
 
 ## The network sweep (S1)
 
@@ -176,7 +176,7 @@ Not edited on this branch, so that it merges with figures-v2 without conflicts.
 - METHODS, measures table: "`field_density_without_flagged_per_px`; `field_density_in_roi_per_px` with
   `-m DIR`."
 - METHODS, section 9 switches: "`BAND_LINE_FILTER` (False, values None): straight band-wall filter; no
-  recommended value (docs/CANALICULI_V2_REPORT.md)."
+  recommended value (docs/reports/CANALICULI_V2_REPORT.md)."
 - METHODS, section 9 subcommands: "`network-sweep`: one network parameter at a time; `validate-network`:
   pipeline against blind hand counts and traces (`-s` self-test)."
 - README, checks: "`python src/diagnostics.py validate-network -s`" and a pointer to

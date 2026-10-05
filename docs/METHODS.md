@@ -180,7 +180,7 @@ cleanup. Checking out that tag reproduces any earlier analysis.
 ## 8. Overnight experiments (2026-10-01)
 
 Branch `overnight-fixes`. Experiments only: nothing in `src/` uses them and no default changed.
-Report: `docs/OVERNIGHT_REPORT.md`; outputs in `results_experiments/<task>/`.
+Report: `docs/reports/OVERNIGHT_REPORT.md`; outputs in `results_experiments/<task>/`.
 
 - `experiments/task0_cache.py`: cache of the default results, timing, and checks that the copied steps reproduce the pipeline.
 - `experiments/task1_artefact.py`: TIFF tags, FFT and banding, axis-aligned skeleton runs (682_z08 lattice), notch filter.
@@ -200,7 +200,7 @@ Pre-validation, pixel units. With every switch off, the pipeline reproduces `res
 Appended after all existing columns of the per-lacuna rows (`canaliculi_measurements.json` and the
 `per_lacuna` sheet) and of `summary_table.csv` and `.xlsx` (as interior means). No existing column
 changes name, order or value. They answer the size dependence found overnight (roots and ring length
-rise with lacuna area; `docs/OVERNIGHT_REPORT.md`, task 4.1).
+rise with lacuna area; `docs/reports/OVERNIGHT_REPORT.md`, task 4.1).
 
 | column | definition |
 |---|---|
@@ -257,7 +257,7 @@ lacunae yellow; skeleton white over the image at 60%; scale bars in pixels. Capt
 ## 10. Figures v2 (branch figures-v2, 2026-10-02)
 
 Pre-validation, pixel units. Figures only: `src/`, `config.py` and `results/` are unchanged. Report:
-`docs/FIGURES_V2_REPORT.md`; map of the figures: `figures_out/INDEX.md`.
+`docs/reports/FIGURES_V2_REPORT.md`; map of the figures: `figures_out/INDEX.md`.
 
 - **Network overlay** (`figures_out/per_image/<image>/network`, `main/Fig02` for 543-2). The skeleton
   is drawn as vector segments between the centres of 8-connected neighbouring pixels, so the drawn set

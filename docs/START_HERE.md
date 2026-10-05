@@ -26,10 +26,10 @@ are 8 wild-type sections, which are sections of 3 or 4 fields.
 
 1. `README.md`: how to run the pipeline, the measures and the results table.
 2. `docs/METHODS.md`: every step and parameter with its origin, limitations and decisions.
-3. `docs/OVERNIGHT_REPORT.md`: the experiments (artefact, thresholds, lacuna audits, size confound,
+3. `docs/reports/OVERNIGHT_REPORT.md`: the experiments (artefact, thresholds, lacuna audits, size confound,
    density, repeatability) and the Decisions needed.
-4. `docs/FIXES_REPORT.md`: the switches, new checks and the first figures.
-5. `docs/FIGURES_V2_REPORT.md`: the new network overlay and the figure fixes.
+4. `docs/reports/FIXES_REPORT.md`: the switches, new checks and the first figures.
+5. `docs/reports/FIGURES_V2_REPORT.md`: the new network overlay and the figure fixes.
 6. `figures_out/INDEX.md` and `results_experiments/INDEX.md`, to find a figure or a result.
 
 ## The branches
@@ -40,9 +40,9 @@ decision.**
 
 | branch | adds |
 |---|---|
-| `overnight-fixes` | `experiments/` and `results_experiments/task0` to `task6`: experiments only, the pipeline unchanged; `docs/OVERNIGHT_REPORT.md` |
-| `publication-fixes` | the switches (all off), normalised per-cell columns, provenance, the checks `regression`, `switch-check`, `fast-check`, `blind`, `unblind`, `sensitivity`, `field-summary`; the first figures; `docs/FIXES_REPORT.md` |
-| `figures-v2` | figures only: the network overlay, cell galleries, hand-count tiles, the 8 figure fixes, the `figures_out/` layout, these index pages; `docs/FIGURES_V2_REPORT.md`. `src/`, `config.py` and `results/` are unchanged |
+| `overnight-fixes` | `experiments/` and `results_experiments/task0` to `task6`: experiments only, the pipeline unchanged; `docs/reports/OVERNIGHT_REPORT.md` |
+| `publication-fixes` | the switches (all off), normalised per-cell columns, provenance, the checks `regression`, `switch-check`, `fast-check`, `blind`, `unblind`, `sensitivity`, `field-summary`; the first figures; `docs/reports/FIXES_REPORT.md` |
+| `figures-v2` | figures only: the network overlay, cell galleries, hand-count tiles, the 8 figure fixes, the `figures_out/` layout, these index pages; `docs/reports/FIGURES_V2_REPORT.md`. `src/`, `config.py` and `results/` are unchanged |
 
 ## The switches
 

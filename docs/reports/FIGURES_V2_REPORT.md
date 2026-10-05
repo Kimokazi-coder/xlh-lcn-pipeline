@@ -48,8 +48,8 @@ colour, 5 px wide, over the original. After: the network figure.
 
 | | 543-2 | 542_z06 |
 |---|---|---|
-| before | ![543-2 before](../results/543-2/canaliculi_verification.png) | ![542_z06 before](../results/542_WT_2_z06c1-2/canaliculi_verification.png) |
-| after | ![543-2 after](../figures_out/per_image/543-2/network.png) | ![542_z06 after](../figures_out/per_image/542_z06/network.png) |
+| before | ![543-2 before](../../results/543-2/canaliculi_verification.png) | ![542_z06 before](../../results/542_WT_2_z06c1-2/canaliculi_verification.png) |
+| after | ![543-2 after](../../figures_out/per_image/543-2/network.png) | ![542_z06 after](../../figures_out/per_image/542_z06/network.png) |
 
 What is better: the raw structure stays visible, because the skeleton is a thin vector line over the
 image at 85% instead of a 5 px coloured band; every skeleton pixel is drawn, not only the threads a
@@ -83,7 +83,7 @@ switch examples (S01) use the network overlay; their values are unchanged.
 
 **P3 Names.** Main figures Fig01 to Fig04, supplementary S01 to S03, renamed with `git mv`. Fields are
 Field 1 to Field 4 in Fig04 and the captions; field-summary still writes F1 to F4 in its own csv.
-`docs/METHODS.md` section 9 gives the new names. `docs/FIXES_REPORT.md` and `figures/REVIEW.md` keep
+`docs/METHODS.md` section 9 gives the new names. `docs/reports/FIXES_REPORT.md` and `figures/REVIEW.md` keep
 the old names because they record the earlier state behind pinned links.
 
 **P4 Per-field plot.** All y axes start at zero; each dot carries its short image name (with a thin
@@ -172,10 +172,10 @@ From `figures/REVIEW_V2.md`:
    tiles) and `b1_wt_key.csv`, a copy of the B1 test key that was left in a temporary folder and is
    needed to redraw S03. Back them up; without the tiles key the hand counts cannot be unblinded.
 7. **682_z08** is merged into Field 4 only in `Fig04_per_field_merged`, by hand; whether it belongs
-   there is open (also Decisions needed 5 of `docs/FIXES_REPORT.md`).
+   there is open (also Decisions needed 5 of `docs/reports/FIXES_REPORT.md`).
 8. **The canal mark** also marks five ordinary-looking lacunae, because the flagged mask covers them
    fully.
-9. **Old names in the earlier reports** (F1 to F5 in `docs/FIXES_REPORT.md` and `figures/REVIEW.md`)
+9. **Old names in the earlier reports** (F1 to F5 in `docs/reports/FIXES_REPORT.md` and `figures/REVIEW.md`)
    were left as they are.
 10. **Fig02 is a byte copy** of `per_image/543-2/network` (4.4 MB twice), so the main folder is complete
     on its own.

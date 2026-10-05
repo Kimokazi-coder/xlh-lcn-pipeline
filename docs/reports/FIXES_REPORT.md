@@ -1,7 +1,7 @@
 # Publication fixes report, 2026-10-02
 
 **Pre-validation, pixel units.** Branch `publication-fixes`, started from `overnight-fixes` (ef04398).
-This session turned the findings of `docs/OVERNIGHT_REPORT.md` into the pipeline behind switches that
+This session turned the findings of `docs/reports/OVERNIGHT_REPORT.md` into the pipeline behind switches that
 are **off by default**, added diagnostics as subcommands of `src/diagnostics.py`, and made publication
 figures. **No default changed**: with every switch off the pipeline reproduces `results/` exactly.
 Before every push, `reference-check` passed (62.33 edges per cell, 27.41 px, 21 bridges), `regression`

@@ -115,4 +115,4 @@ python -u figures/make_figures.py image -a           # figures into figures_out/
 The switches in `config.py` (`NARROW_CRUMB_RULE`, `FILL_ENCLOSED_HOLES_MAX_PX2`,
 `BAND_FILTER_MIN_OPENING_SHARE`, `FAST_LACUNA_STAGE`) are all off, so the default output is unchanged.
 Outputs also carry normalised per-cell columns and a provenance block. Details:
-[docs/FIXES_REPORT.md](docs/FIXES_REPORT.md) and [docs/METHODS.md](docs/METHODS.md) section 9.
+[docs/reports/FIXES_REPORT.md](docs/reports/FIXES_REPORT.md) and [docs/METHODS.md](docs/METHODS.md) section 9.
