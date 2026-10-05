@@ -550,11 +550,12 @@ def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, wor
     for p in images:
         name = lacunae.image_label(p)
         n_all, d_all, x_all = 0, [], 0
-        for kind in ("lacunae", "canaliculi"):
-            r, nw = result_json(ref, name, kind), result_json(out_root, name, kind)
-            if not r.is_file():
-                d_all.append((r.name, "<no reference file>", ""))
-                continue
+        # One file per image holds every measured number, so it is compared once.
+        kind = "quantification"
+        r, nw = result_json(ref, name), result_json(out_root, name)
+        if not r.is_file():
+            d_all.append((r.name, "<no reference file>", ""))
+        else:
             n, d, x = compare_json(r, nw, allow["json"], kind, settings.get(kind))
             n_all += n
             x_all += x
