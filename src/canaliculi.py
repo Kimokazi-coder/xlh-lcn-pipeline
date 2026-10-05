@@ -1433,6 +1433,58 @@ NOTE = (
 )
 
 
+DETECTION_NOTE = (
+    "Detection record: what feature 2 did, with no measured value in it. The "
+    "mask, the skeleton, the vascular mask, the bridged pixels and the graph "
+    "file beside it are what it produced; every number measured from them is "
+    "in results/<label>/5_quantification/ (src/quantification.py). The bridges "
+    "below are the gaps this run joined, which is detection, not a measure."
+)
+
+
+def bridge_records(result: dict) -> list[dict]:
+    """The gaps this run bridged, in the order they were added."""
+    return [
+        {
+            "from_row_col": list(b["from"]),
+            "to_row_col": list(b["to"]),
+            "gap_len_px": round(b["gap_len"], 4),
+            "angle_deg": round(b["angle_deg"], 4),
+            "min_signal_fraction": round(b["min_signal_fraction"], 4),
+        }
+        for b in result["bridges"]
+    ]
+
+
+def save_detection_json(result: dict, out_path: Path) -> None:
+    """The record of one network detection run: parameters, the computed cuts,
+    the bridges it added and provenance."""
+    label = lacunae.image_label(result["image_path"])
+    payload = {
+        "status": "pre-validation",
+        "units": "px",
+        "stage": "canalicular network detection",
+        "image": result["image_path"].name,
+        "image_label": label,
+        "note": DETECTION_NOTE,
+        "outputs": {
+            "mask": f"{label}_{config.SUFFIX_CANALICULI_MASK}",
+            "skeleton": f"{label}_{config.SUFFIX_CANALICULI_SKELETON}",
+            "vascular_mask": f"{label}_{config.SUFFIX_CANALICULI_VASCULAR}",
+            "bridged_pixels": f"{label}_{config.SUFFIX_CANALICULI_BRIDGED}",
+            "graph": f"{label}_{config.SUFFIX_CANALICULI_GRAPH}",
+            "verification": f"{label}_{config.SUFFIX_CANALICULI_VERIFICATION}",
+        },
+        "n_bridges": len(result["bridges"]),
+        "bridges": bridge_records(result),
+        "parameters": parameters(result),
+        "provenance": lacunae.provenance(),
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w") as f:
+        json.dump(payload, f, indent=2)
+
+
 def save_json(result: dict, out_path: Path) -> None:
     payload = {
         "status": "pre-validation",
@@ -1553,6 +1605,7 @@ def write_outputs(result: dict, out_root: Path) -> None:
     save_mask(result["flagged"], config.SUFFIX_CANALICULI_VASCULAR)
     save_mask(result["bridged_pixels"], config.SUFFIX_CANALICULI_BRIDGED)
     save_graph(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_GRAPH))
+    save_detection_json(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_DETECTION))
     save_verification(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_VERIFICATION))
     save_xlsx(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".xlsx"))
     save_json(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".json"))

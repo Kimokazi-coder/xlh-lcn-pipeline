@@ -701,6 +701,37 @@ def parameters() -> dict:
     }
 
 
+DETECTION_NOTE = (
+    "Detection record: what feature 1 did, with no measured value in it. The "
+    "lacunae it found are the 1..N labels of the label image, and every number "
+    "measured from them is in results/<label>/5_quantification/ "
+    "(src/quantification.py)."
+)
+
+
+def save_detection_json(result: dict, out_path: Path) -> None:
+    """The record of one lacuna detection run: parameters, the computed cut and
+    provenance. Counts and shapes are not here; quantification measures them
+    from the label image."""
+    payload = {
+        "status": "pre-validation",
+        "units": "px",
+        "stage": "lacuna detection",
+        "image": result["image_path"].name,
+        "image_label": image_label(result["image_path"]),
+        "note": DETECTION_NOTE,
+        "outputs": {
+            "label_image": f"{image_label(result['image_path'])}_{config.SUFFIX_LACUNA_LABELS}",
+            "outlines": f"{image_label(result['image_path'])}_{config.SUFFIX_LACUNAE_OUTLINES}",
+        },
+        "parameters": {**parameters(), "computed_threshold_t_hi": result["t_hi"]},
+        "provenance": provenance(),
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w") as f:
+        json.dump(payload, f, indent=2)
+
+
 def save_json(result: dict, out_path: Path) -> None:
     payload = {
         "status": "pre-validation",
@@ -760,6 +791,8 @@ def write_outputs(result: dict, out_root: Path) -> None:
                  result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_OUTLINES))
     save_label_image(result["labels"], result["kept"],
                      result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNA_LABELS))
+    save_detection_json(result, result_path(out_root, label, config.SECTION_LACUNAE,
+                                            config.SUFFIX_LACUNAE_DETECTION))
     save_xlsx(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".xlsx"))
     save_json(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".json"))
 
