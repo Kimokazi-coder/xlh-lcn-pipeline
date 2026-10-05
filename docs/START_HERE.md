@@ -15,7 +15,7 @@ are 8 wild-type sections, which are sections of 3 or 4 fields.
 | `config.py` | paths, shared settings and the switches (all off) |
 | `data/WT/` | the 8 input images |
 | `results/` | the default output: one folder per image and `summary_table.xlsx` / `.csv`; the reference for every check |
-| `results_experiments/` | experiments and checks of the later branches; map: `results_experiments/INDEX.md` |
+| `results_experiments/` | experiments and checks; map: `results_experiments/INDEX.md` |
 | `experiments/` | the scripts behind `results_experiments/`, and the progress files of each run |
 | `figures/` | the figure code (`make_figures.py`), captions and review notes |
 | `figures_out/` | the figures; map: `figures_out/INDEX.md` |
@@ -32,17 +32,14 @@ are 8 wild-type sections, which are sections of 3 or 4 fields.
 5. `docs/reports/FIGURES_V2_REPORT.md`: the new network overlay and the figure fixes.
 6. `figures_out/INDEX.md` and `results_experiments/INDEX.md`, to find a figure or a result.
 
-## The branches
+## History
 
-Nothing has been merged into `main`. `main` still holds the cleaned pipeline of 2026-09-30. Each branch
-below starts from the one before it, so the last one contains all three. **Merging is Karim's
-decision.**
-
-| branch | adds |
-|---|---|
-| `overnight-fixes` | `experiments/` and `results_experiments/task0` to `task6`: experiments only, the pipeline unchanged; `docs/reports/OVERNIGHT_REPORT.md` |
-| `publication-fixes` | the switches (all off), normalised per-cell columns, provenance, the checks `regression`, `switch-check`, `fast-check`, `blind`, `unblind`, `sensitivity`, `field-summary`; the first figures; `docs/reports/FIXES_REPORT.md` |
-| `figures-v2` | figures only: the network overlay, cell galleries, hand-count tiles, the 8 figure fixes, the `figures_out/` layout, these index pages; `docs/reports/FIGURES_V2_REPORT.md`. `src/`, `config.py` and `results/` are unchanged |
+All work was merged into `main` on 2026-10-05 by the merge commit `c8e6954`. No side branch is in use:
+`canaliculi-v2` and `figures-v2` still exist on GitHub and are fully merged. The old work is kept as
+tags: `archive-before-cleanup`, `archive-before-cleanup-canaliculi-v2-fixes`, `archive-before-cleanup-main`,
+`archive-before-cleanup-presentation-prep`, `before-canaliculi-v2`, `main-before-merge`,
+`main-before-cleanup`, `canaliculi-v2-final`, `figures-v2-final`, `publication-fixes-final` and
+`overnight-fixes-final`. `main-before-merge` is `main` as it was before the merge.
 
 ## The switches
 

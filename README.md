@@ -1,4 +1,38 @@
-New here? Read [docs/START_HERE.md](docs/START_HERE.md) first: folders, reading order, branches, switches and commands on one page.
+## Repository map
+
+**Status:** pre-validation, pixel units, wild-type (WT) images only.
+
+| folder | what it holds |
+|---|---|
+| `src/` | the pipeline: `lacunae.py` (feature 1), `canaliculi.py` (feature 2), `diagnostics.py` (every check, as subcommands) |
+| `config.py` | paths, shared settings and the switches (all off by default) |
+| `data/` | the input images (`data/WT/`, 8 sections) |
+| `results/` | the default pipeline output; the reference that `regression` checks |
+| `results_experiments/` | experiments and checks; map: `results_experiments/INDEX.md` |
+| `figures/` | the figure code, captions and review notes |
+| `figures_out/` | the figures; map: `figures_out/INDEX.md` |
+| `docs/` | method, start page and tuning protocol; the reports are in `docs/reports/` |
+| `experiments/` | the scripts behind `results_experiments/` |
+| `archive/` | history and earlier analyses, not used by the code |
+
+Run the pipeline, from the repository root:
+
+```
+python src/lacunae.py --dir data/WT          # feature 1: lacunae
+python src/canaliculi.py --dir data/WT       # feature 2: canaliculi and the summary table
+python -u figures/make_figures.py all        # every figure in figures_out/
+```
+
+Check it:
+
+```
+python src/diagnostics.py reference-check    # must PASS: 62.33 / 27.41 / 21 on 543-2
+python src/diagnostics.py regression         # every number against results/, tolerance 0
+```
+
+More: [docs/START_HERE.md](docs/START_HERE.md), [docs/METHODS.md](docs/METHODS.md), [docs/reports/](docs/reports/).
+
+New here? Read [docs/START_HERE.md](docs/START_HERE.md) first: folders, reading order, history, switches and commands on one page.
 
 # lcn-quant
 
@@ -30,7 +64,7 @@ folder run of feature 2 also writes `results/summary_table.xlsx` and `.csv`.
 To check the pipeline, run `python src/diagnostics.py reference-check`. It
 must print PASS for 62.33 edges per cell, 27.41 px mean edge length and 21
 gap bridges on image 543-2. `python src/diagnostics.py --help` lists the
-other diagnostics: `compare-outputs`, `reach`, `lacuna-table` and `sanity`.
+other diagnostics, among them `compare-outputs`, `reach`, `lacuna-table` and `sanity`.
 
 ## Folder map
 
@@ -100,7 +134,7 @@ One overlay per feature, for image 543-2:
 
 Method, parameters, limitations and decisions: [docs/METHODS.md](docs/METHODS.md).
 
-## Checks, switches and figures (branch publication-fixes)
+## Checks, switches and figures
 
 ```
 python src/diagnostics.py regression                 # every number against results/, tolerance 0
@@ -113,6 +147,6 @@ python -u figures/make_figures.py image -a           # figures into figures_out/
 ```
 
 The switches in `config.py` (`NARROW_CRUMB_RULE`, `FILL_ENCLOSED_HOLES_MAX_PX2`,
-`BAND_FILTER_MIN_OPENING_SHARE`, `FAST_LACUNA_STAGE`) are all off, so the default output is unchanged.
+`BAND_FILTER_MIN_OPENING_SHARE`, `FAST_LACUNA_STAGE`, `BAND_LINE_FILTER`) are all off, so the default output is unchanged.
 Outputs also carry normalised per-cell columns and a provenance block. Details:
 [docs/reports/FIXES_REPORT.md](docs/reports/FIXES_REPORT.md) and [docs/METHODS.md](docs/METHODS.md) section 9.
