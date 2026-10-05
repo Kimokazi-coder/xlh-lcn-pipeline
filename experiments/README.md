@@ -17,10 +17,10 @@ Coordinates are (x, y) = (column, row) everywhere, as printed by
 
 | file | what it is |
 |---|---|
-| `PROGRESS.md` | the status of every sub-item; the source of truth for resuming |
+| `archive/branch-runs/PROGRESS.md` | the status of every sub-item; the source of truth for resuming |
 | `common.py` | shared helpers: atomic writers, the default-result cache, pipeline stages with hooks, crop helpers |
-| `progress.py` | updates `PROGRESS.md` (`init`, `set`, `next`, `show`) |
-| `check_and_push.sh` | the two checks (reference-check PASS, `git diff main src config.py` empty), then the push with retries |
+| `archive/branch-runs/progress.py` | updates `archive/branch-runs/PROGRESS.md` (`init`, `set`, `next`, `show`) |
+| `archive/branch-runs/check_and_push.sh` | the two checks (reference-check PASS, `git diff main src config.py` empty), then the push with retries |
 | `task0_cache.py` | 0.2: builds the default cache and times the runs |
 | `task1_artefact.py` | 1.1 to 1.4: acquisition artefact (TIFF tags, FFT, axis-aligned runs, notch filter) |
 | `task2_thresholds.py` | 2.1 to 2.4: lacuna and network thresholds |
@@ -41,7 +41,7 @@ From the repository root, with the project's Python (3.9, the venv):
 ```
 python -u experiments/task0_cache.py              # build or check the cache
 python -u experiments/task1_artefact.py 1.2       # one sub-item
-python experiments/progress.py show               # where things stand
+python archive/branch-runs/progress.py show       # where things stand
 ```
 
 Every script is idempotent. It checks whether each output already exists
@@ -56,7 +56,7 @@ installed as dependencies of skan, so nothing new is needed.
 
 ## How to resume
 
-1. Read `PROGRESS.md`: the "next action" line names the next sub-item.
+1. Read `archive/branch-runs/PROGRESS.md`: the "next action" line names the next sub-item.
 2. `git status` and `git log -5`. Make the tree clean: commit a finished
    item, or discard a half-finished one with `git restore .` for
    tracked files (untracked outputs of a half item can stay, the scripts
@@ -65,6 +65,6 @@ installed as dependencies of skan, so nothing new is needed.
    from their cached outputs. FAILED items stay failed unless the note
    says they were never retried. An item that failed twice is not tried a
    third time.
-4. After each sub-item: `python experiments/progress.py set <id> DONE --sha <sha> --note "..."`,
+4. After each sub-item: `python archive/branch-runs/progress.py set <id> DONE --sha <sha> --note "..."`,
    commit as `overnight: <id> <short description>`, then
-   `bash experiments/check_and_push.sh`.
+   `bash archive/branch-runs/check_and_push.sh`.

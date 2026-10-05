@@ -324,7 +324,7 @@ content, not error. Field density is the most repeatable; the ownership measures
 ## How to rerun
 
 Every number above comes from a file under `results_experiments/`. `experiments/README.md` explains the
-scripts and how to resume; `experiments/PROGRESS.md` lists every sub-item with its commit. Each script
+scripts and how to resume; `archive/branch-runs/PROGRESS.md` lists every sub-item with its commit. Each script
 skips outputs that already exist, so delete an output to recompute it, for example
 `python -u experiments/task2_thresholds.py 2.4`.
 
