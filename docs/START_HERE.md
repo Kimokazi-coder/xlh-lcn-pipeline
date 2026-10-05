@@ -14,11 +14,10 @@ are 8 wild-type sections, which are sections of 3 or 4 fields.
 | `src/` | the pipeline: `lacunae.py` (feature 1), `canaliculi.py` (feature 2), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, shared settings and the switches (all off) |
 | `data/WT/` | the 8 input images |
-| `results/` | the default output: one folder per image and `summary_table.xlsx` / `.csv`; the reference for every check |
+| `results/` | the default output and every figure: one folder per image, `all_images/` (summary table and figures) and `validation_tiles/`; the reference for every check; guide: `results/README.md` |
 | `results_experiments/` | experiments and checks; map: `results_experiments/INDEX.md` |
 | `experiments/` | the scripts behind `results_experiments/`, and the progress files of each run |
 | `figures/` | the figure code (`make_figures.py`), captions and review notes |
-| `figures_out/` | the figures; map: `figures_out/INDEX.md` |
 | `docs/` | the method and the reports |
 | `archive/` | earlier scripts and analyses, never used by the code |
 
@@ -30,7 +29,7 @@ are 8 wild-type sections, which are sections of 3 or 4 fields.
    density, repeatability) and the Decisions needed.
 4. `docs/reports/FIXES_REPORT.md`: the switches, new checks and the first figures.
 5. `docs/reports/FIGURES_V2_REPORT.md`: the new network overlay and the figure fixes.
-6. `figures_out/INDEX.md` and `results_experiments/INDEX.md`, to find a figure or a result.
+6. `results/README.md` and `results_experiments/INDEX.md`, to find a figure or a result.
 
 ## History
 
@@ -64,7 +63,7 @@ python src/canaliculi.py --dir data/WT                   # feature 2 and the sum
 python src/diagnostics.py reference-check                # must PASS: 62.33 / 27.41 / 21 on 543-2
 python src/diagnostics.py regression                     # every number against results/, tolerance 0
 python src/diagnostics.py switch-check                   # what each switch changes
-python -u figures/make_figures.py all                    # every figure, thumbnails and INDEX.md
+python -u figures/make_figures.py all                    # every figure, into results/
 python -u figures/make_figures.py check                  # drawn numbers against results/
 ```
 

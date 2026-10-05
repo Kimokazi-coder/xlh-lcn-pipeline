@@ -1,5 +1,7 @@
 # Figure review, figures v2
 
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); every old and new path: [results/RENAMES.csv](../results/RENAMES.csv)). Links pinned to a commit keep the old paths.
+
 Each exported PNG is viewed at 1000 px wide (a column-width preview) and as a 100% crop of its densest
 region. Defects found, what was changed, and what remains. At most two rounds per figure.
 Pre-validation, pixel units.
@@ -55,7 +57,8 @@ Remaining, left as is:
 
 ## N1 against the old verification images
 
-Compared with `results/<image>/canaliculi_verification.png` (543-2 and 542_z06 side by side at the
+Compared with `results/<image>/canaliculi_verification.png` (now
+`results/<label>/4_archive_not_used/<label>_old_threads_coloured_by_cell.png`, kept for history; 543-2 and 542_z06 side by side at the
 same crop). Better: the raw structure stays visible, because the skeleton is a one-pixel vector line over
 the image at 85% instead of a 5 px wide coloured band; every skeleton pixel is drawn, not only the
 threads a cell owns, so the figure no longer implies an ownership claim that the headline measures do

@@ -1,5 +1,7 @@
 # Publication fixes report, 2026-10-02
 
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../../results/README.md); every old and new path: [results/RENAMES.csv](../../results/RENAMES.csv)). Links pinned to a commit keep the old paths.
+
 **Pre-validation, pixel units.** Branch `publication-fixes`, started from `overnight-fixes` (ef04398).
 This session turned the findings of `docs/reports/OVERNIGHT_REPORT.md` into the pipeline behind switches that
 are **off by default**, added diagnostics as subcommands of `src/diagnostics.py`, and made publication

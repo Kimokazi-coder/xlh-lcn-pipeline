@@ -1,5 +1,7 @@
 # Canaliculi v2 report, 2026-10-03
 
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../../results/README.md); every old and new path: [results/RENAMES.csv](../../results/RENAMES.csv)). Links pinned to a commit keep the old paths.
+
 **Pre-validation, pixel units.** Branch `canaliculi-v2`, started from `origin/publication-fixes` (8673380,
 tag `before-canaliculi-v2`). This run worked on the canalicular part of the pipeline (`src/canaliculi.py`
 and the measures built on it). **No default changed**: every new number is an appended column, and the one
@@ -129,7 +131,7 @@ synthetic data passed 8 of 8 checks (bias -0.023, F1 1.000, a wrong-image negati
 refusal). `docs/NETWORK_TUNING_PROTOCOL.md` fixes the grid, the metrics, the split by whole fields and the
 decision rule before any count exists.
 
-**How to run it on the hand counts.** Count the tiles of `figures_out/validation_tiles/` (branch
+**How to run it on the hand counts.** Count the tiles of `figures_out/validation_tiles/` (now `results/validation_tiles/`; branch
 figures-v2) blind into `annotation_template.csv`; run the pipeline of this branch into a folder (for the
 Sholl columns); then run the command above with the tiles key, which stays outside the repository. To send:
 the filled annotation CSV (codes and counts only; it carries no image name), and, if traced, the trace PNGs

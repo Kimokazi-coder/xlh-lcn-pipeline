@@ -1163,13 +1163,14 @@ in any metadata).
 **Purpose.** These tiles are for counting roots by hand without seeing the pipeline result. Count the
 roots (distinct canalicular threads leaving the lacuna surface) of the lacuna at the centre of each tile
 and enter the number in `annotation_template.csv` (columns code, hand_roots, hand_notes). Do not open
-the image folders of `results/` (only `results/validation_tiles/`) while counting.
+any other folder of `results/` while counting.
 
 **Codes.** The tiles are named T001, T002 and so on in a random order drawn from the operating system's
 random source, so the order cannot be rebuilt from this repository. The key (code, image, lacuna id,
 centre x and y) stays outside the repository, at the path given with `-k` when the tiles were made; the
 command refuses a key path inside the repository. Join the key to the filled template to compare the
-hand counts with `roots_count` in `results/<image>/canaliculi_measurements.json`.
+hand counts with `roots_count` in `results/<image>/2_canaliculi/<image>_canaliculi_results.json` (the
+image column of the key is the folder label).
 
 **Limits.** The tiles hide the pipeline result, not the image: a tile can be matched to its section by
 appearance. A neighbouring lacuna can be partly visible at a tile edge; only the centre lacuna is

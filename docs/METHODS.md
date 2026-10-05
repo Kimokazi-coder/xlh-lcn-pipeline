@@ -197,8 +197,8 @@ Pre-validation, pixel units. With every switch off, the pipeline reproduces `res
 
 ### Normalised per-cell measures (appended columns)
 
-Appended after all existing columns of the per-lacuna rows (`canaliculi_measurements.json` and the
-`per_lacuna` sheet) and of `summary_table.csv` and `.xlsx` (as interior means). No existing column
+Appended after all existing columns of the per-lacuna rows (`<label>_canaliculi_results.json` and the
+`per_lacuna` sheet) and of `summary_all_images.csv` and `.xlsx` (as interior means). No existing column
 changes name, order or value. They answer the size dependence found overnight (roots and ring length
 rise with lacuna area; `docs/reports/OVERNIGHT_REPORT.md`, task 4.1).
 
@@ -245,8 +245,9 @@ hash), and `requirements.txt` pins the versions.
 
 ### Figures
 
-`figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts) to `figures_out/`: a
-per-image figure for each image (now `per_image/<image>/overview`), a contact sheet (now Fig01), a
+`figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts) into `results/` (see
+`results/README.md`): a per-image figure for each image (now `<label>_figure_overview` in
+`results/<label>/3_publication_figures/`), a contact sheet (now Fig01), a
 lacuna-cut sensitivity figure (now Fig03), a per-field plot (now Fig04) and a supplementary figure of two
 switches (now S01); they were called F1 to F5 on branch publication-fixes and were renamed on branch
 figures-v2 (section 10), so that no figure name looks like a field name. One display window for the whole
@@ -257,9 +258,10 @@ lacunae yellow; skeleton white over the image at 60%; scale bars in pixels. Capt
 ## 10. Figures v2 (branch figures-v2, 2026-10-02)
 
 Pre-validation, pixel units. Figures only: `src/`, `config.py` and `results/` are unchanged. Report:
-`docs/reports/FIGURES_V2_REPORT.md`; map of the figures: `figures_out/INDEX.md`.
+`docs/reports/FIGURES_V2_REPORT.md`; map of the figures: `results/README.md`.
 
-- **Network overlay** (`figures_out/per_image/<image>/network`, `main/Fig02` for 543-2). The skeleton
+- **Network overlay** (`results/<label>/3_publication_figures/<label>_figure_network`, `all_images/figures/main/Fig02` for
+  543-2). The skeleton
   is drawn as vector segments between the centres of 8-connected neighbouring pixels, so the drawn set
   is exactly the skeleton. A skeleton pixel is vermillion if it lies in the 30 px ring of an interior
   lacuna by the pipeline's own rule (distance to the lacuna masks at most 30 px, nearest lacuna from
@@ -267,8 +269,8 @@ Pre-validation, pixel units. Figures only: `src/`, `config.py` and `results/` ar
   centres. Per interior lacuna, the vermillion pixels equal `ring_length_r30_px` and the dots equal
   `roots_count` (asserted).
 - **Gallery and hand-count tiles.** Every interior lacuna in a 240 px tile at 3x
-  (`per_image/<image>/gallery`), and the same crops of the raw red channel under random codes for
-  counting roots by hand (`figures_out/validation_tiles/`, key outside the repository).
+  (`<label>_figure_cell_gallery`), and the same crops of the raw red channel under random codes for
+  counting roots by hand (`results/validation_tiles/`, key outside the repository).
 - **Figure fixes.** Rejected lacuna-scale candidates (at least 150 px²) are drawn with the filter that
   rejects them; one colour per meaning; figure ids Fig01 to Fig04 and S01 to S03 and fields Field 1 to
   Field 4; the per-field plot from zero with 682_z08 marked; count lines with interior, frame-edge and

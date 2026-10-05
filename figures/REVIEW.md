@@ -1,5 +1,7 @@
 # Figure review
 
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); every old and new path: [results/RENAMES.csv](../results/RENAMES.csv)). Links pinned to a commit keep the old paths.
+
 Each exported PNG is viewed at 1000 px wide (a column-width preview). Defects found, what was changed,
 and what remains. At most two rounds per figure.
 

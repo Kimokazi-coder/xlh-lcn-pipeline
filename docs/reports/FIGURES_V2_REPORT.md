@@ -1,5 +1,7 @@
 # Figures v2 report, 2026-10-02
 
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../../results/README.md); every old and new path: [results/RENAMES.csv](../../results/RENAMES.csv)). Links pinned to a commit keep the old paths.
+
 **Pre-validation, pixel units.** Branch `figures-v2`, started from `publication-fixes` (8673380). This
 run changed figures only. `src/`, `config.py` and `requirements.txt` are identical to the base, and
 `results/` was not touched. Before every push, `reference-check` passed (62.33 edges per cell, 27.41 px,
@@ -10,7 +12,8 @@ claims a more accurate result: the figures show the pipeline output as it is.
 
 ## Summary
 
-- **A new canalicular overlay** (`figures_out/per_image/<image>/network`, and `main/Fig02` for 543-2).
+- **A new canalicular overlay** (`figures_out/per_image/<image>/network`, and `main/Fig02` for 543-2;
+  now `results/<label>/3_publication_figures/<label>_figure_network`).
   The whole skeleton is drawn as one-pixel vector lines over the image at 85%. Vermillion marks exactly
   the pixels counted in ring length 30 px of interior lacunae, white the rest, magenta dots exactly the
   counted roots. No colour stands for a cell, so no ownership is implied. Three lacunae per image at 3x
@@ -25,7 +28,8 @@ claims a more accurate result: the figures show the pipeline output as it is.
   root dots and 27504 vermillion pixels over the 86 interior lacunae of the 8 images.
 - **A layout a reader can follow**: `figures_out/INDEX.md` (every figure with a thumbnail),
   `figures_out/README.md`, `results_experiments/INDEX.md` (questions to files) and
-  `docs/START_HERE.md`. `python -u figures/make_figures.py all` regenerates the tree.
+  `docs/START_HERE.md`. `python -u figures/make_figures.py all` regenerates the tree. (The figure
+  index and thumbnails are now in `archive/old-indexes/`; the guide is `results/README.md`.)
 
 ## What was built
 
@@ -43,13 +47,14 @@ claims a more accurate result: the figures show the pipeline output as it is.
 
 ## The canalicular overlay, before and after
 
-Before: `results/<image>/canaliculi_verification.png`, each lacuna and the threads it owns in its own
-colour, 5 px wide, over the original. After: the network figure.
+Before: `results/<image>/canaliculi_verification.png` (now
+`results/<label>/4_archive_not_used/<label>_old_threads_coloured_by_cell.png`, kept for history), each
+lacuna and the threads it owns in its own colour, 5 px wide, over the original. After: the network figure.
 
 | | 543-2 | 542_z06 |
 |---|---|---|
-| before | ![543-2 before](../../results/543-2/canaliculi_verification.png) | ![542_z06 before](../../results/542_WT_2_z06c1-2/canaliculi_verification.png) |
-| after | ![543-2 after](../../figures_out/per_image/543-2/network.png) | ![542_z06 after](../../figures_out/per_image/542_z06/network.png) |
+| before | ![543-2 before](../../results/543-2/4_archive_not_used/543-2_old_threads_coloured_by_cell.png) | ![542_z06 before](../../results/542_z06/4_archive_not_used/542_z06_old_threads_coloured_by_cell.png) |
+| after | ![543-2 after](../../results/543-2/3_publication_figures/543-2_figure_network.png) | ![542_z06 after](../../results/542_z06/3_publication_figures/542_z06_figure_network.png) |
 
 What is better: the raw structure stays visible, because the skeleton is a thin vector line over the
 image at 85% instead of a 5 px coloured band; every skeleton pixel is drawn, not only the threads a
@@ -149,7 +154,7 @@ From `figures/REVIEW_V2.md`:
 ## What is blocked
 
 - **Calibration.** No µm/px value; every scale bar is in pixels.
-- **Ground truth.** No hand counts yet. The tiles are ready (`figures_out/validation_tiles/`).
+- **Ground truth.** No hand counts yet. The tiles are ready (`figures_out/validation_tiles/`, now `results/validation_tiles/`).
 - **The D4 decision** on lacunae partly outside the focal plane and on the rejected candidates: the
   figures now show the rejected ones, but whether they count is open.
 - **Animal IDs and acquisition settings**, which decide the unit of analysis and between image-relative

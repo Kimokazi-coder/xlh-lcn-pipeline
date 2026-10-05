@@ -19,7 +19,7 @@ Run the pipeline, from the repository root:
 ```
 python src/lacunae.py --dir data/WT          # feature 1: lacunae
 python src/canaliculi.py --dir data/WT       # feature 2: canaliculi and the summary table
-python -u figures/make_figures.py all        # every figure in figures_out/
+python -u figures/make_figures.py all        # every figure, into results/
 ```
 
 Check it:
@@ -57,8 +57,10 @@ command from the repository root.
 | Feature 1: lacunae | `python src/lacunae.py --dir data/WT` | `python src/lacunae.py --image "data/WT/543-2.tif"` |
 | Feature 2: canaliculi | `python src/canaliculi.py --dir data/WT` | `python src/canaliculi.py --image "data/WT/543-2.tif"` |
 
-Each command writes to `results/<image>/` (`--out` picks another folder). A
-folder run of feature 2 also writes `results/summary_table.xlsx` and `.csv`.
+Each command writes to `results/<label>/1_lacunae/` or `2_canaliculi/` (`--out`
+picks another folder). A folder run of feature 2 also writes
+`results/all_images/summary_all_images.xlsx` and `.csv`. The layout and the
+label of each image: `results/README.md`.
 
 To check the pipeline, run `python src/diagnostics.py reference-check`. It
 must print PASS for 62.33 edges per cell, 27.41 px mean edge length and 21
@@ -73,7 +75,7 @@ src/canaliculi.py    feature 2: canalicular network, skeleton and measurements
 src/diagnostics.py   every diagnostic, as subcommands
 config.py            paths and shared settings
 data/WT/             the 8 input images
-results/             one folder per image, plus summary_table.xlsx and .csv
+results/             one folder per image, all_images/ and validation_tiles/; see results/README.md
 docs/METHODS.md      the method, every parameter and its origin, limitations, decisions
 archive/             history and earlier analyses, not needed to run the pipeline
 CLEANUP_LOG.md       what the 2026-09-30 cleanup did
@@ -100,9 +102,9 @@ labels them ownership-dependent. Edge count is a network parameter, not
 
 ## Results
 
-`results/summary_table.xlsx` (and `.csv`) has one row per image. Per-lacuna
-numbers are in `results/<image>/lacunae.xlsx` and
-`results/<image>/canaliculi_measurements.xlsx`.
+`results/all_images/summary_all_images.xlsx` (and `.csv`) has one row per image.
+Per-lacuna numbers are in `results/<label>/1_lacunae/<label>_lacunae_results.xlsx`
+and `results/<label>/2_canaliculi/<label>_canaliculi_results.xlsx`.
 
 | image | lacunae (interior) | median area px² | roots per cell | ring 30 px per cell (px) | field density px⁻¹ |
 |---|---|---|---|---|---|
@@ -117,9 +119,11 @@ numbers are in `results/<image>/lacunae.xlsx` and
 
 One overlay per feature, for image 543-2:
 - Feature 1, kept lacunae outlined in green:
-  [`results/543-2/lacunae_overlay.png`](results/543-2/lacunae_overlay.png)
-- Feature 2, each lacuna and the threads it owns in one colour:
-  [`results/543-2/canaliculi_verification.png`](results/543-2/canaliculi_verification.png)
+  [`results/543-2/1_lacunae/543-2_lacunae_outlines.png`](results/543-2/1_lacunae/543-2_lacunae_outlines.png)
+- Feature 2, the network figure:
+  [`results/543-2/3_publication_figures/543-2_figure_network.png`](results/543-2/3_publication_figures/543-2_figure_network.png).
+  The old verification picture, each lacuna and the threads it owns in one
+  colour, is now in `results/543-2/4_archive_not_used/`, kept for history only.
 
 ## Still open
 
@@ -142,7 +146,7 @@ python src/diagnostics.py sensitivity -d data/WT -o OUT
 python src/diagnostics.py field-summary -d data/WT -o OUT
 python src/diagnostics.py blind -s data/WT -o CODED -k KEY_OUTSIDE_REPO.csv
 python src/canaliculi.py --dir data/WT -o OTHER_FOLDER   # -o: any output folder; default results/
-python -u figures/make_figures.py image -a           # figures into figures_out/
+python -u figures/make_figures.py image -a           # figures into results/<label>/3_publication_figures/
 ```
 
 The switches in `config.py` (`NARROW_CRUMB_RULE`, `FILL_ENCLOSED_HOLES_MAX_PX2`,

@@ -88,11 +88,11 @@ procedure of section 6 on Hyp fields.
 
 ## 9. Ground truth: how to make it
 
-**Blind hand counts.** Use the tiles in `figures_out/validation_tiles/` (branch figures-v2): 240 px crops of
+**Blind hand counts.** Use the tiles in `results/validation_tiles/`: 240 px crops of
 the raw red channel, one per interior lacuna, named T001, T002 and so on in a random order, with no outline
 or number. For each tile, count the roots (distinct threads leaving the surface of the centre lacuna) and
 write the number in `annotation_template.csv` (`code, hand_roots, hand_notes`). Do not open
-`figures_out/per_image/` or `results/` while counting. Ideally two people count independently, and their
+any other folder of `results/` while counting. Ideally two people count independently, and their
 agreement is reported first; it bounds what any pipeline can reach. The key stays outside the repository
 until the counts are complete.
 

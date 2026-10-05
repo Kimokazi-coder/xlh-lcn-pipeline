@@ -1,5 +1,7 @@
 # Cleanup log, 2026-09-30
 
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](results/README.md); every old and new path: [results/RENAMES.csv](results/RENAMES.csv)). Links pinned to a commit keep the old paths.
+
 The repository was reduced to two feature files, one diagnostics file,
 clean results and one guide, with everything else moved to `archive/`.
 Every step's check passed, so nothing was reverted. Outputs are
