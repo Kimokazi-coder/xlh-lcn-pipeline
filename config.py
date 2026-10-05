@@ -18,8 +18,56 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # Input images.
 DATA_DIR = PROJECT_ROOT / "data"
 
-# Outputs: one folder per image, plus the summary table.
+# Outputs: one folder per image, plus the cross-image files (results/README.md).
 RESULTS_DIR = PROJECT_ROOT / "results"
+
+# Result layout. Every result file is named after its image. The label of an
+# image is its short name, from this table (key: the cleaned file name made by
+# clean_name in src/lacunae.py). Images not listed, for example blinded codes
+# such as S001, use their cleaned name as the label. Naming only; no number
+# depends on it.
+IMAGE_LABELS = {
+    "542_WT_2_z06c1-2": "542_z06",
+    "542_WT_2_z18c1-2": "542_z18",
+    "543-2": "543-2",
+    "543_3": "543_3",
+    "543_z13c1-2": "543_z13",
+    "682_z08c1-2": "682_z08",
+    "682_z23c-2": "682_z23",
+    "682_z29c1-3": "682_z29",
+}
+
+# Folders inside results/<label>/.
+SECTION_LACUNAE = "1_lacunae"
+SECTION_CANALICULI = "2_canaliculi"
+SECTION_FIGURES = "3_publication_figures"
+SECTION_ARCHIVE = "4_archive_not_used"
+
+# Cross-image folders inside results/.
+ALL_IMAGES_DIR = "all_images"
+ALL_IMAGES_ARCHIVE_DIR = "archive_not_used"
+ALL_IMAGES_FIGURES_DIR = "figures"
+VALIDATION_TILES_DIR = "validation_tiles"
+
+# File names. A per-image file is <label>_<suffix>; a suffix without an
+# extension is written with each extension given in its comment.
+SUFFIX_LACUNAE_RESULTS = "lacunae_results"  # .xlsx and .json
+SUFFIX_LACUNAE_OUTLINES = "lacunae_outlines.png"
+SUFFIX_CANALICULI_RESULTS = "canaliculi_results"  # .xlsx and .json
+SUFFIX_CANALICULI_MASK = "canaliculi_mask.png"
+SUFFIX_CANALICULI_SKELETON = "canaliculi_skeleton.png"
+SUFFIX_OLD_THREADS_BY_CELL = "old_threads_coloured_by_cell.png"  # in SECTION_ARCHIVE
+SUFFIX_FIGURE_NETWORK = "figure_network"  # .png and .pdf
+SUFFIX_FIGURE_GALLERY = "figure_cell_gallery"  # .png and .pdf
+SUFFIX_FIGURE_OVERVIEW = "figure_overview"  # .png and .pdf
+SUFFIX_FIGURE_NETWORK_CHECKS = "figure_network_checks.json"
+SUFFIX_FIGURE_GALLERY_CHECKS = "figure_cell_gallery_checks.json"
+SUFFIX_FIGURE_INSET = "figure_inset_choice.json"
+VARIANTS_DIR = "variants_per_image_brightness"  # in SECTION_ARCHIVE
+SUFFIX_VARIANT = "_per_image_brightness"  # appended to a figure suffix, .png
+VARIANT_WINDOW_FILE = "display_window_this_image.json"
+SUMMARY_NAME = "summary_all_images"  # .csv and .xlsx in ALL_IMAGES_DIR
+DISPLAY_WINDOW_FILE = "display_window.json"  # in ALL_IMAGES_DIR/ALL_IMAGES_FIGURES_DIR
 
 # Image and channel selection
 

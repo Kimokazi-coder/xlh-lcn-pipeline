@@ -49,17 +49,9 @@ PRECISION = config.CSV_FLOAT_PRECISION
 
 IMAGE_PATHS = sorted(DATA_DIR.glob("*.tif"))
 
-# Short labels used in tables and in the task text.
-SHORT = {
-    "542_WT_2_z06c1-2": "542_z06",
-    "542_WT_2_z18c1-2": "542_z18",
-    "543-2": "543-2",
-    "543_3": "543_3",
-    "543_z13c1-2": "543_z13",
-    "682_z08c1-2": "682_z08",
-    "682_z23c-2": "682_z23",
-    "682_z29c1-3": "682_z29",
-}
+# Short labels used in tables and in the task text: the image labels of
+# config.IMAGE_LABELS, the one naming table.
+SHORT = dict(config.IMAGE_LABELS)
 LONG = {v: k for k, v in SHORT.items()}
 
 

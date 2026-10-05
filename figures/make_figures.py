@@ -80,11 +80,9 @@ CACHE = ROOT / "results_experiments" / "_cache" / "figures"
 LOG_DIR = ROOT / "experiments" / "logs"
 DATA_DIR = config.DATA_DIR / "WT"
 
-# Short image labels, as in the overnight report.
-SHORT = {
-    "542_WT_2_z06c1-2": "542_z06", "542_WT_2_z18c1-2": "542_z18", "543-2": "543-2", "543_3": "543_3",
-    "543_z13c1-2": "543_z13", "682_z08c1-2": "682_z08", "682_z23c-2": "682_z23", "682_z29c1-3": "682_z29",
-}
+# Short image labels, as in the overnight report: config.IMAGE_LABELS, the
+# one naming table.
+SHORT = config.IMAGE_LABELS
 
 # Style ----------------------------------------------------------------------------
 
@@ -409,10 +407,12 @@ def src_hash() -> str:
 
 def results_numbers(path: Path) -> tuple[list, list]:
     """(lacuna rows, cell rows) of the committed default output in
-    results/<image>/, the pipeline numbers every drawn number must equal."""
-    folder = config.RESULTS_DIR / lacunae.clean_name(path)
-    lac = json.loads((folder / "lacunae.json").read_text(encoding="utf-8"))
-    can = json.loads((folder / "canaliculi_measurements.json").read_text(encoding="utf-8"))
+    results/<label>/, the pipeline numbers every drawn number must equal."""
+    label = lacunae.image_label(path)
+    lac = json.loads(lacunae.result_path(config.RESULTS_DIR, label, config.SECTION_LACUNAE,
+                                         config.SUFFIX_LACUNAE_RESULTS + ".json").read_text(encoding="utf-8"))
+    can = json.loads(lacunae.result_path(config.RESULTS_DIR, label, config.SECTION_CANALICULI,
+                                         config.SUFFIX_CANALICULI_RESULTS + ".json").read_text(encoding="utf-8"))
     return lac["lacunae"], can["lacunae"]
 
 
@@ -1859,7 +1859,7 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
         return
     with open(field_dir / "field_images.csv", newline="") as f:
         rows = list(csv.DictReader(f))
-    with open(config.RESULTS_DIR / "summary_table.csv", newline="") as f:
+    with open(lacunae.all_images_path(config.RESULTS_DIR, config.SUMMARY_NAME + ".csv"), newline="") as f:
         summary_rows = {r["image"]: r for r in csv.DictReader(f)}
     with open(field_dir / "field_summary.csv", newline="") as f:
         field_means = {r["field"]: r for r in csv.DictReader(f)}

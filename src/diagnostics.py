@@ -40,7 +40,7 @@ Usage (from the repo root):
     python src/diagnostics.py switch-check
     python src/diagnostics.py fast-check
     python src/diagnostics.py blind -s data/WT -o CODED_FOLDER -k KEY_OUTSIDE_REPO.csv
-    python src/diagnostics.py unblind -s CODED_RESULTS/summary_table.csv -k KEY.csv -o UNBLINDED.csv
+    python src/diagnostics.py unblind -s CODED_RESULTS/all_images/summary_all_images.csv -k KEY.csv -o UNBLINDED.csv
     python src/diagnostics.py sensitivity -d data/WT -o OUT_FOLDER
     python src/diagnostics.py field-summary -d data/WT -o OUT_FOLDER [-r RESULTS_FOLDER]
     python src/diagnostics.py network-sweep -d data/WT -o OUT_FOLDER
@@ -134,10 +134,23 @@ LACUNA_SUMMARY_KEYS = [f for f, _u in lacunae.LACUNA_SUMMARY_METRICS]
 CELL_KEYS = [f for f, _u, _k in canaliculi.CELL_METRICS]
 
 
-def numbers_from_results(image_dir: Path) -> dict:
-    """The canonical numbers of one image folder in the results layout."""
-    lac = json.load(open(image_dir / "lacunae.json"))
-    can = json.load(open(image_dir / "canaliculi_measurements.json"))
+def result_json(root: Path, label: str, kind: str) -> Path:
+    """The results json of one image in a results folder: kind "lacunae" or
+    "canaliculi" (lacunae.result_path with the config names)."""
+    if kind == "lacunae":
+        return lacunae.result_path(root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".json")
+    return lacunae.result_path(root, label, config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".json")
+
+
+def summary_csv(root: Path) -> Path:
+    """The summary table of a results folder."""
+    return lacunae.all_images_path(root, config.SUMMARY_NAME + ".csv")
+
+
+def numbers_from_results(root: Path, label: str) -> dict:
+    """The canonical numbers of one image in a results folder."""
+    lac = json.load(open(result_json(root, label, "lacunae")))
+    can = json.load(open(result_json(root, label, "canaliculi")))
     per_lacuna = {}
     for lrow, crow in zip(lac["lacunae"], can["lacunae"]):
         row = {k: lrow[k] for k in LACUNA_SHAPE_KEYS}
@@ -157,12 +170,12 @@ def numbers_from_results(image_dir: Path) -> dict:
 
 
 def load_numbers(folder: Path) -> dict:
-    """{image folder name: canonical numbers} for a results folder. A folder
+    """{image label: canonical numbers} for a results folder. A folder
     holding numbers.json (a saved reference snapshot) is read as is."""
     out = {}
     for sub in sorted(p for p in folder.iterdir() if p.is_dir()):
-        if (sub / "lacunae.json").is_file() and (sub / "canaliculi_measurements.json").is_file():
-            out[sub.name] = numbers_from_results(sub)
+        if result_json(folder, sub.name, "lacunae").is_file() and result_json(folder, sub.name, "canaliculi").is_file():
+            out[sub.name] = numbers_from_results(folder, sub.name)
         elif (sub / "numbers.json").is_file():
             out[sub.name] = json.load(open(sub / "numbers.json"))
     return out
@@ -366,21 +379,23 @@ PROVENANCE_KEY = "provenance"
 def regression_allowlist() -> dict:
     """Fields allowed to exist only in the regenerated output, because they
     were appended after results/ was made. Any other new field fails the
-    regression. Json paths use "[*]" for a list index."""
+    regression. Json paths start with the file kind ("lacunae" or
+    "canaliculi", since file names now carry the image label) and use "[*]"
+    for a list index."""
     per_cell = [m[0] for m in canaliculi.NORMALISED_METRICS + canaliculi.NETWORK_V2_METRICS]
-    json_fields = {"canaliculi_measurements.json:normalised_measures[*]",
-                   "canaliculi_measurements.json:network_v2_measures[*]"}
+    json_fields = {"canaliculi:normalised_measures[*]", "canaliculi:network_v2_measures[*]",
+                   "canaliculi:image_label", "lacunae:image_label"}
     for f in per_cell:
-        json_fields.add(f"canaliculi_measurements.json:lacunae[*].{f}")
+        json_fields.add(f"canaliculi:lacunae[*].{f}")
         for stat in ("mean", "median", "sd"):
-            json_fields.add(f"canaliculi_measurements.json:summary.{f}.{stat}")
+            json_fields.add(f"canaliculi:summary.{f}.{stat}")
     for key in getattr(canaliculi, "FIELD_V2_KEYS", []):
-        json_fields.add(f"canaliculi_measurements.json:field.{key}")
+        json_fields.add(f"canaliculi:field.{key}")
     for key in getattr(canaliculi, "PARAMETERS_V2_KEYS", []):
-        json_fields.add(f"canaliculi_measurements.json:parameters.{key}")
+        json_fields.add(f"canaliculi:parameters.{key}")
     for key in ("narrow_crumb_rule", "fill_enclosed_holes_max_px2", "band_filter_min_opening_share",
                 "fast_lacuna_stage"):
-        json_fields.add(f"lacunae.json:parameters.{key}")
+        json_fields.add(f"lacunae:parameters.{key}")
     n_ref = canaliculi.SUMMARY_COLUMNS.index("field length density (px^-1)") + 1
     return {"json": json_fields, "summary_table": set(canaliculi.SUMMARY_COLUMNS[n_ref:])}
 
@@ -403,9 +418,9 @@ def _regenerate_one(job: tuple) -> dict:
         setattr(config, name, value)
     image_path = Path(image_path)
     result = canaliculi.analyse_image(image_path)
-    out_dir = Path(out_root) / lacunae.clean_name(image_path)
-    lacunae.save_json(result["lacunae"], out_dir / "lacunae.json")
-    canaliculi.save_json(result, out_dir / "canaliculi_measurements.json")
+    label = lacunae.image_label(image_path)
+    lacunae.save_json(result["lacunae"], result_json(Path(out_root), label, "lacunae"))
+    canaliculi.save_json(result, result_json(Path(out_root), label, "canaliculi"))
     lac = result["lacunae"]
     return {
         "image_path": image_path,
@@ -455,9 +470,10 @@ def _equal(a, b) -> bool:
     return a == b
 
 
-def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None) -> tuple:
+def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None, kind: str = "") -> tuple:
     """(fields compared, differences, number of fields only in the new file).
-    With `allowed` (allowlist paths), a new field outside it is a difference."""
+    With `allowed` (allowlist paths of this file kind), a new field outside it
+    is a difference."""
     import re
 
     ref = json.load(open(ref_path))
@@ -475,7 +491,7 @@ def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None) -> 
     if allowed is not None:
         index = re.compile(r"\[[0-9]+\]")
         for k in sorted(extra):
-            if new_path.name + ":" + index.sub("[*]", k) not in allowed:
+            if kind + ":" + index.sub("[*]", k) not in allowed:
                 diffs.append((k, "<not in results/>", "unexpected new field"))
     return len(fr), diffs, len(extra)
 
@@ -517,32 +533,32 @@ def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, wor
     allow = regression_allowlist()
     table, ok, total, shown = [], True, 0, []
     for p in images:
-        name = lacunae.clean_name(p)
+        name = lacunae.image_label(p)
         n_all, d_all, x_all = 0, [], 0
-        for fname in ("lacunae.json", "canaliculi_measurements.json"):
-            r, nw = ref / name / fname, out_root / name / fname
+        for kind in ("lacunae", "canaliculi"):
+            r, nw = result_json(ref, name, kind), result_json(out_root, name, kind)
             if not r.is_file():
-                d_all.append((fname, "<no reference file>", ""))
+                d_all.append((r.name, "<no reference file>", ""))
                 continue
-            n, d, x = compare_json(r, nw, allow["json"])
+            n, d, x = compare_json(r, nw, allow["json"], kind)
             n_all += n
             x_all += x
-            d_all += [(f"{fname}:{k}", a, b) for k, a, b in d]
+            d_all += [(f"{r.name}:{k}", a, b) for k, a, b in d]
         total += n_all
         passed = not d_all
         ok &= passed
         shown += [(name, *d) for d in d_all[:5]]
         table.append([name, n_all, len(d_all), x_all, "PASS" if passed else "FAIL"])
-    summ = compare_summary(ref / "summary_table.csv", out_root / "summary_table.csv")
+    summ = compare_summary(summary_csv(ref), summary_csv(out_root))
     s_cells = sum(n for n, _d in summ["rows"].values())
     s_diffs = [(img, *d) for img, (_n, ds) in summ["rows"].items() for d in ds]
-    s_diffs += [("summary_table.csv", col, "<not in results/>", "unexpected new column")
+    s_diffs += [(summary_csv(ref).name, col, "<not in results/>", "unexpected new column")
                 for col in summ["extra_columns"] if col not in allow["summary_table"]]
     ok &= not s_diffs
     total += s_cells
     print_table(["image", "json fields compared", "differ", "new fields (not compared)", "result"], table,
                 title=f"Regression, {label}: {out_root} against {ref} (tolerance 0, provenance ignored)\n")
-    print(f"\nsummary_table.csv: {s_cells} cells compared, {len(s_diffs)} differ"
+    print(f"\n{summary_csv(ref).name}: {s_cells} cells compared, {len(s_diffs)} differ"
           + (f"; new columns not compared: {', '.join(summ['extra_columns'])}" if summ["extra_columns"] else ""))
     for d in (shown + s_diffs)[:20]:
         print("  DIFF", *d)
@@ -597,12 +613,12 @@ SWITCH_SETTINGS_EXTRA = [
 MATCH_PX = 10.0  # a lacuna in two runs is the same object if the centroids lie this close
 
 
-def lacuna_changes(ref_dir: Path, new_dir: Path) -> tuple[list, dict]:
-    """Per-lacuna changes between two output folders of one image, matched by
-    centroid; and the headline values of both runs."""
-    def load(d):
-        lac = json.load(open(d / "lacunae.json"))
-        can = json.load(open(d / "canaliculi_measurements.json"))
+def lacuna_changes(ref_root: Path, new_root: Path, label: str) -> tuple[list, dict]:
+    """Per-lacuna changes of one image between two results folders, matched
+    by centroid; and the headline values of both runs."""
+    def load(root):
+        lac = json.load(open(result_json(root, label, "lacunae")))
+        can = json.load(open(result_json(root, label, "canaliculi")))
         rows = []
         for lr, cr in zip(lac["lacunae"], can["lacunae"]):
             rows.append({"x": lr["centroid_col_px"], "y": lr["centroid_row_px"], "area": lr["area_px2"],
@@ -613,8 +629,8 @@ def lacuna_changes(ref_dir: Path, new_dir: Path) -> tuple[list, dict]:
                 "field_density": can["field"]["canalicular_length_density_per_px"], "bridges": can["n_bridges"]}
         return rows, head
 
-    ref, head_ref = load(ref_dir)
-    new, head_new = load(new_dir)
+    ref, head_ref = load(ref_root)
+    new, head_new = load(new_root)
     used, changes = set(), []
     for r in ref:
         best, bd = None, MATCH_PX
@@ -653,7 +669,7 @@ def cmd_switch_check(args) -> int:
         any_change = False
         for p in images:
             n = lacunae.clean_name(p)
-            changes, head = lacuna_changes(args.ref / n, out / n)
+            changes, head = lacuna_changes(args.ref, out, lacunae.image_label(p))
             moved = {k: (head["before"][k], head["after"][k]) for k in head["before"]
                      if head["before"][k] != head["after"][k]}
             if not changes and not moved:
@@ -971,10 +987,11 @@ def _field_inputs(job: tuple) -> dict:
     path_str, results_dir = job
     image_path = Path(path_str)
     name = lacunae.clean_name(image_path)
-    folder = Path(results_dir) / name if results_dir else None
-    if folder and (folder / "lacunae.json").is_file() and (folder / "canaliculi_measurements.json").is_file():
-        lac = json.load(open(folder / "lacunae.json"))
-        can = json.load(open(folder / "canaliculi_measurements.json"))
+    label = lacunae.image_label(image_path)
+    root = Path(results_dir) if results_dir else None
+    if root and result_json(root, label, "lacunae").is_file() and result_json(root, label, "canaliculi").is_file():
+        lac = json.load(open(result_json(root, label, "lacunae")))
+        can = json.load(open(result_json(root, label, "canaliculi")))
         rows, summary, field = lac["lacunae"], can["summary"], can["field"]
     else:
         config.FAST_LACUNA_STAGE = True
@@ -1295,10 +1312,14 @@ TRACE_TOLERANCE_PX = 3.0
 VALIDATE_SELFTEST_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "validate_selftest"
 
 
-def _clean_from(name: str) -> str:
-    """A clean image name (results/ folder) from a clean or a short name."""
-    short_to_clean = {v: k for k, v in canaliculi.ROI_SHORT_NAMES.items()}
-    return short_to_clean.get(name, name)
+def _label_from(name: str) -> str:
+    """The image label (results/ folder name) from a clean or a short name."""
+    return lacunae.image_label(name)
+
+
+def _clean_from_label(label: str) -> str:
+    """The cleaned name of a label (the label itself when it is not in the table)."""
+    return {v: k for k, v in config.IMAGE_LABELS.items()}.get(label, label)
 
 
 def _read_csv_columns(path: Path, needed: tuple) -> list[dict]:
@@ -1355,10 +1376,10 @@ def trace_scores(skeleton: np.ndarray, trace: np.ndarray, region: np.ndarray | N
 
 
 def _results_lacunae(folder: Path) -> dict:
-    """{clean image name: (lacunae.json rows, canaliculi rows)} of a results folder."""
+    """{image label: (lacuna rows, canaliculi rows)} of a results folder."""
     out = {}
     for sub in sorted(p for p in folder.iterdir() if p.is_dir()):
-        lj, cj = sub / "lacunae.json", sub / "canaliculi_measurements.json"
+        lj, cj = result_json(folder, sub.name, "lacunae"), result_json(folder, sub.name, "canaliculi")
         if lj.is_file() and cj.is_file():
             out[sub.name] = (json.load(open(lj))["lacunae"], json.load(open(cj))["lacunae"])
     return out
@@ -1391,7 +1412,7 @@ def run_validation(annotation: Path, key: Path, results: Path, out: Path, trace_
         k = keyrows.get(a["code"])
         if k is None:
             raise ValueError(f"code {a['code']} is not in the key")
-        image = _clean_from(k["image"])
+        image = _label_from(k["image"])
         lac, cells = data[image]
         lid = int(k["lacuna_id"])
         cell = next(c for c in cells if c["lacuna_id"] == lid)
@@ -1426,9 +1447,9 @@ def run_validation(annotation: Path, key: Path, results: Path, out: Path, trace_
 
         box_rows = _read_csv_columns(boxes, ("image", "x0", "y0", "x1", "y1")) if boxes else None
         for image in sorted(data):
-            short = canaliculi.ROI_SHORT_NAMES.get(image, image)
-            tpath = next((trace_dir / f"{n}.png" for n in (image, short) if (trace_dir / f"{n}.png").is_file()), None)
-            spath = results / image / "canaliculi_skeleton.png"
+            clean = _clean_from_label(image)
+            tpath = next((trace_dir / f"{n}.png" for n in (image, clean) if (trace_dir / f"{n}.png").is_file()), None)
+            spath = lacunae.result_path(results, image, config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_SKELETON)
             if tpath is None or not spath.is_file():
                 continue
             tr = imread(tpath)
@@ -1438,7 +1459,7 @@ def run_validation(annotation: Path, key: Path, results: Path, out: Path, trace_
                 raise ValueError(f"trace {tpath.name} is {tr.shape}, the skeleton is {sk.shape}")
             region = None
             if box_rows is not None:
-                mine = [b for b in box_rows if _clean_from(b["image"]) == image]
+                mine = [b for b in box_rows if _label_from(b["image"]) == image]
                 if not mine:
                     continue
                 region = np.zeros(sk.shape, bool)
@@ -1517,7 +1538,8 @@ def _selftest_validation(workers: int) -> int:
     base = VALIDATE_SELFTEST_DIR
     pipe = base / "pipeline"
     images = lacunae.image_paths(argparse.Namespace(image=None, dir=DEFAULT_IMAGE_DIR))
-    if not all((pipe / lacunae.clean_name(p) / "canaliculi_skeleton.png").is_file() for p in images):
+    if not all(lacunae.result_path(pipe, lacunae.image_label(p), config.SECTION_CANALICULI,
+                                   config.SUFFIX_CANALICULI_SKELETON).is_file() for p in images):
         with ProcessPoolExecutor(max_workers=max(1, min(workers, len(images)))) as ex:
             list(ex.map(_selftest_pipeline_one, [(str(p), str(pipe)) for p in images]))
     data = _results_lacunae(pipe)
@@ -1528,7 +1550,7 @@ def _selftest_validation(workers: int) -> int:
             if c["on_border"]:
                 continue
             noise = int(rng.choice([-1, 0, 1], p=[0.2, 0.6, 0.2]))
-            rows.append({"image": canaliculi.ROI_SHORT_NAMES.get(image, image), "lacuna_id": c["lacuna_id"],
+            rows.append({"image": image, "lacuna_id": c["lacuna_id"],
                          "hand_roots": max(0, c["roots_count"] + noise)})
     order = rng.permutation(len(rows))
     tmp_key_dir = Path(tempfile.mkdtemp(prefix="lcn_selftest_key_"))
@@ -1544,13 +1566,13 @@ def _selftest_validation(workers: int) -> int:
     traces = base / "traces"
     traces.mkdir(parents=True, exist_ok=True)
     for image in data:
-        sk = imread_bool(pipe / image / "canaliculi_skeleton.png")
+        sk = imread_bool(lacunae.result_path(pipe, image, config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_SKELETON))
         tr = np.zeros_like(sk)
         tr[1:, :] = sk[:-1, :]
         rr, cc = np.nonzero(tr)
         drop = rng.random(rr.size) < 0.05
         tr[rr[drop], cc[drop]] = False
-        imsave(traces / f"{canaliculi.ROI_SHORT_NAMES.get(image, image)}.png", (tr * 255).astype(np.uint8),
+        imsave(traces / f"{image}.png", (tr * 255).astype(np.uint8),
                check_contrast=False)
     boxes = base / "boxes.csv"
     with open(boxes, "w", newline="") as f:
@@ -1570,8 +1592,9 @@ def _selftest_validation(workers: int) -> int:
     f1s = [t["f1"] for t in res_all["trace"]]
     # Negative control: one image's skeleton against another image's trace.
     names = sorted(data)
-    wrong = trace_scores(imread_bool(pipe / names[0] / "canaliculi_skeleton.png"),
-                         imread_bool(traces / f"{canaliculi.ROI_SHORT_NAMES.get(names[-1], names[-1])}.png"))["f1"]
+    wrong = trace_scores(imread_bool(lacunae.result_path(pipe, names[0], config.SECTION_CANALICULI,
+                                                         config.SUFFIX_CANALICULI_SKELETON)),
+                         imread_bool(traces / f"{names[-1]}.png"))["f1"]
     checks = [("a key inside the repository is refused", refused, "refused"),
               ("lacunae joined", res_all["joined"] == len(rows), f"{res_all['joined']} of {len(rows)}"),
               ("roots bias near 0 (|bias| < 0.2)", abs(roots["bias"]) < 0.2, f"{roots['bias']:+.3f}"),
@@ -1601,9 +1624,8 @@ def _selftest_pipeline_one(job: tuple) -> bool:
     config.FAST_LACUNA_STAGE = True
     path = Path(path_str)
     result = canaliculi.analyse_image(path)
-    folder = Path(out) / lacunae.clean_name(path)
-    lacunae.save_json(result["lacunae"], folder / "lacunae.json")
-    canaliculi.write_outputs(result, folder)
+    lacunae.save_json(result["lacunae"], result_json(Path(out), lacunae.image_label(path), "lacunae"))
+    canaliculi.write_outputs(result, Path(out))
     return True
 
 

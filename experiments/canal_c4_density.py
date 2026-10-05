@@ -52,7 +52,8 @@ def roi_selftest() -> list[str]:
                "-m", str(masks)]
         done = subprocess.run(cmd, capture_output=True, text=True, cwd=C.ROOT)
         assert done.returncode == 0, done.stderr[-2000:]
-        js = json.loads((out / C.clean(img) / "canaliculi_measurements.json").read_text())
+        js = json.loads(C.lacunae.result_path(out, C.lacunae.image_label(img), C.config.SECTION_CANALICULI,
+                                              C.config.SUFFIX_CANALICULI_RESULTS + ".json").read_text())
         got = js["field"]["field_density_in_roi_per_px"]
         plain = js["field"]["canalicular_length_density_per_px"]
         assert got == expected, (name, got, expected)

@@ -49,15 +49,17 @@ Measures:
     of the skeleton is graph-connected to any lacuna in these 2D sections,
     and owned threads can lie hundreds of px from their cell.
 
-Outputs, per image, in results/<image>/:
-    canaliculi_verification.png   each lacuna and the threads it owns in one
-                                  colour, over the original image
-    canaliculi_skeleton.png       the skeleton, unannotated
-    canaliculi_mask.png           the network mask, unannotated
-    canaliculi_measurements.xlsx  "summary", "field", "per_lacuna", "notes"
-    canaliculi_measurements.json  the same numbers plus the parameters
-After a --dir run, also results/summary_table.xlsx and .csv (one row per
-image; see write_summary_table).
+Outputs, per image, in results/<label>/2_canaliculi/ (the label is the short
+image name of config.IMAGE_LABELS; see lacunae.image_label and result_path):
+    <label>_canaliculi_skeleton.png       the skeleton, unannotated
+    <label>_canaliculi_mask.png           the network mask, unannotated
+    <label>_canaliculi_results.xlsx       "summary", "field", "per_lacuna", "notes"
+    <label>_canaliculi_results.json       the same numbers plus the parameters
+and in results/<label>/4_archive_not_used/ (kept for history, not a result):
+    <label>_old_threads_coloured_by_cell.png   each lacuna and the threads it
+                                  owns in one colour, over the original image
+After a --dir run, also results/all_images/summary_all_images.xlsx and .csv
+(one row per image; see write_summary_table).
 
 Regression check: 543-2 must give 62.33 edges per interior cell, 27.41 px
 mean edge length and 21 bridges (python src/diagnostics.py reference-check).
@@ -1433,6 +1435,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "status": "pre-validation",
         "units": "px",
         "image": result["image_path"].name,
+        "image_label": lacunae.image_label(result["image_path"]),
         "note": NOTE,
         "lacuna_count": result["lacunae"]["lacuna_count"],
         "interior_lacuna_count": result["summary"]["interior_lacuna_count"],
@@ -1510,13 +1513,23 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     wb.save(out_path)
 
 
-def write_outputs(result: dict, out_dir: Path) -> None:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    imsave(out_dir / "canaliculi_mask.png", (result["candidate"] * 255).astype(np.uint8), check_contrast=False)
-    imsave(out_dir / "canaliculi_skeleton.png", (result["skeleton"] * 255).astype(np.uint8), check_contrast=False)
-    save_verification(result, out_dir / "canaliculi_verification.png")
-    save_xlsx(result, out_dir / "canaliculi_measurements.xlsx")
-    save_json(result, out_dir / "canaliculi_measurements.json")
+def write_outputs(result: dict, out_root: Path) -> None:
+    """The canaliculi files of one image under out_root (the results layout).
+    The colour-per-cell picture goes to the archive section, not to
+    2_canaliculi."""
+    label = lacunae.image_label(result["image_path"])
+
+    def path(section, suffix):
+        return lacunae.result_path(out_root, label, section, suffix)
+
+    mask_path = path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_MASK)
+    mask_path.parent.mkdir(parents=True, exist_ok=True)
+    imsave(mask_path, (result["candidate"] * 255).astype(np.uint8), check_contrast=False)
+    imsave(path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_SKELETON),
+           (result["skeleton"] * 255).astype(np.uint8), check_contrast=False)
+    save_verification(result, path(config.SECTION_ARCHIVE, config.SUFFIX_OLD_THREADS_BY_CELL))
+    save_xlsx(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".xlsx"))
+    save_json(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".json"))
 
 
 SUMMARY_COLUMNS = [
@@ -1543,6 +1556,8 @@ SUMMARY_COLUMNS = [
     # field values.
     *[m[3] for m in NETWORK_V2_METRICS],
     *[c for _k, _u, c in FIELD_V2],
+    # Appended with the results layout: the image's label (lacunae.image_label).
+    "image_label",
 ]
 
 SUMMARY_NOTES = [
@@ -1567,7 +1582,7 @@ SUMMARY_NOTES = [
 
 
 def write_summary_table(results: list[dict], out_root: Path) -> None:
-    """results/summary_table.csv and .xlsx: one row per image."""
+    """results/all_images/summary_all_images.csv and .xlsx: one row per image."""
     rows = []
     for r in results:
         rows.append([
@@ -1583,10 +1598,12 @@ def write_summary_table(results: list[dict], out_root: Path) -> None:
             r["field"]["canalicular_length_density_per_px"],
         ] + [r["summary"].get(f, {}).get("mean") for f, _u, _x in NORMALISED_METRICS]
           + [r["summary"].get(m[0], {}).get("mean") for m in NETWORK_V2_METRICS]
-          + [r["field"].get(k) for k in FIELD_V2_KEYS])
+          + [r["field"].get(k) for k in FIELD_V2_KEYS]
+          + [lacunae.image_label(r["image_path"])])
 
-    out_root.mkdir(parents=True, exist_ok=True)
-    with open(out_root / "summary_table.csv", "w", newline="") as f:
+    csv_path = lacunae.all_images_path(out_root, config.SUMMARY_NAME + ".csv")
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(SUMMARY_COLUMNS)
         writer.writerows(rows)
@@ -1602,17 +1619,14 @@ def write_summary_table(results: list[dict], out_root: Path) -> None:
     notes = wb.create_sheet("notes")
     for line in SUMMARY_NOTES:
         notes.append([line])
-    wb.save(out_root / "summary_table.xlsx")
+    wb.save(lacunae.all_images_path(out_root, config.SUMMARY_NAME + ".xlsx"))
 
 
 # Bone ROI masks (option -m). One PNG per image, white = bone, the size of the
-# image, named by the image's clean name (the results/ folder name) or by the
-# short name used in the reports and in results_experiments/task5/roi_edited
-# (the table below, for the 8 WT images). No ROI is applied without -m.
-ROI_SHORT_NAMES = {
-    "542_WT_2_z06c1-2": "542_z06", "542_WT_2_z18c1-2": "542_z18", "543_z13c1-2": "543_z13",
-    "682_z08c1-2": "682_z08", "682_z23c-2": "682_z23", "682_z29c1-3": "682_z29",
-}
+# image, named by the image's clean name or by its short name, the label used
+# in the reports, in results/ and in results_experiments/task5/roi_edited
+# (config.IMAGE_LABELS, the one naming table). No ROI is applied without -m.
+ROI_SHORT_NAMES = config.IMAGE_LABELS
 
 
 def load_roi_mask(roi_dir: Path, image_path: Path, shape: tuple) -> tuple[np.ndarray | None, str | None]:
@@ -1651,8 +1665,8 @@ def main() -> None:
             roi, roi_name = load_roi_mask(args.roi_dir, image_path, shape)
             print(f"{image_path.name}: ROI {roi_name if roi_name else 'none found, field_density_in_roi_per_px is None'}")
         result = analyse_image(image_path, roi_mask=roi)
-        out_dir = args.out / lacunae.clean_name(image_path)
-        write_outputs(result, out_dir)
+        out_dir = args.out / lacunae.image_label(image_path)
+        write_outputs(result, args.out)
         s = result["summary"]
         print(
             f"{image_path.name}: lacunae={result['lacunae']['lacuna_count']}  "
@@ -1665,7 +1679,7 @@ def main() -> None:
 
     if args.dir:
         write_summary_table(results, args.out)
-        print(f"summary table -> {args.out / 'summary_table.xlsx'} and .csv")
+        print(f"summary table -> {lacunae.all_images_path(args.out, config.SUMMARY_NAME + '.xlsx')} and .csv")
 
 
 if __name__ == "__main__":

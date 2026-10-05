@@ -86,12 +86,12 @@ def main() -> int:
     # Unblind and compare with the normal run.
     out_csv = BLIND / "unblinded.csv"
     subprocess.run([sys.executable, str(ROOT / "src" / "diagnostics.py"), "unblind", "-s",
-                    str(BLIND / "out" / "summary_table.csv"), "-k", str(key_path), "-o", str(out_csv)], check=True)
+                    str(D.summary_csv(BLIND / "out")), "-k", str(key_path), "-o", str(out_csv)], check=True)
     with open(out_csv, newline="") as f:
         unblinded = {r["original_name"]: r for r in csv.DictReader(f)}
-    with open(NORMAL / "summary_table.csv", newline="") as f:
+    with open(D.summary_csv(NORMAL), newline="") as f:
         normal = {r["file"]: r for r in csv.DictReader(f)}
-    skip = {"image", "file", "code", "original_name", "original_folder"}
+    skip = {"image", "file", "code", "original_name", "original_folder", "image_label"}
     cells = diffs = 0
     for name, row in unblinded.items():
         ref = normal[name]
@@ -106,12 +106,13 @@ def main() -> int:
     code_of = {r["original_name"]: r["code"] for r in key}
     for name, code in code_of.items():
         clean = "_".join(Path(name).stem.split())
-        for fname in ("lacunae.json", "canaliculi_measurements.json"):
-            a = json.load(open(NORMAL / clean / fname))
-            b = json.load(open(BLIND / "out" / code / fname))
+        for fname in ("lacunae", "canaliculi"):
+            a = json.load(open(D.result_json(NORMAL, D.lacunae.image_label(clean), fname)))
+            b = json.load(open(D.result_json(BLIND / "out", D.lacunae.image_label(code), fname)))
             for d in (a, b):
                 d.pop("provenance", None)
                 d.pop("image", None)
+                d.pop("image_label", None)
             fa, fb = D.flatten_all(a), D.flatten_all(b)
             json_fields += len(fa)
             bad = [k for k in fa if k not in fb or not D._equal(fa[k], fb[k])]

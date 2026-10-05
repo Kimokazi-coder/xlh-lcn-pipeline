@@ -19,12 +19,12 @@ Method, per image:
        lacuna_count but every summary statistic uses interior objects only,
        because their size and shape are truncated by the field of view.
 
-Outputs, per image, in results/<image>/ (the image name with each run of
-spaces replaced by one underscore):
-    lacunae_overlay.png   the image with kept lacunae outlined in green
-    lacunae.xlsx          "summary" (counts and interior mean, median, SD)
-                          and "per_lacuna" sheets
-    lacunae.json          the same numbers plus the parameters used
+Outputs, per image, in results/<label>/1_lacunae/ (the label is the short
+image name of config.IMAGE_LABELS; see image_label and result_path):
+    <label>_lacunae_outlines.png  the image with kept lacunae outlined in green
+    <label>_lacunae_results.xlsx  "summary" (counts and interior mean, median,
+                                  SD) and "per_lacuna" sheets
+    <label>_lacunae_results.json  the same numbers plus the parameters used
 
 Usage (from the repo root):
     python src/lacunae.py --dir data/WT
@@ -177,10 +177,34 @@ def load_channel(image_path: Path) -> tuple[np.ndarray, np.ndarray]:
 
 
 def clean_name(image_path: Path) -> str:
-    """Output folder name for an image: its stem with every run of
-    whitespace replaced by one underscore ("542 WT  2_z06c1-2" becomes
-    "542_WT_2_z06c1-2")."""
+    """An image's stem with every run of whitespace replaced by one
+    underscore ("542 WT  2_z06c1-2" becomes "542_WT_2_z06c1-2"). The key of
+    config.IMAGE_LABELS."""
     return "_".join(image_path.stem.split())
+
+
+def image_label(image) -> str:
+    """The label of an image, used in every result folder and file name: its
+    short name in config.IMAGE_LABELS, or its cleaned name when it is not
+    listed. Takes an image path, a cleaned name or a label."""
+    name = clean_name(image) if isinstance(image, Path) else str(image)
+    return config.IMAGE_LABELS.get(name, name)
+
+
+def result_path(out_root: Path, label: str, section: str, suffix: str, subfolder: str | None = None,
+                prefixed: bool = True) -> Path:
+    """Path of one result file: <out_root>/<label>/<section>/[<subfolder>/]
+    <label>_<suffix>, or <suffix> alone when prefixed is False."""
+    folder = Path(out_root) / label / section
+    if subfolder:
+        folder = folder / subfolder
+    return folder / (f"{label}_{suffix}" if prefixed else suffix)
+
+
+def all_images_path(out_root: Path, name: str, subfolder: str | None = None) -> Path:
+    """Path of one cross-image file: <out_root>/all_images/[<subfolder>/]<name>."""
+    folder = Path(out_root) / config.ALL_IMAGES_DIR
+    return (folder / subfolder / name) if subfolder else folder / name
 
 
 # Segmentation
@@ -666,6 +690,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "status": "pre-validation",
         "units": "px",
         "image": result["image_path"].name,
+        "image_label": image_label(result["image_path"]),
         "note": (
             "Pre-validation: not checked against manual counts. Pixel units. "
             "Border lacunae count toward lacuna_count but the summary covers "
@@ -712,10 +737,13 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     wb.save(out_path)
 
 
-def write_outputs(result: dict, out_dir: Path) -> None:
-    save_overlay(result["display"], result["labels"], result["kept"], out_dir / "lacunae_overlay.png")
-    save_xlsx(result, out_dir / "lacunae.xlsx")
-    save_json(result, out_dir / "lacunae.json")
+def write_outputs(result: dict, out_root: Path) -> None:
+    """The three lacuna files of one image under out_root (the results layout)."""
+    label = image_label(result["image_path"])
+    save_overlay(result["display"], result["labels"], result["kept"],
+                 result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_OUTLINES))
+    save_xlsx(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".xlsx"))
+    save_json(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".json"))
 
 
 def image_paths(args) -> list[Path]:
@@ -735,8 +763,8 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     group.add_argument("--dir", type=Path, help="A folder of .tif images.")
     parser.add_argument(
         "-o", "--out", type=Path, default=config.RESULTS_DIR,
-        help="Results folder (default: results/). Each image gets its own subfolder; "
-             "a folder run of src/canaliculi.py also writes summary_table.xlsx and .csv there.",
+        help="Results folder (default: results/). Each image gets its own subfolder, named by its label; "
+             "a folder run of src/canaliculi.py also writes all_images/summary_all_images.xlsx and .csv there.",
     )
 
 
@@ -747,8 +775,8 @@ def main() -> None:
 
     for image_path in image_paths(args):
         result = analyse_image(image_path)
-        out_dir = args.out / clean_name(image_path)
-        write_outputs(result, out_dir)
+        out_dir = args.out / image_label(image_path) / config.SECTION_LACUNAE
+        write_outputs(result, args.out)
         s = result["summary"]["area_px2"]
         print(
             f"{image_path.name}: lacunae={result['lacuna_count']} "
