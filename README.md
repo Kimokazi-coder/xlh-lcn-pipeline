@@ -122,8 +122,11 @@ One overlay per feature, for image 543-2:
   [`results/543-2/1_lacunae/543-2_lacunae_outlines.png`](results/543-2/1_lacunae/543-2_lacunae_outlines.png)
 - Feature 2, the network figure:
   [`results/543-2/3_publication_figures/543-2_figure_network.png`](results/543-2/3_publication_figures/543-2_figure_network.png).
-  The old verification picture, each lacuna and the threads it owns in one
-  colour, is now in `results/543-2/4_archive_not_used/`, kept for history only.
+  The verification picture, each lacuna and the threads it owns in one colour,
+  is
+  [`results/543-2/2_canaliculi/543-2_canaliculi_verification.png`](results/543-2/2_canaliculi/543-2_canaliculi_verification.png).
+  Its colours show an ownership of threads with no distance limit, so they are
+  not a headline measure.
 
 ## Still open
 

@@ -58,7 +58,7 @@ Remaining, left as is:
 ## N1 against the old verification images
 
 Compared with `results/<image>/canaliculi_verification.png` (now
-`results/<label>/4_archive_not_used/<label>_old_threads_coloured_by_cell.png`, kept for history; 543-2 and 542_z06 side by side at the
+`results/<label>/2_canaliculi/<label>_canaliculi_verification.png`; 543-2 and 542_z06 side by side at the
 same crop). Better: the raw structure stays visible, because the skeleton is a one-pixel vector line over
 the image at 85% instead of a 5 px wide coloured band; every skeleton pixel is drawn, not only the
 threads a cell owns, so the figure no longer implies an ownership claim that the headline measures do

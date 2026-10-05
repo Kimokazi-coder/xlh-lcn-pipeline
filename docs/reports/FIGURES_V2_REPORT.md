@@ -48,12 +48,12 @@ claims a more accurate result: the figures show the pipeline output as it is.
 ## The canalicular overlay, before and after
 
 Before: `results/<image>/canaliculi_verification.png` (now
-`results/<label>/4_archive_not_used/<label>_old_threads_coloured_by_cell.png`, kept for history), each
+`results/<label>/2_canaliculi/<label>_canaliculi_verification.png`), each
 lacuna and the threads it owns in its own colour, 5 px wide, over the original. After: the network figure.
 
 | | 543-2 | 542_z06 |
 |---|---|---|
-| before | ![543-2 before](../../results/543-2/4_archive_not_used/543-2_old_threads_coloured_by_cell.png) | ![542_z06 before](../../results/542_z06/4_archive_not_used/542_z06_old_threads_coloured_by_cell.png) |
+| before | ![543-2 before](../../results/543-2/2_canaliculi/543-2_canaliculi_verification.png) | ![542_z06 before](../../results/542_z06/2_canaliculi/542_z06_canaliculi_verification.png) |
 | after | ![543-2 after](../../results/543-2/3_publication_figures/543-2_figure_network.png) | ![542_z06 after](../../results/542_z06/3_publication_figures/542_z06_figure_network.png) |
 
 What is better: the raw structure stays visible, because the skeleton is a thin vector line over the

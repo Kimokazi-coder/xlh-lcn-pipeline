@@ -55,9 +55,9 @@ image name of config.IMAGE_LABELS; see lacunae.image_label and result_path):
     <label>_canaliculi_mask.png           the network mask, unannotated
     <label>_canaliculi_results.xlsx       "summary", "field", "per_lacuna", "notes"
     <label>_canaliculi_results.json       the same numbers plus the parameters
-and in results/<label>/4_archive_not_used/ (kept for history, not a result):
-    <label>_old_threads_coloured_by_cell.png   each lacuna and the threads it
-                                  owns in one colour, over the original image
+    <label>_canaliculi_verification.png   each lacuna and the threads it owns in
+                                  one colour, over the original image, to check
+                                  the tracing against the real threads
 After a --dir run, also results/all_images/summary_all_images.xlsx and .csv
 (one row per image; see write_summary_table).
 
@@ -1514,9 +1514,7 @@ def save_xlsx(result: dict, out_path: Path) -> None:
 
 
 def write_outputs(result: dict, out_root: Path) -> None:
-    """The canaliculi files of one image under out_root (the results layout).
-    The colour-per-cell picture goes to the archive section, not to
-    2_canaliculi."""
+    """The canaliculi files of one image under out_root (the results layout)."""
     label = lacunae.image_label(result["image_path"])
 
     def path(section, suffix):
@@ -1527,7 +1525,7 @@ def write_outputs(result: dict, out_root: Path) -> None:
     imsave(mask_path, (result["candidate"] * 255).astype(np.uint8), check_contrast=False)
     imsave(path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_SKELETON),
            (result["skeleton"] * 255).astype(np.uint8), check_contrast=False)
-    save_verification(result, path(config.SECTION_ARCHIVE, config.SUFFIX_OLD_THREADS_BY_CELL))
+    save_verification(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_VERIFICATION))
     save_xlsx(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".xlsx"))
     save_json(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".json"))
 
