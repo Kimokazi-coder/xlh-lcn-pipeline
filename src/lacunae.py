@@ -663,6 +663,22 @@ def save_overlay(display_uint8: np.ndarray, label_image: np.ndarray, kept: list[
     imsave(out_path, overlay, check_contrast=False)
 
 
+def label_image_of_kept(labels: np.ndarray, kept: list[tuple]) -> np.ndarray:
+    """The label image src/quantification.py reads: 0 outside a kept lacuna,
+    else the lacuna's 1..N id in kept order, the numbering of every output.
+    Dropped objects are not in it. uint16, so it saves as a 16-bit PNG; the
+    same array as canaliculi.build_lacuna_maps builds in memory."""
+    out = np.zeros(labels.shape, dtype=np.uint16)
+    for lacuna_id, (region, _on_border) in enumerate(kept, start=1):
+        out[labels == region.label] = lacuna_id
+    return out
+
+
+def save_label_image(labels: np.ndarray, kept: list[tuple], out_path: Path) -> None:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    imsave(out_path, label_image_of_kept(labels, kept), check_contrast=False)
+
+
 def parameters() -> dict:
     return {
         "channel": config.CHANNEL,
@@ -738,10 +754,12 @@ def save_xlsx(result: dict, out_path: Path) -> None:
 
 
 def write_outputs(result: dict, out_root: Path) -> None:
-    """The three lacuna files of one image under out_root (the results layout)."""
+    """The lacuna files of one image under out_root (the results layout)."""
     label = image_label(result["image_path"])
     save_overlay(result["display"], result["labels"], result["kept"],
                  result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_OUTLINES))
+    save_label_image(result["labels"], result["kept"],
+                     result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNA_LABELS))
     save_xlsx(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".xlsx"))
     save_json(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".json"))
 

@@ -1317,6 +1317,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         forbidden = forbidden | band_wall
 
     bridges = find_bridges(skeleton, preprocessed, t_lo, forbidden)
+    thresholded = candidate  # before bridging: real signal under every pixel
     if bridges:
         candidate = apply_bridges(candidate, bridges)
         skeleton = morphology.skeletonize(candidate)
@@ -1333,6 +1334,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "display": lac["display"],
         "lacuna_id_map": lacuna_id_map,
         "candidate": candidate,
+        "bridged_pixels": candidate & ~thresholded,
         "skeleton": skeleton,
         "flagged": flagged,
         "bridges": bridges,
@@ -1342,6 +1344,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "field": field_metrics(skeleton, cells["graph"], lacuna_mask, len(kept), precision, flagged, roi_mask),
         "graph": cells["graph"],
         "edge_owner": cells["edge_owner"],
+        "owner": cells["owner"],
         "node_dist": cells["node_dist"],
         "owner_map": cells["owner_map"],
         "band_wall": band_wall,
@@ -1513,6 +1516,26 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     wb.save(out_path)
 
 
+def save_graph(result: dict, out_path: Path) -> None:
+    """The cleaned graph and its ownership, for src/quantification.py: node
+    keys (row, col) and ("cell", id), edge weight (length px) and branches,
+    the node owner, its distance through the network and the edge owner. The
+    skan object is not in it; only the drawing needs that."""
+    import pickle
+
+    payload = {
+        "format": 1,
+        "image_label": lacunae.image_label(result["image_path"]),
+        "graph": result["graph"],
+        "owner": result["owner"],
+        "node_dist": result["node_dist"],
+        "edge_owner": result["edge_owner"],
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "wb") as f:
+        pickle.dump(payload, f, protocol=4)
+
+
 def write_outputs(result: dict, out_root: Path) -> None:
     """The canaliculi files of one image under out_root (the results layout)."""
     label = lacunae.image_label(result["image_path"])
@@ -1520,11 +1543,16 @@ def write_outputs(result: dict, out_root: Path) -> None:
     def path(section, suffix):
         return lacunae.result_path(out_root, label, section, suffix)
 
+    def save_mask(mask, suffix):
+        imsave(path(config.SECTION_CANALICULI, suffix), (mask * 255).astype(np.uint8), check_contrast=False)
+
     mask_path = path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_MASK)
     mask_path.parent.mkdir(parents=True, exist_ok=True)
     imsave(mask_path, (result["candidate"] * 255).astype(np.uint8), check_contrast=False)
-    imsave(path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_SKELETON),
-           (result["skeleton"] * 255).astype(np.uint8), check_contrast=False)
+    save_mask(result["skeleton"], config.SUFFIX_CANALICULI_SKELETON)
+    save_mask(result["flagged"], config.SUFFIX_CANALICULI_VASCULAR)
+    save_mask(result["bridged_pixels"], config.SUFFIX_CANALICULI_BRIDGED)
+    save_graph(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_GRAPH))
     save_verification(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_VERIFICATION))
     save_xlsx(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".xlsx"))
     save_json(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_RESULTS + ".json"))

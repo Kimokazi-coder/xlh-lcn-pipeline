@@ -37,26 +37,44 @@ IMAGE_LABELS = {
     "682_z29c1-3": "682_z29",
 }
 
-# Folders inside results/<label>/.
+# Folders inside results/<label>/. Detection writes 1_lacunae and
+# 2_canaliculi, src/quantification.py writes 5_quantification, and every
+# measured number lives in 5_quantification alone.
 SECTION_LACUNAE = "1_lacunae"
 SECTION_CANALICULI = "2_canaliculi"
 SECTION_FIGURES = "3_publication_figures"
 SECTION_ARCHIVE = "4_archive_not_used"
+SECTION_QUANTIFICATION = "5_quantification"
 
 # Cross-image folders inside results/.
 ALL_IMAGES_DIR = "all_images"
 ALL_IMAGES_ARCHIVE_DIR = "archive_not_used"
 ALL_IMAGES_FIGURES_DIR = "figures"
+ALL_IMAGES_QUANT_DIR = "quantification"
 VALIDATION_TILES_DIR = "validation_tiles"
 
 # File names. A per-image file is <label>_<suffix>; a suffix without an
 # extension is written with each extension given in its comment.
+# Measured numbers per image. Replaced by SECTION_QUANTIFICATION; still
+# written while the split is in progress.
 SUFFIX_LACUNAE_RESULTS = "lacunae_results"  # .xlsx and .json
-SUFFIX_LACUNAE_OUTLINES = "lacunae_outlines.png"
 SUFFIX_CANALICULI_RESULTS = "canaliculi_results"  # .xlsx and .json
+# Detection records: what each stage did, with no measured value in them.
+SUFFIX_LACUNAE_DETECTION = "lacunae_detection.json"
+SUFFIX_CANALICULI_DETECTION = "canaliculi_detection.json"
+SUFFIX_LACUNAE_OUTLINES = "lacunae_outlines.png"
 SUFFIX_CANALICULI_MASK = "canaliculi_mask.png"
 SUFFIX_CANALICULI_SKELETON = "canaliculi_skeleton.png"
 SUFFIX_CANALICULI_VERIFICATION = "canaliculi_verification.png"
+# Detection output that src/quantification.py reads. The label image is 16-bit,
+# 0 outside a kept lacuna and its 1..N lacuna_id inside; the three masks are
+# 0 or 255; the graph file holds the cleaned graph with its ownership.
+SUFFIX_LACUNA_LABELS = "lacuna_labels.png"
+SUFFIX_CANALICULI_VASCULAR = "canaliculi_vascular_mask.png"
+SUFFIX_CANALICULI_BRIDGED = "canaliculi_bridged_pixels.png"
+SUFFIX_CANALICULI_GRAPH = "canaliculi_graph.pickle"
+# Quantification output: every measured number of one image.
+SUFFIX_QUANTIFICATION = "quantification"  # .json, .xlsx and .pdf
 SUFFIX_FIGURE_NETWORK = "figure_network"  # .png and .pdf
 SUFFIX_FIGURE_GALLERY = "figure_cell_gallery"  # .png and .pdf
 SUFFIX_FIGURE_OVERVIEW = "figure_overview"  # .png and .pdf
@@ -67,6 +85,9 @@ VARIANTS_DIR = "variants_per_image_brightness"  # in SECTION_ARCHIVE
 SUFFIX_VARIANT = "_per_image_brightness"  # appended to a figure suffix, .png
 VARIANT_WINDOW_FILE = "display_window_this_image.json"
 SUMMARY_NAME = "summary_all_images"  # .csv and .xlsx in ALL_IMAGES_DIR
+# One row per image, in ALL_IMAGES_DIR/ALL_IMAGES_QUANT_DIR. This becomes the
+# only cross-image table; it replaces summary_all_images with the same columns.
+QUANT_SUMMARY_NAME = "quantification_all_images"  # .csv, .xlsx and .pdf
 DISPLAY_WINDOW_FILE = "display_window.json"  # in ALL_IMAGES_DIR/ALL_IMAGES_FIGURES_DIR
 
 # Image and channel selection
