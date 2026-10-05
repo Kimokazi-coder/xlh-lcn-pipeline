@@ -246,8 +246,33 @@ hash), and `requirements.txt` pins the versions.
 ### Figures
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts) to `figures_out/`: a
-per-image figure for each image (F1), a contact sheet (F2), a lacuna-cut sensitivity figure (F3), a
-per-field plot (F4) and a supplementary figure of two switches (F5). One display window for the whole
+per-image figure for each image (now `per_image/<image>/overview`), a contact sheet (now Fig01), a
+lacuna-cut sensitivity figure (now Fig03), a per-field plot (now Fig04) and a supplementary figure of two
+switches (now S01); they were called F1 to F5 on branch publication-fixes and were renamed on branch
+figures-v2 (section 10), so that no figure name looks like a field name. One display window for the whole
 dataset (1st and 99.8th percentile of the pooled red channel); interior lacunae cyan, frame-edge
 lacunae yellow; skeleton white over the image at 60%; scale bars in pixels. Captions:
 `figures/captions.md`; review notes: `figures/REVIEW.md`.
+
+## 10. Figures v2 (branch figures-v2, 2026-10-02)
+
+Pre-validation, pixel units. Figures only: `src/`, `config.py` and `results/` are unchanged. Report:
+`docs/FIGURES_V2_REPORT.md`; map of the figures: `figures_out/INDEX.md`.
+
+- **Network overlay** (`figures_out/per_image/<image>/network`, `main/Fig02` for 543-2). The skeleton
+  is drawn as vector segments between the centres of 8-connected neighbouring pixels, so the drawn set
+  is exactly the skeleton. A skeleton pixel is vermillion if it lies in the 30 px ring of an interior
+  lacuna by the pipeline's own rule (distance to the lacuna masks at most 30 px, nearest lacuna from
+  `canaliculi.nearest_lacuna_map`), white otherwise; roots are magenta dots at the root cluster
+  centres. Per interior lacuna, the vermillion pixels equal `ring_length_r30_px` and the dots equal
+  `roots_count` (asserted).
+- **Gallery and hand-count tiles.** Every interior lacuna in a 240 px tile at 3x
+  (`per_image/<image>/gallery`), and the same crops of the raw red channel under random codes for
+  counting roots by hand (`figures_out/validation_tiles/`, key outside the repository).
+- **Figure fixes.** Rejected lacuna-scale candidates (at least 150 px²) are drawn with the filter that
+  rejects them; one colour per meaning; figure ids Fig01 to Fig04 and S01 to S03 and fields Field 1 to
+  Field 4; the per-field plot from zero with 682_z08 marked; count lines with interior, frame-edge and
+  rejected counts; "c" for a lacuna inside a flagged canal region; insets at least 60 px from the frame;
+  a fixed display window, with per-image window variants for display only.
+- **Regenerate** with `python -u figures/make_figures.py all`; `check` compares the drawing data with
+  `results/`.

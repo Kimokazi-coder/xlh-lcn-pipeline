@@ -1,3 +1,5 @@
+New here? Read [docs/START_HERE.md](docs/START_HERE.md) first: folders, reading order, branches, switches and commands on one page.
+
 # lcn-quant
 
 Quantification of the osteocyte lacuno-canalicular network (LCN) in 2D
