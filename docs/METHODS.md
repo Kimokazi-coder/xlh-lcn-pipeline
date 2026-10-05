@@ -15,7 +15,12 @@ No Hyp or Hyp;Enpp1 image has been processed, and periosteocytic lesions
 
 ## 1. Pipeline steps
 
-### Feature 1: lacunae (`src/lacunae.py`)
+Detection and quantification are separate scripts. `src/lacunae.py` and
+`src/canaliculi.py` find, trace and draw, and save what they found;
+`src/quantification.py` measures that and writes every number. No measure is
+computed in two places.
+
+### Feature 1: lacunae, detection (`src/lacunae.py`)
 
 1. Take the red channel of the image as a float in [0, 1].
 2. Split the channel's own histogram into three classes (multi-Otsu:
@@ -29,10 +34,10 @@ No Hyp or Hyp;Enpp1 image has been processed, and periosteocytic lesions
    ratio at most 6. Objects touching the frame edge are kept and flagged;
    they count, but all statistics use interior lacunae only.
 
-Per lacuna: area, major and minor axis, aspect ratio, eccentricity,
-solidity, orientation, centroid.
+It writes the outlines picture and the lacuna label image (0 outside a kept
+lacuna, its 1..N id inside), which is what the measures are taken from.
 
-### Feature 2: canalicular network (`src/canaliculi.py`)
+### Feature 2: canalicular network, detection (`src/canaliculi.py`)
 
 Adapted from the OCY pipeline (Kollmannsberger et al., New J. Phys. 2017,
 github.com/phi-max/OCY_connectomics) where marked. OCY works on 3D stacks;
@@ -62,7 +67,19 @@ these are single 2D sections, which drives every departure.
    10 px of its body. One multi-source shortest-path run gives every
    reachable node to the cell it connects to through the network, and each
    edge to the owner of its nearer end. There is no distance limit.
-8. **Measures**, per lacuna and per field (section 3).
+It writes the mask, the skeleton, the verification picture, the vascular mask,
+the pixels gap bridging added, and the cleaned graph with its ownership.
+
+### Quantification (`src/quantification.py`)
+
+Reads the label image, the masks and the graph above, and measures them
+(section 3). Per lacuna: area, major and minor axis, aspect ratio,
+eccentricity, solidity, orientation, centroid, the frame-edge flag, and every
+network measure. Per image: the counts, the interior statistics and the field
+measures. It writes `results/<label>/5_quantification/` (json, xlsx and a plain
+pdf) and the one cross-image table,
+`results/all_images/quantification/quantification_all_images.csv`, `.xlsx` and
+`.pdf`. Every statistic is over interior lacunae only, as before.
 
 ## 2. Parameters and where each value came from
 
@@ -109,6 +126,27 @@ and `src/canaliculi.py`, each with a longer provenance comment.
 | ring length 60 px (`ring_length_r60_px`) | lacuna | reported | the same at 60 px |
 | **field length density** | image | **headline** | all skeleton px / analysed area (field minus lacunae), px⁻¹ |
 | owned length, edge count, mean edge length | lacuna | ownership-dependent | from graph ownership; network descriptors only |
+| **canalicular width** (`width_median_px`, `ring_width_mean_r30_px`) | image, lacuna | **headline**, new | local full width of a thread: 2 x the Euclidean distance transform of the canalicular mask at each skeleton pixel |
+
+**Canalicular width.** At every skeleton pixel the distance transform of the
+mask gives the distance to the nearest pixel outside the thread, so twice it is
+the local full width in px. The width is measured only where there is real
+signal under the skeleton: the pixels gap bridging added are left out (a bridge
+is drawn, not measured), as are the lacuna buffer and the vascular mask with its
+dilation, because a broad bright canal is not a canaliculus. Per image the mean,
+median, p10 and p90 and the number of pixels used; per lacuna the mean over its
+own 30 px ring, with the ownership rule of `ring_length_r30_px`. On these 8 WT
+sections the median is 6.0 px in seven images and 6.3 px in 542_z06, which
+matches the thread half width measured for the top-hat radius (section 2: p50
+3.0 px, p99 4.2 px).
+
+**What the width cannot do yet.** The threads are only about 2 to 6 px wide, so
+the measure sits close to the pixel grid and is quantised in steps of about 1 px;
+a median of exactly 6.0 px in seven of eight images is that quantisation, not a
+real agreement to three digits. It moves with the threshold, because a lower cut
+makes every thread wider, so it carries the provenance of the hysteresis low cut
+(the weakest in section 2). It is **not validated**: no manual width measurement
+exists for these images.
 
 **Why these are the headline measures.** Between the earlier default
 segmentation and the current one (compared on 2026-09-24, adopted on
@@ -149,6 +187,8 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 - **Small approximations:** parallel graph edges (1.3% of branches) keep
   only the shorter length; ring lengths count skeleton pixels, so a
   diagonal step counts 1 px.
+- **Canalicular width is quantised and threshold dependent** (section 3), and
+  no manual width measurement exists to check it against.
 
 ## 5. Decisions made
 

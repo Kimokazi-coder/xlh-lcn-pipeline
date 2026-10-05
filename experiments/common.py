@@ -406,7 +406,7 @@ def lacuna_stage(channel: np.ndarray, t_hi: float | None = None, merge_fn=None, 
     distance = ndi.distance_transform_edt(mask)
     merged = (merge_fn or (merge_fast if fast else lacunae.merge_shallow_splits))(ws, mask, distance)
     kept = (filter_fn or lacunae.filter_regions)(merged)
-    rows = lacunae.measurements_for(kept, PRECISION)
+    rows = quantification.measurements_for(kept, PRECISION)
     return {"mask": mask, "ws_labels": ws, "labels": merged, "kept": kept, "t_hi": t_hi, "rows": rows}
 
 

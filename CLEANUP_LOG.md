@@ -101,3 +101,59 @@ GitHub's 100 MB limit (the largest is 3.0 MB), so Git LFS was not needed.
   for a planted-difference test of compare-outputs was also deleted. Other
   working files (including the Step 1 verification output) remain in the
   session's temporary folder outside the repository.
+
+# Detection and quantification split, 2026-10-05
+
+Branch `quant-split`, not merged. Pre-validation, pixel units. No threshold,
+parameter default or algorithm changed, and every existing number is identical:
+all 5179 measured values of the 8 images, read from the two old per-image result
+files, are reproduced exactly by the new output
+(`python src/diagnostics.py regression` at tolerance 0, and a field by field
+comparison against the branch point).
+
+**What moved.** `src/lacunae.py` and `src/canaliculi.py` detect, trace, own and
+draw. They no longer measure anything and no longer write a measured number.
+Each writes a record of what it did (`<label>_lacunae_detection.json`,
+`<label>_canaliculi_detection.json`: parameters, the cuts it computed, the
+bridges, provenance) and the files the measures are taken from: the lacuna label
+image, the network mask, the skeleton, the vascular mask, the pixels gap bridging
+added, and the cleaned graph with its ownership.
+
+`src/quantification.py` is new and holds every measure of both features, moved
+over unchanged. It writes `results/<label>/5_quantification/` (json, xlsx and a
+plain-text pdf) and the one cross-image table,
+`results/all_images/quantification/quantification_all_images.csv`, `.xlsx` and
+`.pdf`, which replaced `summary_all_images` with the same columns in the same
+order. One row per lacuna now holds its shape and its network measures together.
+
+**New measure: canalicular width.** Twice the Euclidean distance transform of
+the canalicular mask at each skeleton pixel, so the local full width of a thread
+in px, measured only where there is real signal under the skeleton. Per image
+mean, median, p10, p90 and the number of pixels used; per lacuna the mean over
+its own 30 px ring. The median is 6.0 px in seven of the eight sections and
+6.3 px in 542_z06, which matches the thread half width of
+`docs/METHODS.md` section 2 (p50 3.0 px). It is quantised by the pixel grid, it
+moves with the threshold, and it is not validated.
+
+**Notes and deviations**
+
+- **The measurement parameters stayed where they are documented.** The radii,
+  the root merge distance and the attach gap keep their provenance comments at
+  the top of `src/canaliculi.py` (`docs/METHODS.md` section 2 says that is where
+  parameters live), and the measures use them from there. Only measurement code
+  moved.
+- **The old per-image result files are gone**, not kept beside the new ones:
+  `<label>_lacunae_results.json`/`.xlsx` and
+  `<label>_canaliculi_results.json`/`.xlsx`. Their content is in
+  `<label>_quantification.*`. Keeping them would have left two copies of every
+  number, which the brief ruled out for the cross-image table and which is no
+  better per image.
+- **`-m` (the bone ROI) moved** from `src/canaliculi.py` to
+  `src/quantification.py`, because the ROI only ever fed a measure.
+- **The pdf pages are A4 landscape** with a monospace font sized to fit the
+  widest table, so no column is cut off; the per-lacuna table is split into
+  blocks of columns, each holding every lacuna. matplotlib was already a
+  dependency, so nothing was added.
+- The counts of kept objects stay in the detection record of a run's console
+  line, because how many objects the filters kept is a detection outcome. Every
+  count in a result file is measured from the label image.

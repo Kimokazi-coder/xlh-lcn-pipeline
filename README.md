@@ -4,7 +4,7 @@
 
 | folder | what it holds |
 |---|---|
-| `src/` | the pipeline: `lacunae.py` (feature 1), `canaliculi.py` (feature 2), `diagnostics.py` (every check, as subcommands) |
+| `src/` | the pipeline: `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, shared settings and the switches (all off by default) |
 | `data/` | the input images (`data/WT/`, 8 sections) |
 | `results/` | the default pipeline output and the reference that `regression` checks; everything per image and all figures, see [`results/README.md`](results/README.md) |
@@ -17,10 +17,14 @@
 Run the pipeline, from the repository root:
 
 ```
-python src/lacunae.py --dir data/WT          # feature 1: lacunae
-python src/canaliculi.py --dir data/WT       # feature 2: canaliculi and the summary table
+python src/lacunae.py --dir data/WT          # feature 1: find and label the lacunae
+python src/canaliculi.py --dir data/WT       # feature 2: trace the network
+python src/quantification.py --dir data/WT   # measure both, per image and for all images
 python -u figures/make_figures.py all        # every figure, into results/
 ```
+
+Run them in that order. Detection draws and labels; quantification measures what
+detection saved, and every measured number is written only by it.
 
 Check it:
 
@@ -54,12 +58,17 @@ command from the repository root.
 
 | | on a folder | on one image |
 |---|---|---|
-| Feature 1: lacunae | `python src/lacunae.py --dir data/WT` | `python src/lacunae.py --image "data/WT/543-2.tif"` |
-| Feature 2: canaliculi | `python src/canaliculi.py --dir data/WT` | `python src/canaliculi.py --image "data/WT/543-2.tif"` |
+| Feature 1: lacunae, detection | `python src/lacunae.py --dir data/WT` | `python src/lacunae.py --image "data/WT/543-2.tif"` |
+| Feature 2: canaliculi, detection | `python src/canaliculi.py --dir data/WT` | `python src/canaliculi.py --image "data/WT/543-2.tif"` |
+| Measures, both features | `python src/quantification.py --dir data/WT` | `python src/quantification.py --image "data/WT/543-2.tif"` |
 
-Each command writes to `results/<label>/1_lacunae/` or `2_canaliculi/` (`--out`
-picks another folder). A folder run of feature 2 also writes
-`results/all_images/summary_all_images.xlsx` and `.csv`. The layout and the
+Detection writes `results/<label>/1_lacunae/` and `2_canaliculi/`: the overlay,
+the mask, the skeleton, the verification picture, the lacuna label image, the
+vascular and bridged-pixel masks, the graph with its ownership, and a record of
+what it did. Quantification reads those and writes every number into
+`results/<label>/5_quantification/` and, for a folder run,
+`results/all_images/quantification/quantification_all_images.xlsx`, `.csv` and
+`.pdf`. `-o` picks another folder for all three commands. The layout and the
 label of each image: `results/README.md`.
 
 To check the pipeline, run `python src/diagnostics.py reference-check`. It
@@ -70,15 +79,16 @@ other diagnostics, among them `compare-outputs`, `reach`, `lacuna-table` and `sa
 ## Folder map
 
 ```
-src/lacunae.py       feature 1: lacuna detection, counting and measurement
-src/canaliculi.py    feature 2: canalicular network, skeleton and measurements
+src/lacunae.py       feature 1 detection: find, filter and label the lacunae
+src/canaliculi.py    feature 2 detection: network mask, skeleton, bridging, ownership
+src/quantification.py every measure of both features, and the tables and reports
 src/diagnostics.py   every diagnostic, as subcommands
 config.py            paths and shared settings
 data/WT/             the 8 input images
 results/             one folder per image, all_images/ and validation_tiles/; see results/README.md
 docs/METHODS.md      the method, every parameter and its origin, limitations, decisions
 archive/             history and earlier analyses, not needed to run the pipeline
-CLEANUP_LOG.md       what the 2026-09-30 cleanup did
+CLEANUP_LOG.md       what the 2026-09-30 cleanup and the later steps did
 ```
 
 ## Measures
@@ -89,6 +99,13 @@ CLEANUP_LOG.md       what the 2026-09-30 cleanup did
   counted for its nearest lacuna.
 - **Field length density**: all skeleton px divided by the analysed field
   area, in px⁻¹.
+
+- **Canalicular width**: twice the Euclidean distance transform of the
+  canalicular mask at each skeleton pixel, so the local full width of a thread,
+  in px. Reported per image (`width_median_px`) and per lacuna over its 30 px
+  ring (`ring_width_mean_r30_px`). The threads are only about 2 to 6 px wide, so
+  this sits close to the pixel grid, it moves with the threshold, and it is not
+  validated.
 
 **Also reported:** lacuna count and interior count (lacunae not touching the
 frame; every per-cell mean uses these), area and shape per lacuna, and ring
@@ -102,9 +119,11 @@ labels them ownership-dependent. Edge count is a network parameter, not
 
 ## Results
 
-`results/all_images/summary_all_images.xlsx` (and `.csv`) has one row per image.
-Per-lacuna numbers are in `results/<label>/1_lacunae/<label>_lacunae_results.xlsx`
-and `results/<label>/2_canaliculi/<label>_canaliculi_results.xlsx`.
+`results/all_images/quantification/quantification_all_images.xlsx` (and `.csv`
+and `.pdf`) has one row per image. Per-lacuna numbers are in
+`results/<label>/5_quantification/<label>_quantification.xlsx` (and `.json`,
+and `.pdf` to read), one row per lacuna with its shape and its network measures
+together.
 
 | image | lacunae (interior) | median area px² | roots per cell | ring 30 px per cell (px) | field density px⁻¹ |
 |---|---|---|---|---|---|
@@ -148,7 +167,8 @@ python src/diagnostics.py switch-check               # what each switch in confi
 python src/diagnostics.py sensitivity -d data/WT -o OUT
 python src/diagnostics.py field-summary -d data/WT -o OUT
 python src/diagnostics.py blind -s data/WT -o CODED -k KEY_OUTSIDE_REPO.csv
-python src/canaliculi.py --dir data/WT -o OTHER_FOLDER   # -o: any output folder; default results/
+python src/quantification.py --dir data/WT -o OTHER_FOLDER   # -o: any output folder; default results/
+python src/quantification.py --dir data/WT -m ROI_FOLDER     # adds the density inside a bone ROI
 python -u figures/make_figures.py image -a           # figures into results/<label>/3_publication_figures/
 ```
 

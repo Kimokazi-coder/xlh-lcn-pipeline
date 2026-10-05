@@ -113,30 +113,6 @@ CRUMB_INSIDE_HULL_MIN = 0.5
 # width above which a structure is broader than any canaliculus.
 BAND_FILTER_OPENING_RADIUS_PX = 5
 
-LACUNA_MEASUREMENT_FIELDS = [
-    "lacuna_id",
-    "area_px2",
-    "major_axis_length_px",
-    "minor_axis_length_px",
-    "aspect_ratio",
-    "eccentricity",
-    "solidity",
-    "orientation_rad",
-    "centroid_row_px",
-    "centroid_col_px",
-    "on_border",
-]
-
-LACUNA_SUMMARY_METRICS = [
-    ("area_px2", "px^2"),
-    ("major_axis_length_px", "px"),
-    ("minor_axis_length_px", "px"),
-    ("aspect_ratio", "unitless"),
-    ("eccentricity", "unitless"),
-    ("solidity", "unitless"),
-]
-
-
 # Loading
 
 def load_channel(image_path: Path) -> tuple[np.ndarray, np.ndarray]:
@@ -520,60 +496,12 @@ def segment_image(image_path: Path, t_hi: float | None = None):
 
 # Measurements
 
-def region_to_measurement(lacuna_id: int, region, on_border: bool, precision: int) -> dict:
-    minor = region.axis_minor_length
-    major = region.axis_major_length
-    aspect_ratio = (major / minor) if minor > 0 else float("inf")
-    row, col = region.centroid
-    return {
-        "lacuna_id": lacuna_id,
-        "area_px2": round(float(region.area), precision),
-        "major_axis_length_px": round(float(major), precision),
-        "minor_axis_length_px": round(float(minor), precision),
-        "aspect_ratio": round(float(aspect_ratio), precision),
-        "eccentricity": round(float(region.eccentricity), precision),
-        "solidity": round(float(region.solidity), precision),
-        "orientation_rad": round(float(region.orientation), precision),
-        "centroid_row_px": round(float(row), precision),
-        "centroid_col_px": round(float(col), precision),
-        "on_border": bool(on_border),
-    }
-
-
-def measurements_for(kept: list[tuple], precision: int) -> list[dict]:
-    """One row per kept lacuna, numbered 1..N in kept order. The canaliculi
-    feature uses the same numbering."""
-    return [
-        region_to_measurement(i, region, on_border, precision)
-        for i, (region, on_border) in enumerate(kept, start=1)
-    ]
-
-
-def summarize_interior(measurements: list[dict], precision: int) -> dict:
-    """Mean, median and sample SD (ddof=1) over interior lacunae only. SD is
-    None below 2 objects, and everything is None with no interior object."""
-    interior = [m for m in measurements if not m["on_border"]]
-    n = len(interior)
-
-    stats = {"interior_lacuna_count": n, "units": "px"}
-    for field, _unit in LACUNA_SUMMARY_METRICS:
-        values = np.array([m[field] for m in interior], dtype=float)
-        if n == 0:
-            mean = median = sd = None
-        else:
-            mean = round(float(values.mean()), precision)
-            median = round(float(np.median(values)), precision)
-            sd = round(float(values.std(ddof=1)), precision) if n >= 2 else None
-        stats[field] = {"mean": mean, "median": median, "sd": sd}
-    return stats
-
-
 def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
-    """Everything feature 1 computes for one image, without writing. t_hi:
-    see segment_image."""
-    precision = config.CSV_FLOAT_PRECISION
+    """Detection of one image, without writing: the label image, the kept
+    objects and the cut that was used. The counts are how many objects the
+    filters kept, which belongs to detection. Every measured number comes from
+    src/quantification.py. t_hi: see segment_image."""
     display, channel, labels, kept, t_hi = segment_image(image_path, t_hi)
-    rows = measurements_for(kept, precision)
     border = sum(1 for _r, on_border in kept if on_border)
     return {
         "image_path": image_path,
@@ -581,11 +509,9 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
         "labels": labels,
         "kept": kept,
         "t_hi": t_hi,
-        "rows": rows,
         "lacuna_count": len(kept),
         "border_lacuna_count": border,
         "interior_lacuna_count": len(kept) - border,
-        "summary": summarize_interior(rows, precision),
     }
 
 
@@ -732,58 +658,6 @@ def save_detection_json(result: dict, out_path: Path) -> None:
         json.dump(payload, f, indent=2)
 
 
-def save_json(result: dict, out_path: Path) -> None:
-    payload = {
-        "status": "pre-validation",
-        "units": "px",
-        "image": result["image_path"].name,
-        "image_label": image_label(result["image_path"]),
-        "note": (
-            "Pre-validation: not checked against manual counts. Pixel units. "
-            "Border lacunae count toward lacuna_count but the summary covers "
-            "interior lacunae only."
-        ),
-        "lacuna_count": result["lacuna_count"],
-        "border_lacuna_count": result["border_lacuna_count"],
-        "interior_lacuna_count": result["interior_lacuna_count"],
-        "summary": result["summary"],
-        "parameters": {**parameters(), "computed_threshold_t_hi": result["t_hi"]},
-        "lacunae": result["rows"],
-        "provenance": provenance(),
-    }
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w") as f:
-        json.dump(payload, f, indent=2)
-
-
-def save_xlsx(result: dict, out_path: Path) -> None:
-    from openpyxl import Workbook
-
-    wb = Workbook()
-    summary = wb.active
-    summary.title = "summary"
-    summary.append(["image", "status", "lacuna_count", "border_lacuna_count", "interior_lacuna_count"])
-    summary.append([
-        result["image_path"].name, "pre-validation", result["lacuna_count"],
-        result["border_lacuna_count"], result["interior_lacuna_count"],
-    ])
-    summary.append([])
-    summary.append(["Pre-validation, pixel units. Statistics below are over interior (on_border False) lacunae only."])
-    summary.append(["metric", "mean", "median", "sd", "units", "n"])
-    stats = result["summary"]
-    for field, unit in LACUNA_SUMMARY_METRICS:
-        s = stats[field]
-        summary.append([field, s["mean"], s["median"], s["sd"], unit, stats["interior_lacuna_count"]])
-
-    per_lacuna = wb.create_sheet("per_lacuna")
-    per_lacuna.append(LACUNA_MEASUREMENT_FIELDS)
-    for m in result["rows"]:
-        per_lacuna.append([m[f] for f in LACUNA_MEASUREMENT_FIELDS])
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(out_path)
-
-
 def write_outputs(result: dict, out_root: Path) -> None:
     """The lacuna files of one image under out_root (the results layout)."""
     label = image_label(result["image_path"])
@@ -793,8 +667,6 @@ def write_outputs(result: dict, out_root: Path) -> None:
                      result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNA_LABELS))
     save_detection_json(result, result_path(out_root, label, config.SECTION_LACUNAE,
                                             config.SUFFIX_LACUNAE_DETECTION))
-    save_xlsx(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".xlsx"))
-    save_json(result, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_RESULTS + ".json"))
 
 
 def image_paths(args) -> list[Path]:
@@ -820,7 +692,8 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Lacuna detection and measurement (pre-validation, px).")
+    parser = argparse.ArgumentParser(description="Lacuna detection (pre-validation, px). Measures: "
+                                                 "src/quantification.py.")
     add_input_arguments(parser)
     args = parser.parse_args()
 
@@ -828,11 +701,10 @@ def main() -> None:
         result = analyse_image(image_path)
         out_dir = args.out / image_label(image_path) / config.SECTION_LACUNAE
         write_outputs(result, args.out)
-        s = result["summary"]["area_px2"]
         print(
             f"{image_path.name}: lacunae={result['lacuna_count']} "
             f"(interior {result['interior_lacuna_count']}, border {result['border_lacuna_count']})  "
-            f"median interior area={s['median']} px^2  -> {out_dir}"
+            f"t_hi={result['t_hi']:.6f}  -> {out_dir}"
         )
 
 

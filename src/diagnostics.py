@@ -383,7 +383,7 @@ def regression_allowlist() -> dict:
     regression. Json paths start with the file kind ("lacunae" or
     "canaliculi", since file names now carry the image label) and use "[*]"
     for a list index."""
-    per_cell = [m[0] for m in canaliculi.NORMALISED_METRICS + canaliculi.NETWORK_V2_METRICS]
+    per_cell = [m[0] for m in quantification.NORMALISED_METRICS + quantification.NETWORK_V2_METRICS]
     json_fields = {"canaliculi:normalised_measures[*]", "canaliculi:network_v2_measures[*]",
                    "canaliculi:image_label", "lacunae:image_label"}
     for f in per_cell:
@@ -1184,7 +1184,7 @@ def _sweep_lacunae(path_str: str, cache_dir: str) -> dict:
         labels, kept_ids, border, t_hi = z["labels"], z["kept"], z["border"], float(z["t_hi"])
     regions = {r.label: r for r in measure.regionprops(labels)}
     kept = [(regions[int(i)], bool(b)) for i, b in zip(kept_ids, border)]
-    rows = lacunae.measurements_for(kept, config.CSV_FLOAT_PRECISION)
+    rows = quantification.measurements_for(kept, config.CSV_FLOAT_PRECISION)
     return {"labels": labels, "kept": kept, "t_hi": t_hi, "rows": rows, "display": None,
             "lacuna_count": len(kept), "interior_lacuna_count": sum(1 for _r, b in kept if not b)}
 

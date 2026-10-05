@@ -51,6 +51,7 @@ import pickle
 import sys
 from pathlib import Path
 
+import networkx as nx
 import numpy as np
 from scipy import ndimage as ndi
 from skimage import measure, morphology
@@ -64,17 +65,9 @@ import canaliculi  # noqa: E402
 import lacunae  # noqa: E402
 
 
-# The measure lists. They live here because this is where the measures are.
-# While the split is in progress they still name the lists of the detection
-# modules, which the next step moves over unchanged.
-LACUNA_MEASUREMENT_FIELDS = lacunae.LACUNA_MEASUREMENT_FIELDS
-LACUNA_SUMMARY_METRICS = lacunae.LACUNA_SUMMARY_METRICS
-CELL_METRICS = canaliculi.CELL_METRICS
-NORMALISED_METRICS = canaliculi.NORMALISED_METRICS
-NETWORK_V2_METRICS = canaliculi.NETWORK_V2_METRICS
-FIELD_V2 = canaliculi.FIELD_V2
-FIELD_V2_KEYS = canaliculi.FIELD_V2_KEYS
-FIELD_UNITS = canaliculi.FIELD_UNITS
+# RING_RADII_PX and the other measurement parameters keep their documented
+# place at the top of the detection modules (docs/METHODS.md section 2) and
+# are used from there.
 RING_RADII_PX = canaliculi.RING_RADII_PX
 
 
@@ -113,6 +106,565 @@ WIDTH_IMAGE_METRICS = [
 WIDTH_CELL_METRICS = [
     ("ring_width_mean_r30_px", "px", 0, "canalicular width in ring 30 px per cell (px)"),
 ]
+
+WIDTH_NOTES = [
+    "Canalicular width: 2 x the Euclidean distance transform of the canalicular mask at each skeleton pixel.",
+    "Measured only on skeleton pixels with real signal under them: bridged pixels, the lacuna buffer and the",
+    "dilated vascular mask are excluded. The threads are about 2 to 6 px wide, so the width is close to the",
+    "pixel grid and quantised in steps of about 1 px, it moves with the threshold (a lower cut widens every",
+    "thread), and it has not been validated against any manual measurement.",
+]
+
+# Measures: the lacuna shape, moved unchanged from src/lacunae.py
+
+LACUNA_MEASUREMENT_FIELDS = [
+    "lacuna_id",
+    "area_px2",
+    "major_axis_length_px",
+    "minor_axis_length_px",
+    "aspect_ratio",
+    "eccentricity",
+    "solidity",
+    "orientation_rad",
+    "centroid_row_px",
+    "centroid_col_px",
+    "on_border",
+]
+
+
+LACUNA_SUMMARY_METRICS = [
+    ("area_px2", "px^2"),
+    ("major_axis_length_px", "px"),
+    ("minor_axis_length_px", "px"),
+    ("aspect_ratio", "unitless"),
+    ("eccentricity", "unitless"),
+    ("solidity", "unitless"),
+]
+
+
+def region_to_measurement(lacuna_id: int, region, on_border: bool, precision: int) -> dict:
+    minor = region.axis_minor_length
+    major = region.axis_major_length
+    aspect_ratio = (major / minor) if minor > 0 else float("inf")
+    row, col = region.centroid
+    return {
+        "lacuna_id": lacuna_id,
+        "area_px2": round(float(region.area), precision),
+        "major_axis_length_px": round(float(major), precision),
+        "minor_axis_length_px": round(float(minor), precision),
+        "aspect_ratio": round(float(aspect_ratio), precision),
+        "eccentricity": round(float(region.eccentricity), precision),
+        "solidity": round(float(region.solidity), precision),
+        "orientation_rad": round(float(region.orientation), precision),
+        "centroid_row_px": round(float(row), precision),
+        "centroid_col_px": round(float(col), precision),
+        "on_border": bool(on_border),
+    }
+
+
+def measurements_for(kept: list[tuple], precision: int) -> list[dict]:
+    """One row per kept lacuna, numbered 1..N in kept order. The canaliculi
+    feature uses the same numbering."""
+    return [
+        region_to_measurement(i, region, on_border, precision)
+        for i, (region, on_border) in enumerate(kept, start=1)
+    ]
+
+
+def summarize_lacuna_shape(measurements: list[dict], precision: int) -> dict:
+    """Mean, median and sample SD (ddof=1) over interior lacunae only. SD is
+    None below 2 objects, and everything is None with no interior object."""
+    interior = [m for m in measurements if not m["on_border"]]
+    n = len(interior)
+
+    stats = {"interior_lacuna_count": n, "units": "px"}
+    for field, _unit in LACUNA_SUMMARY_METRICS:
+        values = np.array([m[field] for m in interior], dtype=float)
+        if n == 0:
+            mean = median = sd = None
+        else:
+            mean = round(float(values.mean()), precision)
+            median = round(float(np.median(values)), precision)
+            sd = round(float(values.std(ddof=1)), precision) if n >= 2 else None
+        stats[field] = {"mean": mean, "median": median, "sd": sd}
+    return stats
+
+
+# Measures: the canalicular network, moved unchanged from src/canaliculi.py.
+# A name that belongs to detection, such as a parameter with its provenance
+# comment, stays in that module and is used through it.
+
+# Per-lacuna measures, in output order, with units and kind.
+CELL_METRICS = [
+    ("roots_count", "count", "headline"),
+    ("ring_length_r30_px", "px", "headline"),
+    ("ring_length_r60_px", "px", "reported"),
+    ("owned_length_px", "px", "ownership-dependent"),
+    ("edge_count", "count", "ownership-dependent"),
+    ("mean_edge_length_px", "px", "ownership-dependent"),
+]
+
+
+# Size-normalised per-cell measures, appended after every existing column so
+# no existing column changes name, order or value. From the overnight report
+# (docs/OVERNIGHT_REPORT.md, task 4.1): roots and ring lengths rise with
+# lacuna size (Spearman 0.84 and 0.88 across images, positive within every
+# image), and these forms remove that dependence. Definitions as in
+# experiments/task4_size.py:
+#   perimeter_px                skimage regionprops perimeter of the lacuna
+#   ring_area_rR_px2            pixels of the nearest-lacuna partition within R
+#                               px of the body, other lacunae excluded (A_R)
+#   in_frame_fraction_rR        in-frame share of the full annulus of radius R
+#                               around this lacuna alone, in an unbounded plane
+#   ring_density_rR             ring_length_rR_px / ring_area_rR_px2 (L_R / A_R)
+#   roots_per_100px_perimeter   100 x roots_count / perimeter_px
+# (name, unit, extra decimals beyond config.CSV_FLOAT_PRECISION)
+NORMALISED_METRICS = [
+    ("perimeter_px", "px", 0),
+    ("ring_area_r30_px2", "px^2", 0),
+    ("ring_area_r60_px2", "px^2", 0),
+    ("in_frame_fraction_r30", "unitless", 0),
+    ("in_frame_fraction_r60", "unitless", 0),
+    ("ring_density_r30", "px^-1", 4),
+    ("ring_density_r60", "px^-1", 4),
+    ("roots_per_100px_perimeter", "per 100 px", 0),
+]
+
+
+# Per-cell measures appended on branch canaliculi-v2 (docs/CANALICULI_V2_REPORT.md),
+# after every existing column, so no existing column changes name, order or
+# value. They add information only and change no existing number.
+#   ring_attached_length_rR_px  skeleton px of the R px ring (the same pixels as
+#                               ring_length_rR_px) that lie in an 8-connected
+#                               component of that ring which reaches within
+#                               canaliculi.LACUNA_ATTACH_GAP_PX of the lacuna: threads that
+#                               touch the cell, not threads that only pass by
+#   ring_length_w_rR_px         chain code length of the ring: the skeleton as a
+#                               pixel graph, 1 per orthogonal link and sqrt(2)
+#                               per diagonal link (skeleton_links); a link
+#                               belongs to the ring of its first pixel in
+#                               raster order. ring_length_rR_px counts pixels,
+#                               so a diagonal step counts 1 there.
+#   sholl_crossings_rR          8-connected skeleton components inside the band
+#                               of the cell's nearest-lacuna partition whose
+#                               distance to the lacuna masks lies in
+#                               [R - 0.75, R + 0.75): threads crossing a circle
+#                               around the cell. No graph, no bridging test, no
+#                               attach gap (sholl_crossings).
+# (name, unit, extra decimals beyond config.CSV_FLOAT_PRECISION, summary table column)
+NETWORK_V2_METRICS = [
+    ("ring_attached_length_r30_px", "px", 0, "ring attached length 30 px per cell (px)"),
+    ("ring_attached_length_r60_px", "px", 0, "ring attached length 60 px per cell (px)"),
+    ("ring_length_w_r30_px", "px", 0, "ring length weighted 30 px per cell (px)"),
+    ("ring_length_w_r60_px", "px", 0, "ring length weighted 60 px per cell (px)"),
+    ("sholl_crossings_r10", "count", 0, "Sholl crossings 10 px per cell"),
+    ("sholl_crossings_r20", "count", 0, "Sholl crossings 20 px per cell"),
+    ("sholl_crossings_r30", "count", 0, "Sholl crossings 30 px per cell"),
+]
+
+
+# Sholl crossings. Radii (px) from the lacuna masks: 30 px is the ring of the
+# headline measure; 10 px is the attach gap of the roots, so a crossing there is
+# a thread at root distance; 20 px is midway. Half width of the band: the
+# distance map changes by at most the step length between neighbouring pixels
+# (1 or sqrt(2) = 1.414), so a band 1.5 px wide holds at least one pixel of
+# every thread that crosses it. Definitions, not tuned values.
+SHOLL_RADII_PX = (10, 20, 30)
+
+
+SHOLL_HALF_WIDTH_PX = 0.75
+
+
+# Field measures appended on branch canaliculi-v2, after every existing key of
+# the field block: (key, unit, summary table column).
+#   field_length_density_w_per_px  chain code length of the whole skeleton over
+#                                  the analysed area (as the existing density,
+#                                  which counts pixels)
+#   field_density_without_flagged_per_px
+#                                  skeleton px outside the flagged canal mask
+#                                  (as used by the pipeline, dilated by
+#                                  FLAGGED_DILATION_PX) over the analysed area
+#                                  outside it
+#   field_density_in_roi_per_px    skeleton px inside a bone ROI mask over the
+#                                  analysed area inside it; only with the -m
+#                                  option of this command, None otherwise
+FIELD_V2 = [
+    ("field_length_density_w_per_px", "px^-1", "field length density weighted (px^-1)"),
+    ("field_density_without_flagged_per_px", "px^-1", "field length density without flagged regions (px^-1)"),
+    ("field_density_in_roi_per_px", "px^-1", "field length density in ROI (px^-1)"),
+]
+
+
+FIELD_V2_KEYS = [k for k, _u, _c in FIELD_V2]
+
+
+# Chain code link lengths.
+DIAGONAL_LINK_PX = float(np.sqrt(2.0))
+
+
+def cell_edge_lengths(G: nx.Graph, edge_owner: dict, cell_id: int) -> list[float]:
+    """Length (px) of each edge this cell owns: len() is edge_count, sum()
+    is owned_length_px."""
+    lengths = []
+    for edge, owner_id in edge_owner.items():
+        if owner_id != cell_id:
+            continue
+        u, v = tuple(edge)
+        lengths.append(float(G[u][v]["weight"]))
+    return lengths
+
+
+def cell_root_count(G: nx.Graph, cell_id: int) -> int:
+    """Distinct threads leaving this lacuna's surface: the skeleton nodes
+    attached to its virtual node, clustered by single linkage at
+    canaliculi.ROOT_MERGE_DIST_PX so one thick thread counts once."""
+    src = ("cell", cell_id)
+    if not G.has_node(src):
+        return 0
+    points = [n for n in G.neighbors(src) if not canaliculi._is_cell_node(n)]
+    if not points:
+        return 0
+
+    unmerged = list(points)
+    clusters: list[list] = []
+    while unmerged:
+        seed = unmerged.pop()
+        cluster = [seed]
+        changed = True
+        while changed:
+            changed = False
+            for other in list(unmerged):
+                if any(np.hypot(other[0] - m[0], other[1] - m[1]) <= canaliculi.ROOT_MERGE_DIST_PX for m in cluster):
+                    cluster.append(other)
+                    unmerged.remove(other)
+                    changed = True
+        clusters.append(cluster)
+    return len(clusters)
+
+
+def ring_lengths(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray, n_lacunae: int) -> dict:
+    """{radius: array indexed by lacuna id} of skeleton pixel counts within
+    that radius of each lacuna, each pixel counted for its nearest lacuna."""
+    out = {}
+    for radius in canaliculi.RING_RADII_PX:
+        pixels = skeleton & (dist_to_lacuna <= radius) & (nearest_id > 0)
+        out[radius] = np.bincount(nearest_id[pixels], minlength=n_lacunae + 1)
+    return out
+
+
+def add_normalised_measures(rows: list[dict], lacuna_id_map: np.ndarray, dist_to_lacuna: np.ndarray,
+                            nearest_id: np.ndarray, precision: int) -> None:
+    """Append the NORMALISED_METRICS to each per-lacuna row, in place."""
+    regions = {r.label: r for r in measure.regionprops(lacuna_id_map)}
+    n_rows, n_cols = lacuna_id_map.shape
+    areas = {}
+    for radius in canaliculi.RING_RADII_PX:
+        ring = (dist_to_lacuna > 0) & (dist_to_lacuna <= radius)
+        areas[radius] = np.bincount(nearest_id[ring], minlength=lacuna_id_map.max() + 1)
+    for row in rows:
+        region = regions[row["lacuna_id"]]
+        perimeter = float(region.perimeter)
+        row["perimeter_px"] = round(perimeter, precision)
+        fractions, densities = {}, {}
+        for radius in canaliculi.RING_RADII_PX:
+            area = int(areas[radius][row["lacuna_id"]])
+            row[f"ring_area_r{radius}_px2"] = area
+            # Full annulus around this lacuna alone: its mask in a box padded
+            # beyond the radius, so the frame cannot cut it.
+            pad = radius + 2
+            r0, c0, r1, c1 = region.bbox
+            box = np.zeros((r1 - r0 + 2 * pad, c1 - c0 + 2 * pad), dtype=bool)
+            box[pad:pad + r1 - r0, pad:pad + c1 - c0] = region.image
+            dist = ndi.distance_transform_edt(~box)
+            ann_r, ann_c = np.nonzero((dist > 0) & (dist <= radius))
+            ann_r = ann_r + r0 - pad
+            ann_c = ann_c + c0 - pad
+            inside = (ann_r >= 0) & (ann_r < n_rows) & (ann_c >= 0) & (ann_c < n_cols)
+            fractions[radius] = round(float(inside.mean()), precision)
+            length = row[f"ring_length_r{radius}_px"]
+            densities[radius] = round(length / area, precision + 4) if area else None
+        for radius in canaliculi.RING_RADII_PX:
+            row[f"in_frame_fraction_r{radius}"] = fractions[radius]
+        for radius in canaliculi.RING_RADII_PX:
+            row[f"ring_density_r{radius}"] = densities[radius]
+        row["roots_per_100px_perimeter"] = (
+            round(100.0 * row["roots_count"] / perimeter, precision) if perimeter > 0 else None)
+
+
+def ring_attached_lengths(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                          n_lacunae: int) -> dict:
+    """{radius: array indexed by lacuna id} of attached ring length. The ring
+    of lacuna i is exactly the pixel set of ring_lengths (skeleton px within
+    the radius whose nearest lacuna is i). Its 8-connected components are
+    taken within that ring only; a component is attached if one of its pixels
+    lies within canaliculi.LACUNA_ATTACH_GAP_PX of the lacuna masks (the constant the
+    roots use). The attached length is the pixel count of attached
+    components."""
+    out = {}
+    for radius in canaliculi.RING_RADII_PX:
+        ring = skeleton & (dist_to_lacuna <= radius) & (nearest_id > 0)
+        lengths = np.zeros(n_lacunae + 1, dtype=np.int64)
+        boxes = ndi.find_objects(np.where(ring, nearest_id, 0).astype(np.int32), max_label=n_lacunae)
+        for lacuna_id in range(1, n_lacunae + 1):
+            box = boxes[lacuna_id - 1]
+            if box is None:
+                continue
+            own = ring[box] & (nearest_id[box] == lacuna_id)
+            labels = measure.label(own, connectivity=2)
+            if labels.max() == 0:
+                continue
+            near = own & (dist_to_lacuna[box] <= canaliculi.LACUNA_ATTACH_GAP_PX)
+            attached = np.unique(labels[near])
+            attached = attached[attached > 0]
+            lengths[lacuna_id] = int(np.isin(labels, attached).sum())
+        out[radius] = lengths
+    return out
+
+
+def skeleton_links(skeleton: np.ndarray) -> dict:
+    """The skeleton as a pixel graph: one undirected link per pair of
+    neighbouring skeleton pixels, each pair once. Links go to the forward
+    neighbours in raster order (east, south west, south, south east), so the
+    first pixel of a link in raster order is (row, col). A diagonal link is
+    left out when the two pixels already share an orthogonal neighbour that
+    is a skeleton pixel (mixed adjacency): at a corner the path runs over
+    that neighbour, and the diagonal would count the corner twice. This
+    keeps the 8-connected components unchanged. Returns rows, cols, the link
+    weights (1 orthogonal, sqrt(2) diagonal), the direction of each link
+    (h, v, d) and the number of diagonal links left out."""
+    s = skeleton.astype(bool)
+    H, W = s.shape
+    p = np.pad(s, 1)
+
+    def at(dr, dc):
+        return p[1 + dr:1 + dr + H, 1 + dc:1 + dc + W]
+
+    east, south = s & at(0, 1), s & at(1, 0)
+    se_all, sw_all = s & at(1, 1), s & at(1, -1)
+    se = se_all & ~at(0, 1) & ~at(1, 0)
+    sw = sw_all & ~at(0, -1) & ~at(1, 0)
+    parts = [(east, 1.0, "h"), (south, 1.0, "v"), (se, DIAGONAL_LINK_PX, "d"), (sw, DIAGONAL_LINK_PX, "d")]
+    rr, cc, ww, dd = [], [], [], []
+    for mask, w, d in parts:
+        r, c = np.nonzero(mask)
+        rr.append(r)
+        cc.append(c)
+        ww.append(np.full(r.size, w))
+        dd.append(np.full(r.size, d))
+    dropped = int(se_all.sum() - se.sum() + sw_all.sum() - sw.sum())
+    return {"rows": np.concatenate(rr), "cols": np.concatenate(cc), "weights": np.concatenate(ww),
+            "direction": np.concatenate(dd), "diagonal_dropped": dropped}
+
+
+def chain_length(skeleton: np.ndarray) -> float:
+    """Total chain code length of a skeleton (sum of skeleton_links weights)."""
+    return float(skeleton_links(skeleton)["weights"].sum())
+
+
+def ring_weighted_lengths(links: dict, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray, n_lacunae: int) -> dict:
+    """{radius: array indexed by lacuna id} of chain code ring length: the
+    weights of the links whose first pixel lies within the radius of the
+    lacuna masks with this lacuna nearest (the ring_lengths rule)."""
+    r, c, w = links["rows"], links["cols"], links["weights"]
+    out = {}
+    for radius in canaliculi.RING_RADII_PX:
+        inside = (dist_to_lacuna[r, c] <= radius) & (nearest_id[r, c] > 0)
+        out[radius] = np.bincount(nearest_id[r[inside], c[inside]], weights=w[inside], minlength=n_lacunae + 1)
+    return out
+
+
+def sholl_crossings(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                    n_lacunae: int) -> dict:
+    """{radius: array indexed by lacuna id} of crossing counts. The band of
+    lacuna i at radius R is the set of pixels of its nearest-lacuna partition
+    (nearest_id == i) whose distance to the lacuna masks lies in
+    [R - SHOLL_HALF_WIDTH_PX, R + SHOLL_HALF_WIDTH_PX); the image frame
+    bounds it. The count is the number of 8-connected components of the
+    skeleton inside that band, components taken per lacuna. A thread running
+    along the band counts once; a branch point inside the band can join two
+    threads into one component or a thread can wander out and back in and
+    count twice."""
+    out = {}
+    for radius in SHOLL_RADII_PX:
+        band = (skeleton & (dist_to_lacuna >= radius - SHOLL_HALF_WIDTH_PX)
+                & (dist_to_lacuna < radius + SHOLL_HALF_WIDTH_PX) & (nearest_id > 0))
+        counts = np.zeros(n_lacunae + 1, dtype=np.int64)
+        boxes = ndi.find_objects(np.where(band, nearest_id, 0).astype(np.int32), max_label=n_lacunae)
+        for lacuna_id in range(1, n_lacunae + 1):
+            box = boxes[lacuna_id - 1]
+            if box is None:
+                continue
+            counts[lacuna_id] = int(measure.label(band[box] & (nearest_id[box] == lacuna_id), connectivity=2).max())
+        out[radius] = counts
+    return out
+
+
+def add_network_v2_measures(rows: list[dict], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
+                            nearest_id: np.ndarray, precision: int) -> None:
+    """Append the NETWORK_V2_METRICS to each per-lacuna row, in place."""
+    n = max((row["lacuna_id"] for row in rows), default=0)
+    attached = ring_attached_lengths(skeleton, dist_to_lacuna, nearest_id, n)
+    weighted = ring_weighted_lengths(skeleton_links(skeleton), dist_to_lacuna, nearest_id, n)
+    sholl = sholl_crossings(skeleton, dist_to_lacuna, nearest_id, n)
+    for row in rows:
+        for radius in canaliculi.RING_RADII_PX:
+            value = int(attached[radius][row["lacuna_id"]])
+            if value > row[f"ring_length_r{radius}_px"]:
+                raise AssertionError(f"lacuna {row['lacuna_id']}: attached ring {value} px exceeds ring length")
+            row[f"ring_attached_length_r{radius}_px"] = value
+        for radius in canaliculi.RING_RADII_PX:
+            row[f"ring_length_w_r{radius}_px"] = round(float(weighted[radius][row["lacuna_id"]]), precision)
+        for radius in SHOLL_RADII_PX:
+            row[f"sholl_crossings_r{radius}"] = int(sholl[radius][row["lacuna_id"]])
+
+
+def summarize_network(rows: list[dict], precision: int) -> dict:
+    """Mean, median and sample SD over interior lacunae for every per-cell
+    measure. SD is None below 2 values."""
+    interior = [m for m in rows if not m["on_border"]]
+    stats = {"interior_lacuna_count": len(interior), "units": "px"}
+    for field, _unit, _kind in CELL_METRICS:
+        values = np.array([m[field] for m in interior if m.get(field) is not None], dtype=float)
+        if values.size == 0:
+            mean = median = sd = None
+        else:
+            mean = round(float(values.mean()), precision)
+            median = round(float(np.median(values)), precision)
+            sd = round(float(values.std(ddof=1)), precision) if values.size >= 2 else None
+        stats[field] = {"mean": mean, "median": median, "sd": sd}
+    for field, _unit, extra in (NORMALISED_METRICS + [m[:3] for m in NETWORK_V2_METRICS]
+                                + [m[:3] for m in WIDTH_CELL_METRICS]):
+        if not interior or field not in interior[0]:
+            continue
+        values = np.array([m[field] for m in interior if m.get(field) is not None], dtype=float)
+        digits = precision + extra
+        if values.size == 0:
+            mean = median = sd = None
+        else:
+            mean = round(float(values.mean()), digits)
+            median = round(float(np.median(values)), digits)
+            sd = round(float(values.std(ddof=1)), digits) if values.size >= 2 else None
+        stats[field] = {"mean": mean, "median": median, "sd": sd}
+    return stats
+
+
+def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_lacunae: int, precision: int,
+                  flagged: np.ndarray | None = None, roi: np.ndarray | None = None) -> dict:
+    """Per-field measures. They use the whole skeleton and no ownership, so
+    fragmentation affects them far less than any per-cell measure. The
+    appended densities without the flagged mask and in an ROI are None when
+    that mask is not given."""
+    rows, cols = skeleton.shape
+    analysed_area = float(rows * cols - lacuna_mask.sum())
+    skel_px = float(skeleton.sum())
+
+    comp_labels = measure.label(skeleton, connectivity=2)
+    sizes = np.bincount(comp_labels.ravel())[1:].astype(float)
+
+    real = canaliculi.real_subgraph(G)
+    junctions = sum(1 for n in real.nodes() if real.degree(n) >= 3)
+
+    def per_area(value: float) -> float | None:
+        return round(value / analysed_area, precision + 4) if analysed_area > 0 else None
+
+    return {
+        "analysed_area_px2": round(analysed_area, precision),
+        "total_skeleton_length_px": round(skel_px, precision),
+        "canalicular_length_density_per_px": per_area(skel_px),
+        "junction_count": int(junctions),
+        "junction_density_per_px2": per_area(float(junctions)),
+        "lacuna_count": int(n_lacunae),
+        "lacunae_per_px2": per_area(float(n_lacunae)),
+        "skeleton_component_count": int(sizes.size),
+        "mean_component_length_px": round(float(sizes.mean()), precision) if sizes.size else 0.0,
+        "median_component_length_px": round(float(np.median(sizes)), precision) if sizes.size else 0.0,
+        # Appended on branch canaliculi-v2 (FIELD_V2).
+        "field_length_density_w_per_px": per_area(chain_length(skeleton)),
+        "field_density_without_flagged_per_px": _masked_density(skeleton, lacuna_mask, flagged, precision, inside=False),
+        "field_density_in_roi_per_px": _masked_density(skeleton, lacuna_mask, roi, precision, inside=True),
+    }
+
+
+def _masked_density(skeleton: np.ndarray, lacuna_mask: np.ndarray, mask: np.ndarray | None, precision: int,
+                    inside: bool) -> float | None:
+    """Skeleton px over analysed area (field minus lacunae), both restricted
+    to the pixels inside `mask` (inside=True) or outside it (inside=False)."""
+    if mask is None:
+        return None
+    keep = mask if inside else ~mask
+    area = float((keep & ~lacuna_mask).sum())
+    return round(float((skeleton & keep).sum()) / area, precision + 4) if area > 0 else None
+
+
+FIELD_UNITS = {
+    "analysed_area_px2": "px^2",
+    "total_skeleton_length_px": "px",
+    "canalicular_length_density_per_px": "px^-1",
+    "junction_count": "count",
+    "junction_density_per_px2": "px^-2",
+    "lacuna_count": "count",
+    "lacunae_per_px2": "px^-2",
+    "skeleton_component_count": "count",
+    "mean_component_length_px": "px",
+    "median_component_length_px": "px",
+    **{key: unit for key, unit, _c in FIELD_V2},
+}
+
+
+SUMMARY_COLUMNS = [
+    "image",
+    "file",
+    "status",
+    "lacuna count",
+    "interior lacuna count",
+    "median lacuna area (px^2)",
+    "roots per cell",
+    "ring length 30 px per cell (px)",
+    "ring length 60 px per cell (px)",
+    "field length density (px^-1)",
+    # Appended (normalised measures, means over interior cells).
+    "perimeter per cell (px)",
+    "ring area 30 px per cell (px^2)",
+    "ring area 60 px per cell (px^2)",
+    "in-frame fraction 30 px per cell",
+    "in-frame fraction 60 px per cell",
+    "ring density 30 px per cell (px^-1)",
+    "ring density 60 px per cell (px^-1)",
+    "roots per 100 px perimeter per cell",
+    # Appended on branch canaliculi-v2: per-cell means over interior cells, then
+    # field values.
+    *[m[3] for m in NETWORK_V2_METRICS],
+    *[c for _k, _u, c in FIELD_V2],
+    # Appended with the results layout: the image's label (lacunae.image_label).
+    "image_label",
+    # Appended with the detection and quantification split: the width.
+    *[c for _f, _u, _x, c in WIDTH_IMAGE_METRICS],
+    *[c for _f, _u, _x, c in WIDTH_CELL_METRICS],
+]
+
+
+SUMMARY_NOTES = [
+    "PRE-VALIDATION. Not yet checked against manual (ImageJ) counts.",
+    "PIXEL units. The images carry no micron calibration.",
+    "Median lacuna area and every per-cell value are over interior lacunae (not touching the frame edge).",
+    "roots per cell: distinct canalicular threads leaving each lacuna surface (mean over interior cells).",
+    "ring length 30 / 60 px per cell: skeleton px within 30 / 60 px of each lacuna body, each pixel counted",
+    "for its nearest lacuna only (mean over interior cells). Neither depends on network ownership.",
+    "field length density: all skeleton px divided by the analysed field area (field minus lacunae).",
+    "Headline measures: roots per cell, ring length 30 px, field length density.",
+    "Appended columns (normalised measures, means over interior cells): perimeter; ring area A_r, the pixels",
+    "of the nearest-lacuna partition within r px of the body; in-frame fraction of the full r px annulus;",
+    "ring density L_r / A_r; roots per 100 px of perimeter. They remove the dependence of roots and ring",
+    "length on lacuna size (docs/OVERNIGHT_REPORT.md, task 4.1).",
+    "Appended on branch canaliculi-v2: ring attached length 30 / 60 px, the ring length pixels in threads that",
+    "reach within 10 px of the lacuna (passing threads left out); ring length weighted 30 / 60 px and field",
+    "length density weighted, chain code lengths (sqrt(2) per diagonal step); Sholl crossings 10 / 20 / 30 px,",
+    "skeleton components crossing a 1.5 px band at that distance from the lacuna (no graph); see",
+    "docs/CANALICULI_V2_REPORT.md.",
+    "Appended with the detection and quantification split: the canalicular width.",
+    *WIDTH_NOTES,
+]
+
 
 HEADLINE_MEASURES = [
     "roots_count",
@@ -273,20 +825,20 @@ def network_rows(kept: list[tuple], detection: dict, dist_to_lacuna: np.ndarray,
                  nearest_id: np.ndarray, precision: int) -> list[dict]:
     """Roots, ring lengths and the ownership-dependent measures per lacuna, from
     the graph and the ownership that detection saved. The loop of the former
-    canaliculi.measure_cells, unchanged."""
+    measure_cells of src/canaliculi.py, unchanged."""
     graph = detection["graph"]
     edge_owner = detection["edge_owner"]
-    rings = canaliculi.ring_lengths(detection["skeleton"], dist_to_lacuna, nearest_id, len(kept))
+    rings = ring_lengths(detection["skeleton"], dist_to_lacuna, nearest_id, len(kept))
 
     rows = []
     for lacuna_id, (_region, on_border) in enumerate(kept, start=1):
-        lengths = canaliculi.cell_edge_lengths(graph, edge_owner, lacuna_id)
+        lengths = cell_edge_lengths(graph, edge_owner, lacuna_id)
         count = len(lengths)
         total = float(sum(lengths))
         row = {
             "lacuna_id": lacuna_id,
             "on_border": bool(on_border),
-            "roots_count": canaliculi.cell_root_count(graph, lacuna_id),
+            "roots_count": cell_root_count(graph, lacuna_id),
         }
         for radius in canaliculi.RING_RADII_PX:
             row[f"ring_length_r{radius}_px"] = int(rings[radius][lacuna_id])
@@ -315,17 +867,17 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
     kept = kept_from_labels(lacuna_id_map)
     dist_to_lacuna, nearest_id = canaliculi.nearest_lacuna_map(lacuna_id_map)
 
-    # Lacuna shape, the former lacunae.measurements_for.
+    # Lacuna shape, the former measurements_for.
     shape_rows = [
-        lacunae.region_to_measurement(lacuna_id, region, on_border, precision)
+        region_to_measurement(lacuna_id, region, on_border, precision)
         for lacuna_id, (region, on_border) in enumerate(kept, start=1)
     ]
     border = sum(1 for _region, on_border in kept if on_border)
 
     # Network measures per lacuna, then the appended families.
     net_rows = network_rows(kept, detection, dist_to_lacuna, nearest_id, precision)
-    canaliculi.add_normalised_measures(net_rows, lacuna_id_map, dist_to_lacuna, nearest_id, precision)
-    canaliculi.add_network_v2_measures(net_rows, skeleton, dist_to_lacuna, nearest_id, precision)
+    add_normalised_measures(net_rows, lacuna_id_map, dist_to_lacuna, nearest_id, precision)
+    add_network_v2_measures(net_rows, skeleton, dist_to_lacuna, nearest_id, precision)
 
     # The canalicular width, the new measure.
     sample = width_sample_mask(detection)
@@ -341,7 +893,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
         merged.update({k: v for k, v in net_row.items() if k not in merged})
         rows.append(merged)
 
-    field = canaliculi.field_metrics(skeleton, detection["graph"], detection["lacuna_mask"],
+    field = field_metrics(skeleton, detection["graph"], detection["lacuna_mask"],
                                      len(kept), precision, detection["vascular"], roi_mask)
     return {
         "image_path": image_path,
@@ -352,8 +904,8 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
         "n_bridges": detection["canaliculi_detection"]["n_bridges"],
         "rows": rows,
         "areas": [row["area_px2"] for row in rows],
-        "lacuna_summary": lacunae.summarize_interior(shape_rows, precision),
-        "summary": summarize_interior(net_rows, precision),
+        "lacuna_summary": summarize_lacuna_shape(shape_rows, precision),
+        "summary": summarize_network(net_rows, precision),
         "field": field,
         "width": width_image_measures(width, sample, precision),
         "width_values": width[sample],
@@ -372,40 +924,22 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
     }
 
 
-def summarize_interior(rows: list[dict], precision: int) -> dict:
-    """Interior mean, median and sample SD of every per-lacuna network measure,
-    the former canaliculi.summarize_interior with the width added."""
-    stats = canaliculi.summarize_interior(rows, precision)
-    interior = [r for r in rows if not r["on_border"]]
-    for field, _unit, extra, _col in WIDTH_CELL_METRICS:
-        values = np.array([r[field] for r in interior if r.get(field) is not None], dtype=float)
-        digits = precision + extra
-        if values.size == 0:
-            mean = median = sd = None
-        else:
-            mean = round(float(values.mean()), digits)
-            median = round(float(np.median(values)), digits)
-            sd = round(float(values.std(ddof=1)), digits) if values.size >= 2 else None
-        stats[field] = {"mean": mean, "median": median, "sd": sd}
-    return stats
-
-
 # Column order of the per-lacuna table, in four blocks.
 
 def shape_columns() -> list[str]:
-    return list(lacunae.LACUNA_MEASUREMENT_FIELDS)
+    return list(LACUNA_MEASUREMENT_FIELDS)
 
 
 def network_columns() -> list[str]:
-    return [f for f, _u, _k in canaliculi.CELL_METRICS]
+    return [f for f, _u, _k in CELL_METRICS]
 
 
 def normalised_columns() -> list[str]:
-    return [f for f, _u, _x in canaliculi.NORMALISED_METRICS]
+    return [f for f, _u, _x in NORMALISED_METRICS]
 
 
 def v2_columns() -> list[str]:
-    return [m[0] for m in canaliculi.NETWORK_V2_METRICS]
+    return [m[0] for m in NETWORK_V2_METRICS]
 
 
 def width_columns() -> list[str]:
@@ -461,7 +995,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     """Network detection from a finished lacuna result onward, then every
     measure. The detection keys and the measured keys in one dict, so it can
     replace the former canaliculi.analyse_network for any caller."""
-    detected = canaliculi.analyse_network(image_path, lac, channel, t_lo, roi_mask)
+    detected = canaliculi.analyse_network(image_path, lac, channel, t_lo)
     measured = quantify(detection_in_memory(detected), image_path, roi_mask)
     return {**detected, **measured}
 
@@ -492,7 +1026,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "headline_measures": HEADLINE_MEASURES,
         "ownership_dependent_measures": ["owned_length_px", "edge_count", "mean_edge_length_px"],
         "normalised_measures": normalised_columns(),
-        "network_v2_measures": v2_columns() + canaliculi.FIELD_V2_KEYS,
+        "network_v2_measures": v2_columns() + FIELD_V2_KEYS,
         "width_measures": [f for f, _u, _x, _c in WIDTH_IMAGE_METRICS] + width_columns(),
         "lacuna_shape_summary": result["lacuna_summary"],
         "summary": result["summary"],
@@ -505,15 +1039,6 @@ def save_json(result: dict, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2)
-
-
-WIDTH_NOTES = [
-    "Canalicular width: 2 x the Euclidean distance transform of the canalicular mask at each skeleton pixel.",
-    "Measured only on skeleton pixels with real signal under them: bridged pixels, the lacuna buffer and the",
-    "dilated vascular mask are excluded. The threads are about 2 to 6 px wide, so the width is close to the",
-    "pixel grid and quantised in steps of about 1 px, it moves with the threshold (a lower cut widens every",
-    "thread), and it has not been validated against any manual measurement.",
-]
 
 
 # Output: xlsx
@@ -531,17 +1056,17 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     sheet.append(["Pre-validation, pixel units. Statistics below are over interior (on_border False) lacunae only."])
     sheet.append(["metric", "kind", "mean", "median", "sd", "units", "n"])
     n_interior = result["interior_lacuna_count"]
-    for field, unit in lacunae.LACUNA_SUMMARY_METRICS:
+    for field, unit in LACUNA_SUMMARY_METRICS:
         s = result["lacuna_summary"][field]
         sheet.append([field, "lacuna shape", s["mean"], s["median"], s["sd"], unit, n_interior])
-    for field, unit, kind in canaliculi.CELL_METRICS:
+    for field, unit, kind in CELL_METRICS:
         s = result["summary"][field]
         sheet.append([field, kind, s["mean"], s["median"], s["sd"], unit, n_interior])
-    for field, unit, _extra in canaliculi.NORMALISED_METRICS:
+    for field, unit, _extra in NORMALISED_METRICS:
         if field in result["summary"]:
             s = result["summary"][field]
             sheet.append([field, "normalised", s["mean"], s["median"], s["sd"], unit, n_interior])
-    for field, unit, _extra, _col in canaliculi.NETWORK_V2_METRICS:
+    for field, unit, _extra, _col in NETWORK_V2_METRICS:
         if field in result["summary"]:
             s = result["summary"][field]
             sheet.append([field, "network v2", s["mean"], s["median"], s["sd"], unit, n_interior])
@@ -553,7 +1078,7 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     field_sheet.append(["metric", "kind", "value", "units"])
     for key, value in result["field"].items():
         kind = "headline" if key == "canalicular_length_density_per_px" else "reported"
-        field_sheet.append([key, kind, value, canaliculi.FIELD_UNITS[key]])
+        field_sheet.append([key, kind, value, FIELD_UNITS[key]])
 
     width_sheet = wb.create_sheet("width")
     width_sheet.append(["metric", "kind", "value", "units"])
@@ -697,17 +1222,17 @@ def per_image_lines(result: dict) -> list:
     title = f"Interior lacunae only: mean, median and sample SD (n = {n})"
     lines += ["", title, "-" * len(title)]
     stats_rows = []
-    for field, unit in lacunae.LACUNA_SUMMARY_METRICS:
+    for field, unit in LACUNA_SUMMARY_METRICS:
         s = result["lacuna_summary"][field]
         stats_rows.append([field, "lacuna shape", s["mean"], s["median"], s["sd"], unit])
-    for field, unit, kind in canaliculi.CELL_METRICS:
+    for field, unit, kind in CELL_METRICS:
         s = result["summary"][field]
         stats_rows.append([field, kind, s["mean"], s["median"], s["sd"], unit])
-    for field, unit, _extra in canaliculi.NORMALISED_METRICS:
+    for field, unit, _extra in NORMALISED_METRICS:
         if field in result["summary"]:
             s = result["summary"][field]
             stats_rows.append([field, "normalised", s["mean"], s["median"], s["sd"], unit])
-    for field, unit, _extra, _col in canaliculi.NETWORK_V2_METRICS:
+    for field, unit, _extra, _col in NETWORK_V2_METRICS:
         if field in result["summary"]:
             s = result["summary"][field]
             stats_rows.append([field, "network v2", s["mean"], s["median"], s["sd"], unit])
@@ -718,7 +1243,7 @@ def per_image_lines(result: dict) -> list:
 
     lines += ["", "Per field", "---------"]
     lines += text_table(["measure", "value", "units"],
-                        [[k, v, canaliculi.FIELD_UNITS[k]] for k, v in result["field"].items()])
+                        [[k, v, FIELD_UNITS[k]] for k, v in result["field"].items()])
     title = "Canalicular width, the new measure"
     lines += ["", title, "-" * len(title)]
     lines += text_table(["measure", "value", "units"],
@@ -773,15 +1298,6 @@ def write_outputs(result: dict, out_root: Path) -> None:
 # summary_all_images, in the same order and with the same values, and the width
 # columns are appended after them.
 
-SUMMARY_COLUMNS = (list(canaliculi.SUMMARY_COLUMNS)
-                   + [c for _f, _u, _x, c in WIDTH_IMAGE_METRICS]
-                   + [c for _f, _u, _x, c in WIDTH_CELL_METRICS])
-
-SUMMARY_NOTES = list(canaliculi.SUMMARY_NOTES) + [
-    "Appended with the detection and quantification split: the canalicular width.",
-] + WIDTH_NOTES
-
-
 def summary_row(result: dict) -> list:
     """One row of the cross-image table, in SUMMARY_COLUMNS order."""
     summary, field = result["summary"], result["field"]
@@ -797,9 +1313,9 @@ def summary_row(result: dict) -> list:
         summary["ring_length_r60_px"]["mean"],
         field["canalicular_length_density_per_px"],
     ]
-        + [summary.get(f, {}).get("mean") for f, _u, _x in canaliculi.NORMALISED_METRICS]
-        + [summary.get(m[0], {}).get("mean") for m in canaliculi.NETWORK_V2_METRICS]
-        + [field.get(k) for k in canaliculi.FIELD_V2_KEYS]
+        + [summary.get(f, {}).get("mean") for f, _u, _x in NORMALISED_METRICS]
+        + [summary.get(m[0], {}).get("mean") for m in NETWORK_V2_METRICS]
+        + [field.get(k) for k in FIELD_V2_KEYS]
         + [result["label"]]
         + [result["width"][f] for f, _u, _x, _c in WIDTH_IMAGE_METRICS]
         + [summary.get(f, {}).get("mean") for f, _u, _x, _c in WIDTH_CELL_METRICS])

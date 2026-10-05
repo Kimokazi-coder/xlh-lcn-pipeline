@@ -28,6 +28,7 @@ from skimage import measure, morphology
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import common as C  # noqa: E402
 import lacunae  # noqa: E402
+import quantification  # noqa: E402
 
 OUT = C.OUT_ROOT / "task3"
 
@@ -248,7 +249,7 @@ def item_3_2() -> None:
             kept_w = lacunae.filter_regions(m_w)
             C.write_json(OUT / "3.2_widest" / f"{d['short']}.json",
                          {"default_count": d["lacuna_count"], "widest_count": len(kept_w),
-                          "widest_rows": lacunae.measurements_for(kept_w, C.PRECISION)})
+                          "widest_rows": quantification.measurements_for(kept_w, C.PRECISION)})
             print(d["short"], len(rec_s), "pairs")
         C.write_csv(path, pd.DataFrame(rows))
     df = pd.read_csv(path)
@@ -606,7 +607,7 @@ def _variant_run(args) -> str:
     d = C.load(name)
     rejected: list = []
     labels, kept = variant_lacunae(d, variant, rejected)
-    rows = lacunae.measurements_for(kept, C.PRECISION)
+    rows = quantification.measurements_for(kept, C.PRECISION)
     net = C.network_stage(d["channel"], labels, kept, preprocessed=d["preprocessed"], flagged=d["flagged"],
                           signal=d["signal"], t_lo=d["t_lo"])
     h = C.headline(rows, net["cell_rows"], net["density"], len(net["bridges"]))
@@ -805,7 +806,7 @@ def item_3_6b() -> None:
         if not path.is_file():
             rec: list = []
             labels, kept = crumbs_inside_hull(d, rec)
-            lrows = lacunae.measurements_for(kept, C.PRECISION)
+            lrows = quantification.measurements_for(kept, C.PRECISION)
             net = C.network_stage(d["channel"], labels, kept, preprocessed=d["preprocessed"], flagged=d["flagged"],
                                   signal=d["signal"], t_lo=d["t_lo"])
             C.write_npz(C.OUT_ROOT / "_cache" / "variants" / f"{n}__crumbs_inside_hull.npz",

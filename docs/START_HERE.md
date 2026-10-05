@@ -1,17 +1,18 @@
 # Start here
 
 **What this is.** lcn-quant measures the osteocyte lacuno-canalicular network in 2D confocal sections of
-mouse bone (red channel). Feature 1 finds and measures the lacunae. Feature 2 traces the canalicular
-network as a one-pixel skeleton and measures it per lacuna and per field. The headline measures are
-roots per cell, ring length 30 px and field length density. Everything is **pre-validation** (no
-comparison with manual counts yet) and in **pixel units** (the images carry no calibration). The data
-are 8 wild-type sections, which are sections of 3 or 4 fields.
+mouse bone (red channel). Feature 1 finds the lacunae. Feature 2 traces the canalicular network as a
+one-pixel skeleton. A third step measures both, per lacuna and per field: detection and quantification
+are separate scripts, and every measured number comes from the quantification step. The headline
+measures are roots per cell, ring length 30 px, field length density and the canalicular width.
+Everything is **pre-validation** (no comparison with manual counts yet) and in **pixel units** (the
+images carry no calibration). The data are 8 wild-type sections, which are sections of 3 or 4 fields.
 
 ## What each folder holds
 
 | folder | contents |
 |---|---|
-| `src/` | the pipeline: `lacunae.py` (feature 1), `canaliculi.py` (feature 2), `diagnostics.py` (every check, as subcommands) |
+| `src/` | the pipeline: `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, shared settings and the switches (all off) |
 | `data/WT/` | the 8 input images |
 | `results/` | the default output and every figure: one folder per image, `all_images/` (summary table and figures) and `validation_tiles/`; the reference for every check; guide: `results/README.md` |
@@ -58,8 +59,9 @@ In `config.py`. All are off by default; with all off, the pipeline gives `result
 From the repository root, with the project's Python (3.9, the venv):
 
 ```
-python src/lacunae.py --dir data/WT                      # feature 1 into results/ (-o DIR for another folder)
-python src/canaliculi.py --dir data/WT                   # feature 2 and the summary table
+python src/lacunae.py --dir data/WT                      # feature 1 detection (-o DIR for another folder)
+python src/canaliculi.py --dir data/WT                   # feature 2 detection
+python src/quantification.py --dir data/WT               # every measure and both tables
 python src/diagnostics.py reference-check                # must PASS: 62.33 / 27.41 / 21 on 543-2
 python src/diagnostics.py regression                     # every number against results/, tolerance 0
 python src/diagnostics.py switch-check                   # what each switch changes

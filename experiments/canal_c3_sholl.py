@@ -41,7 +41,7 @@ def crop_panel(d: dict, row: dict) -> np.ndarray:
     over = C.paint(raw // 3, d["skeleton"][sl], (140, 140, 140))
     counts = []
     for r, colour in BAND_COLOURS.items():
-        band_area = ((dist >= r - canaliculi.SHOLL_HALF_WIDTH_PX) & (dist < r + canaliculi.SHOLL_HALF_WIDTH_PX)
+        band_area = ((dist >= r - quantification.SHOLL_HALF_WIDTH_PX) & (dist < r + quantification.SHOLL_HALF_WIDTH_PX)
                      & (nearest == lid))
         over = C.paint(over, band_area[sl] & ~d["skeleton"][sl], colour, alpha=0.7)
         hits = band_area & d["skeleton"]
@@ -60,18 +60,18 @@ def item_c3() -> None:
         d = K.pipeline(name)
         data[name] = d
         for lr, cr in zip(d["lacuna_rows"], d["cell_rows"]):
-            for r in canaliculi.SHOLL_RADII_PX:
+            for r in quantification.SHOLL_RADII_PX:
                 v = cr[f"sholl_crossings_r{r}"]
                 assert isinstance(v, int) and v >= 0, (name, cr["lacuna_id"], r, v)
             rows.append({"image": name, "lacuna_id": cr["lacuna_id"], "x": round(lr["centroid_col_px"]),
                          "y": round(lr["centroid_row_px"]), "on_border": cr["on_border"], "area_px2": lr["area_px2"],
                          "roots": cr["roots_count"], **{f"sholl_r{r}": cr[f"sholl_crossings_r{r}"]
-                                                        for r in canaliculi.SHOLL_RADII_PX}})
+                                                        for r in quantification.SHOLL_RADII_PX}})
     df = pd.DataFrame(rows)
     C.write_csv(K.OUT / "C3_sholl.csv", df)
     it = df[~df.on_border.astype(bool)]
     corr = []
-    for r in canaliculi.SHOLL_RADII_PX:
+    for r in quantification.SHOLL_RADII_PX:
         a, pa = spearmanr(it[f"sholl_r{r}"], it.roots)
         b, pb = spearmanr(it[f"sholl_r{r}"], it.area_px2)
         corr.append({"crossings at": f"{r} px", "mean": it[f"sholl_r{r}"].mean(), "median": it[f"sholl_r{r}"].median(),
@@ -104,7 +104,7 @@ def item_c3() -> None:
     md = ["# C3 Sholl crossings", "",
           "Pre-validation, px. New per-lacuna columns `sholl_crossings_r10`, `_r20`, `_r30` (interior means in the summary).",
           "The band of a lacuna at radius $R$ is the part of its nearest-lacuna partition whose distance to the lacuna",
-          f"masks lies in $[R - {canaliculi.SHOLL_HALF_WIDTH_PX}, R + {canaliculi.SHOLL_HALF_WIDTH_PX})$, inside the frame.",
+          f"masks lies in $[R - {quantification.SHOLL_HALF_WIDTH_PX}, R + {quantification.SHOLL_HALF_WIDTH_PX})$, inside the frame.",
           "The count is the number of 8-connected skeleton components inside the band. It uses no graph, no cleanup,",
           "no attach gap and no ownership; it does use the skeleton, so the cuts and the bridging still reach it.",
           "",

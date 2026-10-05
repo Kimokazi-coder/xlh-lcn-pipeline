@@ -41,7 +41,7 @@ def selfcheck() -> list[str]:
     z[5:105, 5] = True
     cases.append(("L shape, two arms of 100 px (199 px)", z.copy(), 198.0))
     for label, mask, expected in cases:
-        got = canaliculi.chain_length(mask)
+        got = quantification.chain_length(mask)
         assert abs(got - expected) < 1e-9, (label, got, expected)
         lines.append(f"| {label} | {int(mask.sum())} | {expected:.6f} | {got:.6f} | PASS |")
     return lines
@@ -53,7 +53,7 @@ def item_c2() -> None:
     for name in K.names():
         d = K.pipeline(name)
         sk = d["skeleton"]
-        links = canaliculi.skeleton_links(sk)
+        links = quantification.skeleton_links(sk)
         w, dirn = links["weights"], links["direction"]
         n_px, n_links, length = int(sk.sum()), int(w.size), float(w.sum())
         # Every 8-neighbour pair, with no diagonal left out (for comparison).

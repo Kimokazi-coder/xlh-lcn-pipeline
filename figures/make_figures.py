@@ -283,7 +283,7 @@ def windowed(channel: np.ndarray, dim: float = 1.0) -> np.ndarray:
 
 def root_clusters(G, cell_id: int) -> list[tuple[float, float]]:
     """The roots of one lacuna as (x, y) points: a copy of
-    canaliculi.cell_root_count that returns the cluster centres instead of
+    quantification.cell_root_count that returns the cluster centres instead of
     their number. Checked against roots_count when the cache is built."""
     src = ("cell", cell_id)
     if not G.has_node(src):
