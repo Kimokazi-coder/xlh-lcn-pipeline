@@ -77,7 +77,7 @@ def pipeline(name: str, overrides: dict | None = None) -> dict:
                 "pixels_row": [int(v) for v in b["pixels"][0]], "pixels_col": [int(v) for v in b["pixels"][1]]}
                for b in res["bridges"]]
     meta = {"image": path.name, "short": short, "setting": tag, "src_hash": src_hash(),
-            "t_hi": res["lacunae"]["t_hi"], "t_lo": res["t_lo"], "lacuna_rows": res["lacunae"]["rows"],
+            "t_hi": res["lacunae"]["t_hi"], "t_lo": res["t_lo"], "lacuna_rows": res["rows"],
             "cell_rows": res["rows"], "summary": res["summary"], "field": res["field"], "bridges": bridges,
             "complete": True}
     C.write_npz(npz, lacuna_id_map=res["lacuna_id_map"].astype(np.int32), skeleton=res["skeleton"],

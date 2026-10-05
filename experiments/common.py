@@ -248,8 +248,8 @@ def build_cache(path: Path) -> dict:
              "min_signal_fraction": b["min_signal_fraction"]}
             for b in res["bridges"]
         ],
-        "lacuna_rows": lac["rows"],
-        "lacuna_summary": lac["summary"],
+        "lacuna_rows": res["rows"],
+        "lacuna_summary": res["lacuna_summary"],
         "lacuna_count": lac["lacuna_count"],
         "interior_lacuna_count": lac["interior_lacuna_count"],
         "cell_rows": res["rows"],

@@ -324,7 +324,7 @@ def pipeline_output(path: Path) -> dict:
         pts = root_clusters(res["graph"], row["lacuna_id"])
         assert len(pts) == row["roots_count"], (name, row["lacuna_id"])
         roots[str(row["lacuna_id"])] = pts
-    meta = {"image": path.name, "short": name, "lacuna_rows": res["lacunae"]["rows"], "cell_rows": res["rows"],
+    meta = {"image": path.name, "short": name, "lacuna_rows": res["rows"], "cell_rows": res["rows"],
             "lacuna_count": res["lacunae"]["lacuna_count"], "interior_count": res["lacunae"]["interior_lacuna_count"],
             "roots_xy": roots, "field": res["field"], "summary": res["summary"]}
     CACHE.mkdir(parents=True, exist_ok=True)
@@ -473,7 +473,7 @@ def build_image_data(path: Path) -> None:
                          "reason": reason, "letter": REASON_LETTER[reason],
                          "x": round(float(cx), 1), "y": round(float(cy), 1), "bbox": [int(v) for v in region.bbox]})
     meta = {"image": path.name, "short": name, "src_hash": src_hash(), "t_hi": lac["t_hi"], "t_lo": res["t_lo"],
-            "lacuna_rows": lac["rows"], "cell_rows": res["rows"], "roots_xy": roots, "rejected": rejected,
+            "lacuna_rows": res["rows"], "cell_rows": res["rows"], "roots_xy": roots, "rejected": rejected,
             "field": res["field"], "complete": True}
     CACHE2.mkdir(parents=True, exist_ok=True)
     npz = CACHE2 / f"{name}.npz"
@@ -1676,19 +1676,20 @@ def figure_thresholds() -> None:
             kept_labels = {region.label for region, _b in lac["kept"]}
             n_rej = sum(1 for rg in measure.regionprops(lac["labels"])
                         if rg.label not in kept_labels and rg.area >= REJECTED_MIN_DRAW_PX2)
-            areas = np.bincount(id_map.ravel(), minlength=len(lac["rows"]) + 1)
-            inside = np.bincount(id_map[flagged].ravel(), minlength=len(lac["rows"]) + 1)
-            canal = [rr["lacuna_id"] for rr in lac["rows"]
+            lac_rows = quantification.measurements_for(lac["kept"], config.CSV_FLOAT_PRECISION)
+            areas = np.bincount(id_map.ravel(), minlength=len(lac_rows) + 1)
+            inside = np.bincount(id_map[flagged].ravel(), minlength=len(lac_rows) + 1)
+            canal = [rr["lacuna_id"] for rr in lac_rows
                      if inside[rr["lacuna_id"]] / areas[rr["lacuna_id"]] >= CANAL_MARK_MIN_SHARE]
-            dd = {"lacuna_id_map": id_map, "lacuna_rows": lac["rows"], "canal_ids": canal,
-                  "interior_ids": [rr["lacuna_id"] for rr in lac["rows"] if not rr["on_border"]],
-                  "edge_ids": [rr["lacuna_id"] for rr in lac["rows"] if rr["on_border"]],
+            dd = {"lacuna_id_map": id_map, "lacuna_rows": lac_rows, "canal_ids": canal,
+                  "interior_ids": [rr["lacuna_id"] for rr in lac_rows if not rr["on_border"]],
+                  "edge_ids": [rr["lacuna_id"] for rr in lac_rows if rr["on_border"]],
                   "rejected": [None] * n_rej}
             x = left + c * (panel + gap)
             y = fig_h - top - (r + 1) * panel - r * text_h
             ax = mm_axes(fig, x, y, panel, panel, FIG_WIDTH_MM, fig_h)
             image_axes(ax, raw)
-            draw_outlines(ax, id_map, lac["rows"], lw=0.6)
+            draw_outlines(ax, id_map, lac_rows, lw=0.6)
             draw_canal_marks(ax, dd, fs=FONT_SIZE - 2.5)
             ax.text(0.5, -0.02, contact_count_lines(dd, three=True), transform=ax.transAxes, ha="center", va="top",
                     fontsize=FONT_SIZE - 2.0, linespacing=1.15)
