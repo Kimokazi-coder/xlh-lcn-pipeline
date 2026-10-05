@@ -400,6 +400,16 @@ def regression_allowlist() -> dict:
     return {"json": json_fields, "summary_table": set(canaliculi.SUMMARY_COLUMNS[n_ref:])}
 
 
+def regression_settings(overrides: dict) -> dict:
+    """{file kind: {field path: value this run requires}}. Such a field records
+    the state of a switch, not a measurement: `parameters.fast_lacuna_stage` is
+    the FAST_LACUNA_STAGE switch itself, so the run with the switch on writes
+    True where results/ holds False. It is checked against this run's switch
+    and not compared with results/. Nothing else is exempt."""
+    fast = bool(overrides.get("FAST_LACUNA_STAGE", config.FAST_LACUNA_STAGE))
+    return {"lacunae": {"parameters.fast_lacuna_stage": fast}}
+
+
 def print_allowlist(allow: dict) -> None:
     print("New fields allowed (appended after results/ was made; counted, not compared):")
     for path in sorted(allow["json"]):
@@ -470,10 +480,14 @@ def _equal(a, b) -> bool:
     return a == b
 
 
-def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None, kind: str = "") -> tuple:
+def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None, kind: str = "",
+                 settings: dict | None = None) -> tuple:
     """(fields compared, differences, number of fields only in the new file).
     With `allowed` (allowlist paths of this file kind), a new field outside it
-    is a difference."""
+    is a difference. `settings` ({field path: required value}, from
+    regression_settings) names the fields that record a switch of this run:
+    each is checked against that value, not compared with the reference, and a
+    wrong value is a difference."""
     import re
 
     ref = json.load(open(ref_path))
@@ -482,6 +496,11 @@ def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None, kin
     new.pop(PROVENANCE_KEY, None)
     fr, fn = flatten_all(ref), flatten_all(new)
     diffs = []
+    for path, required in (settings or {}).items():
+        fr.pop(path, None)
+        got = fn.pop(path, "<missing>")
+        if not _equal(got, required):
+            diffs.append((path, f"<switch is {required} in this run>", got))
     for k, v in fr.items():
         if k not in fn:
             diffs.append((k, v, "<missing>"))
@@ -531,6 +550,7 @@ def compare_summary(ref_path: Path, new_path: Path) -> dict:
 def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, workers: int, label: str) -> bool:
     regenerate(images, out_root, overrides, workers)
     allow = regression_allowlist()
+    settings = regression_settings(overrides)
     table, ok, total, shown = [], True, 0, []
     for p in images:
         name = lacunae.image_label(p)
@@ -540,7 +560,7 @@ def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, wor
             if not r.is_file():
                 d_all.append((r.name, "<no reference file>", ""))
                 continue
-            n, d, x = compare_json(r, nw, allow["json"], kind)
+            n, d, x = compare_json(r, nw, allow["json"], kind, settings.get(kind))
             n_all += n
             x_all += x
             d_all += [(f"{r.name}:{k}", a, b) for k, a, b in d]
@@ -558,6 +578,10 @@ def run_regression(images: list, ref: Path, out_root: Path, overrides: dict, wor
     total += s_cells
     print_table(["image", "json fields compared", "differ", "new fields (not compared)", "result"], table,
                 title=f"Regression, {label}: {out_root} against {ref} (tolerance 0, provenance ignored)\n")
+    for s_kind, fields in settings.items():
+        for path, required in fields.items():
+            print(f"setting field checked against this run's switch, not compared with results/: "
+                  f"{s_kind} {path} must be {required} in every {s_kind} json.")
     print(f"\n{summary_csv(ref).name}: {s_cells} cells compared, {len(s_diffs)} differ"
           + (f"; new columns not compared: {', '.join(summ['extra_columns'])}" if summ["extra_columns"] else ""))
     for d in (shown + s_diffs)[:20]:
