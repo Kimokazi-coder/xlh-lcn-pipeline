@@ -105,7 +105,7 @@ chosen again, so the two folders show the same places.
 python src/canal_physical/ablation.py --dir data/WT
 ```
 
-Commit `16866b5735d26a245a320bf92a14e0546e6e2910`, tracked files clean: True. Config hash
+Commit `cfa93cf12b75d3413caf259fb25d027e97bb0500`, tracked files clean: True. Config hash
 `dc534babadca48a8`.
 
 ## Versions
