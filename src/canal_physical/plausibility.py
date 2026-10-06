@@ -49,31 +49,30 @@ CAVEATS = [
 ]
 
 
-def areal_density_per_um2(field: dict, params) -> float | None:
+def areal_density_per_um2(measures: dict, params) -> float | None:
     """Canaliculi crossing a unit area, taken as the skeleton length density:
     um of thread per um^2 is numerically the number of threads crossing a 1 um
     line per um, which is what an areal density of canaliculi counts. Reported
     as a comparison only, and it is not the same construction as a count on a
     cut face."""
-    return field.get("field_length_density_um_per_um2")
+    return measures.get("field_length_density_um_per_um2")
 
 
-def canalicular_length_um(field: dict, interior: dict, params) -> float | None:
+def canalicular_length_um(measures: dict, params) -> float | None:
     """Thread length per lacuna inside this section: the owned length of an
     interior cell, in um. This is a 2D fragment of a 3D length, so it is expected
     to fall below the published range."""
-    value = interior.get("owned_length_px_per_cell")
-    return params.um(value) if value is not None else None
+    return measures.get("owned_length_um_per_cell")
 
 
-def table(field: dict, interior: dict, params) -> list:
+def table(measures: dict, params) -> list:
     """[(what, measured, low, high, unit, inside or outside, note)] for one image
-    and one method."""
+    and one method, from the comparison row that metrics.in_um builds."""
     measured = {
-        "width_median_um": field.get("width_median_um"),
-        "canalicular_length_um": canalicular_length_um(field, interior, params),
-        "roots_per_cell": interior.get("roots_per_cell"),
-        "areal_density_per_um2": areal_density_per_um2(field, params),
+        "width_median_um": measures.get("width_median_um"),
+        "canalicular_length_um": canalicular_length_um(measures, params),
+        "roots_per_cell": measures.get("roots_per_cell"),
+        "areal_density_per_um2": areal_density_per_um2(measures, params),
     }
     rows = []
     for key, what, low, high, unit, note in RANGES:

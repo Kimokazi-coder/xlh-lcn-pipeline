@@ -79,7 +79,7 @@ def median_edge_length_px(graph, edge_owner: dict, n_lacunae: int) -> float | No
     the median over every owned edge is added for the comparison."""
     lengths = []
     for lacuna_id in range(1, n_lacunae + 1):
-        lengths += canaliculi.cell_edge_lengths(graph, edge_owner, lacuna_id)
+        lengths += quantification.cell_edge_lengths(graph, edge_owner, lacuna_id)
     return float(np.median(lengths)) if lengths else None
 
 

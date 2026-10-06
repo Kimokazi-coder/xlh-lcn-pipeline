@@ -96,3 +96,84 @@ def zoom_boxes(skeleton_current: np.ndarray, skeleton_new: np.ndarray, params,
             break
         boxes.append((i * side_px, j * side_px, side_px, value))
     return boxes
+
+
+# The figures. matplotlib is already a dependency of this project
+# (requirements.txt pins 3.9.4), so nothing is added.
+
+PANEL_TITLES = ("raw image", "current method", "experimental method")
+DPI = 300
+# No timestamp in any output, so two identical runs give identical bytes.
+PDF_METADATA = {"CreationDate": None, "Producer": "", "Creator": ""}
+PNG_METADATA = {"Software": ""}
+BOX_COLOUR = (1.0, 1.0, 0.0)  # yellow, the colour the pipeline uses for a frame-edge lacuna
+
+
+def _scale_bar(ax, params, extent_px: int, colour="white") -> None:
+    """A bar of SCALE_BAR_UM micrometres with its label, bottom right."""
+    length_px = params.px(SCALE_BAR_UM)
+    pad = extent_px * 0.04
+    y = extent_px - pad
+    x1 = extent_px - pad
+    x0 = x1 - length_px
+    ax.plot([x0, x1], [y, y], color=colour, linewidth=2.0, solid_capstyle="butt")
+    ax.text((x0 + x1) / 2.0, y - extent_px * 0.015, f"{SCALE_BAR_UM:g} µm",
+            color=colour, ha="center", va="bottom", fontsize=6.5)
+
+
+def _panel(ax, image, title: str, params, extent_px: int, boxes=None) -> None:
+    ax.imshow(image, cmap=None if image.ndim == 3 else "gray", vmin=None if image.ndim == 3 else 0,
+              vmax=None if image.ndim == 3 else 255, interpolation="nearest")
+    ax.set_title(title, fontsize=7.5)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.4)
+    if boxes:
+        from matplotlib.patches import Rectangle
+        for n, (row0, col0, side, _value) in enumerate(boxes, start=1):
+            ax.add_patch(Rectangle((col0, row0), side, side, fill=False, edgecolor=BOX_COLOUR,
+                                   linewidth=0.7))
+            ax.text(col0 + 2, row0 + 2, str(n), color=BOX_COLOUR, fontsize=6, ha="left", va="top")
+    _scale_bar(ax, params, extent_px)
+
+
+def triptych(raw_uint8, current_rgb, new_rgb, label: str, params, boxes, out_png: Path,
+             out_pdf: Path, caption: str) -> None:
+    """Raw, current, experimental, side by side at the same crop and window, with
+    the zoom boxes marked."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    extent = raw_uint8.shape[0]
+    fig, axes = plt.subplots(1, 3, figsize=(10.5, 4.0))
+    for ax, image, title in zip(axes, (raw_uint8, current_rgb, new_rgb), PANEL_TITLES):
+        _panel(ax, image, title, params, extent, boxes)
+    fig.suptitle(f"{label}: {caption}", fontsize=8)
+    fig.tight_layout(rect=(0, 0.02, 1, 0.94))
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_png, dpi=DPI, metadata=PNG_METADATA)
+    fig.savefig(out_pdf, metadata=PDF_METADATA)
+    plt.close(fig)
+
+
+def zoom(raw_uint8, current_rgb, new_rgb, label: str, params, box, index: int, out_png: Path,
+         caption: str) -> None:
+    """The same crop of all three panels, at the box the rule chose."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    row0, col0, side, value = box
+    sl = (slice(row0, row0 + side), slice(col0, col0 + side))
+    fig, axes = plt.subplots(1, 3, figsize=(10.5, 4.2))
+    for ax, image, title in zip(axes, (raw_uint8, current_rgb, new_rgb), PANEL_TITLES):
+        _panel(ax, image[sl], title, params, side)
+    fig.suptitle(f"{label} zoom {index}: {caption}\nat row {row0}, column {col0}, "
+                 f"{params.um(side):g} µm square, skeleton length differs by {value} px",
+                 fontsize=7.5)
+    fig.tight_layout(rect=(0, 0.02, 1, 0.88))
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_png, dpi=DPI, metadata=PNG_METADATA)
+    plt.close(fig)
