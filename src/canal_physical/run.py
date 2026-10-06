@@ -304,7 +304,7 @@ def fixed_zip_dates(path: Path) -> None:
         for info in sorted(src.infolist(), key=lambda i: i.filename):
             data = src.read(info.filename)
             if info.filename == "docProps/core.xml":
-                data = re.sub(rb"(<dcterms:(?:created|modified)[^>]*>)[^<]*", rb"" + stamp, data)
+                data = re.sub(rb"(<dcterms:(?:created|modified)[^>]*>)[^<]*", rb"\g<1>" + stamp, data)
             entry = zipfile.ZipInfo(info.filename, date_time=FIXED_DATE)
             entry.compress_type = zipfile.ZIP_DEFLATED
             entry.external_attr = info.external_attr
