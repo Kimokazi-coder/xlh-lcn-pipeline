@@ -30,7 +30,8 @@ RANGES = [
     ("width_median_um", "canalicular diameter", 0.1, 0.7, "um",
      "common 0.2 to 0.4; limited by the optical resolution, so this is a width in the image"),
     ("canalicular_length_um", "length per canaliculus", 25.0, 50.0, "um",
-     "a 3D length; a 2D section holds only part of a thread"),
+     "owned length per cell divided by roots per cell; a 2D section holds only part of a thread, "
+     "and ownership has no distance limit"),
     ("roots_per_cell", "canaliculi per lacuna", 40.0, 115.0, "count",
      "a 3D count; a section shows the threads crossing that plane only"),
     ("areal_density_per_um2", "areal density", 0.5, 0.9, "per um^2",
@@ -59,10 +60,20 @@ def areal_density_per_um2(measures: dict, params) -> float | None:
 
 
 def canalicular_length_um(measures: dict, params) -> float | None:
-    """Thread length per lacuna inside this section: the owned length of an
-    interior cell, in um. This is a 2D fragment of a 3D length, so it is expected
-    to fall below the published range."""
-    return measures.get("owned_length_um_per_cell")
+    """Length of one canaliculus, in um: the thread length a cell owns divided by
+    the number of threads leaving it, both over interior cells.
+
+    The published range is per canaliculus, not per cell, so the owned length has
+    to be divided by the root count. Two things make this an approximation: a 2D
+    section holds only the part of a thread that lies in the plane, which pulls
+    the value down, and ownership has no distance limit, so a cell can own a
+    thread that runs far away, which pulls it up. It is a comparison, not a
+    measurement of a canaliculus."""
+    length = measures.get("owned_length_um_per_cell")
+    roots = measures.get("roots_per_cell")
+    if length is None or not roots:
+        return None
+    return round(length / roots, 6)
 
 
 def table(measures: dict, params) -> list:
