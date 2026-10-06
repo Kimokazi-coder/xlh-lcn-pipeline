@@ -456,8 +456,14 @@ def verification_matches_pipeline(label: str, path: Path) -> tuple:
 
 
 def write_figures(label: str, display, detections: dict, results: dict, lac: dict, params,
-                  out_dir: Path) -> dict:
-    """Every figure of one image. Returns what the checks need."""
+                  out_dir: Path, compact: bool = False) -> dict:
+    """Every figure of one image. Returns what the checks need.
+
+    With `compact`, three things shrink to fit the size budget, and nothing else
+    changes: the comparison is drawn at one times instead of two, its pdf is
+    rasterised at a lower resolution, and the pipeline style picture of variant A
+    is checked but not kept, because it is a byte for byte duplicate of
+    results/<label>/2_canaliculi/<label>_canaliculi_verification.png."""
     from canal_physical import figures_v2 as fig
 
     folder = out_dir / label
@@ -470,16 +476,25 @@ def write_figures(label: str, display, detections: dict, results: dict, lac: dic
                        folder / f"{label}_v2_{key}.png")
 
     # Two panels in one file, at a smaller upscale so the file stays in budget.
+    upscale = 1 if compact else COMPARE_UPSCALE
     left = fig.draw_skeleton(display, detections["A"]["skeleton"], detections["A"]["owner_map"],
-                             detections["A"]["lacuna_id_map"], colors, COMPARE_UPSCALE)
+                             detections["A"]["lacuna_id_map"], colors, upscale)
     right = fig.draw_skeleton(display, detections[PRIMARY]["skeleton"], detections[PRIMARY]["owner_map"],
-                              detections[PRIMARY]["lacuna_id_map"], colors, COMPARE_UPSCALE)
+                              detections[PRIMARY]["lacuna_id_map"], colors, upscale)
     gap = np.zeros((left.shape[0], 8, 3), dtype=left.dtype)
-    both = np.concatenate([fig.add_scale_bar(left, params.pixel_size_um, COMPARE_UPSCALE), gap,
-                           fig.add_scale_bar(right, params.pixel_size_um, COMPARE_UPSCALE)], axis=1)
+    both = np.concatenate([fig.add_scale_bar(left, params.pixel_size_um, upscale), gap,
+                           fig.add_scale_bar(right, params.pixel_size_um, upscale)], axis=1)
     reserved = list(colors.values()) + [fig.UNOWNED_COLOUR, (255, 255, 255)]
-    fig.save_png(both, folder / f"{label}_v2_compare_A_{PRIMARY}.png", reserved)
-    save_compare_pdf(both, label, folder / f"{label}_v2_compare_A_{PRIMARY}.pdf", caption)
+    compare_png = folder / f"{label}_v2_compare_A_{PRIMARY}.png"
+    fig.save_png(both, compare_png, reserved)
+    # The pdf embeds the picture that was just written, which already has its
+    # colours reduced to a palette, rather than the full colour array. The pdf
+    # has no palette of its own, so embedding the reduced version is what keeps
+    # it near the size of the png instead of twice it.
+    from skimage.io import imread
+
+    save_compare_pdf(np.asarray(imread(compare_png))[..., :3], label,
+                     folder / f"{label}_v2_compare_A_{PRIMARY}.pdf", caption)
 
     boxes = zoom_boxes(label)
     for i, box in enumerate(boxes, start=1):
@@ -498,28 +513,43 @@ def write_figures(label: str, display, detections: dict, results: dict, lac: dic
 
     pipeline_dir = folder / "pipeline_style"
     checks = {}
-    for key in ("A", PRIMARY):
-        path = pipeline_dir / f"{label}_verification_{key}_pipeline_style.png"
-        fig.pipeline_style(lac, display, detections[key], path)
-        if key == "A":
-            checks["verification"] = verification_matches_pipeline(label, path)
+    primary_path = pipeline_dir / f"{label}_verification_{PRIMARY}_pipeline_style.png"
+    fig.pipeline_style(lac, display, detections[PRIMARY], primary_path)
+    if compact:
+        from skimage.io import imread
+
+        fig.save_png(np.asarray(imread(primary_path)), primary_path,
+                     list(colors.values()) + [(0, 255, 0), (255, 255, 255)])
+    path = pipeline_dir / f"{label}_verification_A_pipeline_style.png"
+    if compact:
+        # Written to a temporary place, checked, and not kept: it is identical to
+        # the committed one, so shipping it again would only cost space.
+        import tempfile
+
+        temporary = Path(tempfile.gettempdir()) / f"{label}_verification_A_check.png"
+        fig.pipeline_style(lac, display, detections["A"], temporary)
+        checks["verification"] = verification_matches_pipeline(label, temporary)
+        temporary.unlink(missing_ok=True)
+    else:
+        fig.pipeline_style(lac, display, detections["A"], path)
+        checks["verification"] = verification_matches_pipeline(label, path)
     return checks
 
 
-def save_compare_pdf(image: np.ndarray, label: str, path: Path, caption: str) -> None:
+def save_compare_pdf(image: np.ndarray, label: str, path: Path, caption: str, dpi: int = 200) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     height, width = image.shape[:2]
-    fig = plt.figure(figsize=(12.0, 12.0 * height / width))
+    fig = plt.figure(figsize=(width / dpi, height / dpi))
     ax = fig.add_axes((0, 0, 1, 1))
     ax.imshow(image, interpolation="nearest")
     ax.set_axis_off()
     fig.text(0.01, 0.985, f"{label}: current method (left) and {PRIMARY} (right). {caption}",
              fontsize=7, color="white", va="top")
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, metadata={"CreationDate": None, "Producer": "", "Creator": ""})
+    fig.savefig(path, dpi=dpi, metadata={"CreationDate": None, "Producer": "", "Creator": ""})
     plt.close(fig)
 
 
@@ -723,6 +753,10 @@ def main() -> None:
     group.add_argument("--dir", type=Path, help="A folder of .tif images.")
     parser.add_argument("-o", "--out", type=Path, default=OUT_DIR, help="Output folder.")
     parser.add_argument("--no-tiles", action="store_true", help="Skip the blind trace tiles.")
+    parser.add_argument("--compact", action="store_true",
+                        help="Fit the size budget: the comparison at one times with a lighter pdf, "
+                             "and the pipeline style picture of variant A checked but not kept, since "
+                             "it duplicates the committed one.")
     args = parser.parse_args()
 
     params = params_mod.DEFAULT
@@ -766,7 +800,8 @@ def main() -> None:
             rows.append(measure_row(label, results[key], detections[key]))
 
         diffs = compare_with_results(label, results["A"]["measured"])
-        checks = write_figures(label, display, detections, results, lac, params, args.out)
+        checks = write_figures(label, display, detections, results, lac, params, args.out,
+                               args.compact)
         checks["variant_A_against_results"] = {"ok": not diffs, "differences": len(diffs)}
         checks["variant_A_verification"] = {"ok": checks["verification"][0],
                                             "detail": checks["verification"][1]}
