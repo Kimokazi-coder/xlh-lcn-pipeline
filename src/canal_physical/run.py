@@ -263,9 +263,53 @@ def write_comparison_tables(rows: list, plaus_rows: list, out_dir: Path, params)
     notes.append([params_mod.PIXEL_LABEL])
     for line in plausibility.CAVEATS:
         notes.append([line])
-    wb.save(out_dir / "comparison_all_images.xlsx")
+    xlsx_path = out_dir / "comparison_all_images.xlsx"
+    fixed_workbook_dates(wb)
+    wb.save(xlsx_path)
+    fixed_zip_dates(xlsx_path)
 
     write_comparison_pdf(rows, plaus_rows, out_dir / "comparison_all_images.pdf", params)
+
+
+# openpyxl stamps the document properties and every zip entry with the time of
+# writing, so two identical runs would produce different bytes. Both are fixed
+# here, which makes the workbook reproducible: the brief asks for two runs to give
+# identical outputs. Nothing about the content changes.
+FIXED_DATE = (1980, 1, 1, 0, 0, 0)
+
+
+def fixed_workbook_dates(wb) -> None:
+    import datetime
+
+    stamp = datetime.datetime(*FIXED_DATE)
+    wb.properties.created = stamp
+    wb.properties.modified = stamp
+    wb.properties.creator = ""
+    wb.properties.lastModifiedBy = ""
+
+
+def fixed_zip_dates(path: Path) -> None:
+    """Rewrite the workbook with fixed entry dates and a fixed modified stamp.
+
+    openpyxl writes the time of saving into docProps/core.xml whatever the
+    properties say, and gives every zip entry the current time, so this is done
+    after the save. The cell values are copied untouched."""
+    import re
+    import shutil
+    import zipfile
+
+    stamp = f"{FIXED_DATE[0]:04d}-{FIXED_DATE[1]:02d}-{FIXED_DATE[2]:02d}T00:00:00Z".encode()
+    tmp = path.with_name(path.name + ".tmp")
+    with zipfile.ZipFile(path) as src, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as dst:
+        for info in sorted(src.infolist(), key=lambda i: i.filename):
+            data = src.read(info.filename)
+            if info.filename == "docProps/core.xml":
+                data = re.sub(rb"(<dcterms:(?:created|modified)[^>]*>)[^<]*", rb"" + stamp, data)
+            entry = zipfile.ZipInfo(info.filename, date_time=FIXED_DATE)
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = info.external_attr
+            dst.writestr(entry, data)
+    shutil.move(str(tmp), str(path))
 
 
 def write_comparison_pdf(rows: list, plaus_rows: list, path: Path, params) -> None:

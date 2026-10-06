@@ -21,7 +21,7 @@ python src/canal_physical/run.py --dir data/WT           # all 8 images, every o
 
 `python -m canal_physical.run --dir data/WT` works too when `src/` is on PYTHONPATH.
 
-Commit: `9b71d9b19108400a72f77a36ff4e2024cf8df247`, tracked files clean: False.
+Commit: `f7aba4e50b72a25e238e79fe252b33a0e578da2c`, tracked files clean: True.
 Config hash: `dc534babadca48a8`.
 Ridge scales chosen: [3.0, 3.6, 4.2] px = [0.39, 0.468, 0.546] um.
 

@@ -1261,12 +1261,12 @@
       },
       {
         "measure": "length per canaliculus",
-        "measured": 110.306898,
+        "measured": 19.891245,
         "range_low": 25.0,
         "range_high": 50.0,
         "unit": "um",
-        "verdict": "above",
-        "note": "a 3D length; a 2D section holds only part of a thread"
+        "verdict": "below",
+        "note": "owned length per cell divided by roots per cell; a 2D section holds only part of a thread, and ownership has no distance limit"
       },
       {
         "measure": "canaliculi per lacuna",
@@ -1299,12 +1299,12 @@
       },
       {
         "measure": "length per canaliculus",
-        "measured": 337.023791,
+        "measured": 62.83537,
         "range_low": 25.0,
         "range_high": 50.0,
         "unit": "um",
         "verdict": "above",
-        "note": "a 3D length; a 2D section holds only part of a thread"
+        "note": "owned length per cell divided by roots per cell; a 2D section holds only part of a thread, and ownership has no distance limit"
       },
       {
         "measure": "canaliculi per lacuna",
@@ -1380,8 +1380,8 @@
     "filter": "skimage.filters.sato, bright ridges, maximum over the scales"
   },
   "provenance": {
-    "git_commit": "9b71d9b19108400a72f77a36ff4e2024cf8df247",
-    "git_dirty": true,
+    "git_commit": "f7aba4e50b72a25e238e79fe252b33a0e578da2c",
+    "git_dirty": false,
     "versions": {
       "python": "3.9.10",
       "numpy": "2.0.2",
