@@ -112,6 +112,20 @@ INVERT_SIGNAL = False
 # acquisition record. Do not guess one.
 PIXEL_SIZE_UM = None
 
+# Branch canal-physical only. The acquisition record gives 0.13 um per pixel in
+# x and y (the 0.44 um z step is not used: these are single 2D sections). The
+# value is ROUNDED and NOT CONFIRMED PER IMAGE, so every output of that branch
+# carries the label "pixel size 0.13 um/px, rounded, unconfirmed".
+#
+# It is a separate constant rather than a value for PIXEL_SIZE_UM above, because
+# PIXEL_SIZE_UM is recorded in the parameters block of every result (see
+# lacunae.parameters and canaliculi.parameters) and switches every figure scale
+# bar to micrometres. Setting it would change those recorded values and the
+# figures, so a fresh run would no longer equal results/ at tolerance 0. The
+# experiment needs a physical scale, not a change to the pipeline's output, so
+# PIXEL_SIZE_UM stays None and the default behaviour is unchanged.
+PIXEL_SIZE_UM_CANAL_PHYSICAL = 0.13
+
 # Output
 
 # Decimal places for exported measurements.

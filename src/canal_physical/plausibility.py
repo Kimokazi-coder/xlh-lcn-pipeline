@@ -1,0 +1,88 @@
+"""Measured values beside published ranges, for reporting only.
+
+**No value in this module is ever used to choose a parameter, a threshold or a
+scale.** Every cut in this method comes from the image's own histogram. This
+table exists so that a number which is far outside what the literature describes
+is visible, not so that the method can be steered toward it.
+
+What the comparison cannot tell you, and which is printed with every table:
+
+- Count per lacuna, canalicular length, volume density and porosity are three
+  dimensional quantities. A single 2D section cuts the network, so a count or a
+  length measured here is not expected to match a 3D number, and no scaling
+  factor is applied to pretend otherwise.
+- The measured width is limited by the optical resolution of the confocal
+  microscope. At a wavelength near 590 nm the lateral resolution is of the order
+  of the canalicular diameter itself, so a thread is imaged wider than it is.
+  The width here is a width in the image, not a true diameter.
+- Several published values are human, not mouse, and some are from TEM or FIB
+  rather than confocal, so the preparation and the resolution differ.
+- The pixel size is 0.13 um/px, rounded and unconfirmed per image, so every
+  micrometre value carries that uncertainty.
+
+**Pixel size 0.13 um/px, rounded, unconfirmed per image.** Pre-validation.
+"""
+from __future__ import annotations
+
+# (key, what it is, low, high, unit, note). The ranges are the ones named in the
+# brief; the citations belong in the thesis text, not in the code.
+RANGES = [
+    ("width_median_um", "canalicular diameter", 0.1, 0.7, "um",
+     "common 0.2 to 0.4; limited by the optical resolution, so this is a width in the image"),
+    ("canalicular_length_um", "length per canaliculus", 25.0, 50.0, "um",
+     "a 3D length; a 2D section holds only part of a thread"),
+    ("roots_per_cell", "canaliculi per lacuna", 40.0, 115.0, "count",
+     "a 3D count; a section shows the threads crossing that plane only"),
+    ("areal_density_per_um2", "areal density", 0.5, 0.9, "per um^2",
+     "canaliculi per um^2 of bone area"),
+]
+
+CAVEATS = [
+    "Reporting only: no value below was used to choose any parameter, threshold or scale.",
+    "Count per lacuna, canalicular length, volume density and porosity are 3D quantities. A single 2D",
+    "section is not expected to match them, and nothing here is scaled to make it match.",
+    "The width is limited by the optical resolution of the confocal microscope, so it is a width in the",
+    "image and not a true canalicular diameter.",
+    "Several published values are human, not mouse, and come from other preparations and resolutions.",
+    "Pixel size 0.13 um/px, rounded, unconfirmed per image, so every micrometre value carries that.",
+    "This is a sanity check, not a target.",
+]
+
+
+def areal_density_per_um2(field: dict, params) -> float | None:
+    """Canaliculi crossing a unit area, taken as the skeleton length density:
+    um of thread per um^2 is numerically the number of threads crossing a 1 um
+    line per um, which is what an areal density of canaliculi counts. Reported
+    as a comparison only, and it is not the same construction as a count on a
+    cut face."""
+    return field.get("field_length_density_um_per_um2")
+
+
+def canalicular_length_um(field: dict, interior: dict, params) -> float | None:
+    """Thread length per lacuna inside this section: the owned length of an
+    interior cell, in um. This is a 2D fragment of a 3D length, so it is expected
+    to fall below the published range."""
+    value = interior.get("owned_length_px_per_cell")
+    return params.um(value) if value is not None else None
+
+
+def table(field: dict, interior: dict, params) -> list:
+    """[(what, measured, low, high, unit, inside or outside, note)] for one image
+    and one method."""
+    measured = {
+        "width_median_um": field.get("width_median_um"),
+        "canalicular_length_um": canalicular_length_um(field, interior, params),
+        "roots_per_cell": interior.get("roots_per_cell"),
+        "areal_density_per_um2": areal_density_per_um2(field, params),
+    }
+    rows = []
+    for key, what, low, high, unit, note in RANGES:
+        value = measured.get(key)
+        if value is None:
+            verdict = "no value"
+        elif low <= value <= high:
+            verdict = "inside"
+        else:
+            verdict = "below" if value < low else "above"
+        rows.append((what, value, low, high, unit, verdict, note))
+    return rows
