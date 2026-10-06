@@ -1,0 +1,909 @@
+{
+  "status": "pre-validation",
+  "pixel_size_label": "pixel size 0.13 um/px, rounded, unconfirmed",
+  "pixel_size_um": 0.13,
+  "image_label": "682_z08",
+  "note": "The experimental method rebuilt around the physical scale. Scales are set in micrometres or chosen from the image, never from the earlier mask and never from a published value. The width is measured on the image, not on the mask, and includes the optical blur, so it is an upper bound on the diameter. No variant is called better than another.",
+  "variants": {
+    "A": "current method, as is",
+    "P1": "ridge, sigmas 0.13, 0.17, 0.21 um",
+    "P2": "ridge, sigmas 0.17, 0.21, 0.26 um (primary)",
+    "P3": "ridge, one scale per image chosen from the image",
+    "P4": "P2 with the low cut at 0.9 of the high cut",
+    "P5": "P2 with gap bridging off",
+    "N": "P2 on the notch filtered image"
+  },
+  "p3_scale_choice": {
+    "chosen_sigma_um": 0.334,
+    "chosen_sigma_px": 2.5692,
+    "at_the_edge_of_the_search_range": true,
+    "candidates": [
+      {
+        "sigma_um": 0.1,
+        "sigma_px": 0.7692,
+        "scale_normalised_response_median_of_top": 0.0373652937665703
+      },
+      {
+        "sigma_um": 0.126,
+        "sigma_px": 0.9692,
+        "scale_normalised_response_median_of_top": 0.0628565085115792
+      },
+      {
+        "sigma_um": 0.152,
+        "sigma_px": 1.1692,
+        "scale_normalised_response_median_of_top": 0.08285321281593631
+      },
+      {
+        "sigma_um": 0.178,
+        "sigma_px": 1.3692,
+        "scale_normalised_response_median_of_top": 0.1008282843065963
+      },
+      {
+        "sigma_um": 0.204,
+        "sigma_px": 1.5692,
+        "scale_normalised_response_median_of_top": 0.11630712525226188
+      },
+      {
+        "sigma_um": 0.23,
+        "sigma_px": 1.7692,
+        "scale_normalised_response_median_of_top": 0.12906487328473892
+      },
+      {
+        "sigma_um": 0.256,
+        "sigma_px": 1.9692,
+        "scale_normalised_response_median_of_top": 0.13908471308210205
+      },
+      {
+        "sigma_um": 0.282,
+        "sigma_px": 2.1692,
+        "scale_normalised_response_median_of_top": 0.14643855341425388
+      },
+      {
+        "sigma_um": 0.308,
+        "sigma_px": 2.3692,
+        "scale_normalised_response_median_of_top": 0.1514576607111514
+      },
+      {
+        "sigma_um": 0.334,
+        "sigma_px": 2.5692,
+        "scale_normalised_response_median_of_top": 0.154249641736676
+      }
+    ]
+  },
+  "measures": {
+    "A": {
+      "field_length_density_per_px": 0.03464652,
+      "field_length_density_um_per_um2": 0.266512,
+      "analysed_area_px2": 1017909.0,
+      "analysed_area_um2": 17202.6621,
+      "total_skeleton_length_px": 35267.0,
+      "total_skeleton_length_um": 4584.71,
+      "junction_count": 480,
+      "junction_density_per_px2": 0.00047155,
+      "junction_density_per_um2": 0.0279,
+      "roots_per_cell": 10.0,
+      "owned_length_px_per_cell": 1860.5611,
+      "owned_length_um_per_cell": 241.872943,
+      "mean_edge_length_px": 25.4567,
+      "mean_edge_length_um": 3.309371,
+      "median_edge_length_px": 17.414213562373096,
+      "median_edge_length_um": 2.263848,
+      "width_median_px": 6.0,
+      "width_median_um": 0.78,
+      "width_p10_px": 2.8284,
+      "width_p10_um": 0.367692,
+      "width_p90_px": 8.0,
+      "width_p90_um": 1.04,
+      "width_pixels_used": 32998,
+      "thread_end_fraction": 0.777315,
+      "connected_to_lacuna_fraction": 0.409921,
+      "interior_lacuna_count": 8,
+      "lacuna_count": 10,
+      "n_bridges": 24,
+      "ring_length_r30_px_per_cell": 396.75,
+      "ring_length_r30_um_per_cell": 51.5775,
+      "ring_length_r60_px_per_cell": 982.0,
+      "ring_length_r60_um_per_cell": 127.66,
+      "ring_width_mean_r30_px_per_cell": 5.5385,
+      "ring_width_mean_r30_um_per_cell": 0.720005
+    },
+    "P1": {
+      "field_length_density_per_px": 0.0396784,
+      "field_length_density_um_per_um2": 0.305218,
+      "analysed_area_px2": 1017909.0,
+      "analysed_area_um2": 17202.6621,
+      "total_skeleton_length_px": 40389.0,
+      "total_skeleton_length_um": 5250.57,
+      "junction_count": 714,
+      "junction_density_per_px2": 0.00070144,
+      "junction_density_per_um2": 0.0415,
+      "roots_per_cell": 11.0,
+      "owned_length_px_per_cell": 2776.098,
+      "owned_length_um_per_cell": 360.89274,
+      "mean_edge_length_px": 23.7274,
+      "mean_edge_length_um": 3.084562,
+      "median_edge_length_px": 16.313708498984763,
+      "median_edge_length_um": 2.120782,
+      "width_median_px": 4.0,
+      "width_median_um": 0.52,
+      "width_p10_px": 2.0,
+      "width_p10_um": 0.26,
+      "width_p90_px": 6.0,
+      "width_p90_um": 0.78,
+      "width_pixels_used": 37747,
+      "thread_end_fraction": 0.70808,
+      "connected_to_lacuna_fraction": 0.546404,
+      "interior_lacuna_count": 8,
+      "lacuna_count": 10,
+      "n_bridges": 23,
+      "ring_length_r30_px_per_cell": 430.625,
+      "ring_length_r30_um_per_cell": 55.98125,
+      "ring_length_r60_px_per_cell": 1093.25,
+      "ring_length_r60_um_per_cell": 142.1225,
+      "ring_width_mean_r30_px_per_cell": 4.1797,
+      "ring_width_mean_r30_um_per_cell": 0.543361
+    },
+    "P2": {
+      "field_length_density_per_px": 0.03867045,
+      "field_length_density_um_per_um2": 0.297465,
+      "analysed_area_px2": 1017909.0,
+      "analysed_area_um2": 17202.6621,
+      "total_skeleton_length_px": 39363.0,
+      "total_skeleton_length_um": 5117.19,
+      "junction_count": 680,
+      "junction_density_per_px2": 0.00066804,
+      "junction_density_per_um2": 0.0395,
+      "roots_per_cell": 10.625,
+      "owned_length_px_per_cell": 2836.5633,
+      "owned_length_um_per_cell": 368.753229,
+      "mean_edge_length_px": 24.5537,
+      "mean_edge_length_um": 3.191981,
+      "median_edge_length_px": 17.242640687119284,
+      "median_edge_length_um": 2.241543,
+      "width_median_px": 4.4721,
+      "width_median_um": 0.581373,
+      "width_p10_px": 2.8284,
+      "width_p10_um": 0.367692,
+      "width_p90_px": 6.0,
+      "width_p90_um": 0.78,
+      "width_pixels_used": 36786,
+      "thread_end_fraction": 0.701831,
+      "connected_to_lacuna_fraction": 0.567921,
+      "interior_lacuna_count": 8,
+      "lacuna_count": 10,
+      "n_bridges": 20,
+      "ring_length_r30_px_per_cell": 421.25,
+      "ring_length_r30_um_per_cell": 54.7625,
+      "ring_length_r60_px_per_cell": 1072.75,
+      "ring_length_r60_um_per_cell": 139.4575,
+      "ring_width_mean_r30_px_per_cell": 4.5159,
+      "ring_width_mean_r30_um_per_cell": 0.587067
+    },
+    "P3": {
+      "field_length_density_per_px": 0.03712807,
+      "field_length_density_um_per_um2": 0.285601,
+      "analysed_area_px2": 1017909.0,
+      "analysed_area_um2": 17202.6621,
+      "total_skeleton_length_px": 37793.0,
+      "total_skeleton_length_um": 4913.09,
+      "junction_count": 674,
+      "junction_density_per_px2": 0.00066214,
+      "junction_density_per_um2": 0.0392,
+      "roots_per_cell": 10.25,
+      "owned_length_px_per_cell": 3188.5913,
+      "owned_length_um_per_cell": 414.516869,
+      "mean_edge_length_px": 24.8721,
+      "mean_edge_length_um": 3.233373,
+      "median_edge_length_px": 16.899494936611667,
+      "median_edge_length_um": 2.196934,
+      "width_median_px": 5.6569,
+      "width_median_um": 0.735397,
+      "width_p10_px": 4.0,
+      "width_p10_um": 0.52,
+      "width_p90_px": 7.2111,
+      "width_p90_um": 0.937443,
+      "width_pixels_used": 35421,
+      "thread_end_fraction": 0.677158,
+      "connected_to_lacuna_fraction": 0.650969,
+      "interior_lacuna_count": 8,
+      "lacuna_count": 10,
+      "n_bridges": 34,
+      "ring_length_r30_px_per_cell": 403.25,
+      "ring_length_r30_um_per_cell": 52.4225,
+      "ring_length_r60_px_per_cell": 1023.875,
+      "ring_length_r60_um_per_cell": 133.10375,
+      "ring_width_mean_r30_px_per_cell": 5.0881,
+      "ring_width_mean_r30_um_per_cell": 0.661453
+    },
+    "P4": {
+      "field_length_density_per_px": 0.03611816,
+      "field_length_density_um_per_um2": 0.277832,
+      "analysed_area_px2": 1017909.0,
+      "analysed_area_um2": 17202.6621,
+      "total_skeleton_length_px": 36765.0,
+      "total_skeleton_length_um": 4779.45,
+      "junction_count": 585,
+      "junction_density_per_px2": 0.00057471,
+      "junction_density_per_um2": 0.034,
+      "roots_per_cell": 10.125,
+      "owned_length_px_per_cell": 2488.637,
+      "owned_length_um_per_cell": 323.52281,
+      "mean_edge_length_px": 25.7861,
+      "mean_edge_length_um": 3.352193,
+      "median_edge_length_px": 17.899494936611667,
+      "median_edge_length_um": 2.326934,
+      "width_median_px": 4.4721,
+      "width_median_um": 0.581373,
+      "width_p10_px": 2.0,
+      "width_p10_um": 0.26,
+      "width_p90_px": 6.0,
+      "width_p90_um": 0.78,
+      "width_pixels_used": 33989,
+      "thread_end_fraction": 0.720323,
+      "connected_to_lacuna_fraction": 0.53691,
+      "interior_lacuna_count": 8,
+      "lacuna_count": 10,
+      "n_bridges": 91,
+      "ring_length_r30_px_per_cell": 395.5,
+      "ring_length_r30_um_per_cell": 51.415,
+      "ring_length_r60_px_per_cell": 1004.625,
+      "ring_length_r60_um_per_cell": 130.60125,
+      "ring_width_mean_r30_px_per_cell": 4.3575,
+      "ring_width_mean_r30_um_per_cell": 0.566475
+    },
+    "P5": {
+      "field_length_density_per_px": 0.03862133,
+      "field_length_density_um_per_um2": 0.297087,
+      "analysed_area_px2": 1017909.0,
+      "analysed_area_um2": 17202.6621,
+      "total_skeleton_length_px": 39313.0,
+      "total_skeleton_length_um": 5110.69,
+      "junction_count": 677,
+      "junction_density_per_px2": 0.00066509,
+      "junction_density_per_um2": 0.0394,
+      "roots_per_cell": 10.625,
+      "owned_length_px_per_cell": 2776.1001,
+      "owned_length_um_per_cell": 360.893013,
+      "mean_edge_length_px": 24.3817,
+      "mean_edge_length_um": 3.169621,
+      "median_edge_length_px": 17.035533905932738,
+      "median_edge_length_um": 2.214619,
+      "width_median_px": 4.4721,
+      "width_median_um": 0.581373,
+      "width_p10_px": 2.8284,
+      "width_p10_um": 0.367692,
+      "width_p90_px": 6.0,
+      "width_p90_um": 0.78,
+      "width_pixels_used": 36766,
+      "thread_end_fraction": 0.707474,
+      "connected_to_lacuna_fraction": 0.556024,
+      "interior_lacuna_count": 8,
+      "lacuna_count": 10,
+      "n_bridges": 0,
+      "ring_length_r30_px_per_cell": 421.0,
+      "ring_length_r30_um_per_cell": 54.73,
+      "ring_length_r60_px_per_cell": 1072.125,
+      "ring_length_r60_um_per_cell": 139.37625,
+      "ring_width_mean_r30_px_per_cell": 4.5168,
+      "ring_width_mean_r30_um_per_cell": 0.587184
+    },
+    "N": {
+      "field_length_density_per_px": 0.03866357,
+      "field_length_density_um_per_um2": 0.297412,
+      "analysed_area_px2": 1017909.0,
+      "analysed_area_um2": 17202.6621,
+      "total_skeleton_length_px": 39356.0,
+      "total_skeleton_length_um": 5116.28,
+      "junction_count": 679,
+      "junction_density_per_px2": 0.00066705,
+      "junction_density_per_um2": 0.0395,
+      "roots_per_cell": 10.625,
+      "owned_length_px_per_cell": 2835.7616,
+      "owned_length_um_per_cell": 368.649008,
+      "mean_edge_length_px": 24.5602,
+      "mean_edge_length_um": 3.192826,
+      "median_edge_length_px": 17.242640687119284,
+      "median_edge_length_um": 2.241543,
+      "width_median_px": 4.4721,
+      "width_median_um": 0.581373,
+      "width_p10_px": 2.8284,
+      "width_p10_um": 0.367692,
+      "width_p90_px": 6.0,
+      "width_p90_um": 0.78,
+      "width_pixels_used": 36779,
+      "thread_end_fraction": 0.702007,
+      "connected_to_lacuna_fraction": 0.567915,
+      "interior_lacuna_count": 8,
+      "lacuna_count": 10,
+      "n_bridges": 20,
+      "ring_length_r30_px_per_cell": 421.25,
+      "ring_length_r30_um_per_cell": 54.7625,
+      "ring_length_r60_px_per_cell": 1072.5,
+      "ring_length_r60_um_per_cell": 139.425,
+      "ring_width_mean_r30_px_per_cell": 4.5152,
+      "ring_width_mean_r30_um_per_cell": 0.586976
+    }
+  },
+  "width_on_the_image": {
+    "A": {
+      "width_fwhm_pixels_used": 30157,
+      "width_fwhm_candidates": 30923,
+      "width_fwhm_failure_fraction": 0.0248,
+      "width_fwhm_median_px": 4.8839,
+      "width_fwhm_median_um": 0.634912,
+      "width_fwhm_p10_px": 4.0709,
+      "width_fwhm_p10_um": 0.529216,
+      "width_fwhm_p90_px": 5.8475,
+      "width_fwhm_p90_um": 0.760169
+    },
+    "P1": {
+      "width_fwhm_pixels_used": 32428,
+      "width_fwhm_candidates": 33773,
+      "width_fwhm_failure_fraction": 0.0398,
+      "width_fwhm_median_px": 4.8379,
+      "width_fwhm_median_um": 0.628923,
+      "width_fwhm_p10_px": 3.9047,
+      "width_fwhm_p10_um": 0.507612,
+      "width_fwhm_p90_px": 5.8082,
+      "width_fwhm_p90_um": 0.755061
+    },
+    "P2": {
+      "width_fwhm_pixels_used": 32267,
+      "width_fwhm_candidates": 33361,
+      "width_fwhm_failure_fraction": 0.0328,
+      "width_fwhm_median_px": 4.8651,
+      "width_fwhm_median_um": 0.632458,
+      "width_fwhm_p10_px": 3.9799,
+      "width_fwhm_p10_um": 0.517384,
+      "width_fwhm_p90_px": 5.8536,
+      "width_fwhm_p90_um": 0.760963
+    },
+    "P3": {
+      "width_fwhm_pixels_used": 31357,
+      "width_fwhm_candidates": 32271,
+      "width_fwhm_failure_fraction": 0.0283,
+      "width_fwhm_median_px": 4.9085,
+      "width_fwhm_median_um": 0.6381,
+      "width_fwhm_p10_px": 4.0715,
+      "width_fwhm_p10_um": 0.529298,
+      "width_fwhm_p90_px": 5.9306,
+      "width_fwhm_p90_um": 0.770981
+    },
+    "P4": {
+      "width_fwhm_pixels_used": 30251,
+      "width_fwhm_candidates": 31111,
+      "width_fwhm_failure_fraction": 0.0276,
+      "width_fwhm_median_px": 4.8736,
+      "width_fwhm_median_um": 0.633562,
+      "width_fwhm_p10_px": 4.0462,
+      "width_fwhm_p10_um": 0.526001,
+      "width_fwhm_p90_px": 5.8284,
+      "width_fwhm_p90_um": 0.757692
+    },
+    "P5": {
+      "width_fwhm_pixels_used": 32254,
+      "width_fwhm_candidates": 33345,
+      "width_fwhm_failure_fraction": 0.0327,
+      "width_fwhm_median_px": 4.8651,
+      "width_fwhm_median_um": 0.632457,
+      "width_fwhm_p10_px": 3.9814,
+      "width_fwhm_p10_um": 0.517585,
+      "width_fwhm_p90_px": 5.8525,
+      "width_fwhm_p90_um": 0.760829
+    },
+    "N": {
+      "width_fwhm_pixels_used": 32262,
+      "width_fwhm_candidates": 33355,
+      "width_fwhm_failure_fraction": 0.0328,
+      "width_fwhm_median_px": 4.8651,
+      "width_fwhm_median_um": 0.632461,
+      "width_fwhm_p10_px": 3.98,
+      "width_fwhm_p10_um": 0.517402,
+      "width_fwhm_p90_px": 5.8544,
+      "width_fwhm_p90_um": 0.761078
+    }
+  },
+  "contrast": {
+    "A": {
+      "noise_level": 0.02181922,
+      "contrast_snr_median": 9.0226,
+      "contrast_snr_p10": 3.6376,
+      "low_contrast_fraction": 0.0138,
+      "contrast_pixels_used": 30923
+    },
+    "P1": {
+      "noise_level": 0.02578813,
+      "contrast_snr_median": 6.7631,
+      "contrast_snr_p10": 2.5608,
+      "low_contrast_fraction": 0.0414,
+      "contrast_pixels_used": 33773
+    },
+    "P2": {
+      "noise_level": 0.02465689,
+      "contrast_snr_median": 7.235,
+      "contrast_snr_p10": 2.7831,
+      "low_contrast_fraction": 0.0306,
+      "contrast_pixels_used": 33361
+    },
+    "P3": {
+      "noise_level": 0.02321205,
+      "contrast_snr_median": 7.9623,
+      "contrast_snr_p10": 3.0407,
+      "low_contrast_fraction": 0.0292,
+      "contrast_pixels_used": 32271
+    },
+    "P4": {
+      "noise_level": 0.02657844,
+      "contrast_snr_median": 7.2661,
+      "contrast_snr_p10": 3.0077,
+      "low_contrast_fraction": 0.0183,
+      "contrast_pixels_used": 31111
+    },
+    "P5": {
+      "noise_level": 0.02465689,
+      "contrast_snr_median": 7.2379,
+      "contrast_snr_p10": 2.7868,
+      "low_contrast_fraction": 0.0303,
+      "contrast_pixels_used": 33345
+    },
+    "N": {
+      "noise_level": 0.02465821,
+      "contrast_snr_median": 7.2356,
+      "contrast_snr_p10": 2.7843,
+      "low_contrast_fraction": 0.0305,
+      "contrast_pixels_used": 33355
+    }
+  },
+  "artifacts": {
+    "A": {
+      "skeleton_px": 35267,
+      "bridged_px": 30,
+      "bridged_fraction": 0.000851,
+      "straight_run_px": 8625,
+      "straight_run_fraction": 0.244563,
+      "rectangle_count": 0,
+      "legacy_unsupported_fraction": 0.07412,
+      "legacy_unsupported_px": 2614,
+      "straight_run_fraction_smoothed": 0.20946
+    },
+    "P1": {
+      "skeleton_px": 40389,
+      "bridged_px": 33,
+      "bridged_fraction": 0.000817,
+      "straight_run_px": 9826,
+      "straight_run_fraction": 0.243284,
+      "rectangle_count": 0,
+      "legacy_unsupported_fraction": 0.124836,
+      "legacy_unsupported_px": 5042,
+      "straight_run_fraction_smoothed": 0.19488
+    },
+    "P2": {
+      "skeleton_px": 39363,
+      "bridged_px": 30,
+      "bridged_fraction": 0.000762,
+      "straight_run_px": 10196,
+      "straight_run_fraction": 0.259025,
+      "rectangle_count": 0,
+      "legacy_unsupported_fraction": 0.120773,
+      "legacy_unsupported_px": 4754,
+      "straight_run_fraction_smoothed": 0.211786
+    },
+    "P3": {
+      "skeleton_px": 37793,
+      "bridged_px": 57,
+      "bridged_fraction": 0.001508,
+      "straight_run_px": 9918,
+      "straight_run_fraction": 0.26243,
+      "rectangle_count": 0,
+      "legacy_unsupported_fraction": 0.112217,
+      "legacy_unsupported_px": 4241,
+      "straight_run_fraction_smoothed": 0.224391
+    },
+    "P4": {
+      "skeleton_px": 36765,
+      "bridged_px": 230,
+      "bridged_fraction": 0.006256,
+      "straight_run_px": 9386,
+      "straight_run_fraction": 0.255297,
+      "rectangle_count": 0,
+      "legacy_unsupported_fraction": 0.081844,
+      "legacy_unsupported_px": 3009,
+      "straight_run_fraction_smoothed": 0.208782
+    },
+    "P5": {
+      "skeleton_px": 39313,
+      "bridged_px": 0,
+      "bridged_fraction": 0.0,
+      "straight_run_px": 10140,
+      "straight_run_fraction": 0.25793,
+      "rectangle_count": 0,
+      "legacy_unsupported_fraction": 0.119808,
+      "legacy_unsupported_px": 4710,
+      "straight_run_fraction_smoothed": 0.210788
+    },
+    "N": {
+      "skeleton_px": 39356,
+      "bridged_px": 30,
+      "bridged_fraction": 0.000762,
+      "straight_run_px": 10198,
+      "straight_run_fraction": 0.259122,
+      "rectangle_count": 0,
+      "legacy_unsupported_fraction": 0.120617,
+      "legacy_unsupported_px": 4747,
+      "straight_run_fraction_smoothed": 0.211581
+    }
+  },
+  "parameters": {
+    "A": {
+      "pixel_size_um": null,
+      "smooth_sigma_px": 0.8,
+      "tophat_radius_px": 5,
+      "background_mode_subtract": true,
+      "threshold": "hysteresis, high cut = lower 3-class multi-Otsu cut",
+      "hysteresis_low_fraction": 0.75,
+      "network_threshold_t_lo": 0.083984375,
+      "lacuna_threshold_t_hi": 0.6252833946078431,
+      "lacuna_dilation_px": 2,
+      "min_thread_object_px2": 8,
+      "block_growth_in_flagged": true,
+      "broad_opening_radius_px": 8,
+      "flagged_min_span_fraction": 0.45,
+      "flagged_min_major_axis_px": 420.0,
+      "flagged_dilation_px": 4,
+      "flagged_area_px2": 84301.0,
+      "gap_bridging": true,
+      "max_bridge_gap_px": 10.0,
+      "max_bridge_angle_deg": 40.0,
+      "min_bridge_signal_fraction": 0.7,
+      "direction_walk_px": 5,
+      "prune_spur_len_px": 4,
+      "min_internal_edge_len_px": 6,
+      "graph_cleanup_max_iter": 20,
+      "lacuna_attach_gap_px": 10,
+      "ownership": "graph connectivity, no distance cap",
+      "root_merge_dist_px": 8.0,
+      "ring_radii_px": [
+        30,
+        60
+      ],
+      "band_line_filter": false,
+      "band_line_min_len_px": null,
+      "band_line_reach_px": null,
+      "band_line_remove_px": 2
+    },
+    "P1": {
+      "variant": "P1",
+      "what": "ridge, sigmas 0.13, 0.17, 0.21 um",
+      "thresholded_quantity": "multiscale ridge response (skimage.filters.sato, bright ridges)",
+      "gap_bridging": true,
+      "sigmas_um": [
+        0.13,
+        0.17,
+        0.21
+      ],
+      "sigmas_px": [
+        1.0,
+        1.3077,
+        1.6154
+      ],
+      "hysteresis_low_fraction": 0.75,
+      "high_cut": 0.023319710631043364,
+      "low_cut": 0.017489782973282523,
+      "ridge_source_image": "flattened channel"
+    },
+    "P2": {
+      "variant": "P2",
+      "what": "ridge, sigmas 0.17, 0.21, 0.26 um (primary)",
+      "thresholded_quantity": "multiscale ridge response (skimage.filters.sato, bright ridges)",
+      "gap_bridging": true,
+      "sigmas_um": [
+        0.17,
+        0.21,
+        0.26
+      ],
+      "sigmas_px": [
+        1.3077,
+        1.6154,
+        2.0
+      ],
+      "hysteresis_low_fraction": 0.75,
+      "high_cut": 0.0266050310804046,
+      "low_cut": 0.01995377331030345,
+      "ridge_source_image": "flattened channel"
+    },
+    "P3": {
+      "variant": "P3",
+      "what": "ridge, one scale per image chosen from the image",
+      "thresholded_quantity": "multiscale ridge response (skimage.filters.sato, bright ridges)",
+      "gap_bridging": true,
+      "sigmas_um": [
+        0.334
+      ],
+      "sigmas_px": [
+        2.5692
+      ],
+      "hysteresis_low_fraction": 0.75,
+      "high_cut": 0.029160712396143436,
+      "low_cut": 0.02187053429710758,
+      "ridge_source_image": "flattened channel"
+    },
+    "P4": {
+      "variant": "P4",
+      "what": "P2 with the low cut at 0.9 of the high cut",
+      "thresholded_quantity": "multiscale ridge response (skimage.filters.sato, bright ridges)",
+      "gap_bridging": true,
+      "sigmas_um": [
+        0.17,
+        0.21,
+        0.26
+      ],
+      "sigmas_px": [
+        1.3077,
+        1.6154,
+        2.0
+      ],
+      "hysteresis_low_fraction": 0.9,
+      "high_cut": 0.0266050310804046,
+      "low_cut": 0.02394452797236414,
+      "ridge_source_image": "flattened channel"
+    },
+    "P5": {
+      "variant": "P5",
+      "what": "P2 with gap bridging off",
+      "thresholded_quantity": "multiscale ridge response (skimage.filters.sato, bright ridges)",
+      "gap_bridging": false,
+      "sigmas_um": [
+        0.17,
+        0.21,
+        0.26
+      ],
+      "sigmas_px": [
+        1.3077,
+        1.6154,
+        2.0
+      ],
+      "hysteresis_low_fraction": 0.75,
+      "high_cut": 0.0266050310804046,
+      "low_cut": 0.01995377331030345,
+      "ridge_source_image": "flattened channel"
+    },
+    "N": {
+      "variant": "N",
+      "what": "P2 on the notch filtered image",
+      "thresholded_quantity": "multiscale ridge response (skimage.filters.sato, bright ridges)",
+      "gap_bridging": true,
+      "sigmas_um": [
+        0.17,
+        0.21,
+        0.26
+      ],
+      "sigmas_px": [
+        1.3077,
+        1.6154,
+        2.0
+      ],
+      "hysteresis_low_fraction": 0.75,
+      "high_cut": 0.026604228599085157,
+      "low_cut": 0.01995317144931387,
+      "ridge_source_image": "notch filtered flattened channel"
+    }
+  },
+  "lengths_in_um_and_px": [
+    {
+      "parameter": "pixel_size_um",
+      "um": 0.13,
+      "px": null,
+      "what": "um per pixel, rounded, unconfirmed"
+    },
+    {
+      "parameter": "sigma_um",
+      "um": [
+        0.39,
+        0.468,
+        0.546
+      ],
+      "px": [
+        3.0,
+        3.6,
+        4.2
+      ],
+      "what": "ridge scales"
+    },
+    {
+      "parameter": "hysteresis_low_fraction",
+      "um": 0.75,
+      "px": null,
+      "what": "share of the high cut"
+    },
+    {
+      "parameter": "lacuna_buffer_um",
+      "um": 0.26,
+      "px": 2,
+      "what": "buffer around a lacuna"
+    },
+    {
+      "parameter": "min_object_area_um2",
+      "um": 0.1352,
+      "px": 8,
+      "what": "smallest mask fragment, area"
+    },
+    {
+      "parameter": "max_bridge_gap_um",
+      "um": 1.3,
+      "px": 10.0,
+      "what": "longest gap bridged"
+    },
+    {
+      "parameter": "direction_walk_um",
+      "um": 0.65,
+      "px": 5,
+      "what": "walk back for the thread direction"
+    },
+    {
+      "parameter": "max_bridge_angle_deg",
+      "um": 40.0,
+      "px": null,
+      "what": "degrees"
+    },
+    {
+      "parameter": "min_bridge_signal_fraction",
+      "um": 0.7,
+      "px": null,
+      "what": "share of the cut"
+    },
+    {
+      "parameter": "prune_spur_um",
+      "um": 0.52,
+      "px": 4.0,
+      "what": "shortest kept spur"
+    },
+    {
+      "parameter": "min_internal_edge_um",
+      "um": 0.78,
+      "px": 6.0,
+      "what": "shortest kept internal edge"
+    },
+    {
+      "parameter": "lacuna_attach_gap_um",
+      "um": 1.3,
+      "px": 10.0,
+      "what": "attach distance"
+    },
+    {
+      "parameter": "root_merge_um",
+      "um": 1.04,
+      "px": 8.0,
+      "what": "root cluster distance"
+    },
+    {
+      "parameter": "ring_radii_um",
+      "um": [
+        3.9,
+        7.8
+      ],
+      "px": [
+        30.0,
+        60.0
+      ],
+      "what": "ring radii"
+    },
+    {
+      "parameter": "broad_opening_um",
+      "um": 1.04,
+      "px": 8,
+      "what": "opening that finds broad structures"
+    },
+    {
+      "parameter": "vascular_dilation_um",
+      "um": 0.52,
+      "px": 4,
+      "what": "dilation of the flagged region"
+    },
+    {
+      "parameter": "vascular_min_span_fraction",
+      "um": 0.45,
+      "px": null,
+      "what": "share of the frame"
+    },
+    {
+      "parameter": "vascular_min_major_axis_um",
+      "um": 54.6,
+      "px": 420.0,
+      "what": "smallest flagged major axis"
+    },
+    {
+      "parameter": "width_percentiles",
+      "um": [
+        10,
+        90
+      ],
+      "px": null,
+      "what": "percentiles reported"
+    },
+    {
+      "parameter": "random_seed",
+      "um": 0,
+      "px": null,
+      "what": "no random choice is made"
+    }
+  ],
+  "checks": {
+    "variant_A_against_results": {
+      "ok": true,
+      "differences": 0
+    },
+    "variant_A_verification": {
+      "ok": true,
+      "detail": "pixel identical"
+    }
+  },
+  "provenance": {
+    "git_commit": "ac7f4c8b8f3b7fa6319bb965ab990e30704bc87c",
+    "git_dirty": false,
+    "versions": {
+      "python": "3.9.10",
+      "numpy": "2.0.2",
+      "scipy": "1.13.1",
+      "scikit-image": "0.24.0",
+      "skan": "0.13.1",
+      "networkx": "3.2.1",
+      "pandas": "2.3.3"
+    },
+    "config_hash": "dc534babadca48a8",
+    "config_hash_covers": [
+      "ALL_IMAGES_ARCHIVE_DIR",
+      "ALL_IMAGES_DIR",
+      "ALL_IMAGES_FIGURES_DIR",
+      "ALL_IMAGES_QUANT_DIR",
+      "BAND_FILTER_MIN_OPENING_SHARE",
+      "BAND_LINE_FILTER",
+      "BAND_LINE_MIN_LEN_PX",
+      "BAND_LINE_REACH_PX",
+      "BAND_LINE_REMOVE_PX",
+      "CHANNEL",
+      "CHANNEL_AXIS",
+      "CSV_FLOAT_PRECISION",
+      "DISPLAY_WINDOW_FILE",
+      "FAST_LACUNA_STAGE",
+      "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "IMAGE_LABELS",
+      "INVERT_SIGNAL",
+      "NARROW_CRUMB_RULE",
+      "PIXEL_SIZE_UM",
+      "PIXEL_SIZE_UM_CANAL_PHYSICAL",
+      "QUANT_SUMMARY_NAME",
+      "RANDOM_SEED",
+      "SECTION_ARCHIVE",
+      "SECTION_CANALICULI",
+      "SECTION_FIGURES",
+      "SECTION_LACUNAE",
+      "SECTION_QUANTIFICATION",
+      "SUFFIX_CANALICULI_BRIDGED",
+      "SUFFIX_CANALICULI_DETECTION",
+      "SUFFIX_CANALICULI_GRAPH",
+      "SUFFIX_CANALICULI_MASK",
+      "SUFFIX_CANALICULI_RESULTS",
+      "SUFFIX_CANALICULI_SKELETON",
+      "SUFFIX_CANALICULI_VASCULAR",
+      "SUFFIX_CANALICULI_VERIFICATION",
+      "SUFFIX_FIGURE_GALLERY",
+      "SUFFIX_FIGURE_GALLERY_CHECKS",
+      "SUFFIX_FIGURE_INSET",
+      "SUFFIX_FIGURE_NETWORK",
+      "SUFFIX_FIGURE_NETWORK_CHECKS",
+      "SUFFIX_FIGURE_OVERVIEW",
+      "SUFFIX_LACUNAE_DETECTION",
+      "SUFFIX_LACUNAE_OUTLINES",
+      "SUFFIX_LACUNAE_RESULTS",
+      "SUFFIX_LACUNA_LABELS",
+      "SUFFIX_QUANTIFICATION",
+      "SUFFIX_VARIANT",
+      "SUMMARY_NAME",
+      "VALIDATION_TILES_DIR",
+      "VARIANTS_DIR",
+      "VARIANT_WINDOW_FILE"
+    ],
+    "pixel_size_um": 0.13,
+    "pixel_size_label": "pixel size 0.13 um/px, rounded, unconfirmed"
+  }
+}
