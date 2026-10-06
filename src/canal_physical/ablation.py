@@ -302,11 +302,15 @@ def panels_figure(panels: list, title: str, out_path: Path, params, extent_px: i
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    import textwrap
+
     fig, axes = plt.subplots(1, len(panels), figsize=(3.5 * len(panels), 4.0))
     axes = np.atleast_1d(axes)
     for ax, (image, name) in zip(axes, panels):
         compare._panel(ax, image, name, params, extent_px, boxes)
-    fig.suptitle(title, fontsize=8)
+    # Wrap to the figure width, so a long caption is never cut off at the edge.
+    wrapped = textwrap.wrap(title, width=max(60, 46 * len(panels)))
+    fig.suptitle(chr(10).join(wrapped), fontsize=8)
     fig.tight_layout(rect=(0, 0.02, 1, 0.92))
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=compare.DPI, metadata=compare.PNG_METADATA)
