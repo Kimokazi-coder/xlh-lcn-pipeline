@@ -71,6 +71,12 @@ LOW_CONTRAST_SNR = 2.0
 
 NEIGHBOUR_OFFSETS = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
 
+# The median of the positive half of a centred normal distribution, in units of
+# its standard deviation. Used to recover the noise from a background that the
+# flattening has clipped at zero.
+HALF_NORMAL_MEDIAN = 0.6744897501960817
+MIN_NOISE_PIXELS = 1000
+
 
 def junction_mask(skeleton: np.ndarray) -> np.ndarray:
     """Skeleton pixels with three or more skeleton neighbours, where a single
@@ -233,6 +239,16 @@ def noise_level(flattened: np.ndarray, exclude: np.ndarray) -> float:
     values = flattened[~exclude]
     if values.size == 0:
         return 0.0
+    # The flattening subtracts the histogram mode and clips at zero, so on these
+    # images more than half of the background is exactly 0 and both the median
+    # and the median absolute deviation of the background are 0. A plain robust
+    # estimate therefore returns no noise at all. What survives the clipping is
+    # the positive half of the noise, and for a symmetric distribution clipped at
+    # its centre the median of the positive half is 0.6745 times the standard
+    # deviation, which gives the estimate back.
+    positive = values[values > 0]
+    if positive.size >= MIN_NOISE_PIXELS:
+        return float(np.median(positive) / HALF_NORMAL_MEDIAN)
     median = float(np.median(values))
     return float(1.4826 * np.median(np.abs(values - median)))
 
