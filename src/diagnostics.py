@@ -141,13 +141,6 @@ def result_json(root: Path, label: str, kind: str = "quantification") -> Path:
     return quantification.quant_path(root, label, ".json")
 
 
-def detection_json(root: Path, label: str, kind: str) -> Path:
-    """The detection record of one stage: kind "lacunae" or "canaliculi"."""
-    if kind == "lacunae":
-        return lacunae.result_path(root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_DETECTION)
-    return lacunae.result_path(root, label, config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_DETECTION)
-
-
 def summary_csv(root: Path) -> Path:
     """The cross-image table of a results folder."""
     return quantification.summary_path(root, ".csv")
@@ -373,7 +366,7 @@ def cmd_sanity(args) -> int:
 # (columns appended later) are counted but not compared, because results/ has
 # nothing to compare them with.
 
-REGRESSION_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "regression"
+REGRESSION_DIR = config.PROJECT_ROOT / ".cache" / "regression"
 PROVENANCE_KEY = "provenance"
 
 
@@ -608,16 +601,16 @@ def cmd_regression(args) -> int:
 
 # switch-check -------------------------------------------------------------------
 # Each switch of config.py turned on alone, at the value the overnight report
-# names (docs/OVERNIGHT_REPORT.md), every image regenerated into an ignored
+# names (the overnight report, tag archive-2026-10-13), every image regenerated into an ignored
 # folder, and every change against results/ listed. Nothing is tuned here.
 
-SWITCH_CHECK_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "switch_check"
+SWITCH_CHECK_DIR = config.PROJECT_ROOT / ".cache" / "switch_check"
 SWITCHES_ON = [
     ("NARROW_CRUMB_RULE", True),
     ("FILL_ENCLOSED_HOLES_MAX_PX2", 200),
     ("BAND_FILTER_MIN_OPENING_SHARE", 0.515),
 ]
-# The band-wall filter has no recommended value (docs/CANALICULI_V2_REPORT.md,
+# The band-wall filter has no recommended value (the canaliculi v2 report, tag archive-2026-10-13,
 # B1), so it is run at the two evidence settings of B1, labelled as such:
 # the only line length that separates any part of the 542_z06 line (97 px, in
 # the gap from 95 to 100) with the reach that the line needs there (66 px: its
@@ -1107,7 +1100,7 @@ def cmd_field_summary(args) -> int:
              "repeat the same cells, so they are not independent samples; the value of a field is the mean over",
              "its images.", "",
              f"Fields derived from the data: lacunae matched one to one by centroid within {FIELD_MATCH_PX:g} px, no",
-             f"shift; two images are linked when the matched share of the smaller image lies above the largest gap",
+             "shift; two images are linked when the matched share of the smaller image lies above the largest gap",
              f"in the sorted shares (cut {cut:.2f}) and is at least {FIELD_MIN_MATCH_SHARE:g}. An image with no link is its own field.", ""]
     for r in field_rows:
         lines.append(f"- {r['field']}: {r['images']} ({r['n_images']} image{'s' if r['n_images'] != 1 else ''})")
@@ -1133,7 +1126,7 @@ def cmd_field_summary(args) -> int:
 
 
 # network-sweep ------------------------------------------------------------------
-# One-at-a-time sensitivity of the network stage (docs/CANALICULI_V2_REPORT.md,
+# One-at-a-time sensitivity of the network stage (the canaliculi v2 report, tag archive-2026-10-13,
 # S1). The lacuna stage runs once per image (fast stage, identical labels) and is
 # cached; only the network stage reruns. Each parameter of src/canaliculi.py is
 # set to a low and a high value (about -30% and +30%, or the nearest sensible
@@ -1315,7 +1308,7 @@ def cmd_network_sweep(args) -> int:
 
 
 # validate-network ------------------------------------------------------------------
-# The validation harness (docs/CANALICULI_V2_REPORT.md, V1; docs/NETWORK_TUNING_
+# The validation harness (the canaliculi v2 report, tag archive-2026-10-13, V1; docs/NETWORK_TUNING_
 # PROTOCOL.md). Hand counts of the blinded tiles are joined to the pipeline
 # output through the key, which must lie outside the repository; unblinding
 # happens only here and only in the output tables. Optional: hand-traced thread
@@ -1326,7 +1319,7 @@ ANNOTATION_COLUMNS = ("code", "hand_roots")
 KEY_COLUMNS = ("code", "image", "lacuna_id")
 VALIDATION_MEASURES = ("roots_count", "sholl_crossings_r10", "sholl_crossings_r20")
 TRACE_TOLERANCE_PX = 3.0
-VALIDATE_SELFTEST_DIR = config.PROJECT_ROOT / "results_experiments" / "_cache" / "validate_selftest"
+VALIDATE_SELFTEST_DIR = config.PROJECT_ROOT / ".cache" / "validate_selftest"
 
 
 def _label_from(name: str) -> str:
@@ -1693,7 +1686,7 @@ def main() -> None:
     p = sub.add_parser("regression", help="Regenerate every image and compare with results/ at tolerance 0.")
     add_images_arguments(p)
     p.add_argument("-o", dest="out", type=Path, default=REGRESSION_DIR,
-                   help="Where to regenerate (default: results_experiments/_cache/regression, git-ignored).")
+                   help="Where to regenerate (default: .cache/regression, git-ignored).")
     p.add_argument("-r", dest="ref", type=Path, default=config.RESULTS_DIR, help="Reference folder (default: results/).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_regression)
@@ -1701,7 +1694,7 @@ def main() -> None:
     p = sub.add_parser("switch-check", help="Each switch on alone: what changes against results/.")
     add_images_arguments(p)
     p.add_argument("-o", dest="out", type=Path, default=SWITCH_CHECK_DIR,
-                   help="Where to regenerate (default: results_experiments/_cache/switch_check, git-ignored).")
+                   help="Where to regenerate (default: .cache/switch_check, git-ignored).")
     p.add_argument("-r", dest="ref", type=Path, default=config.RESULTS_DIR, help="Reference folder (default: results/).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_switch_check)

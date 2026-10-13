@@ -74,7 +74,6 @@ from __future__ import annotations
 
 import argparse
 import colorsys
-import csv
 import json
 import random
 import sys
@@ -364,7 +363,7 @@ def network_candidate_mask(
 
 
 # Straight runs (used by the band-wall filter, config.BAND_LINE_FILTER, off by
-# default; docs/CANALICULI_V2_REPORT.md, item B1)
+# default; the canaliculi v2 report, tag archive-2026-10-13, item B1)
 
 # The skeleton is widened to this width (a 3 x 3 dilation) before the line
 # openings, so a straight thread that wobbles by one pixel still holds a line.
@@ -426,12 +425,12 @@ def band_wall_zone(skeleton: np.ndarray, flagged: np.ndarray) -> np.ndarray:
     config.BAND_LINE_REMOVE_PX of every 8-connected object of straight-run
     pixels (straight_run_mask at config.BAND_LINE_MIN_LEN_PX) that comes within
     config.BAND_LINE_REACH_PX of the flagged canal mask. Both values are None by
-    default because no value is recommended (docs/CANALICULI_V2_REPORT.md, B1);
+    default because no value is recommended (the canaliculi v2 report, tag archive-2026-10-13, B1);
     turning the switch on without them is an error."""
     length, reach = config.BAND_LINE_MIN_LEN_PX, config.BAND_LINE_REACH_PX
     if length is None or reach is None:
         raise ValueError("BAND_LINE_FILTER is on but BAND_LINE_MIN_LEN_PX or BAND_LINE_REACH_PX is None; "
-                         "no value is recommended, set both deliberately (see docs/CANALICULI_V2_REPORT.md, B1)")
+                         "no value is recommended, set both deliberately (see the canaliculi v2 report, tag archive-2026-10-13, B1)")
     zone = np.zeros(skeleton.shape, dtype=bool)
     if not flagged.any():
         return zone
@@ -1084,8 +1083,8 @@ def write_outputs(result: dict, out_root: Path) -> None:
 
 # Bone ROI masks (option -m). One PNG per image, white = bone, the size of the
 # image, named by the image's clean name or by its short name, the label used
-# in the reports, in results/ and in results_experiments/task5/roi_edited
-# (config.IMAGE_LABELS, the one naming table). No ROI is applied without -m.
+# in results/ (config.IMAGE_LABELS, the one naming table). No ROI is applied
+# without -m.
 ROI_SHORT_NAMES = config.IMAGE_LABELS
 
 

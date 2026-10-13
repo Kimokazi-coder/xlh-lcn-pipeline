@@ -55,10 +55,6 @@ VALIDATION_TILES_DIR = "validation_tiles"
 
 # File names. A per-image file is <label>_<suffix>; a suffix without an
 # extension is written with each extension given in its comment.
-# Measured numbers per image. Replaced by SECTION_QUANTIFICATION; still
-# written while the split is in progress.
-SUFFIX_LACUNAE_RESULTS = "lacunae_results"  # .xlsx and .json
-SUFFIX_CANALICULI_RESULTS = "canaliculi_results"  # .xlsx and .json
 # Detection records: what each stage did, with no measured value in them.
 SUFFIX_LACUNAE_DETECTION = "lacunae_detection.json"
 SUFFIX_CANALICULI_DETECTION = "canaliculi_detection.json"
@@ -139,7 +135,7 @@ RANDOM_SEED = 0
 # Each changes the pipeline only when turned on. With every switch off the
 # outputs equal results/ exactly (python src/diagnostics.py regression), and
 # python src/diagnostics.py switch-check shows what each one changes. Karim
-# decides which to turn on. Evidence: docs/OVERNIGHT_REPORT.md.
+# decides which to turn on. Evidence: the overnight report, tag archive-2026-10-13.
 
 # Narrow crumb rule (overnight report 3.1, 3.4, 3.6b). After the re-merge and
 # the filters, a dropped watershed piece joins a kept lacuna only if it
@@ -172,8 +168,7 @@ BAND_FILTER_MIN_OPENING_SHARE = None
 # regression passes with it on. Off by default; it changes speed, not output.
 FAST_LACUNA_STAGE = False
 
-# Straight band-wall filter (branch canaliculi-v2, docs/CANALICULI_V2_REPORT.md
-# item B1; evidence results_experiments/canal_v2/B1_straight_runs.md). When on,
+# Straight band-wall filter. When on,
 # the skeleton loses the zone within BAND_LINE_REMOVE_PX of every straight run
 # of the skeleton (a one-pixel line of BAND_LINE_MIN_LEN_PX px fitting in the
 # skeleton widened to 3 px, at one of 24 orientations) that comes within

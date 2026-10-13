@@ -36,17 +36,3 @@ def ridge_response(flattened: np.ndarray, params, sigmas_px: tuple | None = None
     response = filters.sato(flattened.astype(np.float64), sigmas=sigmas,
                             black_ridges=False, mode="reflect")
     return np.nan_to_num(response, nan=0.0, posinf=0.0, neginf=0.0)
-
-
-def response_summary(response: np.ndarray, params, sigmas_px: tuple | None = None) -> dict:
-    """What the response looks like, for the per-image json. Reporting only."""
-    finite = response[np.isfinite(response)]
-    sigmas = list(sigmas_px) if sigmas_px else params.sigmas_px()
-    return {
-        "sigmas_px": sigmas,
-        "sigmas_um": [params.um(s) for s in sigmas],
-        "response_min": float(finite.min()) if finite.size else None,
-        "response_max": float(finite.max()) if finite.size else None,
-        "response_median": float(np.median(finite)) if finite.size else None,
-        "filter": "skimage.filters.sato, bright ridges, maximum over the scales",
-    }

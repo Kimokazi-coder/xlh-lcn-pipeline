@@ -207,7 +207,7 @@ CELL_METRICS = [
 
 # Size-normalised per-cell measures, appended after every existing column so
 # no existing column changes name, order or value. From the overnight report
-# (docs/OVERNIGHT_REPORT.md, task 4.1): roots and ring lengths rise with
+# (the overnight report, tag archive-2026-10-13, task 4.1): roots and ring lengths rise with
 # lacuna size (Spearman 0.84 and 0.88 across images, positive within every
 # image), and these forms remove that dependence. Definitions as in
 # experiments/task4_size.py:
@@ -231,7 +231,7 @@ NORMALISED_METRICS = [
 ]
 
 
-# Per-cell measures appended on branch canaliculi-v2 (docs/CANALICULI_V2_REPORT.md),
+# Per-cell measures appended on branch canaliculi-v2 (the canaliculi v2 report, tag archive-2026-10-13),
 # after every existing column, so no existing column changes name, order or
 # value. They add information only and change no existing number.
 #   ring_attached_length_rR_px  skeleton px of the R px ring (the same pixels as
@@ -655,12 +655,12 @@ SUMMARY_NOTES = [
     "Appended columns (normalised measures, means over interior cells): perimeter; ring area A_r, the pixels",
     "of the nearest-lacuna partition within r px of the body; in-frame fraction of the full r px annulus;",
     "ring density L_r / A_r; roots per 100 px of perimeter. They remove the dependence of roots and ring",
-    "length on lacuna size (docs/OVERNIGHT_REPORT.md, task 4.1).",
+    "length on lacuna size (the overnight report, tag archive-2026-10-13, task 4.1).",
     "Appended on branch canaliculi-v2: ring attached length 30 / 60 px, the ring length pixels in threads that",
     "reach within 10 px of the lacuna (passing threads left out); ring length weighted 30 / 60 px and field",
     "length density weighted, chain code lengths (sqrt(2) per diagonal step); Sholl crossings 10 / 20 / 30 px,",
     "skeleton components crossing a 1.5 px band at that distance from the lacuna (no graph); see",
-    "docs/CANALICULI_V2_REPORT.md.",
+    "the canaliculi v2 report, tag archive-2026-10-13.",
     "Appended with the detection and quantification split: the canalicular width.",
     *WIDTH_NOTES,
 ]
@@ -847,16 +847,6 @@ def network_rows(kept: list[tuple], detection: dict, dist_to_lacuna: np.ndarray,
         row["mean_edge_length_px"] = round(total / count if count else 0.0, precision)
         rows.append(row)
     return rows
-
-
-def measure_cells(kept: list, skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
-                  nearest_id: np.ndarray, precision: int) -> dict:
-    """Ownership and the per-lacuna network measures from arrays in memory, for a
-    caller that has a skeleton but no results folder (the experiment scripts)."""
-    own = canaliculi.build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
-    rows = network_rows(kept, {"graph": own["graph"], "edge_owner": own["edge_owner"], "skeleton": skeleton},
-                        dist_to_lacuna, nearest_id, precision)
-    return {"rows": rows, **own}
 
 
 def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = None) -> dict:

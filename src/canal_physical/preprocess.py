@@ -27,8 +27,3 @@ def vascular_mask(channel: np.ndarray) -> np.ndarray:
     is removed from the image, growth into these regions is blocked, and the width
     measure leaves them out."""
     return canaliculi.flagged_structures(channel)
-
-
-def tophat_radius_px() -> int:
-    """The radius the flattening uses, for the parameter report."""
-    return canaliculi.TOPHAT_RADIUS_PX

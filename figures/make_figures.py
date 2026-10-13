@@ -306,39 +306,6 @@ def root_clusters(G, cell_id: int) -> list[tuple[float, float]]:
     return [(float(np.mean([c[1] for c in cl])), float(np.mean([c[0] for c in cl]))) for cl in clusters]
 
 
-def pipeline_output(path: Path) -> dict:
-    """Default pipeline output for one image, cached in
-    .cache/figures/ (git-ignored)."""
-    name = short(path)
-    npz, js = CACHE / f"{name}.npz", CACHE / f"{name}.json"
-    if npz.is_file() and js.is_file():
-        meta = json.loads(js.read_text(encoding="utf-8"))
-        with np.load(npz) as z:
-            meta["lacuna_id_map"] = z["lacuna_id_map"]
-            meta["skeleton"] = z["skeleton"]
-        meta["channel"] = lacunae.load_channel(path)[1]
-        return meta
-    res = quantification.analyse_image(path)
-    roots = {}
-    for row in res["rows"]:
-        pts = root_clusters(res["graph"], row["lacuna_id"])
-        assert len(pts) == row["roots_count"], (name, row["lacuna_id"])
-        roots[str(row["lacuna_id"])] = pts
-    meta = {"image": path.name, "short": name, "lacuna_rows": res["rows"], "cell_rows": res["rows"],
-            "lacuna_count": res["lacunae"]["lacuna_count"], "interior_count": res["lacunae"]["interior_lacuna_count"],
-            "roots_xy": roots, "field": res["field"], "summary": res["summary"]}
-    CACHE.mkdir(parents=True, exist_ok=True)
-    tmp = npz.with_name(npz.name + ".tmp")
-    with open(tmp, "wb") as f:
-        np.savez_compressed(f, lacuna_id_map=res["lacuna_id_map"].astype(np.int32), skeleton=res["skeleton"])
-    os.replace(tmp, npz)
-    write_json(js, meta)
-    meta["lacuna_id_map"] = res["lacuna_id_map"]
-    meta["skeleton"] = res["skeleton"]
-    meta["channel"] = lacunae.load_channel(path)[1]
-    return meta
-
-
 # Drawing helpers -----------------------------------------------------------------------
 
 def draw_outlines(ax, lacuna_id_map: np.ndarray, rows: list, numbers: bool = False, lw: float = OUTLINE_PT,
@@ -376,14 +343,6 @@ def image_axes(ax, img: np.ndarray, cmap: str = "gray") -> None:
     ax.set_yticks([])
     for sp in ax.spines.values():
         sp.set_linewidth(0.5)
-
-
-def skeleton_rgb(channel: np.ndarray, skeleton: np.ndarray) -> np.ndarray:
-    """Raw image dimmed to 60% in grey, skeleton pixels white."""
-    g = windowed(channel, DIM_FACTOR)
-    rgb = np.stack([g, g, g], axis=-1)
-    rgb[skeleton] = 1.0
-    return rgb
 
 
 # Figures v2: shared data and drawing code ---------------------------------------------
@@ -1331,16 +1290,6 @@ def _selftest_n0() -> None:
 
 INSET_MARGIN_PX = 16
 INSET_ZOOM = 3.0
-
-
-def choose_inset_cell(out: dict) -> tuple[int, str]:
-    """The interior lacuna whose roots count is closest to the image median
-    over interior lacunae; ties go to the smallest id."""
-    interior = [(r["lacuna_id"], c["roots_count"]) for r, c in zip(out["lacuna_rows"], out["cell_rows"])
-                if not r["on_border"]]
-    med = float(np.median([n for _i, n in interior]))
-    best = min(interior, key=lambda t: (abs(t[1] - med), t[0]))
-    return best[0], f"interior median roots {med:g}; lacuna {best[0]} has {best[1]} roots (closest, ties to smallest id)"
 
 
 INSET_OVERRIDES = ROOT / "figures" / "inset_overrides.csv"

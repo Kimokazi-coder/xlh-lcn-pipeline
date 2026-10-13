@@ -8,7 +8,9 @@ in the skeleton and never in the measuring. This module only:
 - converts the measures it returns into micrometres;
 - adds the three network-shape measures the comparison asks for that the
   pipeline does not report: the thread-end fraction, the share of skeleton length
-  connected to a lacuna, and the median edge length.
+  connected to a lacuna, and the median edge length;
+- adds the artifact measures: the axis-aligned runs, the rectangles on the pixel
+  grid, and the share of skeleton the flattened image does not support.
 
 Conversions at s = 0.13 um/px: a length in px times s is um; an area in px^2
 times s^2 is um^2; a length density in px^-1 divided by s is um of thread per
@@ -19,6 +21,7 @@ number here has been checked against a manual count.
 """
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 
 import canaliculi
@@ -183,9 +186,93 @@ COMPARISON_COLUMNS = [
     "owned_length_px_per_cell", "owned_length_um_per_cell",
     "analysed_area_px2", "analysed_area_um2",
 ]
+# The artifact measures
+# Moved here unchanged when src/canal_physical/ablation.py was removed: they are
+# measures, and this is where the measures live. A canaliculus has no reason to
+# follow the pixel grid, so a long axis-aligned run or a closed rectangle on the
+# grid is a sign of the detector and not of the tissue.
+
+STRAIGHT_RUN_MIN_PX = 8
+
+# Two nodes count as lying on one axis-aligned side if their rows or their columns
+# differ by at most this, which allows the one pixel of slack a cleaned graph node
+# can carry.
+RECTANGLE_TOLERANCE_PX = 1
 
 
-def comparison_row(label: str, method: str, result: dict, pixel_label: str) -> list:
-    row = {"image_label": label, "method": method, "pixel_size_label": pixel_label,
-           **result["comparison"]}
-    return [row.get(c) for c in COMPARISON_COLUMNS]
+def unsupported_mask(skeleton: np.ndarray, flattened: np.ndarray, cut: float) -> np.ndarray:
+    """Skeleton pixels the flattened image does not support: those not above the
+    image's own lower multi-Otsu cut, which is the exact complement of the rule
+    the current method uses to call a pixel signal (`img > t_lo`)."""
+    return skeleton & ~(flattened > cut)
+
+
+def straight_run_mask(skeleton: np.ndarray, min_length: int = STRAIGHT_RUN_MIN_PX) -> np.ndarray:
+    """Skeleton pixels inside a perfectly horizontal or vertical run of at least
+    `min_length` pixels.
+
+    A run is a maximal set of consecutive skeleton pixels along one image row or
+    one image column. A pixel that belongs to a long run in either direction is
+    marked. Diagonal and curved stretches are never marked, however long, so this
+    counts only structure that follows the pixel grid."""
+    marked = np.zeros_like(skeleton, dtype=bool)
+    for axis in (0, 1):
+        work = skeleton if axis == 1 else skeleton.T
+        out = np.zeros_like(work, dtype=bool)
+        for i in range(work.shape[0]):
+            line = work[i]
+            if not line.any():
+                continue
+            # Run boundaries along this line.
+            padded = np.concatenate(([False], line, [False]))
+            edges = np.flatnonzero(padded[1:] != padded[:-1])
+            for start, stop in zip(edges[0::2], edges[1::2]):
+                if stop - start >= min_length:
+                    out[i, start:stop] = True
+        marked |= out if axis == 1 else out.T
+    return marked
+
+
+def rectangle_count(graph) -> int:
+    """Closed loops of four nodes in the cleaned skeleton graph whose four sides
+    are all axis-aligned.
+
+    The loops come from networkx.cycle_basis, which gives one independent cycle
+    per loop in the graph, so this counts independent four-node loops and not
+    every way of walking one. A side counts as axis-aligned when its two nodes
+    share a row or a column to within RECTANGLE_TOLERANCE_PX. A real network has
+    no reason to close a rectangle on the pixel grid."""
+    real = canaliculi.real_subgraph(graph)
+    count = 0
+    for cycle in nx.cycle_basis(real):
+        if len(cycle) != 4:
+            continue
+        sides = list(zip(cycle, cycle[1:] + cycle[:1]))
+        if all(abs(u[0] - v[0]) <= RECTANGLE_TOLERANCE_PX or abs(u[1] - v[1]) <= RECTANGLE_TOLERANCE_PX
+               for u, v in sides):
+            count += 1
+    return count
+
+
+def artifact_measures(detection: dict, flattened: np.ndarray, cut: float) -> dict:
+    """The three artifact measures, over the whole skeleton, with the share of it
+    that gap bridging drew."""
+    skel = detection["skeleton"]
+    total = int(skel.sum())
+    if total == 0:
+        return {"skeleton_px": 0, "unsupported_fraction": None, "bridged_fraction": None,
+                "straight_run_fraction": None, "rectangle_count": 0,
+                "unsupported_px": 0, "bridged_px": 0, "straight_run_px": 0}
+    unsupported = unsupported_mask(skel, flattened, cut)
+    straight = straight_run_mask(skel)
+    bridged = skel & detection["bridged"]
+    return {
+        "skeleton_px": total,
+        "unsupported_px": int(unsupported.sum()),
+        "unsupported_fraction": round(float(unsupported.sum()) / total, 6),
+        "bridged_px": int(bridged.sum()),
+        "bridged_fraction": round(float(bridged.sum()) / total, 6),
+        "straight_run_px": int(straight.sum()),
+        "straight_run_fraction": round(float(straight.sum()) / total, 6),
+        "rectangle_count": rectangle_count(detection["graph"]),
+    }
