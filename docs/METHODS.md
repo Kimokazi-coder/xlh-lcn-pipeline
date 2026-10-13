@@ -619,7 +619,7 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
   `2_canaliculi/` are tracked: the skeleton png is an input to
   `validate-network`.
 
-## 14. History
+## 15. History
 
 Earlier experiments, reports and analyses are preserved at the git tag
 `archive-2026-10-13`, which is the repository as it was before the 2026-10-13
