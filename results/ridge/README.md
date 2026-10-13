@@ -26,9 +26,11 @@ not a validated result.** No variant is called better than another by any number
 
 | variant | what | sigmas (um) | sigmas (px) | low cut | bridging |
 |---|---|---|---|---|---|
-| P5 | ridge, sigmas 0.17, 0.21, 0.26 um, gap bridging off | 0.17, 0.21, 0.26 | 1.308, 1.615, 2.0 | 0.75 | no |
+| P5 | ridge, bridging off, finest scales 0.17, 0.21, 0.26 um | 0.17, 0.21, 0.26 | 1.308, 1.615, 2.0 | 0.75 | no |
 | A | current method, as is | | | 0.75 | yes |
-| P2 | ridge, sigmas 0.17, 0.21, 0.26 um, gap bridging on | 0.17, 0.21, 0.26 | 1.308, 1.615, 2.0 | 0.75 | yes |
+| D | ridge, bridging off, sigmas 3.0, 3.6, 4.2 px | 0.39, 0.468, 0.546 | 3.0, 3.6, 4.2 | 0.75 | no |
+| F | ridge, bridging off, single scale 3.0 px | 0.39 | 3.0 | 0.75 | no |
+| G | ridge, bridging off, sigmas 1.5, 2.0, 2.5 px | 0.195, 0.26, 0.325 | 1.5, 2.0, 2.5 | 0.75 | no |
 
 P5 and P2 carry the same scales and the same cut: they differ by the bridging switch and
 nothing else, so the difference between their numbers is the effect of bridging alone.
@@ -74,7 +76,7 @@ and draws only what is owned.
 |---|---|
 | `comparison_all_images.csv` and `.xlsx` | the comparison table: every measure, every image, every variant, with the summary of means and the notes |
 | `comparison_summary.csv` | the means over the images and the change from A |
-| `<label>/<label>_compare.png` | P5, then A, then P2 side by side, one pixel skeleton, 2x |
+| `<label>/<label>_compare.png` | P5, then A, then D, then F, then G side by side, one pixel skeleton, 2x |
 | `<label>/verification_<variant>.png` | the pipeline's own picture of that variant, 1024 x 1024, by `canaliculi.save_verification`: each lacuna outlined and the skeleton it owns thickened, in its colour, over the full brightness original. Unowned skeleton is not drawn |
 
 `verification_A.png` is checked pixel for pixel against the committed
@@ -92,7 +94,7 @@ have made the colours meaningless. The background error is a mean of about 1 lev
 python src/canal_physical/physical.py --dir data/WT
 ```
 
-Commit `e2b8e11ac9bea9d96a8e8291ae90ce7390028539`, tracked files clean: False. Config hash `4026503a93d224d7`.
+Commit `2c732010eec6293dd980a1605613d16b06bd5900`, tracked files clean: False. Config hash `4026503a93d224d7`.
 
 ## Every length, in micrometres and pixels
 
@@ -123,23 +125,23 @@ Commit `e2b8e11ac9bea9d96a8e8291ae90ce7390028539`, tracked files clean: False. C
 
 ## Mean over the images
 
-| measure | P5 | A | P2 |
-|---|---|---|---|
-| `width_fwhm_median_um` | 0.6351 | 0.6368 | 0.6352 |
-| `width_dt_median_um` | 0.6006 | 0.7853 | 0.6006 |
-| `low_contrast_fraction` | 0.04019 | 0.02063 | 0.04053 |
-| `contrast_snr_median` | 7.882 | 9.955 | 7.877 |
-| `straight_run_fraction` | 0.2365 | 0.221 | 0.2375 |
-| `straight_run_fraction_smoothed` | 0.1931 | 0.1872 | 0.194 |
-| `rectangle_count` | 0 | 0 | 0 |
-| `connected_to_lacuna_fraction` | 0.4557 | 0.336 | 0.48 |
-| `junction_count` | 733.6 | 529.8 | 738.8 |
-| `thread_end_fraction` | 0.6927 | 0.7641 | 0.6869 |
-| `field_length_density_um_per_um2` | 0.3232 | 0.3008 | 0.3237 |
-| `roots_per_cell` | 7.965 | 7.545 | 7.965 |
-| `skeleton_px` | 4.289e+04 | 3.992e+04 | 4.295e+04 |
-| `n_bridges` | 0 | 18.12 | 19.62 |
-| `legacy_unsupported_fraction` | 0.09118 | 0.06798 | 0.09214 |
+| measure | P5 | A | D | F | G |
+|---|---|---|---|---|---|
+| `width_fwhm_median_um` | 0.6351 | 0.6368 | 0.6484 | 0.6443 | 0.6387 |
+| `width_dt_median_um` | 0.6006 | 0.7853 | 0.9631 | 0.78 | 0.7465 |
+| `low_contrast_fraction` | 0.04019 | 0.02063 | 0.06676 | 0.0402 | 0.03481 |
+| `contrast_snr_median` | 7.882 | 9.955 | 10.07 | 9.335 | 8.592 |
+| `unsupported_fraction` | 0.09118 | 0.06798 | 0.1198 | 0.09041 | 0.08882 |
+| `straight_run_fraction` | 0.2365 | 0.221 | 0.2634 | 0.25 | 0.2447 |
+| `straight_run_fraction_smoothed` | 0.1931 | 0.1872 | 0.2167 | 0.2066 | 0.2024 |
+| `rectangle_count` | 0 | 0 | 0.25 | 0 | 0 |
+| `connected_to_lacuna_fraction` | 0.4557 | 0.336 | 0.7033 | 0.5489 | 0.5109 |
+| `junction_count` | 733.6 | 529.8 | 871.6 | 728.9 | 723 |
+| `thread_end_fraction` | 0.6927 | 0.7641 | 0.5817 | 0.6491 | 0.6747 |
+| `field_length_density_um_per_um2` | 0.3232 | 0.3008 | 0.3126 | 0.3061 | 0.3159 |
+| `roots_per_cell` | 7.965 | 7.545 | 7.845 | 7.308 | 7.778 |
+| `skeleton_px` | 4.289e+04 | 3.992e+04 | 4.148e+04 | 4.062e+04 | 4.191e+04 |
+| `n_bridges` | 0 | 18.12 | 0 | 0 | 0 |
 
 ## Versions
 
