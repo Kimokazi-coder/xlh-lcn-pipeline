@@ -100,7 +100,7 @@ REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
 
 # The regression check for the default pipeline, fixed on 2026-09-28 when
 # hysteresis and gap bridging became the defaults (before that it was 37.00
-# and 29.43 px with no bridges). Means are over interior lacunae, rounded to
+# Means are over interior lacunae, rounded to
 # 2 decimals.
 REFERENCE_VALUES = [
     ("edges per interior cell (mean edge_count)", 62.33),
@@ -155,7 +155,6 @@ def numbers_from_results(root: Path, label: str) -> dict:
     return {
         "lacuna_count": q["lacuna_count"],
         "interior_lacuna_count": q["interior_lacuna_count"],
-        "n_bridges": q["n_bridges"],
         "lacunae_summary": {k: q["lacuna_shape_summary"][k] for k in LACUNA_SUMMARY_KEYS},
         "canaliculi_summary": {k: q["summary"][k] for k in CELL_KEYS},
         "field": dict(q["field"]),
@@ -637,7 +636,7 @@ def lacuna_changes(ref_root: Path, new_root: Path, label: str) -> tuple[list, di
         head = {"lacuna_count": q["lacuna_count"], "interior_count": q["interior_lacuna_count"],
                 "roots_per_cell": q["summary"]["roots_count"]["mean"],
                 "ring30_per_cell": q["summary"]["ring_length_r30_px"]["mean"],
-                "field_density": q["field"]["canalicular_length_density_per_px"], "bridges": q["n_bridges"]}
+                "field_density": q["field"]["canalicular_length_density_per_px"]}
         return rows, head
 
     ref, head_ref = load(ref_root)
@@ -867,7 +866,7 @@ def cmd_unblind(args) -> int:
 
 SENSITIVITY_SCALES = (0.8, 0.9, 1.1, 1.2)
 SENSITIVITY_MEASURES = [("roots_per_cell", "roots per cell"), ("ring30_per_cell", "ring 30 px per cell"),
-                        ("field_density", "field density"), ("lacuna_count", "lacuna count"), ("bridges", "bridges")]
+                        ("field_density", "field density"), ("lacuna_count", "lacuna count")]
 
 
 def _cuts_of(path_str: str) -> dict:
@@ -893,7 +892,7 @@ def _sensitivity_run(job: tuple) -> dict:
            "lacuna_count": result["lacunae"]["lacuna_count"],
            "interior_count": result["lacunae"]["interior_lacuna_count"],
            "roots_per_cell": s["roots_count"]["mean"], "ring30_per_cell": s["ring_length_r30_px"]["mean"],
-           "field_density": result["field"]["canalicular_length_density_per_px"], "bridges": len(result["bridges"])}
+           "field_density": result["field"]["canalicular_length_density_per_px"]}
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = out_path.with_name(out_path.name + ".tmp")
     tmp.write_text(json.dumps(row, indent=1), encoding="utf-8")
@@ -1137,9 +1136,6 @@ def cmd_field_summary(args) -> int:
 NETWORK_SWEEP = [
     ("TOPHAT_RADIUS_PX", (4, 6)),
     ("HYSTERESIS_LOW_FRACTION", (0.525, 0.975)),
-    ("MAX_BRIDGE_GAP_PX", (0.0, 7.0, 13.0)),
-    ("MAX_BRIDGE_ANGLE_DEG", (28.0, 52.0)),
-    ("MIN_BRIDGE_SIGNAL_FRACTION", (0.49, 0.91)),
     ("PRUNE_SPUR_LEN_PX", (3, 5)),
     ("ROOT_MERGE_DIST_PX", (6.0, 10.0)),
     ("LACUNA_ATTACH_GAP_PX", (7, 13)),
@@ -1155,7 +1151,6 @@ SWEEP_MEASURES = [
     ("sholl20", "Sholl 20 px", ("summary", "sholl_crossings_r20")),
     ("sholl30", "Sholl 30 px", ("summary", "sholl_crossings_r30")),
     ("field_density", "field density", ("field", "canalicular_length_density_per_px")),
-    ("bridges", "bridges", ("bridges", None)),
 ]
 
 
@@ -1221,9 +1216,7 @@ def _sweep_run(job: tuple) -> dict:
     row = {"image": lacunae.clean_name(image_path), "parameter": param or "default",
            "value": value, "t_lo": result["t_lo"]}
     for key, _label, (block, field) in SWEEP_MEASURES:
-        if block == "bridges":
-            row[key] = len(result["bridges"])
-        elif block == "field":
+        if block == "field":
             row[key] = result["field"][field]
         else:
             row[key] = result["summary"][field]["mean"]
@@ -1281,7 +1274,7 @@ def cmd_network_sweep(args) -> int:
              "Percent change against each image's default run: median over the images, range in brackets. "
              "No value is recommended and no default changed.", "",
              "Defaults: " + ", ".join(f"`{k}` = {v}" for k, v in defaults.items()) + "; t_lo is each image's own "
-             "lower Otsu cut. MAX_BRIDGE_GAP_PX = 0 means no bridging.", "",
+             "lower Otsu cut.", "",
              "| setting | " + " | ".join(label for _k, label, _s in SWEEP_MEASURES) + " |",
              "|---|" + "---|" * len(SWEEP_MEASURES)]
     for e in table:

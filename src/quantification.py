@@ -16,12 +16,11 @@ src/canaliculi.py have already written:
     2_canaliculi/<label>_canaliculi_vascular_mask.png   broad bright structures,
                                                  already dilated by
                                                  canaliculi.FLAGGED_DILATION_PX
-    2_canaliculi/<label>_canaliculi_bridged_pixels.png  the pixels gap bridging
                                                  added, which have no signal
                                                  under them
     2_canaliculi/<label>_canaliculi_graph.pickle the cleaned graph and ownership
     2_canaliculi/<label>_canaliculi_detection.json      parameters, the network
-                                                 cut and the bridges
+                                                 cut
 
 What it writes:
     5_quantification/<label>_quantification.json   every number, the parameters
@@ -77,9 +76,8 @@ RING_RADII_PX = canaliculi.RING_RADII_PX
 # canalicular mask. On a one-pixel centre line this is the standard
 # distance-transform width. It is a new measure, added with this script.
 #
-# Which mask: the mask with real signal under it, that is the saved network mask
-# minus the pixels gap bridging added. A bridge is drawn, not measured, so its
-# pixels would report the width of a drawn line.
+# Which mask: the saved network mask. Every pixel in it was put there by the
+# threshold on the ridge response, so every pixel has real signal under it.
 #
 # Which pixels: skeleton pixels that lie on that mask, outside the lacuna buffer
 # (canaliculi.LACUNA_DILATION_PX around every lacuna body, which the mask
@@ -109,7 +107,7 @@ WIDTH_CELL_METRICS = [
 
 WIDTH_NOTES = [
     "Canalicular width: 2 x the Euclidean distance transform of the canalicular mask at each skeleton pixel.",
-    "Measured only on skeleton pixels with real signal under them: bridged pixels, the lacuna buffer and the",
+    "Measured only on skeleton pixels on the canalicular mask: the lacuna buffer and the",
     "dilated vascular mask are excluded. The threads are about 2 to 6 px wide, so the width is close to the",
     "pixel grid and quantised in steps of about 1 px, it moves with the threshold (a lower cut widens every",
     "thread), and it has not been validated against any manual measurement.",
@@ -721,7 +719,6 @@ def load_detection(out_root: Path, label: str) -> dict:
         "mask": can(config.SUFFIX_CANALICULI_MASK),
         "skeleton": can(config.SUFFIX_CANALICULI_SKELETON),
         "vascular": can(config.SUFFIX_CANALICULI_VASCULAR),
-        "bridged": can(config.SUFFIX_CANALICULI_BRIDGED),
         "graph": can(config.SUFFIX_CANALICULI_GRAPH),
         "canaliculi_detection": can(config.SUFFIX_CANALICULI_DETECTION),
     }
@@ -736,14 +733,12 @@ def load_detection(out_root: Path, label: str) -> dict:
         graph_data = pickle.load(f)
     labels = np.asarray(imread(needed["labels"])).astype(np.int32)
     mask = _read_mask(needed["mask"])
-    bridged = _read_mask(needed["bridged"])
     return {
         "label": label,
         "lacuna_id_map": labels,
         "lacuna_mask": labels > 0,
         "mask": mask,
-        "thresholded": mask & ~bridged,
-        "bridged": bridged,
+        "thresholded": mask,
         "skeleton": _read_mask(needed["skeleton"]),
         "vascular": _read_mask(needed["vascular"]),
         "graph": graph_data["graph"],
@@ -778,12 +773,13 @@ def width_map(thresholded: np.ndarray) -> np.ndarray:
 
 
 def width_sample_mask(detection: dict) -> np.ndarray:
-    """The skeleton pixels whose width is measured: on the canalicular mask with
-    real signal under it, not a bridged pixel, not in the lacuna buffer and not
-    in the vascular mask (which is already dilated)."""
+    """The skeleton pixels whose width is measured: on the canalicular mask, not
+    in the lacuna buffer and not in the vascular mask (which is already
+    dilated). Every skeleton pixel now has real signal under it, since nothing
+    is drawn into the mask that the threshold did not put there."""
     buffered_lacunae = morphology.dilation(detection["lacuna_mask"],
                                            morphology.disk(canaliculi.LACUNA_DILATION_PX))
-    return (detection["skeleton"] & detection["thresholded"] & ~detection["bridged"]
+    return (detection["skeleton"] & detection["thresholded"]
             & ~buffered_lacunae & ~detection["vascular"])
 
 
@@ -891,7 +887,6 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
         "lacuna_count": len(kept),
         "border_lacuna_count": border,
         "interior_lacuna_count": len(kept) - border,
-        "n_bridges": detection["canaliculi_detection"]["n_bridges"],
         "rows": rows,
         "areas": [row["area_px2"] for row in rows],
         "lacuna_summary": summarize_lacuna_shape(shape_rows, precision),
@@ -904,8 +899,8 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
             "canaliculi": detection["canaliculi_detection"]["parameters"],
             "quantification": {
                 "width_definition": "2 x Euclidean distance transform of the canalicular mask at each skeleton pixel",
-                "width_mask": "the saved network mask minus the bridged pixels",
-                "width_excluded": ["bridged pixels", "the lacuna buffer", "the dilated vascular mask"],
+                "width_mask": "the saved network mask",
+                "width_excluded": ["the lacuna buffer", "the dilated vascular mask"],
                 "width_percentiles": list(WIDTH_PERCENTILES),
                 "ring_radii_px": list(canaliculi.RING_RADII_PX),
                 "statistics_over": "interior lacunae only",
@@ -962,8 +957,7 @@ def detection_in_memory(result: dict) -> dict:
         "lacuna_id_map": result["lacuna_id_map"],
         "lacuna_mask": result["lacuna_id_map"] > 0,
         "mask": result["candidate"],
-        "thresholded": result["candidate"] & ~result["bridged_pixels"],
-        "bridged": result["bridged_pixels"],
+        "thresholded": result["candidate"],
         "skeleton": result["skeleton"],
         "vascular": result["flagged"],
         "graph": result["graph"],
@@ -975,7 +969,6 @@ def detection_in_memory(result: dict) -> dict:
         },
         "canaliculi_detection": {
             "parameters": canaliculi.parameters(result),
-            "n_bridges": len(result["bridges"]),
         },
     }
 
@@ -1012,7 +1005,6 @@ def save_json(result: dict, out_path: Path) -> None:
         "lacuna_count": result["lacuna_count"],
         "border_lacuna_count": result["border_lacuna_count"],
         "interior_lacuna_count": result["interior_lacuna_count"],
-        "n_bridges": result["n_bridges"],
         "headline_measures": HEADLINE_MEASURES,
         "ownership_dependent_measures": ["owned_length_px", "edge_count", "mean_edge_length_px"],
         "normalised_measures": normalised_columns(),
@@ -1039,9 +1031,9 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     wb = Workbook()
     sheet = wb.active
     sheet.title = "per_image"
-    sheet.append(["image", "status", "lacuna_count", "border_lacuna_count", "interior_lacuna_count", "n_bridges"])
+    sheet.append(["image", "status", "lacuna_count", "border_lacuna_count", "interior_lacuna_count"])
     sheet.append([result["image_path"].name, "pre-validation", result["lacuna_count"],
-                  result["border_lacuna_count"], result["interior_lacuna_count"], result["n_bridges"]])
+                  result["border_lacuna_count"], result["interior_lacuna_count"]])
     sheet.append([])
     sheet.append(["Pre-validation, pixel units. Statistics below are over interior (on_border False) lacunae only."])
     sheet.append(["metric", "kind", "mean", "median", "sd", "units", "n"])
@@ -1208,7 +1200,7 @@ def per_image_lines(result: dict) -> list:
                         [["lacuna count", result["lacuna_count"]],
                          ["interior lacuna count", result["interior_lacuna_count"]],
                          ["frame-edge lacuna count", result["border_lacuna_count"]],
-                         ["gap bridges added (detection)", result["n_bridges"]]])
+                         ])
     title = f"Interior lacunae only: mean, median and sample SD (n = {n})"
     lines += ["", title, "-" * len(title)]
     stats_rows = []

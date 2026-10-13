@@ -67,7 +67,6 @@ SUFFIX_CANALICULI_VERIFICATION = "canaliculi_verification.png"
 # 0 or 255; the graph file holds the cleaned graph with its ownership.
 SUFFIX_LACUNA_LABELS = "lacuna_labels.png"
 SUFFIX_CANALICULI_VASCULAR = "canaliculi_vascular_mask.png"
-SUFFIX_CANALICULI_BRIDGED = "canaliculi_bridged_pixels.png"
 SUFFIX_CANALICULI_GRAPH = "canaliculi_graph.pickle"
 # Quantification output: every measured number of one image.
 SUFFIX_QUANTIFICATION = "quantification"  # .json, .xlsx and .pdf
@@ -164,21 +163,3 @@ BAND_FILTER_MIN_OPENING_SHARE = None
 # and at t_hi scaled 0.8 to 1.2 (python src/diagnostics.py fast-check), and
 # regression passes with it on. Off by default; it changes speed, not output.
 FAST_LACUNA_STAGE = False
-
-# Straight band-wall filter. When on,
-# the skeleton loses the zone within BAND_LINE_REMOVE_PX of every straight run
-# of the skeleton (a one-pixel line of BAND_LINE_MIN_LEN_PX px fitting in the
-# skeleton widened to 3 px, at one of 24 orientations) that comes within
-# BAND_LINE_REACH_PX of the flagged canal mask, and no bridge may enter that
-# zone. Default: off. Recommended value: none. On the 8 WT images the 542_z06
-# band line (x 515 to 541, y 590 to 900) is straight only in pieces. Its
-# straight part touches the canal mask only at a length of 40 px, where 66
-# other straight objects touch canal masks too; the only length that separates
-# any part of it (95 to 100 px, between 90 and 105) removes 103 of its about
-# 380 skeleton px, 65.01 px away from the canal mask. Both values stay None,
-# and the filter refuses to run until they are set.
-BAND_LINE_FILTER = False
-BAND_LINE_MIN_LEN_PX = None
-BAND_LINE_REACH_PX = None
-# Zone removed around the straight runs (px), from the task brief ("within 2 px").
-BAND_LINE_REMOVE_PX = 2

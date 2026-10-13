@@ -66,7 +66,7 @@ After a --dir run, also results/all_images/summary_all_images.xlsx and .csv
 (one row per image; see write_summary_table).
 
 Regression check: 543-2 must give 62.33 edges per interior cell, 27.41 px
-mean edge length and 21 bridges (python src/diagnostics.py reference-check).
+mean edge length (python src/diagnostics.py reference-check).
 
 Usage (from the repo root):
     python src/canaliculi.py --dir data/WT
@@ -184,38 +184,6 @@ FLAGGED_MIN_MAJOR_AXIS_PX = 420.0
 # the far field: 0.70x at 0 to 4 px, then 0.96x, 1.09x, 1.01x, 1.01x. It is at
 # baseline from about 4 px out, so 4 px, not more.
 FLAGGED_DILATION_PX = 4
-
-# Parameters: gap bridging
-# A 2D section cuts a 3D network, so a canaliculus leaving the focal plane
-# ends mid-field. Phase 0(c) sampled the signal in the gap between each
-# skeleton endpoint and its nearest different component (pooled over the 8 WT
-# images; median of the MINIMUM signal fraction along the gap, where 1.0 is
-# the threshold): 2 to 5 px 0.964, 5 to 8 px 0.886, 8 to 11 px 0.734, 11 to
-# 15 px 0.568. A blind morphological closing is not used: only 21% of
-# endpoint-to-neighbour angles are under 20 degrees, so most nearest
-# neighbours are parallel threads, and closing would fuse them.
-
-# Longest gap bridged (px). At 8 to 11 px the dimmest point in a gap still
-# sits at 0.73 of the threshold (median); by 11 to 15 px it is 0.57 and only
-# about 29% of gaps keep a minimum above 0.7.
-MAX_BRIDGE_GAP_PX = 10.0
-
-# Largest angle (degrees) between the thread's own direction at the endpoint
-# and the vector to the partner. Pooled angles run 21.0% under 20 degrees,
-# 17.8% at 20 to 40, 17.7% at 40 to 60, then a long tail to 180; 40 keeps the
-# two leading bins, the pairs that point at each other.
-MAX_BRIDGE_ANGLE_DEG = 40.0
-
-# The MINIMUM signal fraction along the gap must reach this: one
-# background-level pixel breaks a thread however bright its ends. 93.5% of
-# 5 to 8 px gaps qualify but only 29.9% of 11 to 15 px gaps, so this limit
-# and MAX_BRIDGE_GAP_PX reinforce each other.
-MIN_BRIDGE_SIGNAL_FRACTION = 0.7
-
-# How far (px) to walk back along the thread to estimate its direction: long
-# enough to average out the staircase of a rasterized diagonal, short enough
-# not to average across a real bend.
-DIRECTION_WALK_PX = 5
 
 # Parameters: graph and ownership
 
@@ -403,215 +371,6 @@ def network_candidate_mask(
     candidate = morphology.remove_small_objects(candidate, min_size=MIN_THREAD_OBJECT_PX2)
     return candidate, t_lo, response
 
-
-# Straight runs (used by the band-wall filter, config.BAND_LINE_FILTER, off by
-# default; the canaliculi v2 report, tag archive-2026-10-13, item B1)
-
-# The skeleton is widened to this width (a 3 x 3 dilation) before the line
-# openings, so a straight thread that wobbles by one pixel still holds a line.
-STRAIGHT_RUN_DILATION_PX = 3
-# Line orientations tested: 24, in steps of 7.5 degrees over 180 degrees.
-STRAIGHT_RUN_ORIENTATIONS = 24
-
-
-def line_offsets(length: int, angle_deg: float) -> np.ndarray:
-    """(row, col) offsets of a one-pixel digital line of `length` pixels at
-    `angle_deg` (0 along x, 90 along y), centred on the origin, unique."""
-    t = np.arange(length) - (length - 1) / 2.0
-    a = np.deg2rad(angle_deg)
-    # Round half up, not to even: np.round would put an even-length line on
-    # every second pixel. Consecutive offsets then differ by at most 1 in each
-    # coordinate, so the line is 8-connected and has `length` distinct pixels.
-    offs = np.stack([np.floor(t * np.sin(a) + 0.5), np.floor(t * np.cos(a) + 0.5)], axis=1).astype(int)
-    return np.unique(offs, axis=0)
-
-
-def _shift_and(mask: np.ndarray, offsets: np.ndarray, sign: int) -> np.ndarray:
-    """AND (sign = +1, erosion) or OR (sign = -1, dilation) of the mask
-    shifted by each offset; pixels shifted in from outside the frame are
-    False."""
-    H, W = mask.shape
-    out = np.ones_like(mask) if sign > 0 else np.zeros_like(mask)
-    for dr, dc in offsets:
-        dr, dc = int(dr) * sign, int(dc) * sign
-        shifted = np.zeros_like(mask)
-        rs, re = max(0, -dr), min(H, H - dr)
-        cs, ce = max(0, -dc), min(W, W - dc)
-        if rs < re and cs < ce:
-            shifted[rs:re, cs:ce] = mask[rs + dr:re + dr, cs + dc:ce + dc]
-        if sign > 0:
-            out &= shifted
-        else:
-            out |= shifted
-    return out
-
-
-def straight_run_mask(skeleton: np.ndarray, length: int) -> np.ndarray:
-    """Pixels of the widened skeleton that lie under a straight line of
-    `length` pixels fitting entirely inside it, at any of the tested
-    orientations (the union of the openings with line structuring
-    elements)."""
-    half = STRAIGHT_RUN_DILATION_PX // 2
-    wide = ndi.binary_dilation(skeleton, structure=np.ones((2 * half + 1, 2 * half + 1), bool))
-    out = np.zeros_like(wide)
-    for k in range(STRAIGHT_RUN_ORIENTATIONS):
-        offs = line_offsets(length, 180.0 * k / STRAIGHT_RUN_ORIENTATIONS)
-        eroded = _shift_and(wide, offs, +1)
-        if eroded.any():
-            out |= _shift_and(eroded, offs, -1)
-    return out
-
-
-def band_wall_zone(skeleton: np.ndarray, flagged: np.ndarray) -> np.ndarray:
-    """The band-wall filter (config.BAND_LINE_FILTER): the zone within
-    config.BAND_LINE_REMOVE_PX of every 8-connected object of straight-run
-    pixels (straight_run_mask at config.BAND_LINE_MIN_LEN_PX) that comes within
-    config.BAND_LINE_REACH_PX of the flagged canal mask. Both values are None by
-    default because no value is recommended (the canaliculi v2 report, tag archive-2026-10-13, B1);
-    turning the switch on without them is an error."""
-    length, reach = config.BAND_LINE_MIN_LEN_PX, config.BAND_LINE_REACH_PX
-    if length is None or reach is None:
-        raise ValueError("BAND_LINE_FILTER is on but BAND_LINE_MIN_LEN_PX or BAND_LINE_REACH_PX is None; "
-                         "no value is recommended, set both deliberately (see the canaliculi v2 report, tag archive-2026-10-13, B1)")
-    zone = np.zeros(skeleton.shape, dtype=bool)
-    if not flagged.any():
-        return zone
-    runs = straight_run_mask(skeleton, int(length))
-    labels = measure.label(runs, connectivity=2)
-    if labels.max() == 0:
-        return zone
-    dist = ndi.distance_transform_edt(~flagged)
-    nearest = ndi.minimum(dist, labels, index=np.arange(1, labels.max() + 1))
-    keep = np.nonzero(np.asarray(nearest) <= reach)[0] + 1
-    if keep.size == 0:
-        return zone
-    zone = np.isin(labels, keep)
-    if config.BAND_LINE_REMOVE_PX > 0:
-        zone = morphology.dilation(zone, morphology.disk(config.BAND_LINE_REMOVE_PX))
-    return zone
-
-
-# Gap bridging
-
-def skeleton_endpoints(skeleton: np.ndarray) -> np.ndarray:
-    """Pixel-level degree-1 skeleton pixels, i.e. thread ends."""
-    neighbours = ndi.convolve(skeleton.astype(np.uint8), np.ones((3, 3), np.uint8), mode="constant")
-    return np.argwhere(skeleton & (neighbours - skeleton.astype(np.uint8) == 1))
-
-
-def walk_back(skeleton: np.ndarray, start: tuple[int, int], max_steps: int) -> tuple[int, int]:
-    """Walk inward from an endpoint along the thread, up to max_steps. Stops
-    at a junction, where the thread's direction stops being defined."""
-    rows, cols = skeleton.shape
-    visited = {start}
-    current = start
-    for _ in range(max_steps):
-        candidates = []
-        for dr, dc in NEIGHBOUR_OFFSETS:
-            r, c = current[0] + dr, current[1] + dc
-            if 0 <= r < rows and 0 <= c < cols and skeleton[r, c] and (r, c) not in visited:
-                candidates.append((r, c))
-        if len(candidates) != 1:
-            break
-        current = candidates[0]
-        visited.add(current)
-    return current
-
-
-def find_bridges(
-    skeleton: np.ndarray,
-    preprocessed: np.ndarray,
-    t_lo: float,
-    forbidden: np.ndarray,
-) -> list[dict]:
-    """Every endpoint-to-component pair passing all three tests: gap length,
-    angle, and minimum signal along the gap.
-
-    The signal fraction is preprocessed / t_lo, so 1.0 means "this pixel
-    would have been in the mask". `forbidden` is the lacuna bodies plus the
-    flagged structures: a bridge may not start in, end in or cross either."""
-    comp_labels = measure.label(skeleton, connectivity=2)
-    radius = int(np.ceil(MAX_BRIDGE_GAP_PX))
-    offsets_r, offsets_c = np.mgrid[-radius:radius + 1, -radius:radius + 1]
-    offset_dist = np.hypot(offsets_r, offsets_c)
-    in_range = offset_dist <= MAX_BRIDGE_GAP_PX
-
-    rows, cols = skeleton.shape
-    bridges = []
-    claimed: set = set()
-    for r, c in skeleton_endpoints(skeleton):
-        r, c = int(r), int(c)
-        if forbidden[r, c]:
-            continue
-        r0, r1 = max(0, r - radius), min(rows, r + radius + 1)
-        c0, c1 = max(0, c - radius), min(cols, c + radius + 1)
-        window = comp_labels[r0:r1, c0:c1]
-        wr0, wc0 = r0 - (r - radius), c0 - (c - radius)
-        dist_window = offset_dist[wr0:wr0 + window.shape[0], wc0:wc0 + window.shape[1]]
-        ok_window = in_range[wr0:wr0 + window.shape[0], wc0:wc0 + window.shape[1]]
-
-        own = comp_labels[r, c]
-        other = (window > 0) & (window != own) & ok_window
-        if not other.any():
-            continue
-        masked = np.where(other, dist_window, np.inf)
-        idx = np.unravel_index(int(np.argmin(masked)), masked.shape)
-        gap_len = float(masked[idx])
-        tr, tc = int(r0 + idx[0]), int(c0 + idx[1])
-
-        # One bridge per endpoint pair, so two endpoints facing each other
-        # do not both draw the same line.
-        key = (min((r, c), (tr, tc)), max((r, c), (tr, tc)))
-        if key in claimed:
-            continue
-
-        back = walk_back(skeleton, (r, c), DIRECTION_WALK_PX)
-        direction = np.array([r - back[0], c - back[1]], dtype=float)
-        gap_vector = np.array([tr - r, tc - c], dtype=float)
-        norm = np.linalg.norm(direction) * np.linalg.norm(gap_vector)
-        if norm <= 0:
-            continue
-        cosine = float(np.dot(direction, gap_vector) / norm)
-        angle = float(np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0))))
-        if angle > MAX_BRIDGE_ANGLE_DEG:
-            continue
-
-        n_samples = max(1, int(round(gap_len)) - 1)
-        ts = np.linspace(0.0, 1.0, n_samples + 2)[1:-1]
-        sr = np.clip(np.round(r + ts * (tr - r)).astype(int), 0, rows - 1)
-        sc = np.clip(np.round(c + ts * (tc - c)).astype(int), 0, cols - 1)
-        if forbidden[sr, sc].any():
-            continue
-
-        fraction = np.clip(preprocessed[sr, sc] / t_lo, 0.0, None) if t_lo > 0 else np.zeros(sr.shape)
-        if float(fraction.min()) < MIN_BRIDGE_SIGNAL_FRACTION:
-            continue
-
-        claimed.add(key)
-        bridges.append(
-            {
-                "from": (r, c),
-                "to": (tr, tc),
-                "gap_len": gap_len,
-                "angle_deg": angle,
-                "min_signal_fraction": float(fraction.min()),
-                "pixels": (sr, sc),
-            }
-        )
-    return bridges
-
-
-def apply_bridges(mask: np.ndarray, bridges: list[dict]) -> np.ndarray:
-    """Draw each accepted bridge into the mask, which is then
-    re-skeletonized, so a bridge becomes part of the network."""
-    out = mask.copy()
-    for bridge in bridges:
-        sr, sc = bridge["pixels"]
-        out[sr, sc] = True
-    return out
-
-
-# Lacuna maps
 
 def build_lacuna_maps(labels: np.ndarray, kept: list[tuple]) -> tuple[np.ndarray, np.ndarray]:
     """(lacuna_mask, lacuna_id_map). lacuna_id_map is 0 outside any kept
@@ -915,14 +674,6 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     candidate, t_lo, response = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
     skeleton = morphology.skeletonize(candidate)
 
-    # Band-wall filter (switch, off by default): the skeleton inside the straight
-    # wall zone is removed. The network mask is not cut, so re-thinning leaves no
-    # stubs along the cut.
-    band_wall = None
-    if config.BAND_LINE_FILTER:
-        band_wall = band_wall_zone(skeleton, flagged)
-        skeleton = skeleton & ~band_wall
-
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
     own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
     return {
@@ -935,18 +686,12 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "skeleton": skeleton,
         "flagged": flagged,
         "ridge_response": response,
-        # Gap bridging is gone with the threshold method. These two keep their
-        # shape for the step that still reads them; the bridging code itself is
-        # removed next, together with the plumbing.
-        "bridges": [],
-        "bridged_pixels": np.zeros_like(candidate),
         "t_lo": t_lo,
         "graph": own["graph"],
         "edge_owner": own["edge_owner"],
         "owner": own["owner"],
         "node_dist": own["node_dist"],
         "owner_map": own["owner_map"],
-        "band_wall": band_wall,
     }
 
 
@@ -1009,15 +754,7 @@ def parameters(result: dict) -> dict:
         "ownership": "graph connectivity, no distance cap",
         "root_merge_dist_px": ROOT_MERGE_DIST_PX,
         "ring_radii_px": list(RING_RADII_PX),
-        # Appended on branch canaliculi-v2 (PARAMETERS_V2_KEYS).
-        "band_line_filter": config.BAND_LINE_FILTER,
-        "band_line_min_len_px": config.BAND_LINE_MIN_LEN_PX,
-        "band_line_reach_px": config.BAND_LINE_REACH_PX,
-        "band_line_remove_px": config.BAND_LINE_REMOVE_PX,
     }
-
-
-PARAMETERS_V2_KEYS = ["band_line_filter", "band_line_min_len_px", "band_line_reach_px", "band_line_remove_px"]
 
 
 DETECTION_NOTE = (
@@ -1029,23 +766,9 @@ DETECTION_NOTE = (
 )
 
 
-def bridge_records(result: dict) -> list[dict]:
-    """The gaps this run bridged, in the order they were added."""
-    return [
-        {
-            "from_row_col": list(b["from"]),
-            "to_row_col": list(b["to"]),
-            "gap_len_px": round(b["gap_len"], 4),
-            "angle_deg": round(b["angle_deg"], 4),
-            "min_signal_fraction": round(b["min_signal_fraction"], 4),
-        }
-        for b in result["bridges"]
-    ]
-
-
 def save_detection_json(result: dict, out_path: Path) -> None:
     """The record of one network detection run: parameters, the computed cuts,
-    the bridges it added and provenance."""
+    and provenance."""
     label = lacunae.image_label(result["image_path"])
     payload = {
         "status": "pre-validation",
@@ -1058,12 +781,9 @@ def save_detection_json(result: dict, out_path: Path) -> None:
             "mask": f"{label}_{config.SUFFIX_CANALICULI_MASK}",
             "skeleton": f"{label}_{config.SUFFIX_CANALICULI_SKELETON}",
             "vascular_mask": f"{label}_{config.SUFFIX_CANALICULI_VASCULAR}",
-            "bridged_pixels": f"{label}_{config.SUFFIX_CANALICULI_BRIDGED}",
             "graph": f"{label}_{config.SUFFIX_CANALICULI_GRAPH}",
             "verification": f"{label}_{config.SUFFIX_CANALICULI_VERIFICATION}",
         },
-        "n_bridges": len(result["bridges"]),
-        "bridges": bridge_records(result),
         "parameters": parameters(result),
         "provenance": lacunae.provenance(),
     }
@@ -1107,7 +827,6 @@ def write_outputs(result: dict, out_root: Path) -> None:
     imsave(mask_path, (result["candidate"] * 255).astype(np.uint8), check_contrast=False)
     save_mask(result["skeleton"], config.SUFFIX_CANALICULI_SKELETON)
     save_mask(result["flagged"], config.SUFFIX_CANALICULI_VASCULAR)
-    save_mask(result["bridged_pixels"], config.SUFFIX_CANALICULI_BRIDGED)
     save_graph(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_GRAPH))
     save_detection_json(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_DETECTION))
     save_verification(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_VERIFICATION))
@@ -1151,7 +870,7 @@ def main() -> None:
         write_outputs(result, args.out)
         print(
             f"{image_path.name}: lacunae={result['lacunae']['lacuna_count']}  "
-            f"skeleton px={int(result['skeleton'].sum())}  bridges={len(result['bridges'])}  "
+            f"skeleton px={int(result['skeleton'].sum())}  "
             f"t_lo={result['t_lo']:.6f}  -> {out_dir}"
         )
 
