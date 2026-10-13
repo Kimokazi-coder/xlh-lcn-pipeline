@@ -20,8 +20,14 @@ micrometres, so setting it would change the recorded values and a fresh run woul
 A canaliculus is found because it is a thin bright **ridge**, not because it is bright. The flattened
 channel goes through a **Sato ridge filter at sigmas 3.0, 3.6 and 4.2 px**, the response is thresholded
 with hysteresis at a low cut of 0.75, the lacuna bodies and small specks are removed, and the result is
-skeletonized. **There is no gap bridging.** Then ownership by shortest path, the 50 um length limit, and
-the measures.
+skeletonized. **There is no gap bridging.**
+
+A lacuna then owns a thread only where there is **signal all the way to it**, not merely because it is
+close. A **second dimmer pass** continues the threads it owns into response down to half the low cut, no
+more than 5 px past where the confident skeleton stopped. The **50 um length limit** prunes what runs too
+far. Dim thread-shaped structure that no lacuna owns is kept separately as **unattached**: in the field
+density, never per lacuna. Every value is in `config.py`; METHODS sections 8 and 9 say where each came
+from and what it cost.
 
 This was variant D of the ablation that compared it against the older intensity threshold; that
 comparison is at the git tag `archive-2026-10-13`. **No variant was validated against a manual count, so
@@ -88,11 +94,14 @@ From the repository root, with the project's Python (3.9, the venv):
 python src/lacunae.py --dir data/WT                      # feature 1 detection (-o DIR for another folder)
 python src/canaliculi.py --dir data/WT                   # feature 2 detection
 python src/quantification.py --dir data/WT               # every measure and both tables
-python src/diagnostics.py reference-check                # must PASS: 109.25 / 24.11 / 6.00 on 543-2
+python src/diagnostics.py reference-check                # must PASS: 127.00 / 17.44 / 3.58 on 543-2
 python src/diagnostics.py regression                     # every number against results/, tolerance 0
 python src/diagnostics.py switch-check                   # what each switch changes
 python -u figures/make_figures.py all                    # every figure, into results/
 python -u figures/make_figures.py check                  # drawn numbers against results/
+python src/diagnostics.py survey -d data/WT -o results/survey     # what it does to every image
+python src/diagnostics.py shape-picture -d data/WT -o results/network_shape
+python src/validate_manual.py                            # score against a hand tracing
 ```
 
 Do not write a new `results/` unless a switch is adopted on purpose; `results/` is the reference that

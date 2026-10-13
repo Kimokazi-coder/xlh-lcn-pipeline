@@ -34,9 +34,18 @@ There is **one** method. A canaliculus is found because it is a thin bright
    structures only already-bright pixels are kept.
 4. Remove the lacuna bodies plus a 2 px buffer and small specks, then
    skeletonize. **There is no gap bridging**: a gap is left as a gap.
-5. Graph, cleanup, and ownership by shortest path through the network.
-6. Apply the **50 um length limit** (below) and rebuild ownership.
-7. Measure.
+5. Graph, cleanup, and ownership by shortest path through the network. A lacuna
+   attaches to a thread only where there is **signal all the way to it**: the
+   dimmest point of the straight path from the lacuna surface must reach 0.7 of
+   the response's low cut, within 20 px.
+6. A **second, dimmer pass** continues the threads a lacuna owns into response
+   down to half the low cut, no more than 5 px past where the owned skeleton
+   already reaches, then redoes the graph and the ownership.
+7. Apply the **50 um length limit** (below) and rebuild ownership.
+8. Find **unattached** dim threads: thread-shaped structure no lacuna owns, kept
+   only if at least 1.3 um long and three times longer than wide. Counted in the
+   field density, never per lacuna.
+9. Measure.
 
 This was variant D of the ablation that compared it against the older intensity
 threshold; that comparison is preserved at the git tag `archive-2026-10-13`. **No
@@ -50,10 +59,19 @@ with 0.13 um/px. **None is validated against this data.** The figures are what
 the osteocyte literature reports for mouse cortical bone, used as a plausibility
 bound and never as a threshold tuned to improve a result.
 
-| limit | value | effect |
+| constant | value | what it does |
 |---|---|---|
-| `MAX_CANALICULUS_LENGTH_UM` | 50 um (385 px) | **prunes** |
-| `CANALICULUS_LENGTH_RANGE_UM` | 25 to 50 um (192 to 385 px) | report only |
+| `MAX_CANALICULUS_LENGTH_UM` | 50 um (385 px) | **prunes** the skeleton |
+| `LACUNA_ATTACH_REACH_UM` | 2.6 um (20 px) | how far a lacuna reaches for a thread |
+| `LACUNA_ATTACH_MIN_SIGNAL_FRACTION` | 0.7 of the low cut | the signal that path must carry |
+| `DIM_THREAD_CUT_FRACTION` | 0.5 of the low cut | the second pass's cut |
+| `DIM_THREAD_REACH_UM` | 0.65 um (5 px) | how far a dim thread may continue |
+| `UNATTACHED_MIN_LENGTH_UM` | 1.3 um (10 px) | shortest unattached thread kept |
+| `UNATTACHED_MIN_ASPECT` | 3.0 | how thread-shaped it must be |
+| `GLOW_TRIM_WIDTH_FRACTION` | 0.5 of the body's own width | trims a glow streak before judging shape |
+| `OUT_OF_FOCUS_MIN_AREA_UM2` | 2.5 um² (148 px) | smallest out-of-focus body |
+| `OUT_OF_FOCUS_MAX_ASPECT` / `MIN_SOLIDITY` / `MIN_CONTRAST` | 1.5 / 0.90 / 1.5 | round, and brighter than its surroundings |
+| `CANALICULUS_LENGTH_RANGE_UM` | 25 to 50 um | report only |
 
 **The length limit.** No canaliculus runs further than 50 um from the surface of
 the lacuna that owns it, measured **along the network**, not as a straight line.
@@ -89,6 +107,9 @@ the emission wavelength and the pinhole are unknown.
 | `figures/` | the figure code, captions and review notes |
 | `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`NETWORK_TUNING_PROTOCOL.md`](docs/NETWORK_TUNING_PROTOCOL.md) |
 
+The lacuna count now includes out-of-focus lacunae, which carry no area or shape;
+see docs/METHODS.md section 9.
+
 Earlier experiments, the older intensity-threshold method, the ablation that
 chose this one and every earlier report are preserved at the git tag
 `archive-2026-10-13`. `main` is the only branch.
@@ -119,10 +140,13 @@ folder run, `results/all_images/quantification/quantification_all_images.xlsx`,
 Check it:
 
 ```
-python src/diagnostics.py reference-check    # must PASS: 109.25 / 24.11 / 6.00 on 543-2
+python src/diagnostics.py reference-check    # must PASS: 127.00 / 17.44 / 3.58 on 543-2
 python src/diagnostics.py regression         # every number against results/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
 python src/diagnostics.py --help             # every other diagnostic
+python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image
+python src/diagnostics.py shape-picture -d data/WT -o results/network_shape
+python src/validate_manual.py                # score against a hand tracing, when one exists
 ```
 
 The switches in `config.py` (`NARROW_CRUMB_RULE`, `FILL_ENCLOSED_HOLES_MAX_PX2`,
@@ -159,16 +183,16 @@ and `.pdf`) has one row per image. Per-lacuna numbers are in
 `.pdf` to read), one row per lacuna with its shape and its network measures
 together.
 
-| image | lacunae (interior) | median area px² | roots per cell | ring 30 px per cell (px) | field density px⁻¹ |
-|---|---|---|---|---|---|
-| 542_WT_2_z06c1-2 | 16 (13) | 3013 | 10.92 | 422.1 | 0.0374 |
-| 542_WT_2_z18c1-2 | 12 (11) | 3684 | 8.27 | 371.6 | 0.0340 |
-| 543-2 | 12 (12) | 2066 | 6.00 | 246.1 | 0.0342 |
-| 543_3 | 10 (9) | 2174 | 6.67 | 270.8 | 0.0345 |
-| 543_z13c1-2 | 11 (11) | 1736 | 5.73 | 274.1 | 0.0357 |
-| 682_z08c1-2 | 10 (8) | 2672 | 10.50 | 422.9 | 0.0322 |
-| 682_z23c-2 | 14 (11) | 1519 | 6.64 | 300.1 | 0.0334 |
-| 682_z29c1-3 | 13 (11) | 1624 | 5.36 | 250.5 | 0.0287 |
+| image | lacunae (interior) | roots per cell | ring 30 px per cell (px) | field density px⁻¹ |
+|---|---|---|---|---|
+| 542_WT_2_z06c1-2 | 17 (14) | 11.00 | 433.1 | 0.0389 |
+| 542_WT_2_z18c1-2 | 13 (11) | 6.18 | 399.3 | 0.0364 |
+| 543-2 | 12 (12) | 3.58 | 272.2 | 0.0369 |
+| 543_3 | 11 (10) | 3.00 | 283.2 | 0.0348 |
+| 543_z13c1-2 | 11 (11) | 4.36 | 310.4 | 0.0402 |
+| 682_z08c1-2 | 10 (8) | 8.88 | 460.0 | 0.0345 |
+| 682_z23c-2 | 14 (11) | 5.91 | 315.2 | 0.0352 |
+| 682_z29c1-3 | 14 (12) | 5.33 | 271.3 | 0.0327 |
 
 The figures under `results/<label>/3_publication_figures/` are regenerated by
 `python -u figures/make_figures.py all` and are not tracked. The pipeline's own
