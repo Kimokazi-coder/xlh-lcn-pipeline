@@ -619,7 +619,43 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
   `2_canaliculi/` are tracked: the skeleton png is an input to
   `validate-network`.
 
-## 15. History
+## 15. Validation against a manual tracing
+
+The gate everything here is pre-validation against. `src/validate_manual.py`
+compares what the pipeline traced with what a person traced by hand and reports
+where the two differ. It is not a measure of the pipeline's own.
+
+```
+python src/validate_manual.py                        # every image that has a tracing
+python src/validate_manual.py -o results/validation  # and write the json
+```
+
+It reads `manual_trace/<label>_manual.png`, a binary mask the size of the whole
+image, and `manual_trace/<label>_manual_lacunae.csv`, a header `x,y` and one row
+per hand-marked lacuna centre. Both are optional and scored independently, and
+with neither present it prints `no manual masks yet` and returns 0, so it can sit
+in a check sequence from the day it was written. The format is in
+`manual_trace/README.md`.
+
+| it reports | what it means |
+|---|---|
+| skeleton precision | share of the pipeline's skeleton within 2 px of some hand-traced pixel: how much of what it drew is really there |
+| skeleton recall | share of the hand tracing within 2 px of some pipeline pixel: how much of what is there it drew |
+| f1 | their harmonic mean |
+| lacunae matched, missed, extra | a point matches the lacuna whose body contains it, or the nearest within 25 px; each lacuna can be claimed once |
+
+The tolerance is 2 px = 0.26 um. A hand line and a skeleton of the same thread
+never agree pixel for pixel, and a thread is about 6 px wide, so 2 px compares
+the same structure without letting the next thread over count as a match. The
+25 px lacuna tolerance is 3.25 um, well under the spacing between neighbours.
+
+It was checked both ways before being committed: scored against the pipeline's
+own skeleton and centroids it returns precision 1.0, recall 1.0 and every lacuna
+matched; against a tracing deliberately broken (left half dropped, shifted 5 px,
+two lacunae withheld and one invented) it returns precision 0.137, recall 0.259,
+9 matched, 1 missed and 2 extra.
+
+## 16. History
 
 Earlier experiments, reports and analyses are preserved at the git tag
 `archive-2026-10-13`, which is the repository as it was before the 2026-10-13
