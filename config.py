@@ -177,7 +177,29 @@ MAX_CANALICULUS_LENGTH_UM = 50.0
 LACUNA_ATTACH_REACH_UM = 2.6
 LACUNA_ATTACH_MIN_SIGNAL_FRACTION = 0.7
 
-# (c) Report only, no pruning. The range a canalicular length is reported
+# (c) The second, dimmer pass. A canaliculus that leaves a lacuna often fades
+# before it ends, and the survey found 11 to 13% of the area within 150 px of a
+# lacuna carrying ridge response between half the low cut and the low cut: real
+# structure the one-pass threshold can never reach, because hysteresis can only
+# grow into what is already above the low cut somewhere.
+#
+# So a second pass accepts response down to DIM_THREAD_CUT_FRACTION of the low
+# cut, but ONLY continuing from skeleton a lacuna already owns, and only
+# DIM_THREAD_REACH_UM further along the dim structure than that skeleton reaches.
+#
+# Both limits are needed. The faint band is a connected mesh: seeded from owned
+# skeleton with connectivity alone and no reach, it floods, because at half the
+# low cut the whole band is two connected components and the mask grows by 35%
+# (measured on 543_3). The reach is what makes it a thread continuation rather
+# than a flood: a dim thread may carry on 10 px past where the confident skeleton
+# stopped, and no further.
+#
+# 1.3 um is 10 px. 0.5 is the floor the survey measured the faint band against.
+# NOT VALIDATED: no hand count chose either value.
+DIM_THREAD_CUT_FRACTION = 0.5
+DIM_THREAD_REACH_UM = 0.65
+
+# (d) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The
 # pipeline does not act on it.
 CANALICULUS_LENGTH_RANGE_UM = (25.0, 50.0)

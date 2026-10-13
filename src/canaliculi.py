@@ -236,6 +236,10 @@ LACUNA_ATTACH_REACH_PX = config.px_int(config.LACUNA_ATTACH_REACH_UM)
 # after comparison would be reading two different measures.
 RING_ATTACHED_GAP_PX = 10
 
+# How far a dim thread may continue past the skeleton a lacuna already owns, in
+# pixels. Set in micrometres in config.py; see the comment there.
+DIM_THREAD_REACH_PX = config.px_int(config.DIM_THREAD_REACH_UM)
+
 # Parameters: per-cell measures
 
 # Attachment points closer than this (px) count as one root, so one thick
@@ -681,6 +685,43 @@ def build_owner_pixel_map(shape: tuple[int, int], skel_obj, G: nx.Graph, edge_ow
     return owner_map
 
 
+def grow_dim_threads(candidate: np.ndarray, response: np.ndarray, t_hi: float,
+                     owned_skeleton: np.ndarray, lacuna_mask: np.ndarray,
+                     flagged: np.ndarray) -> np.ndarray:
+    """The pixels a second, dimmer pass adds to the network mask.
+
+    A canaliculus often fades before it ends, and hysteresis can only grow into
+    what already reaches the low cut somewhere, so a thread that fades below it
+    stops dead. This pass accepts response down to
+    config.DIM_THREAD_CUT_FRACTION of the low cut, but only where it CONTINUES
+    skeleton a lacuna already owns, and only config.DIM_THREAD_REACH_UM further
+    along the dim structure than that skeleton reaches.
+
+    The reach is what keeps it a continuation rather than a flood. At half the
+    low cut the faint band is a connected mesh covering much of the frame, so
+    connectivity alone would swallow it whole.
+
+    The two exclusions of the first pass still apply: nothing grows into a
+    vascular structure unless it was already above the high cut, and nothing
+    grows into the lacuna buffer."""
+    from skimage.graph import MCP_Geometric
+
+    if not owned_skeleton.any():
+        return np.zeros_like(candidate)
+    low = t_hi * HYSTERESIS_LOW_FRACTION
+    permissive = response >= low * config.DIM_THREAD_CUT_FRACTION
+    if flagged.any():
+        permissive = permissive & ~(flagged & ~(response >= t_hi))
+    permissive = permissive & ~morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
+    permissive = permissive | owned_skeleton
+    costs = np.where(permissive, 1.0, np.inf)
+    reached, _traceback = MCP_Geometric(costs, fully_connected=True).find_costs(
+        np.argwhere(owned_skeleton))
+    grown = permissive & np.isfinite(reached) & (reached <= DIM_THREAD_REACH_PX)
+    grown = morphology.remove_small_objects(grown | candidate, min_size=MIN_THREAD_OBJECT_PX2)
+    return grown & ~candidate
+
+
 def network_distance_map(skeleton: np.ndarray, lacuna_mask: np.ndarray) -> np.ndarray:
     """For every skeleton pixel, its distance in px from the nearest lacuna
     SURFACE measured ALONG THE NETWORK. inf where no lacuna reaches it.
@@ -806,6 +847,20 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     skeleton, own, prune = prune_beyond_length_limit(
         kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
         attach_min_signal, MAX_CANALICULUS_LENGTH_PX)
+
+    # The second, dimmer pass: continue the threads a lacuna already owns into
+    # signal the first cut could not reach. Everything after it is redone on the
+    # grown mask, so the graph, the ownership and the 50 um limit all see one
+    # skeleton and not two.
+    dim = grow_dim_threads(candidate, response, t_lo, skeleton & (own["owner_map"] > 0),
+                           lacuna_mask, flagged)
+    if dim.any():
+        candidate = candidate | dim
+        skeleton = morphology.skeletonize(candidate)
+        skeleton_before = skeleton
+        skeleton, own, prune = prune_beyond_length_limit(
+            kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
+            attach_min_signal, MAX_CANALICULUS_LENGTH_PX)
     return {
         "image_path": image_path,
         "lacunae": lac,
@@ -813,6 +868,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "lacuna_id_map": lacuna_id_map,
         "lacuna_mask": lacuna_mask,
         "candidate": candidate,
+        "dim_pass_px": int(dim.sum()),
         "skeleton": skeleton,
         "skeleton_before_length_prune": skeleton_before,
         "length_prune": prune,
@@ -879,6 +935,10 @@ def parameters(result: dict) -> dict:
         "flagged_dilation_px": FLAGGED_DILATION_PX,
         "flagged_area_px2": float(result["flagged"].sum()),
         "gap_bridging": False,
+        "dim_thread_cut_fraction": config.DIM_THREAD_CUT_FRACTION,
+        "dim_thread_reach_um": config.DIM_THREAD_REACH_UM,
+        "dim_thread_reach_px": DIM_THREAD_REACH_PX,
+        "dim_pass_added_px": result["dim_pass_px"],
         "lacuna_attach_reach_um": config.LACUNA_ATTACH_REACH_UM,
         "lacuna_attach_reach_px": LACUNA_ATTACH_REACH_PX,
         "lacuna_attach_min_signal_fraction": config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION,

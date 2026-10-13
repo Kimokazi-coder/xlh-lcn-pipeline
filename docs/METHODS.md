@@ -77,7 +77,11 @@ these are single 2D sections, which drives every departure.
    (section 8). One multi-source shortest-path run then gives every reachable
    node to the cell it connects to through the network, and each edge to the
    owner of its nearer end.
-8. **The 50 um length limit** (section 7): every skeleton pixel further than
+8. **Second, dimmer pass** (section 8): continue the threads a lacuna owns into
+   response down to half the low cut, no further than 5 px past where the owned
+   skeleton already reaches, then redo the graph and the ownership on the grown
+   mask.
+9. **The 50 um length limit** (section 7): every skeleton pixel further than
    that from the surface of its owning lacuna, measured along the network, is
    pruned, and ownership is rebuilt on what is left.
 It writes the mask, the skeleton, the verification picture, the vascular mask and
