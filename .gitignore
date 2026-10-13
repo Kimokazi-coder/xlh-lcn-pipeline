@@ -14,3 +14,11 @@ code_key*
 *_key.csv
 # Claude Code settings for this machine, not part of the pipeline.
 .claude/
+
+# results/ridge/ verification pictures. Every run redraws one per variant per
+# image, five variants on eight images, which is 60 MiB. They are deterministic
+# and were checked byte for byte against tag archive-2026-10-13, so only the
+# preferred variant's is tracked and the rest are regenerated with
+# python src/canal_physical/physical.py --dir data/WT
+results/ridge/*/verification_*.png
+!results/ridge/*/verification_P5.png

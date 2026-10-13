@@ -43,9 +43,12 @@ results/
     4_archive_not_used/     kept for history, not a result (see Archive)
     5_quantification/       every measured number: <label>_quantification.json, .xlsx and .pdf
   validation_tiles/         tiles for counting roots by hand
-  ridge/                    the experimental ridge comparison, P5 then A then P2:
+  ridge/                    the experimental ridge comparison, P5 then A then D, F, G:
                             comparison_all_images.csv and .xlsx, comparison_summary.csv,
-                            README.md, and <label>/<label>_compare.png per image.
+                            README.md, <label>/<label>_compare.png (all five side by side)
+                            and <label>/verification_<variant>.png (the pipeline's own
+                            picture of each variant, 1024 x 1024). Only verification_P5
+                            is tracked; the rest are redrawn by the one command.
                             Not the pipeline and not validated; see docs/METHODS.md section 7
 ```
 

@@ -208,7 +208,8 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 | 2026-09-29 | Thin band objects, the leaked outline and the unfilled hole recorded as known cases; nothing changed. |
 | 2026-09-29 | Reach measured; a reach cap and ownership-free measures (roots, ring lengths) built; the cap left off. |
 | 2026-09-30 | Final cleanup: the code keeps only the default path; alternatives (v3 and hybrid detectors, adjacent-pair merge, reach cap, ridge and other preprocessing, other assignment and counting methods, exclusion mask) are preserved at the git tag `archive-2026-10-13`. Headline measures fixed as roots per cell, ring length 30 px and field length density. |
-| 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. The experimental method keeps three variants: A, P2 and P5. |
+| 2026-10-13 | The ablation variants D, F and G are restored from the tag beside A and P5, and P2 is dropped. |
+| 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. The experimental method keeps A and P5. |
 
 ## 6. Open questions
 
@@ -228,18 +229,23 @@ The flattening, the lacuna buffer, the vascular handling, the bridging rule, the
 graph cleanup, the ownership and the ring radii stay exactly as the current
 method has them, so one idea changes at a time.
 
-| variant | what |
-|---|---|
-| P5 | ridge, sigmas 0.17, 0.21 and 0.26 um, gap bridging off |
-| A | the current method, as it stands |
-| P2 | ridge, same scales and same cut, gap bridging on |
+| variant | what | scales |
+|---|---|---|
+| P5 | ridge, gap bridging off | 0.17, 0.21, 0.26 um (1.31, 1.62, 2.00 px) |
+| A | the current method, as it stands | |
+| D | ridge, gap bridging off | 3.0, 3.6, 4.2 px |
+| F | ridge, gap bridging off, one scale | 3.0 px |
+| G | ridge, gap bridging off | 1.5, 2.0, 2.5 px |
 
-**P5 is listed first because it is the preferred variant visually. That is a
+**P5 is listed first because it is my preferred variant visually. That is a
 visual preference and it is not validated.**
 
-P5 and P2 carry the same scales and the same cut, so they differ by that one
-switch and nothing else, and the difference between their numbers is the effect
-of bridging alone.
+D, F and G are the ablation variants, restored from the git tag
+`archive-2026-10-13`, where their scales were written in pixels. Every ridge
+variant has gap bridging off, so the scales are the only thing separating them.
+Every run asserts that D, F and G convert back to exactly those pixel scales, and
+their output has been checked against the tag: on all 8 images every artifact
+measure and every verification picture is identical to the ablation output.
 
 Beside the pipeline's own measures it reports the width measured **on the image**
 (the full width at half maximum of the intensity profile across the thread: it
@@ -250,10 +256,14 @@ axis-aligned runs and pixel-grid rectangles a grid-following detector produces.
 `python src/canal_physical/physical.py --dir data/WT` writes `results/ridge/`:
 the comparison table (`comparison_all_images.csv` and `.xlsx`,
 `comparison_summary.csv`), a README with every parameter and the provenance, and
-per image `<label>/<label>_compare.png`, the three variants side by side. Every
-run asserts that each micrometre parameter converts back to exactly the pixel
-value the imported pipeline code uses, and that variant A still equals
-`results/` at tolerance 0 with a pixel-identical verification image.
+per image `<label>/<label>_compare.png`, all five variants side by side, and
+`<label>/verification_<variant>.png`, the pipeline's own picture of each variant
+at 1024 x 1024 by `canaliculi.save_verification`. Only `verification_P5.png` is
+tracked: the five variants on eight images come to 60 MiB and all of them are
+redrawn by the one command. Every run asserts that each micrometre parameter
+converts back to exactly the pixel value the imported pipeline code uses, and
+that variant A still equals `results/` at tolerance 0 with a pixel-identical
+verification image.
 
 **Nothing about this method is validated.** No variant has been checked against
 a manual count, none is called better than another, and nothing was tuned to

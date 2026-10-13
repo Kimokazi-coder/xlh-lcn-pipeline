@@ -99,20 +99,25 @@ cell".
 
 `src/canal_physical/` thresholds a multiscale ridge response instead of the
 flattened intensity, with every scale set in micrometres from the pixel size.
-Three variants are run and reported side by side, in this order:
+Five variants are run and reported side by side, in this order:
 
-| variant | what |
-|---|---|
-| P5 | ridge, sigmas 0.17, 0.21 and 0.26 um, gap bridging off |
-| A | the current method, as it stands |
-| P2 | ridge, same scales and same cut, gap bridging on |
+| variant | what | scales |
+|---|---|---|
+| P5 | ridge, gap bridging off | 0.17, 0.21, 0.26 um (1.31, 1.62, 2.00 px) |
+| A | the current method, as it stands | |
+| D | ridge, gap bridging off | 3.0, 3.6, 4.2 px |
+| F | ridge, gap bridging off, one scale | 3.0 px |
+| G | ridge, gap bridging off | 1.5, 2.0, 2.5 px |
 
 **P5 is listed first because it is my preferred variant visually. That is a
 visual preference and it is not validated.**
 
-P5 and P2 carry the same scales and the same cut, so they differ by that one
-switch and nothing else, and the difference between their numbers is the effect
-of bridging alone.
+D, F and G are the ablation variants, restored from the git tag
+`archive-2026-10-13`, where their scales were written in pixels. Every ridge
+variant has gap bridging off, so the scales are the only thing separating them.
+Every run asserts that D, F and G convert back to exactly those pixel scales, and
+their output has been checked against the tag: on all 8 images every artifact
+measure and every verification picture is identical to the ablation output.
 
 ```
 python src/canal_physical/physical.py --dir data/WT     # -> results/ridge/
@@ -126,8 +131,20 @@ the comparison rests on the pipeline itself.
 
 `results/ridge/` holds the comparison table (`comparison_all_images.csv` and
 `.xlsx`, `comparison_summary.csv`), a README recording every parameter and the
-provenance, and per image `<label>/<label>_compare.png`, the three variants side
-by side.
+provenance, and per image:
+
+- `<label>/<label>_compare.png`: all five variants side by side, skeleton one
+  pixel wide, at 2x.
+- `<label>/verification_<variant>.png`: the pipeline's own picture of that
+  variant at 1024 x 1024, drawn by `canaliculi.save_verification`, with each
+  lacuna outlined and the skeleton it owns thickened in its colour over the full
+  brightness original. `verification_A.png` is checked pixel for pixel against
+  the committed `results/<label>/2_canaliculi/` one on every run, which is how
+  the run proves variant A is the pipeline.
+
+Only `verification_P5.png` is tracked, because the five variants on eight images
+come to 60 MiB and all of them are redrawn by the one command above. The
+comparison table reports every variant whether its picture is tracked or not.
 
 ## Results
 

@@ -41,10 +41,11 @@ in the working tree.
 ## The experimental ridge method
 
 `src/canal_physical/` thresholds a multiscale ridge response instead of the flattened intensity, with
-every scale set in micrometres. Three variants, reported in this order: **P5** the ridge at sigmas 0.17,
-0.21 and 0.26 um with gap bridging off, **A** the current method as it stands, and **P2** the same ridge
-with bridging on, so P5 and P2 differ by that one switch alone. P5 leads because it is the preferred
-variant visually, which is a visual preference and is **not validated**.
+every scale set in micrometres. Five variants, reported in this order: **P5** the ridge at 0.17, 0.21 and
+0.26 um, **A** the current method as it stands, and **D**, **F** and **G**, the ablation variants restored
+from the tag `archive-2026-10-13` at 3.0, 3.6, 4.2 px, at a single 3.0 px, and at 1.5, 2.0, 2.5 px. Every
+ridge variant has gap bridging off, so the scales are the only thing separating them. P5 leads because it
+is the preferred variant visually, which is a visual preference and is **not validated**.
 `python src/canal_physical/physical.py --dir data/WT` writes the comparison into `results/ridge/`.
 **Nothing about this method is validated** and no variant is called better than another by any number.
 
