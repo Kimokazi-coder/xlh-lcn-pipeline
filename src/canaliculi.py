@@ -240,6 +240,10 @@ RING_ATTACHED_GAP_PX = 10
 # pixels. Set in micrometres in config.py; see the comment there.
 DIM_THREAD_REACH_PX = config.px_int(config.DIM_THREAD_REACH_UM)
 
+# The shortest an unattached dim component may be, in pixels, once skeletonized.
+# Set in micrometres in config.py; see the comment there.
+UNATTACHED_MIN_LENGTH_PX = config.px_int(config.UNATTACHED_MIN_LENGTH_UM)
+
 # Parameters: per-cell measures
 
 # Attachment points closer than this (px) count as one root, so one thick
@@ -722,6 +726,49 @@ def grow_dim_threads(candidate: np.ndarray, response: np.ndarray, t_hi: float,
     return grown & ~candidate
 
 
+def find_unattached_threads(response: np.ndarray, t_hi: float, owned_skeleton: np.ndarray,
+                            skeleton: np.ndarray, lacuna_mask: np.ndarray,
+                            flagged: np.ndarray) -> np.ndarray:
+    """Dim thread-shaped structure that touches no lacuna, as a skeleton of its
+    own.
+
+    The second pass only continues threads a lacuna already owns, so a
+    canaliculus whose whole run is dim, or whose lacuna lies outside the section,
+    is still missed. This finds those, from the same dim tier, and keeps a
+    component only if it looks like a thread and not like a patch of background:
+    at least UNATTACHED_MIN_LENGTH_PX long once skeletonized and at least
+    config.UNATTACHED_MIN_ASPECT times longer than wide.
+
+    The test is strict because nothing vouches for this tier: there is no lacuna
+    at the end of it, so it is accepted on its own shape alone. What comes back
+    is NEVER owned and never enters a per-lacuna measure."""
+    low = t_hi * HYSTERESIS_LOW_FRACTION
+    permissive = response >= low * config.DIM_THREAD_CUT_FRACTION
+    if flagged.any():
+        permissive = permissive & ~(flagged & ~(response >= t_hi))
+    permissive = permissive & ~morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
+    # Anything the main skeleton or its ownership already covers is not this.
+    seeded = morphology.dilation(skeleton | owned_skeleton, morphology.disk(1))
+    labels = morphology.label(permissive, connectivity=2)
+    touching = set(np.unique(labels[seeded & (labels > 0)]))
+    touching.discard(0)
+
+    out = np.zeros_like(permissive)
+    for region in measure.regionprops(labels):
+        if region.label in touching:
+            continue
+        minor, major = region.axis_minor_length, region.axis_major_length
+        aspect = (major / minor) if minor > 0 else float("inf")
+        if aspect < config.UNATTACHED_MIN_ASPECT:
+            continue
+        piece = labels[region.slice] == region.label
+        thin = morphology.skeletonize(piece)
+        if int(thin.sum()) < UNATTACHED_MIN_LENGTH_PX:
+            continue
+        out[region.slice] |= thin
+    return out
+
+
 def network_distance_map(skeleton: np.ndarray, lacuna_mask: np.ndarray) -> np.ndarray:
     """For every skeleton pixel, its distance in px from the nearest lacuna
     SURFACE measured ALONG THE NETWORK. inf where no lacuna reaches it.
@@ -861,6 +908,10 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         skeleton, own, prune = prune_beyond_length_limit(
             kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
             attach_min_signal, MAX_CANALICULUS_LENGTH_PX)
+    # Dim thread-shaped structure that touches no lacuna: a class of its own,
+    # never owned, counted only in the field measures.
+    unattached = find_unattached_threads(response, t_lo, skeleton & (own["owner_map"] > 0),
+                                         skeleton, lacuna_mask, flagged)
     return {
         "image_path": image_path,
         "lacunae": lac,
@@ -869,6 +920,8 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "lacuna_mask": lacuna_mask,
         "candidate": candidate,
         "dim_pass_px": int(dim.sum()),
+        "unattached": unattached,
+        "unattached_px": int(unattached.sum()),
         "skeleton": skeleton,
         "skeleton_before_length_prune": skeleton_before,
         "length_prune": prune,
@@ -895,13 +948,25 @@ def lacuna_colors(n_lacunae: int) -> dict[int, tuple[int, int, int]]:
     return colors
 
 
+# Unattached dim threads are drawn in this grey: present, visibly not owned by
+# any cell, and never mistaken for a lacuna colour.
+UNATTACHED_COLOUR = (150, 150, 150)
+
+
 def save_verification(result: dict, out_path: Path) -> None:
-    """Each lacuna outlined, and the skeleton it owns drawn, in its colour
-    over the full-brightness original, so the tracing can be checked against
-    the real threads underneath. Unowned skeleton is not drawn."""
+    """Each lacuna outlined, and the skeleton it owns drawn, in its colour over
+    the full-brightness original, so the tracing can be checked against the real
+    threads underneath. Unowned skeleton is not drawn.
+
+    Unattached dim threads (canaliculi.find_unattached_threads) are drawn in
+    grey, under the owned skeleton, so what the field density counts but no cell
+    owns can be seen and told apart at a glance."""
     n = len(result["lacunae"]["kept"])
     colors = lacuna_colors(n)
     vis = result["display"].copy()
+    unattached = result.get("unattached")
+    if unattached is not None and unattached.any():
+        vis[morphology.dilation(unattached, morphology.disk(VIS_SKELETON_DILATION_PX))] =             UNATTACHED_COLOUR
     for lacuna_id in range(1, n + 1):
         color = colors[lacuna_id]
         boundary = segmentation.find_boundaries(result["lacuna_id_map"] == lacuna_id, mode="outer")
@@ -935,6 +1000,9 @@ def parameters(result: dict) -> dict:
         "flagged_dilation_px": FLAGGED_DILATION_PX,
         "flagged_area_px2": float(result["flagged"].sum()),
         "gap_bridging": False,
+        "unattached_min_length_um": config.UNATTACHED_MIN_LENGTH_UM,
+        "unattached_min_aspect": config.UNATTACHED_MIN_ASPECT,
+        "unattached_px": result["unattached_px"],
         "dim_thread_cut_fraction": config.DIM_THREAD_CUT_FRACTION,
         "dim_thread_reach_um": config.DIM_THREAD_REACH_UM,
         "dim_thread_reach_px": DIM_THREAD_REACH_PX,

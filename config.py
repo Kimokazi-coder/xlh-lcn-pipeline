@@ -199,7 +199,28 @@ LACUNA_ATTACH_MIN_SIGNAL_FRACTION = 0.7
 DIM_THREAD_CUT_FRACTION = 0.5
 DIM_THREAD_REACH_UM = 0.65
 
-# (d) Report only, no pruning. The range a canalicular length is reported
+# (d) Dim threads that touch no lacuna. The second pass above only continues
+# threads a lacuna already owns, so a canaliculus whose whole run is dim, or
+# whose lacuna is out of the section, is still missed. Those threads are real
+# structure and belong in a field measure even though no cell can claim them.
+#
+# They are accepted from the same dim tier, down to DIM_THREAD_CUT_FRACTION of
+# the low cut, but only where the component looks like a thread rather than a
+# patch of background: at least UNATTACHED_MIN_LENGTH_UM long once skeletonized,
+# and at least UNATTACHED_MIN_ASPECT times longer than it is wide.
+#
+# 1.3 um is 10 px, about two thread widths, so a component must actually run
+# somewhere. The length floor is the one a canaliculus has to clear to be worth
+# counting at all. Both are deliberately strict, because this tier has no lacuna
+# to vouch for it: it is accepted on its own shape alone.
+#
+# They are counted as "unattached": included in the field length density, which
+# asks how much canalicular network the tissue holds, and NEVER in a per-lacuna
+# measure, because no lacuna owns them. NOT VALIDATED.
+UNATTACHED_MIN_LENGTH_UM = 1.3
+UNATTACHED_MIN_ASPECT = 3.0
+
+# (e) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The
 # pipeline does not act on it.
 CANALICULUS_LENGTH_RANGE_UM = (25.0, 50.0)

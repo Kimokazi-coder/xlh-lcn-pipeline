@@ -135,6 +135,10 @@ held out and used to confirm.
 | limits | reported length range | 25 to 50 um | report only, acted on by nothing; the range the literature reports for canalicular length |
 | ownership | attach reach | 2.6 um = 20 px | was 10 px while attachment went by distance alone. With the signal test deciding, a longer reach cannot cross empty space, and contact threads sat 10 to 20 px out. 25 px was tried and changed no guard number, so the shorter value stands |
 | ownership | attach minimum signal | 0.7 of the response's low cut | the fraction the old gap bridging required of a gap, measured the same way: the MINIMUM along the path, not the mean |
+| second pass | dim cut | 0.5 of the response's low cut | the floor the survey measured the faint band against |
+| second pass | dim reach | 0.65 um = 5 px | how far a dim thread may continue past owned skeleton. 10 px was tried and took the skeleton past the 25% guard on four images |
+| unattached | minimum length | 1.3 um = 10 px | about two thread widths, so a component must actually run somewhere before it counts |
+| unattached | minimum aspect | 3.0 | a thread is long and thin; this rejects a patch of background that happens to clear the dim cut |
 
 Parameters live as documented constants at the top of `src/lacunae.py`
 and `src/canaliculi.py`, each with a longer provenance comment.
@@ -316,7 +320,7 @@ name in its xlsx.
   therefore an **upper bound on the diameter**, not the diameter, and the json
   says so in the block itself.
 
-## 8. Ownership by signal, not by distance
+## 8. Ownership by signal, and the two dimmer tiers
 
 A lacuna owns a thread only if there is a thread between them.
 
@@ -358,6 +362,71 @@ which exists to recover real dim threads, and the guard is judged on the result
 of both.
 
 **Not validated.** No hand count chose the reach or the fraction.
+
+### The second, dimmer pass
+
+A canaliculus often fades before it ends. Hysteresis can only grow into what
+already reaches the low cut somewhere, so a thread that fades below it stops
+dead, and the survey measured how much is lost that way: **11 to 13% of the area
+within 150 px of a lacuna carries ridge response between half the low cut and the
+low cut**, 85,000 to 111,000 px per image, against a whole skeleton of 29,000 to
+38,000 px.
+
+So a second pass accepts response down to `config.DIM_THREAD_CUT_FRACTION` = 0.5
+of the low cut, under two limits together:
+
+- it must **continue skeleton a lacuna already owns**, the only seed, so nothing
+  is recovered in open field, and
+- it may run only `config.DIM_THREAD_REACH_UM` = 0.65 um = 5 px further along the
+  dim structure than that skeleton already reaches.
+
+The second limit is what makes this a thread continuation rather than a flood. At
+half the low cut the faint band is a connected mesh: on 543_3 it is two connected
+components, so a seeded growth with connectivity alone and no reach swallows it
+and the mask grows 35%. Everything after the pass is redone on the grown mask, so
+the graph, the ownership and the 50 um limit all see one skeleton and not two.
+
+**Choosing the reach.** 1.3 um (10 px) was tried first. It recovered owned length
+per cell by 36 to 70%, but the skeleton grew past the 25% guard on four images
+(543-2 +32.0%, 543_z13 +28.2%, 682_z08 +25.6%, 682_z29 +36.4%). At 0.65 um (5 px)
+no image trips either guard: skeleton length runs -1.0 to +14.3% and owned length
+per cell -8.0 to +28.2%. The shorter reach is the value, for every image.
+
+**Together with the ownership rule.** Step 1 took owned length away, most of it
+on 543_3, which lost 11.9% when the empty-space network was refused. This pass
+gives real thread back, and 543_3 ends at -8.0%, inside the guard. The two are
+judged together because they pull in opposite directions on the same quantity.
+
+**Not validated.** No hand count chose the cut or the reach.
+
+### Dim threads that touch no lacuna
+
+The second pass only continues threads a lacuna already owns, so a canaliculus
+whose whole run is dim, or whose lacuna lies outside the section, is still
+missed. Those threads are real structure and belong in a field measure even
+though no cell can claim them.
+
+They are taken from the same dim tier, down to half the low cut, and a component
+is kept only if it looks like a thread rather than a patch of background: at
+least `config.UNATTACHED_MIN_LENGTH_UM` = 1.3 um = 10 px long once skeletonized,
+and at least `config.UNATTACHED_MIN_ASPECT` = 3.0 times longer than it is wide.
+Anything the main skeleton already touches is not this tier by definition.
+
+The test is deliberately strict because nothing vouches for this tier: there is
+no lacuna at the end of it, so it is accepted on its own shape alone. It finds
+224 to 1011 px per image.
+
+**Where it counts and where it does not.** These threads are labelled
+**unattached**. They are included in the field length density, which asks how
+much canalicular network the tissue holds, and they are **never** in a per-lacuna
+measure, because no lacuna owns them. Both densities are reported side by side,
+`canalicular_length_density_attached_per_px` and
+`field_length_density_with_unattached_per_px`, so the tier can always be taken
+back out. In the verification picture they are drawn in grey, under the owned
+skeleton, so what the field density counts but no cell owns is visible at a
+glance.
+
+**Not validated.**
 
 ## 9. Normalised per-cell measures
 

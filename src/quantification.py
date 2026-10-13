@@ -547,7 +547,8 @@ def summarize_network(rows: list[dict], precision: int) -> dict:
 
 
 def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_lacunae: int, precision: int,
-                  flagged: np.ndarray | None = None, roi: np.ndarray | None = None) -> dict:
+                  flagged: np.ndarray | None = None, roi: np.ndarray | None = None,
+                  unattached: np.ndarray | None = None) -> dict:
     """Per-field measures. They use the whole skeleton and no ownership, so
     fragmentation affects them far less than any per-cell measure. The
     appended densities without the flagged mask and in an ROI are None when
@@ -580,6 +581,18 @@ def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_
         "field_length_density_w_per_px": per_area(chain_length(skeleton)),
         "field_density_without_flagged_per_px": _masked_density(skeleton, lacuna_mask, flagged, precision, inside=False),
         "field_density_in_roi_per_px": _masked_density(skeleton, lacuna_mask, roi, precision, inside=True),
+        # Unattached dim threads (canaliculi.find_unattached_threads): thread
+        # shaped structure no lacuna owns. A field measure asks how much
+        # canalicular network the tissue holds, so they belong in the density;
+        # no per-lacuna measure sees them, because no lacuna owns them. The
+        # attached-only density is kept beside it so the two can be compared.
+        "unattached_length_px": round(float(unattached.sum()), precision)
+        if unattached is not None else 0.0,
+        "unattached_component_count": int(measure.label(unattached, connectivity=2).max())
+        if unattached is not None and unattached.any() else 0,
+        "canalicular_length_density_attached_per_px": per_area(skel_px),
+        "field_length_density_with_unattached_per_px": per_area(
+            skel_px + (float(unattached.sum()) if unattached is not None else 0.0)),
     }
 
 
@@ -949,7 +962,8 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
         rows.append(merged)
 
     field = field_metrics(skeleton, detection["graph"], detection["lacuna_mask"],
-                                     len(kept), precision, detection["vascular"], roi_mask)
+                                     len(kept), precision, detection["vascular"], roi_mask,
+                                     detection.get("unattached"))
     limits = biological_limits_report(detection, net_rows, width, sample, precision)
     return {
         "image_path": image_path,
@@ -1029,6 +1043,7 @@ def detection_in_memory(result: dict) -> dict:
         "lacuna_mask": result["lacuna_id_map"] > 0,
         "mask": result["candidate"],
         "thresholded": result["candidate"],
+        "unattached": result["unattached"],
         "skeleton": result["skeleton"],
         "vascular": result["flagged"],
         "graph": result["graph"],
