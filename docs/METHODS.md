@@ -52,29 +52,40 @@ these are single 2D sections, which drives every departure.
 1. **Flatten the background** (OCY): a light Gaussian, a white top-hat, and
    subtraction of the histogram mode, so thin threads stay thin instead of
    fusing into ribbons.
-2. **Threshold with hysteresis**: the high cut is the image's own lower
-   multi-Otsu cut; dim pixels down to 0.75 of it are kept only where they
-   connect to bright ones.
-3. **Vascular canals**: broad bright structures are found on the raw
-   channel (an opening that erases every canaliculus, then a shape gate far
-   above lacuna size). Inside them, hysteresis and gap bridging may not
-   add anything. Nothing is removed. This stops a vessel wall from being
-   traced as a canaliculus.
-4. **Mask and skeleton**: remove the lacuna bodies plus a 2 px buffer and
-   specks under 8 px², then reduce to one-pixel centre lines.
-5. **Gap bridging** (not in OCY): join a thread end to the nearest other
-   thread only if the gap is at most 10 px, points within 40 degrees of the
-   thread's direction, and holds signal of at least 0.7 of the threshold at
-   every point. Bridges may not touch a lacuna or a vascular structure.
+2. **Ridge filter** (not in OCY): the Sato tubeness of the flattened image over
+   sigmas 3.0, 3.6 and 4.2 px, as the maximum across the scales
+   (`canaliculi.RIDGE_SIGMAS_PX`). A canaliculus is detected because it is a
+   thin bright ridge, not because it is bright. Sato rather than Frangi: both
+   are Hessian based, and Sato's tubeness keeps one response per scale without
+   Frangi's second shape term, which is tuned for blob rejection and would add
+   two more constants with no evidence here.
+3. **Threshold the RESPONSE with hysteresis**: the high cut is the response's
+   own lower multi-Otsu cut; dim pixels down to 0.75 of it are kept only where
+   they connect to bright ones.
+4. **Vascular canals**: broad bright structures are found on the raw channel
+   (an opening that erases every canaliculus, then a shape gate far above
+   lacuna size). Inside them hysteresis may not add anything. Nothing is
+   removed. This stops a vessel wall from being traced as a canaliculus.
+5. **Mask and skeleton**: remove the lacuna bodies plus a 2 px buffer and
+   specks under 8 px², then reduce to one-pixel centre lines. **There is no gap
+   bridging**: a gap is left as a gap.
 6. **Graph and cleanup** (OCY): spurs under 4 px are pruned, internal edges
    under 6 px (thread crossings) are collapsed, degree-2 chains merged, all
    repeated until nothing changes.
 7. **Ownership** (OCY): each lacuna is attached to skeleton nodes within
    10 px of its body. One multi-source shortest-path run gives every
    reachable node to the cell it connects to through the network, and each
-   edge to the owner of its nearer end. There is no distance limit.
-It writes the mask, the skeleton, the verification picture, the vascular mask,
-the pixels gap bridging added, and the cleaned graph with its ownership.
+   edge to the owner of its nearer end.
+8. **The 50 um length limit** (section 7): every skeleton pixel further than
+   that from the surface of its owning lacuna, measured along the network, is
+   pruned, and ownership is rebuilt on what is left.
+It writes the mask, the skeleton, the verification picture, the vascular mask and
+the cleaned graph with its ownership.
+
+This is **one** method and there is no switch for another. It was variant D of
+the ablation that compared it against the older intensity threshold, which is
+preserved at the git tag `archive-2026-10-13`. **No variant was validated against
+a manual count, so choosing this one is not a validated result.**
 
 ### Quantification (`src/quantification.py`)
 
@@ -102,21 +113,21 @@ held out and used to confirm.
 | lacunae | maximum aspect ratio | 6.0 | sanity limit; kept lacunae top out at 5.76 |
 | lacunae | maximum area | 5% of the field | sanity cap; largest kept lacuna is 0.9% |
 | network | Gaussian sigma | 0.8 px | below thread width, as in OCY_main.m |
+| network | ridge sigmas | 3.0, 3.6, 4.2 px | they bracket the measured thread half widths (p50 3.0, p99 4.2 px) with one step between; a Sato filter answers to a tube whose radius is near sigma. Measured on this data, never from a published value, and NOT validated |
 | network | top-hat radius | 5 px | measured thread half-widths p50 3.0, p99 4.2 px; by eye r = 4 fragments and r = 6 fuses threads |
-| network | hysteresis low cut | 0.75 × high cut | the one setting (with bridging) inside guards fixed in advance, on tuning and held-out images; 0.5 failed. One value after one failure, not a sweep: the weakest provenance here |
+| network | hysteresis low cut | 0.75 × high cut | carried over unchanged from the intensity method, where it was the one setting inside guards fixed in advance; 0.5 failed. One value after one failure, not a sweep: the weakest provenance here |
 | network | lacuna buffer | 2 px | keeps the lacuna rim from reading as a thread stub |
 | network | speck removal | < 8 px² | small enough to keep a short real thread |
 | canals | opening radius | 8 px | erases threads (width p99 8.5 px), keeps broad objects |
 | canals | shape gate | span ≥ 0.45 of the image and major axis ≥ 420 px | clean gap between lacuna-scale objects (span ≤ 0.23, axis ≤ 211 px) and canals (span ≥ 0.58); WT only |
 | canals | dilation | 4 px | network density returns to baseline 4 px from the canal edge |
-| bridging | maximum gap | 10 px | signal in gaps drops sharply beyond about 10 px |
-| bridging | maximum angle | 40° | keeps the two leading bins of the measured angle distribution |
-| bridging | minimum signal | 0.7 of threshold | 93.5% of 5 to 8 px gaps pass, 29.9% of 11 to 15 px gaps |
 | graph | spur pruning | < 4 px | thresholding noise |
 | graph | crossing collapse | < 6 px | one thread width; OCY's ratio would remove half of all internal edges |
 | graph | attach distance | 10 px | every lacuna attaches (largest nearest gap 7 px); 5 px left 28 of 98 unattached |
 | roots | merge distance | 8 px | one thread width |
 | rings | radii | 30 and 60 px | 30 px from the round 2 local-density work; 60 px is twice that, about two thirds of the median lacuna length (89 px) |
+| limits | maximum canalicular length | 50 um = 385 px | the outer end of the reported lacuna-to-lacuna spacing in mouse cortical bone, so a thread longer than this from one cell body is not one canaliculus. A plausibility bound from the literature, NOT validated on this data and never tuned to improve a result |
+| limits | reported length range | 25 to 50 um | report only, acted on by nothing; the range the literature reports for canalicular length |
 
 Parameters live as documented constants at the top of `src/lacunae.py`
 and `src/canaliculi.py`, each with a longer provenance comment.
@@ -137,8 +148,9 @@ and `src/canaliculi.py`, each with a longer provenance comment.
 **Canalicular width.** At every skeleton pixel the distance transform of the
 mask gives the distance to the nearest pixel outside the thread, so twice it is
 the local full width in px. The width is measured only where there is real
-signal under the skeleton: the pixels gap bridging added are left out (a bridge
-is drawn, not measured), as are the lacuna buffer and the vascular mask with its
+signal under the skeleton, which every mask pixel now has, since nothing is
+drawn into the mask that the threshold did not put there. Left out are the
+lacuna buffer and the vascular mask with its
 dilation, because a broad bright canal is not a canaliculus. Per image the mean,
 median, p10 and p90 and the number of pixels used; per lacuna the mean over its
 own 30 px ring, with the ownership rule of `ring_length_r30_px`. On these 8 WT
@@ -208,66 +220,94 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 | 2026-09-29 | Thin band objects, the leaked outline and the unfilled hole recorded as known cases; nothing changed. |
 | 2026-09-29 | Reach measured; a reach cap and ownership-free measures (roots, ring lengths) built; the cap left off. |
 | 2026-09-30 | Final cleanup: the code keeps only the default path; alternatives (v3 and hybrid detectors, adjacent-pair merge, reach cap, ridge and other preprocessing, other assignment and counting methods, exclusion mask) are preserved at the git tag `archive-2026-10-13`. Headline measures fixed as roots per cell, ring length 30 px and field length density. |
-| 2026-10-13 | The ablation variants D, F and G are restored from the tag beside A and P5, and P2 is dropped. |
-| 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. The experimental method keeps A and P5. |
+| 2026-10-13 | ONE canalicular method: the ridge method with gap bridging off, ablation variant D, at sigmas 3.0, 3.6 and 4.2 px. The intensity threshold, gap bridging, the band-wall filter and every other variant are deleted and live at the tag. |
+| 2026-10-13 | The 50 um length limit is adopted, measured along the network, and prunes. Two report-only limits are added beside it. Nothing about any of them is validated. |
+| 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. |
 
 ## 6. Open questions
 
 1. Validation against manual counts (roots per cell is the per-cell number
-   to compare).
+   to compare). Nothing in this pipeline has been validated: not the ridge
+   scales, not the 50 um limit, not a single measure.
 2. Whether lacunae lying partly outside the focal plane should count.
 3. The two thin objects on vascular bands: exclude or keep.
 4. Whether the thesis's primary outcome is per field or per cell.
 
-## 7. The experimental ridge method
+## 7. The biological limits
 
-`src/canal_physical/`, not the pipeline. It changes one idea of the canalicular
-stage: instead of hysteresis on the flattened intensity it thresholds a
-multiscale ridge response (`skimage.filters.sato`, bright ridges), with every
-scale set in micrometres from the pixel size rather than from the earlier mask.
-The flattening, the lacuna buffer, the vascular handling, the bridging rule, the
-graph cleanup, the ownership and the ring radii stay exactly as the current
-method has them, so one idea changes at a time.
+Fixed in `config.py`, written in micrometres, identical for every image, and
+converted once with `PIXEL_SIZE_UM_ACQUIRED` = 0.13 um/px, so the micrometre
+value is the parameter and the pixel value follows from it.
 
-| variant | what | scales |
-|---|---|---|
-| P5 | ridge, gap bridging off | 0.17, 0.21, 0.26 um (1.31, 1.62, 2.00 px) |
-| A | the current method, as it stands | |
-| D | ridge, gap bridging off | 3.0, 3.6, 4.2 px |
-| F | ridge, gap bridging off, one scale | 3.0 px |
-| G | ridge, gap bridging off | 1.5, 2.0, 2.5 px |
+| limit | micrometres | pixels | effect |
+|---|---|---|---|
+| `MAX_CANALICULUS_LENGTH_UM` | 50 | 385 | **prunes the skeleton** |
+| `CANALICULUS_LENGTH_RANGE_UM` | 25 to 50 | 192 to 385 | report only |
 
-**P5 is listed first because it is my preferred variant visually. That is a
-visual preference and it is not validated.**
+**Source, and what it is not.** Both figures are what the osteocyte literature
+reports for mouse cortical bone: 50 um is the outer end of the reported
+lacuna-to-lacuna spacing, so a thread running further than that from one cell
+body is not one canaliculus but a tracing error or a thread belonging to a lacuna
+outside the section. They are used as plausibility bounds. **Neither has been
+checked against a manual count on this data**, neither was chosen by looking at
+what it did to a result, and no literature value is ever used as a threshold that
+tunes an outcome.
 
-D, F and G are the ablation variants, restored from the git tag
-`archive-2026-10-13`, where their scales were written in pixels. Every ridge
-variant has gap bridging off, so the scales are the only thing separating them.
-Every run asserts that D, F and G convert back to exactly those pixel scales, and
-their output has been checked against the tag: on all 8 images every artifact
-measure and every verification picture is identical to the ablation output.
+### (a) The length limit, which prunes
 
-Beside the pipeline's own measures it reports the width measured **on the image**
-(the full width at half maximum of the intensity profile across the thread: it
-includes the optical blur, so it is an upper bound on the diameter, not the
-diameter), the contrast against each variant's own background, and the
-axis-aligned runs and pixel-grid rectangles a grid-following detector produces.
+Every skeleton pixel further than 385 px from a lacuna surface, measured **along
+the network**, is removed, and ownership is rebuilt on what is left.
 
-`python src/canal_physical/physical.py --dir data/WT` writes `results/ridge/`:
-the comparison table (`comparison_all_images.csv` and `.xlsx`,
-`comparison_summary.csv`), a README with every parameter and the provenance, and
-per image `<label>/<label>_compare.png`, all five variants side by side, and
-`<label>/verification_<variant>.png`, the pipeline's own picture of each variant
-at 1024 x 1024 by `canaliculi.save_verification`. Only `verification_P5.png` is
-tracked: the five variants on eight images come to 60 MiB and all of them are
-redrawn by the one command. Every run asserts that each micrometre parameter
-converts back to exactly the pixel value the imported pipeline code uses, and
-that variant A still equals `results/` at tolerance 0 with a pixel-identical
-verification image.
+The distance is a geodesic distance on the skeleton itself
+(`skimage.graph.MCP_Geometric`, in `canaliculi.network_distance_map`): a path may
+travel only along skeleton pixels and across the lacuna buffer that separates a
+thread from the body it belongs to, a diagonal step costs the square root of 2,
+and every lacuna body is a source at distance 0, so the shortest path decides
+which lacuna a thread is measured from, which is the rule ownership already uses.
+It is deliberately independent of the network graph and its cleanup, so the limit
+is enforced on the same quantity the report measures.
 
-**Nothing about this method is validated.** No variant has been checked against
-a manual count, none is called better than another, and nothing was tuned to
-improve a result or to approach a published value.
+A pixel that **no** lacuna reaches within the limit is **not** pruned: there is
+no owning lacuna to measure a length from, so the limit says nothing about it and
+it stays in the skeleton, unowned.
+
+Pruning can cut a path and leave what lay behind it reachable only by a longer
+way round, which can push another pixel past the limit, so the prune repeats to a
+fixed point. On these 8 images one round settles it.
+
+What it removes, as skeleton px and total chain-code length:
+
+| image | px before | px after | removed | um before | um after |
+|---|---|---|---|---|---|
+| 542_z06 | 38921 | 37752 | 1169 (3.0%) | 5726.0 | 5555.1 |
+| 542_z18 | 37595 | 34260 | 3335 (8.9%) | 5532.1 | 5036.9 |
+| 543-2 | 45028 | 35034 | 9994 (22.2%) | 6676.3 | 5185.3 |
+| 543_3 | 46104 | 35500 | 10604 (23.0%) | 6829.1 | 5250.8 |
+| 543_z13 | 44036 | 36701 | 7335 (16.7%) | 6511.3 | 5419.5 |
+| 682_z08 | 37407 | 32768 | 4639 (12.4%) | 5464.6 | 4792.3 |
+| 682_z23 | 42338 | 34205 | 8133 (19.2%) | 6231.2 | 5033.2 |
+| 682_z29 | 40390 | 29332 | 11058 (27.4%) | 5923.0 | 4311.3 |
+| **all 8** | **331819** | **275552** | **56267 (17.0%)** | | |
+
+### (b) Report only, acted on by nothing
+
+In the `biological_limits` block of each image's json and the sheet of the same
+name in its xlsx.
+
+- **Per-thread length against the 25 to 50 um range.** A thread is the run from a
+  lacuna surface to a thread tip, by the same geodesic measure the limit prunes
+  on, so the two cannot disagree. Reported as the share inside the range, below
+  it and above it, with the median and the percentiles. The comparison is made in
+  whole pixels against the bounds as applied, because 385 px is 50.05 um and
+  comparing a micrometre length against 50.00 would put a thread the prune kept
+  just outside the range.
+- **Roots per lacuna**, over interior lacunae.
+- **The apparent width.** Twice the distance transform of the mask at each
+  sampled skeleton pixel. It **includes the optical blur**, which widens a thread
+  beyond its true size, and no point spread function is subtracted because the
+  numerical aperture, the emission wavelength and the pinhole are unknown. It is
+  therefore an **upper bound on the diameter**, not the diameter, and the json
+  says so in the block itself.
 
 ## 8. Normalised per-cell measures
 
@@ -292,8 +332,10 @@ step); Sholl crossings at 10 / 20 / 30 px, the skeleton components crossing a
 
 ## 9. Switches (all off by default)
 
-In `config.py`; each comment names its evidence. With all off, `results/` is
-reproduced exactly (`python src/diagnostics.py regression`).
+In `config.py`; each comment names its evidence. They all act on the **lacuna**
+stage: the canalicular method has no switch, because there is only one method.
+With all off, `results/` is reproduced exactly
+(`python src/diagnostics.py regression`).
 
 - `NARROW_CRUMB_RULE` (False): after the filters, a dropped watershed piece joins a kept lacuna if it
   touches only that lacuna and at least half of it lies inside the lacuna's convex hull
@@ -303,15 +345,13 @@ reproduced exactly (`python src/diagnostics.py regression`).
   an opening with a 5 px disk are rejected (0.515 sits in a gap that rests on two objects).
 - `FAST_LACUNA_STAGE` (False): bounding-box versions of the watershed split and the re-merge; identical
   labels, 15 to 25 times faster. It changes speed, not output.
-- `BAND_LINE_FILTER` (False): removes the zone around straight skeleton runs that reach the vascular
-  mask. No value is recommended, so it refuses to run until `BAND_LINE_MIN_LEN_PX` and
-  `BAND_LINE_REACH_PX` are set deliberately.
-
 `python src/diagnostics.py switch-check` shows what each one changes on a folder.
 
 ## 10. Checks (`src/diagnostics.py`)
 
-- `reference-check`: 62.33 edges per cell, 27.41 px mean edge length and 21 gap bridges on 543-2.
+- `reference-check`: 109.25 edges per cell, 24.11 px mean edge length and 6.00 roots per cell on
+  543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
+  being a headline measure that does not depend on ownership.
 - `regression`: regenerate every image into an ignored folder and compare every json and summary number
   with `results/` at tolerance 0 (provenance ignored), with and without the fast stage.
 - `switch-check`: each switch on alone; every lacuna whose area, roots or ring 30 px change.
@@ -320,7 +360,8 @@ reproduced exactly (`python src/diagnostics.py regression`).
 - `sensitivity`: both Otsu cuts scaled 0.8 to 1.2, alone, together and pooled; percent changes of roots
   per cell, ring 30 px, field density, lacuna count and bridges.
 - `field-summary`: fields from lacuna centroid matching (25 px), per-field means; the field is the unit.
-- `network-sweep`: one network parameter at a time at a low and a high value.
+- `network-sweep`: one network parameter at a time at a low and a high value. The three bridging
+  parameters went with gap bridging.
 - `validate-network`: roots and Sholl crossings against the blind hand counts, and the skeleton against
   the traced threads. The tiles to trace are in `manual_trace/`; what may be tuned afterwards is fixed
   in advance in `docs/NETWORK_TUNING_PROTOCOL.md`.
