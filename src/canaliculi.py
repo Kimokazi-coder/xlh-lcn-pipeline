@@ -6,21 +6,25 @@ lengths are px and densities are per px or per px^2.
 
 Lacunae come from src/lacunae.py (imported, not copied).
 
+There is ONE method: the ridge method with gap bridging off, which was
+variant D of the ablation (tag archive-2026-10-13). Nothing about it is
+validated and it has not been compared with a manual count.
+
 Method, per image. Adapted from the OCY pipeline (Kollmannsberger et al.,
 New J. Phys. 2017) where noted. OCY works on 3D confocal stacks; these are
 single 2D optical sections, which is behind every departure from it.
     1. Flatten the background: a light Gaussian, a white top-hat and a
        histogram-mode offset subtraction (OCY_main.m, OCY_thr_stack.m).
-    2. Threshold with hysteresis: dim pixels are kept only where they
-       connect to confidently bright ones. Both cuts come from the image's
-       own histogram. Inside vascular-canal structures ("flagged", found on
-       the raw channel) only already-bright pixels are kept.
-    3. Remove the lacuna bodies (plus a 2 px buffer) and small specks, then
-       skeletonize to one-pixel centre lines.
-    4. Bridge short gaps where a thread was interrupted: only gaps that are
-       short, in line with the thread, and hold real signal all along. No
-       bridge may touch a lacuna or a flagged structure. OCY has no such step:
-       in 3D a thread leaving one plane continues in the next.
+    2. Take the Sato ridge response of that flattened image over the scales
+       RIDGE_SIGMAS_PX, as the maximum across them. A canaliculus is found
+       because it is a thin bright ridge, not because it is bright.
+    3. Threshold the RESPONSE with hysteresis: dim pixels are kept only where
+       they connect to confidently bright ones. Both cuts come from the
+       response's own histogram. Inside vascular-canal structures ("flagged",
+       found on the raw channel) only already-bright pixels are kept.
+    4. Remove the lacuna bodies (plus a 2 px buffer) and small specks, then
+       skeletonize to one-pixel centre lines. There is no gap bridging: a gap
+       is left as a gap.
     5. Turn the skeleton into a graph and clean it to a fixed point: prune
        short spurs, collapse crossing artefacts, merge degree-2 chains
        (OCY's Skel2Graph3D with THR_BRANCH).
@@ -131,6 +135,16 @@ HYSTERESIS_LOW_FRACTION = 0.75
 # Buffer (px) removed from the network mask around each lacuna body, so the
 # lacuna's own bright rim is not read as a stub of canaliculus.
 LACUNA_DILATION_PX = 2
+
+# Parameters: the ridge filter
+
+# The scales of the Sato tubeness filter, in pixels. These are variant D of the
+# ablation (tag archive-2026-10-13, src/canal_physical/ablation.py): the scales
+# that bracket the canalicular half width measured on this data, with one step
+# between them. A Sato filter responds to a tube whose radius is near sigma.
+# Confocal blur widens a thread beyond its true size, so these describe the
+# image and not the canaliculus, and none of them came from a published value.
+RIDGE_SIGMAS_PX = (3.0, 3.6, 4.2)
 
 # Mask fragments smaller than this (px^2) are dropped as thresholding noise
 # before skeletonizing. Deliberately small so a real, thin, short thread
@@ -335,11 +349,32 @@ def flagged_structures(channel: np.ndarray) -> np.ndarray:
     return flagged
 
 
+def ridge_response(preprocessed: np.ndarray) -> np.ndarray:
+    """Sato tubeness of the flattened channel over RIDGE_SIGMAS_PX, as the
+    maximum across the scales.
+
+    A canaliculus is found because it is a ridge, a thin bright line, and not
+    because it is bright: that is the one idea separating this method from a
+    plain threshold of the intensity. black_ridges is False because the
+    canaliculi are bright on a dark background. The response has no physical
+    unit, and only its own histogram is ever used to threshold it.
+
+    Sato rather than Frangi: both are Hessian based, and Sato's tubeness keeps a
+    single response per scale without Frangi's second shape term, which is tuned
+    for blob rejection and would need two more constants with no evidence here."""
+    response = filters.sato(preprocessed.astype(np.float64), sigmas=list(RIDGE_SIGMAS_PX),
+                            black_ridges=False, mode="reflect")
+    return np.nan_to_num(response, nan=0.0, posinf=0.0, neginf=0.0)
+
+
 def hysteresis_mask(img: np.ndarray, no_growth: np.ndarray, t_lo: float | None = None) -> tuple[np.ndarray, float]:
-    """Hysteresis threshold of the preprocessed image. Returns (mask, the
-    strict cut). Inside `no_growth` only pixels already above the strict cut
-    survive, so there hysteresis can add nothing. A given t_lo replaces the
-    computed strict cut (sensitivity diagnostics only)."""
+    """Hysteresis threshold of `img`. Returns (mask, the strict cut). Inside
+    `no_growth` only pixels already above the strict cut survive, so there
+    hysteresis can add nothing. A given t_lo replaces the computed strict cut
+    (sensitivity diagnostics only).
+
+    The strict cut is the lower of the image's own three-class multi-Otsu cuts,
+    so it comes from this image and nothing else."""
     if t_lo is None:
         strict_mask, t_lo = total_signal_mask(img)
     else:
@@ -353,13 +388,20 @@ def hysteresis_mask(img: np.ndarray, no_growth: np.ndarray, t_lo: float | None =
 
 def network_candidate_mask(
     preprocessed: np.ndarray, lacuna_mask: np.ndarray, flagged: np.ndarray, t_lo: float | None = None
-) -> tuple[np.ndarray, float]:
-    """Threshold, remove the buffered lacuna bodies, despeckle by size."""
-    signal, t_lo = hysteresis_mask(preprocessed, flagged, t_lo)
+) -> tuple[np.ndarray, float, np.ndarray]:
+    """(mask, the strict cut, the ridge response). Hysteresis on the RIDGE
+    RESPONSE of the flattened channel, then the buffered lacuna bodies removed
+    and the small fragments despeckled.
+
+    The cut is the response's own, and a given t_lo replaces it (sensitivity
+    diagnostics only). Despeckling is by pixel count, never by erosion, which
+    would delete one-pixel-wide threads."""
+    response = ridge_response(preprocessed)
+    signal, t_lo = hysteresis_mask(response, flagged, t_lo)
     buffered_lacunae = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
     candidate = signal & ~buffered_lacunae
     candidate = morphology.remove_small_objects(candidate, min_size=MIN_THREAD_OBJECT_PX2)
-    return candidate, t_lo
+    return candidate, t_lo, response
 
 
 # Straight runs (used by the band-wall filter, config.BAND_LINE_FILTER, off by
@@ -870,28 +912,16 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     lacuna_mask, lacuna_id_map = build_lacuna_maps(lac["labels"], kept)
     flagged = flagged_structures(channel)
     preprocessed = preprocess_channel(channel)
-    candidate, t_lo = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
+    candidate, t_lo, response = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
     skeleton = morphology.skeletonize(candidate)
 
-    # Band-wall filter (switch, off by default): where the canal blocking works,
-    # the skeleton inside the straight wall zone is removed, before bridging and
-    # again after the re-skeletonization that follows it, and no bridge may
-    # enter the zone, like the flagged region itself. The network mask is not
-    # cut, so re-thinning leaves no stubs along the cut.
+    # Band-wall filter (switch, off by default): the skeleton inside the straight
+    # wall zone is removed. The network mask is not cut, so re-thinning leaves no
+    # stubs along the cut.
     band_wall = None
-    forbidden = lacuna_mask | flagged
     if config.BAND_LINE_FILTER:
         band_wall = band_wall_zone(skeleton, flagged)
         skeleton = skeleton & ~band_wall
-        forbidden = forbidden | band_wall
-
-    bridges = find_bridges(skeleton, preprocessed, t_lo, forbidden)
-    thresholded = candidate  # before bridging: real signal under every pixel
-    if bridges:
-        candidate = apply_bridges(candidate, bridges)
-        skeleton = morphology.skeletonize(candidate)
-        if band_wall is not None:
-            skeleton = skeleton & ~band_wall
 
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
     own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
@@ -902,10 +932,14 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "lacuna_id_map": lacuna_id_map,
         "lacuna_mask": lacuna_mask,
         "candidate": candidate,
-        "bridged_pixels": candidate & ~thresholded,
         "skeleton": skeleton,
         "flagged": flagged,
-        "bridges": bridges,
+        "ridge_response": response,
+        # Gap bridging is gone with the threshold method. These two keep their
+        # shape for the step that still reads them; the bridging code itself is
+        # removed next, together with the plumbing.
+        "bridges": [],
+        "bridged_pixels": np.zeros_like(candidate),
         "t_lo": t_lo,
         "graph": own["graph"],
         "edge_owner": own["edge_owner"],
@@ -953,7 +987,9 @@ def parameters(result: dict) -> dict:
         "smooth_sigma_px": SMOOTH_SIGMA_PX,
         "tophat_radius_px": TOPHAT_RADIUS_PX,
         "background_mode_subtract": True,
-        "threshold": "hysteresis, high cut = lower 3-class multi-Otsu cut",
+        "thresholded_quantity": "multiscale ridge response (skimage.filters.sato, bright ridges)",
+        "ridge_sigmas_px": list(RIDGE_SIGMAS_PX),
+        "threshold": "hysteresis on the ridge response, high cut = its lower 3-class multi-Otsu cut",
         "hysteresis_low_fraction": HYSTERESIS_LOW_FRACTION,
         "network_threshold_t_lo": result["t_lo"],
         "lacuna_threshold_t_hi": result["lacunae"]["t_hi"],
@@ -965,11 +1001,7 @@ def parameters(result: dict) -> dict:
         "flagged_min_major_axis_px": FLAGGED_MIN_MAJOR_AXIS_PX,
         "flagged_dilation_px": FLAGGED_DILATION_PX,
         "flagged_area_px2": float(result["flagged"].sum()),
-        "gap_bridging": True,
-        "max_bridge_gap_px": MAX_BRIDGE_GAP_PX,
-        "max_bridge_angle_deg": MAX_BRIDGE_ANGLE_DEG,
-        "min_bridge_signal_fraction": MIN_BRIDGE_SIGNAL_FRACTION,
-        "direction_walk_px": DIRECTION_WALK_PX,
+        "gap_bridging": False,
         "prune_spur_len_px": PRUNE_SPUR_LEN_PX,
         "min_internal_edge_len_px": MIN_INTERNAL_EDGE_LEN_PX,
         "graph_cleanup_max_iter": GRAPH_CLEANUP_MAX_ITER,
@@ -990,10 +1022,10 @@ PARAMETERS_V2_KEYS = ["band_line_filter", "band_line_min_len_px", "band_line_rea
 
 DETECTION_NOTE = (
     "Detection record: what feature 2 did, with no measured value in it. The "
-    "mask, the skeleton, the vascular mask, the bridged pixels and the graph "
-    "file beside it are what it produced; every number measured from them is "
-    "in results/<label>/5_quantification/ (src/quantification.py). The bridges "
-    "below are the gaps this run joined, which is detection, not a measure."
+    "mask, the skeleton, the vascular mask and the graph file beside it are what "
+    "it produced; every number measured from them is in "
+    "results/<label>/5_quantification/ (src/quantification.py). The method is "
+    "the ridge method with gap bridging off, so no gap was joined."
 )
 
 
