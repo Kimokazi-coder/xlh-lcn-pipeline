@@ -20,12 +20,17 @@ method has them, so one idea changes at a time. The top-hat radius of the
 flattening is 5 px, which is 0.65 um and wider than a thread; it is reported with
 every run and left alone here, and remains an open question.
 
-Three variants are kept, reported in this order: P5 is the ridge method with gap
-bridging off, A is the current method as it stands, and P2 is P5 with gap
-bridging on, so P2 and P5 differ by that one switch and nothing else. P5 leads
-because it is the preferred variant by eye, which is a visual preference and not
-a validated result. The output is one folder, results/ridge/: the comparison
-tables and, per image, the three variants side by side as one png.
+Five variants, reported in this order. P5 is the ridge method at the finest
+scales with gap bridging off, and it leads because it is the preferred variant by
+eye, which is a visual preference and not a validated result. A is the current
+method as it stands. D, F and G are the ablation variants restored from tag
+archive-2026-10-13: the same ridge method with bridging off at coarser scales,
+at a single scale, and at middling scales. Every ridge variant here has bridging
+off, so the scales are the only thing that separates them.
+
+The output is one folder, results/ridge/: the comparison tables, per image the
+variants side by side as one png, and per image and variant the pipeline's own
+verification picture.
 """
 from __future__ import annotations
 
@@ -62,14 +67,37 @@ PIXEL_SIZE_UM = config.PIXEL_SIZE_UM_CANAL_PHYSICAL
 # report and the figure read; it decides nothing that is computed, since every
 # variant is looked up by key and every change is still measured against A.
 VARIANTS = [
-    ("P5", "ridge, sigmas 0.17, 0.21, 0.26 um, gap bridging off", "ridge", False,
+    ("P5", "ridge, bridging off, finest scales 0.17, 0.21, 0.26 um", "ridge", False,
      (0.17, 0.21, 0.26), 0.75),
     ("A", "current method, as is", "current", True, None, None),
-    ("P2", "ridge, sigmas 0.17, 0.21, 0.26 um, gap bridging on", "ridge", True,
-     (0.17, 0.21, 0.26), 0.75),
+    ("D", "ridge, bridging off, sigmas 3.0, 3.6, 4.2 px", "ridge", False,
+     (0.39, 0.468, 0.546), 0.75),
+    ("F", "ridge, bridging off, single scale 3.0 px", "ridge", False,
+     (0.39,), 0.75),
+    ("G", "ridge, bridging off, sigmas 1.5, 2.0, 2.5 px", "ridge", False,
+     (0.195, 0.26, 0.325), 0.75),
 ]
 VARIANT_KEYS = [v[0] for v in VARIANTS]
 VARIANT_LABELS = {v[0]: v[1] for v in VARIANTS}
+
+# D, F and G come from src/canal_physical/ablation.py at tag archive-2026-10-13,
+# where their scales were written in pixels. This module writes every scale in
+# micrometres, so each one above is the micrometre value that converts back to
+# exactly the pixel value the ablation used. Asserted on import: a restored
+# variant cannot drift from the definition it was restored from.
+ABLATION_SIGMAS_PX = {"D": (3.0, 3.6, 4.2), "F": (3.0,), "G": (1.5, 2.0, 2.5)}
+
+
+def check_ablation_scales(params=None) -> dict:
+    """{variant: its pixel scales}, having checked each against the ablation."""
+    params = params or params_mod.DEFAULT
+    out = {}
+    for key, expected in ABLATION_SIGMAS_PX.items():
+        sigmas_um = next(v[4] for v in VARIANTS if v[0] == key)
+        got = tuple(params.px(s) for s in sigmas_um)
+        assert got == expected, f"variant {key}: scales {got} px, ablation used {expected} px"
+        out[key] = got
+    return out
 
 def build(key: str, lac: dict, channel: np.ndarray, label: str, params) -> dict:
     """One variant's detection. Everything except the thresholded quantity, the
@@ -235,9 +263,11 @@ def measure_variant(key: str, detection: dict, image_path, params, legacy_cut: f
 
     # Artifact measures: the straight runs raw and smoothed, the rectangles, and
     # the legacy support measure kept only for continuity.
+    # Reported under the names the ablation table used, so the two can be read
+    # side by side. unsupported_fraction is measured against the CURRENT method's
+    # own threshold, which favours variant A; that caveat is in the notes sheet
+    # and has not changed, only the column name.
     artifacts = metrics.artifact_measures(detection, detection["flattened"], legacy_cut)
-    artifacts["legacy_unsupported_fraction"] = artifacts.pop("unsupported_fraction")
-    artifacts["legacy_unsupported_px"] = artifacts.pop("unsupported_px")
     artifacts["straight_run_fraction_smoothed"] = smoothed_straight_run_fraction(skel)
 
     return {"variant": key, "measured": measured, "width": width, "contrast": contrast,
@@ -252,10 +282,11 @@ MEASURE_COLUMNS = [
     "width_dt_median_px", "width_dt_median_um", "width_dt_p10_px", "width_dt_p90_px",
     # Support, neutral and legacy.
     "contrast_snr_median", "contrast_snr_p10", "low_contrast_fraction", "contrast_pixels_used",
-    "noise_level", "legacy_unsupported_fraction",
-    # Shape of the traced network.
-    "straight_run_fraction", "straight_run_fraction_smoothed", "rectangle_count",
-    "skeleton_px", "bridged_fraction", "n_bridges",
+    "noise_level",
+    # The artifact measures, as the ablation reported them.
+    "unsupported_fraction", "unsupported_px",
+    "straight_run_fraction", "straight_run_px", "straight_run_fraction_smoothed", "rectangle_count",
+    "skeleton_px", "bridged_fraction", "bridged_px", "n_bridges",
     # Everything the pipeline measures.
     "field_length_density_per_px", "field_length_density_um_per_um2",
     "roots_per_cell", "ring_length_r30_px_per_cell", "ring_length_r30_um_per_cell",
@@ -270,10 +301,10 @@ MEASURE_COLUMNS = [
 
 SUMMARY_MEASURES = [
     "width_fwhm_median_um", "width_dt_median_um", "low_contrast_fraction", "contrast_snr_median",
-    "straight_run_fraction", "straight_run_fraction_smoothed", "rectangle_count",
+    "unsupported_fraction", "straight_run_fraction", "straight_run_fraction_smoothed",
+    "rectangle_count",
     "connected_to_lacuna_fraction", "junction_count", "thread_end_fraction",
     "field_length_density_um_per_um2", "roots_per_cell", "skeleton_px", "n_bridges",
-    "legacy_unsupported_fraction",
 ]
 
 
@@ -492,8 +523,12 @@ def notes_lines(params) -> list:
         "  the normal on both sides, over the noise, where the noise is 1.4826 times the median absolute",
         "  deviation of the flattened image outside the lacunae, the vascular regions and that variant's",
         "  own mask. low_contrast_fraction is the share below 2.",
-        "legacy_unsupported_fraction: the earlier measure, which used the CURRENT method's own threshold",
-        "  and so favoured the current method. Kept only so the earlier tables can be followed.",
+        "unsupported_fraction: share of skeleton pixels NOT above the image's own lower multi-Otsu cut",
+        "  of the flattened intensity, which is the cut the CURRENT method uses as its high threshold.",
+        "  The cut is taken once per image from the flattened channel, so every variant is judged by the",
+        "  same cut, but it is the current method's own cut and so it favours variant A.",
+        "rectangle_count: closed loops of four skeleton graph nodes whose four sides are all axis",
+        "  aligned. A real network has no reason to close a rectangle on the pixel grid.",
         "straight_run_fraction: share of skeleton pixels in an axis-aligned run of at least 8 px. A thin",
         "  skeleton on a pixel grid contains straight runs by its nature, and the current method already",
         "  scores about 0.22, so only differences between variants mean anything here.",
@@ -519,8 +554,11 @@ def main() -> None:
     # imported pipeline code uses, or the variants are not comparable. This
     # raises rather than reporting a number built on a mismatch.
     checked = skeleton.check_parameters_match_current(params)
+    scales = check_ablation_scales(params)
     print(f"Pixel size {params.pixel_size_um} um/px. {params_mod.PIXEL_LABEL}.")
     print(f"{len(checked)} parameters match the current method's pixel values exactly.")
+    print("restored from tag archive-2026-10-13: "
+          + "; ".join(f"{k} {', '.join(f'{s:g}' for s in v)} px" for k, v in scales.items()))
     print(f"Field 1024 px = {1024 * params.pixel_size_um:g} um.")
     for key in VARIANT_KEYS:
         print(f"  {key:3s} {VARIANT_LABELS[key]}")
