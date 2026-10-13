@@ -27,7 +27,7 @@ works in micrometres throughout.
 | `config.py` | paths, shared settings and the switches (all off by default) |
 | `data/WT/` | the 8 input images |
 | `results/` | the pipeline output and the reference that `regression` checks; see [`results/README.md`](results/README.md) |
-| `results_ridge/` | the ridge comparison, written by `src/canal_physical/physical.py`; not tracked |
+| `results/ridge/` | the ridge comparison: the tables and one side by side figure per image |
 | `manual_trace/` | four raw tiles for the blind hand trace that will produce the ground truth |
 | `figures/` | the figure code, captions and review notes |
 | `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`NETWORK_TUNING_PROTOCOL.md`](docs/NETWORK_TUNING_PROTOCOL.md) |
@@ -99,26 +99,35 @@ cell".
 
 `src/canal_physical/` thresholds a multiscale ridge response instead of the
 flattened intensity, with every scale set in micrometres from the pixel size.
-Three variants are run and reported side by side:
+Three variants are run and reported side by side, in this order:
 
 | variant | what |
 |---|---|
+| P5 | ridge, sigmas 0.17, 0.21 and 0.26 um, gap bridging off |
 | A | the current method, as it stands |
-| P2 | ridge, sigmas 0.17, 0.21 and 0.26 um |
-| P5 | P2 with gap bridging off |
+| P2 | ridge, same scales and same cut, gap bridging on |
 
-P2 and P5 carry the same scales and the same cut, so they differ by that one
+**P5 is listed first because it is my preferred variant visually. That is a
+visual preference and it is not validated.**
+
+P5 and P2 carry the same scales and the same cut, so they differ by that one
 switch and nothing else, and the difference between their numbers is the effect
 of bridging alone.
 
 ```
-python src/canal_physical/physical.py --dir data/WT     # -> results_ridge/
+python src/canal_physical/physical.py --dir data/WT     # -> results/ridge/
 ```
 
 **Nothing about this method is validated.** No variant has been checked against
-a manual count and none is called better than another; it is a diagnosis, not a
-claim of improvement. Every run asserts that variant A still equals `results/`
-at tolerance 0, so the comparison rests on the pipeline itself.
+a manual count and none is called better than another by any number; it is a
+diagnosis, not a claim of improvement. Every run asserts that variant A still
+equals `results/` at tolerance 0 with a pixel-identical verification image, so
+the comparison rests on the pipeline itself.
+
+`results/ridge/` holds the comparison table (`comparison_all_images.csv` and
+`.xlsx`, `comparison_summary.csv`), a README recording every parameter and the
+provenance, and per image `<label>/<label>_compare.png`, the three variants side
+by side.
 
 ## Results
 

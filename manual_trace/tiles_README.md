@@ -4,7 +4,7 @@
 
 These tiles are the raw image and nothing else. No mask, no skeleton and no result of any
 method is drawn on them, so a trace made here cannot be steered by what any method found.
-**Do not open any figure or result file under `results/` or `results_ridge/` while you
+**Do not open any figure or result file under `results/` while you
 trace.** That is the whole point of tracing blind.
 
 ## The tiles

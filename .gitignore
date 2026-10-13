@@ -9,13 +9,8 @@ __pycache__/
 # Blinding keys (added 2026-10-02, publication-fixes B1): a key links coded
 # image names to the originals and must never be committed. The blind
 # subcommand refuses to write one inside the repository; these patterns are a
-# second guard. Listed under Decisions needed in docs/FIXES_REPORT.md.
+# second guard.
 code_key*
 *_key.csv
 # Claude Code settings for this machine, not part of the pipeline.
 .claude/
-
-# The ridge comparison is regenerated in one command
-# (python src/canal_physical/physical.py --dir data/WT), like every figure under
-# results/3_publication_figures, so it is not tracked.
-results_ridge/

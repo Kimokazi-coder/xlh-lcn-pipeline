@@ -1,9 +1,9 @@
 # Results
 
 Everything the pipeline and the figure code produce, per image and for all images together.
-**Pre-validation**: no number here has been checked against manual counts. **Pixel units**: the images
-pixel size is 0.13 um/px (acquisition record, all 8 images, rounded to two decimals), but the
-pipeline reports px, px² and px⁻¹ so that a fresh run still equals this folder at tolerance 0.
+**Pre-validation**: no number here has been checked against manual counts. **Pixel units**: the pixel
+size is 0.13 um/px (acquisition record, all 8 images, rounded to two decimals), but the pipeline reports
+px, px² and px⁻¹ so that a fresh run still equals this folder at tolerance 0.
 The thresholds are image-relative: each image's cuts come from its own histogram. The data are 8 wild-type
 (WT) sections. Method and parameters: [docs/METHODS.md](../docs/METHODS.md); where to start:
 [docs/START_HERE.md](../docs/START_HERE.md).
@@ -12,6 +12,11 @@ The thresholds are image-relative: each image's cuts come from its own histogram
 draw, and save what they found in `1_lacunae/` and `2_canaliculi/`. `src/quantification.py` reads that and
 writes every measured number, in `5_quantification/` and in the one cross-image table. No number is
 computed in two places.
+
+**What is tracked.** Everything above except `3_publication_figures/` and `all_images/figures/`: every
+figure there is redrawn by `python -u figures/make_figures.py all`, so none of them is committed. The
+stage pictures in `1_lacunae/` and `2_canaliculi/` are committed, because the skeleton png is an input to
+`python src/diagnostics.py validate-network`.
 
 ## Layout
 
@@ -38,6 +43,10 @@ results/
     4_archive_not_used/     kept for history, not a result (see Archive)
     5_quantification/       every measured number: <label>_quantification.json, .xlsx and .pdf
   validation_tiles/         tiles for counting roots by hand
+  ridge/                    the experimental ridge comparison, P5 then A then P2:
+                            comparison_all_images.csv and .xlsx, comparison_summary.csv,
+                            README.md, and <label>/<label>_compare.png per image.
+                            Not the pipeline and not validated; see docs/METHODS.md section 7
 ```
 
 The label is the short image name. The table from the image file name to the label is

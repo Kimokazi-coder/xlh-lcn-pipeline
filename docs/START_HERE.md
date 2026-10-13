@@ -23,7 +23,7 @@ to micrometres, so setting it would change the recorded values and a fresh run w
 | `config.py` | paths, shared settings and the switches (all off) |
 | `data/WT/` | the 8 input images |
 | `results/` | the pipeline output: one folder per image, `all_images/` and `validation_tiles/`; the reference for every check; guide: `results/README.md` |
-| `results_ridge/` | the ridge comparison table and figures; not tracked |
+| `results/ridge/` | the ridge comparison: the tables and one side by side figure per image |
 | `manual_trace/` | four raw tiles for the blind hand trace that will produce the ground truth |
 | `figures/` | the figure code (`make_figures.py`), captions and review notes |
 | `docs/` | this page, `METHODS.md` and `NETWORK_TUNING_PROTOCOL.md` |
@@ -41,10 +41,12 @@ in the working tree.
 ## The experimental ridge method
 
 `src/canal_physical/` thresholds a multiscale ridge response instead of the flattened intensity, with
-every scale set in micrometres. Three variants: **A** the current method as it stands, **P2** the ridge
-at sigmas 0.17, 0.21 and 0.26 um, and **P5** P2 with gap bridging off, so P2 and P5 differ by that one
-switch alone. `python src/canal_physical/physical.py --dir data/WT` writes the comparison into
-`results_ridge/`. **Nothing about it is validated** and no variant is called better than another.
+every scale set in micrometres. Three variants, reported in this order: **P5** the ridge at sigmas 0.17,
+0.21 and 0.26 um with gap bridging off, **A** the current method as it stands, and **P2** the same ridge
+with bridging on, so P5 and P2 differ by that one switch alone. P5 leads because it is the preferred
+variant visually, which is a visual preference and is **not validated**.
+`python src/canal_physical/physical.py --dir data/WT` writes the comparison into `results/ridge/`.
+**Nothing about this method is validated** and no variant is called better than another by any number.
 
 ## The switches
 
@@ -71,7 +73,7 @@ python src/diagnostics.py regression                     # every number against 
 python src/diagnostics.py switch-check                   # what each switch changes
 python -u figures/make_figures.py all                    # every figure, into results/
 python -u figures/make_figures.py check                  # drawn numbers against results/
-python src/canal_physical/physical.py --dir data/WT      # the ridge comparison, into results_ridge/
+python src/canal_physical/physical.py --dir data/WT      # the ridge comparison, into results/ridge/
 ```
 
 Do not write a new `results/` unless a switch is adopted on purpose; `results/` is the reference that

@@ -230,11 +230,14 @@ method has them, so one idea changes at a time.
 
 | variant | what |
 |---|---|
+| P5 | ridge, sigmas 0.17, 0.21 and 0.26 um, gap bridging off |
 | A | the current method, as it stands |
-| P2 | ridge, sigmas 0.17, 0.21 and 0.26 um |
-| P5 | P2 with gap bridging off |
+| P2 | ridge, same scales and same cut, gap bridging on |
 
-P2 and P5 carry the same scales and the same cut, so they differ by that one
+**P5 is listed first because it is the preferred variant visually. That is a
+visual preference and it is not validated.**
+
+P5 and P2 carry the same scales and the same cut, so they differ by that one
 switch and nothing else, and the difference between their numbers is the effect
 of bridging alone.
 
@@ -244,13 +247,13 @@ includes the optical blur, so it is an upper bound on the diameter, not the
 diameter), the contrast against each variant's own background, and the
 axis-aligned runs and pixel-grid rectangles a grid-following detector produces.
 
-`python src/canal_physical/physical.py --dir data/WT` writes `results_ridge/`:
+`python src/canal_physical/physical.py --dir data/WT` writes `results/ridge/`:
 the comparison table (`comparison_all_images.csv` and `.xlsx`,
 `comparison_summary.csv`), a README with every parameter and the provenance, and
-per image the three variants side by side. Every run asserts that each
-micrometre parameter converts back to exactly the pixel value the imported
-pipeline code uses, and that variant A still equals `results/` at tolerance 0
-with a pixel-identical verification image.
+per image `<label>/<label>_compare.png`, the three variants side by side. Every
+run asserts that each micrometre parameter converts back to exactly the pixel
+value the imported pipeline code uses, and that variant A still equals
+`results/` at tolerance 0 with a pixel-identical verification image.
 
 **Nothing about this method is validated.** No variant has been checked against
 a manual count, none is called better than another, and nothing was tuned to

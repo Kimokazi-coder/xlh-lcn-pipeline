@@ -20,10 +20,12 @@ method has them, so one idea changes at a time. The top-hat radius of the
 flattening is 5 px, which is 0.65 um and wider than a thread; it is reported with
 every run and left alone here, and remains an open question.
 
-Three variants are kept. A is the current method as it stands, P2 is the ridge
-method, and P5 is P2 with gap bridging off, so P2 and P5 differ by that one
-switch and nothing else. The output is one folder: the comparison tables and, per
-image, the three variants side by side.
+Three variants are kept, reported in this order: P5 is the ridge method with gap
+bridging off, A is the current method as it stands, and P2 is P5 with gap
+bridging on, so P2 and P5 differ by that one switch and nothing else. P5 leads
+because it is the preferred variant by eye, which is a visual preference and not
+a validated result. The output is one folder, results/ridge/: the comparison
+tables and, per image, the three variants side by side as one png.
 """
 from __future__ import annotations
 
@@ -53,14 +55,21 @@ PIXEL_SIZE_UM = config.PIXEL_SIZE_UM_CANAL_PHYSICAL
 # (key, what it is, family, bridging, sigmas in um or None, low cut share)
 # The ridge filter always reads the flattened channel. P2 and P5 carry the same
 # scales and the same cut and differ only in the bridging switch.
+#
+# P5 is listed first because it is the preferred variant by eye. That is a visual
+# preference and nothing more: it is NOT validated, and no variant is called
+# better than another by any number here. The order decides how the tables, the
+# report and the figure read; it decides nothing that is computed, since every
+# variant is looked up by key and every change is still measured against A.
 VARIANTS = [
+    ("P5", "ridge, sigmas 0.17, 0.21, 0.26 um, gap bridging off", "ridge", False,
+     (0.17, 0.21, 0.26), 0.75),
     ("A", "current method, as is", "current", True, None, None),
-    ("P2", "ridge, sigmas 0.17, 0.21, 0.26 um (primary)", "ridge", True, (0.17, 0.21, 0.26), 0.75),
-    ("P5", "P2 with gap bridging off", "ridge", False, (0.17, 0.21, 0.26), 0.75),
+    ("P2", "ridge, sigmas 0.17, 0.21, 0.26 um, gap bridging on", "ridge", True,
+     (0.17, 0.21, 0.26), 0.75),
 ]
 VARIANT_KEYS = [v[0] for v in VARIANTS]
 VARIANT_LABELS = {v[0]: v[1] for v in VARIANTS}
-PRIMARY = "P2"
 
 def build(key: str, lac: dict, channel: np.ndarray, label: str, params) -> dict:
     """One variant's detection. Everything except the thresholded quantity, the
@@ -293,7 +302,7 @@ def measure_row(label: str, result: dict, detection: dict) -> list:
 
 # Running it
 
-OUT_DIR = Path(__file__).resolve().parents[2] / "results_ridge"
+OUT_DIR = config.RESULTS_DIR / "ridge"
 # The comparison holds the three variants side by side, so it is drawn at a
 # smaller upscale than a single panel would be to keep the file in budget.
 COMPARE_UPSCALE = 2
@@ -348,9 +357,8 @@ def verification_matches_pipeline(label: str, path: Path) -> tuple:
 
 def write_figures(label: str, display, detections: dict, lac: dict, params,
                   out_dir: Path) -> dict:
-    """The one figure of one image: the three variants side by side, as a png and
-    the same picture as a pdf that carries the caption. Returns what the checks
-    need.
+    """The one figure of one image: the three variants side by side, as a png.
+    Returns what the checks need.
 
     Variant A's pipeline style verification picture is drawn too, compared with
     the committed one in results/<label>/2_canaliculi/, and then deleted. It is a
@@ -361,7 +369,6 @@ def write_figures(label: str, display, detections: dict, lac: dict, params,
 
     folder = out_dir / label
     colors = canaliculi.lacuna_colors(len(lac["kept"]))
-    caption = f"{params_mod.PIXEL_LABEL}, pre-validation"
 
     panels = []
     for key in VARIANT_KEYS:
@@ -373,39 +380,13 @@ def write_figures(label: str, display, detections: dict, lac: dict, params,
     for panel in panels[1:]:
         both = np.concatenate([both, gap, panel], axis=1)
     reserved = list(colors.values()) + [UNOWNED_COLOUR, (255, 255, 255)]
-    compare_png = folder / f"{label}_compare.png"
-    save_png(both, compare_png, reserved)
-    # The pdf embeds the picture that was just written, which already has its
-    # colours reduced to a palette, rather than the full colour array. The pdf
-    # has no palette of its own, so embedding the reduced version is what keeps
-    # it near the size of the png instead of twice it.
-    from skimage.io import imread
-
-    save_compare_pdf(np.asarray(imread(compare_png))[..., :3], label,
-                     folder / f"{label}_compare.pdf", caption)
+    save_png(both, folder / f"{label}_compare.png", reserved)
 
     temporary = Path(tempfile.gettempdir()) / f"{label}_verification_A_check.png"
     pipeline_style(lac, display, detections["A"], temporary)
     checks = {"verification": verification_matches_pipeline(label, temporary)}
     temporary.unlink(missing_ok=True)
     return checks
-
-
-def save_compare_pdf(image: np.ndarray, label: str, path: Path, caption: str, dpi: int = 200) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    height, width = image.shape[:2]
-    fig = plt.figure(figsize=(width / dpi, height / dpi))
-    ax = fig.add_axes((0, 0, 1, 1))
-    ax.imshow(image, interpolation="nearest")
-    ax.set_axis_off()
-    fig.text(0.01, 0.985, f"{label}: " + ", then ".join(VARIANT_KEYS)
-             + f", left to right. {caption}", fontsize=7, color="white", va="top")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=dpi, metadata={"CreationDate": None, "Producer": "", "Creator": ""})
-    plt.close(fig)
 
 
 def fixed_workbook(wb, path: Path) -> None:
@@ -632,6 +613,9 @@ def write_readme(out_dir: Path, params, image_paths: dict, means: dict) -> None:
         "handling, the graph cleanup, the ownership and the ring radii are the current method's in every",
         "one, so only the named difference can move a number.",
         "",
+        "**P5 is listed first because it is the preferred variant by eye. That is a visual preference,",
+        "not a validated result.** No variant is called better than another by any number below.",
+        "",
         "| variant | what | sigmas (um) | sigmas (px) | low cut | bridging |",
         "|---|---|---|---|---|---|",
     ]
@@ -645,7 +629,7 @@ def write_readme(out_dir: Path, params, image_paths: dict, means: dict) -> None:
                          f"{'yes' if bridging else 'no'} |")
     lines += [
         "",
-        "P2 and P5 carry the same scales and the same cut: they differ by the bridging switch and",
+        "P5 and P2 carry the same scales and the same cut: they differ by the bridging switch and",
         "nothing else, so the difference between their numbers is the effect of bridging alone.",
         "The response of `skimage.filters.sato` is already scale normalised, which was checked on",
         "synthetic ridges rather than assumed: the raw response peaks at about 0.6 times the full width",
@@ -692,7 +676,7 @@ def write_readme(out_dir: Path, params, image_paths: dict, means: dict) -> None:
         "| `comparison_all_images.csv` and `.xlsx` | the comparison table: every measure, every image, "
         "every variant, with the summary of means and the notes |",
         "| `comparison_summary.csv` | the means over the images and the change from A |",
-        "| `<label>/<label>_compare.png` and `.pdf` | " + ", then ".join(VARIANT_KEYS)
+        "| `<label>/<label>_compare.png` | " + ", then ".join(VARIANT_KEYS)
         + f" side by side, {COMPARE_UPSCALE}x |",
         "",
         "The comparison is written as an indexed png with the skeleton colours",
