@@ -113,15 +113,15 @@ def images_from(args) -> list[Path]:
 REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
 
 # The quick check that the default pipeline still gives what it gave. Fixed on
-# 2026-10-13, when the ridge method with gap bridging off became the one method
-# and the 50 um length limit was added. Means are over interior lacunae, rounded
+# 2026-10-13, after ownership by signal, the two dimmer tiers and the two new
+# lacuna rules. Means are over interior lacunae, rounded
 # to 2 decimals. The third number was "gap bridges added", which no longer
 # exists; roots per cell takes its place, being a headline measure that does not
 # depend on ownership and the one a manual count will be compared against.
 REFERENCE_VALUES = [
-    ("edges per interior cell (mean edge_count)", 109.25),
-    ("mean edge length, px (interior mean of mean_edge_length_px)", 24.11),
-    ("roots per interior cell (mean roots_count)", 6.0),
+    ("edges per interior cell (mean edge_count)", 127.0),
+    ("mean edge length, px (interior mean of mean_edge_length_px)", 17.44),
+    ("roots per interior cell (mean roots_count)", 3.58),
 ]
 
 

@@ -29,8 +29,11 @@
     "fast_lacuna_stage": false,
     "computed_threshold_t_hi": 0.5234375
   },
+  "out_of_focus_ids": [
+    14
+  ],
   "provenance": {
-    "git_commit": "913c571c376a45f1c2d75920d448d5e3d5e04798",
+    "git_commit": "7418f365f5002562a048587664b433dcd064e836",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -41,7 +44,7 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "2f6c1d0563d8d19f",
+    "config_hash": "45b2f9e717367599",
     "config_hash_covers": [
       "ALL_IMAGES_ARCHIVE_DIR",
       "ALL_IMAGES_DIR",
@@ -52,13 +55,22 @@
       "CHANNEL",
       "CHANNEL_AXIS",
       "CSV_FLOAT_PRECISION",
+      "DIM_THREAD_CUT_FRACTION",
+      "DIM_THREAD_REACH_UM",
       "DISPLAY_WINDOW_FILE",
       "FAST_LACUNA_STAGE",
       "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "GLOW_TRIM_WIDTH_FRACTION",
       "IMAGE_LABELS",
       "INVERT_SIGNAL",
+      "LACUNA_ATTACH_MIN_SIGNAL_FRACTION",
+      "LACUNA_ATTACH_REACH_UM",
       "MAX_CANALICULUS_LENGTH_UM",
       "NARROW_CRUMB_RULE",
+      "OUT_OF_FOCUS_MAX_ASPECT",
+      "OUT_OF_FOCUS_MIN_AREA_UM2",
+      "OUT_OF_FOCUS_MIN_CONTRAST",
+      "OUT_OF_FOCUS_MIN_SOLIDITY",
       "PIXEL_SIZE_UM",
       "PIXEL_SIZE_UM_ACQUIRED",
       "QUANT_SUMMARY_NAME",
@@ -72,6 +84,7 @@
       "SUFFIX_CANALICULI_GRAPH",
       "SUFFIX_CANALICULI_MASK",
       "SUFFIX_CANALICULI_SKELETON",
+      "SUFFIX_CANALICULI_UNATTACHED",
       "SUFFIX_CANALICULI_VASCULAR",
       "SUFFIX_CANALICULI_VERIFICATION",
       "SUFFIX_FIGURE_GALLERY",
@@ -86,6 +99,8 @@
       "SUFFIX_QUANTIFICATION",
       "SUFFIX_VARIANT",
       "SUMMARY_NAME",
+      "UNATTACHED_MIN_ASPECT",
+      "UNATTACHED_MIN_LENGTH_UM",
       "VALIDATION_TILES_DIR",
       "VARIANTS_DIR",
       "VARIANT_WINDOW_FILE"

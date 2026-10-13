@@ -1052,6 +1052,7 @@ def save_detection_json(result: dict, out_path: Path) -> None:
             "mask": f"{label}_{config.SUFFIX_CANALICULI_MASK}",
             "skeleton": f"{label}_{config.SUFFIX_CANALICULI_SKELETON}",
             "vascular_mask": f"{label}_{config.SUFFIX_CANALICULI_VASCULAR}",
+            "unattached": f"{label}_{config.SUFFIX_CANALICULI_UNATTACHED}",
             "graph": f"{label}_{config.SUFFIX_CANALICULI_GRAPH}",
             "verification": f"{label}_{config.SUFFIX_CANALICULI_VERIFICATION}",
         },
@@ -1098,6 +1099,7 @@ def write_outputs(result: dict, out_root: Path) -> None:
     imsave(mask_path, (result["candidate"] * 255).astype(np.uint8), check_contrast=False)
     save_mask(result["skeleton"], config.SUFFIX_CANALICULI_SKELETON)
     save_mask(result["flagged"], config.SUFFIX_CANALICULI_VASCULAR)
+    save_mask(result["unattached"], config.SUFFIX_CANALICULI_UNATTACHED)
     save_graph(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_GRAPH))
     save_detection_json(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_DETECTION))
     save_verification(result, path(config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_VERIFICATION))

@@ -68,6 +68,10 @@ SUFFIX_CANALICULI_VERIFICATION = "canaliculi_verification.png"
 SUFFIX_LACUNA_LABELS = "lacuna_labels.png"
 SUFFIX_CANALICULI_VASCULAR = "canaliculi_vascular_mask.png"
 SUFFIX_CANALICULI_GRAPH = "canaliculi_graph.pickle"
+# Dim thread-shaped structure no lacuna owns (canaliculi.find_unattached_threads).
+# Saved because quantification must give the same numbers whether it measures
+# from memory or from these files.
+SUFFIX_CANALICULI_UNATTACHED = "canaliculi_unattached.png"
 # Quantification output: every measured number of one image.
 SUFFIX_QUANTIFICATION = "quantification"  # .json, .xlsx and .pdf
 SUFFIX_FIGURE_NETWORK = "figure_network"  # .png and .pdf

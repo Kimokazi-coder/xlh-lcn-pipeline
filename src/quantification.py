@@ -751,6 +751,11 @@ FIELD_UNITS = {
     "mean_component_length_px": "px",
     "median_component_length_px": "px",
     **{key: unit for key, unit, _c in FIELD_V2},
+    # The unattached dim tier (step 3): a field measure only, never per lacuna.
+    "unattached_length_px": "px",
+    "unattached_component_count": "count",
+    "canalicular_length_density_attached_per_px": "px^-1",
+    "field_length_density_with_unattached_per_px": "px^-1",
 }
 
 
@@ -864,6 +869,7 @@ def load_detection(out_root: Path, label: str) -> dict:
         "mask": can(config.SUFFIX_CANALICULI_MASK),
         "skeleton": can(config.SUFFIX_CANALICULI_SKELETON),
         "vascular": can(config.SUFFIX_CANALICULI_VASCULAR),
+        "unattached": can(config.SUFFIX_CANALICULI_UNATTACHED),
         "graph": can(config.SUFFIX_CANALICULI_GRAPH),
         "canaliculi_detection": can(config.SUFFIX_CANALICULI_DETECTION),
     }
@@ -886,11 +892,16 @@ def load_detection(out_root: Path, label: str) -> dict:
         "thresholded": mask,
         "skeleton": _read_mask(needed["skeleton"]),
         "vascular": _read_mask(needed["vascular"]),
+        "unattached": _read_mask(needed["unattached"]),
         "graph": graph_data["graph"],
         "owner": graph_data["owner"],
         "node_dist": graph_data["node_dist"],
         "edge_owner": graph_data["edge_owner"],
         "lacunae_detection": json.loads(needed["lacunae_detection"].read_text(encoding="utf-8")),
+        # Out-of-focus lacunae, as detection recorded them: counted and owning
+        # threads, but carrying no area or shape.
+        "out_of_focus_ids": json.loads(
+            needed["lacunae_detection"].read_text(encoding="utf-8")).get("out_of_focus_ids") or [],
         "canaliculi_detection": json.loads(needed["canaliculi_detection"].read_text(encoding="utf-8")),
     }
 

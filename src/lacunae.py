@@ -737,6 +737,11 @@ def save_detection_json(result: dict, out_path: Path) -> None:
             "outlines": f"{image_label(result['image_path'])}_{config.SUFFIX_LACUNAE_OUTLINES}",
         },
         "parameters": {**parameters(), "computed_threshold_t_hi": result["t_hi"]},
+        # Which lacunae were kept as out-of-focus (config, section f). Saved
+        # because quantification must measure them the same way whether it works
+        # from memory or from these files: they are counted and they own threads,
+        # but they carry no area or shape.
+        "out_of_focus_ids": list(result.get("out_of_focus_ids") or ()),
         "provenance": provenance(),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)
