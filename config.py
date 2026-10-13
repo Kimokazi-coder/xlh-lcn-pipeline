@@ -130,6 +130,11 @@ def px_int(um: float) -> int:
     return int(round(um / PIXEL_SIZE_UM_ACQUIRED))
 
 
+def area_px2(um2: float) -> int:
+    """Square micrometres to whole square pixels."""
+    return int(round(um2 / PIXEL_SIZE_UM_ACQUIRED ** 2))
+
+
 def um(px_value: float) -> float:
     """Pixels to micrometres."""
     return px_value * PIXEL_SIZE_UM_ACQUIRED
@@ -220,7 +225,57 @@ DIM_THREAD_REACH_UM = 0.65
 UNATTACHED_MIN_LENGTH_UM = 1.3
 UNATTACHED_MIN_ASPECT = 3.0
 
-# (e) Report only, no pruning. The range a canalicular length is reported
+# (e) Trimming a glow streak off a lacuna body. A bright osteocyte often carries
+# a tail of out-of-plane glow, and the threshold takes body and tail as one
+# object, which makes it far more elongated than the cell is. The aspect filter
+# then rejects a real lacuna for the shape of its glow.
+#
+# So a region that fails ONLY the aspect test gets one second chance: the body is
+# opened with a disk of GLOW_TRIM_WIDTH_FRACTION of its own widest inscribed
+# radius, which removes anything narrower than that fraction of the body's widest
+# point, the largest surviving piece is taken as the body, and every filter is
+# applied again to it. A region that already passes is never touched, so this can
+# only rescue and never lose: applied to every region instead, it pushes four
+# otherwise good lacunae below the area floor and rescues one, a net loss of
+# three (measured over all 8 images).
+#
+# 0.5 is the fraction. A canalicular thread is about 6 px wide and a lacuna body
+# 30 to 90 px across, so half the widest inscribed radius sits far above a thread
+# and far below a body: it cuts glow and tails, not cells. MAX_ASPECT_RATIO is
+# NOT raised; the shape rule is unchanged and only what it is measured on
+# changes. NOT VALIDATED.
+GLOW_TRIM_WIDTH_FRACTION = 0.5
+
+# (f) Out-of-focus lacunae. A lacuna lying partly outside the focal plane shows
+# as a round glow whose bright core clears the intensity cut but is far smaller
+# than MIN_AREA_PX2, so the area filter drops it. The survey found 1,184 such
+# sub-area candidates over the 8 images, and nearly all of them are thresholding
+# specks: a rule that counted them all would add hundreds of false cells.
+#
+# So the rule is the most selective one that can be justified, and a candidate
+# must satisfy ALL of it. It must be ROUND, because a blurred body is round while
+# a speck on a thread is not: aspect at most OUT_OF_FOCUS_MAX_ASPECT and solidity
+# at least OUT_OF_FOCUS_MIN_SOLIDITY. It must be CLEARLY BRIGHTER THAN ITS
+# SURROUNDINGS, mean intensity at least OUT_OF_FOCUS_MIN_CONTRAST times the mean
+# of the ring just outside it, because a body glows above its background while a
+# speck sits on a thread no dimmer than itself. And it must be LARGE ENOUGH TO BE
+# A BODY, at least OUT_OF_FOCUS_MIN_AREA_UM2.
+#
+# 2.5 um2 is about 148 px, a round core about 14 px across: two canalicular
+# widths, far above the specks that fill the sub-area population, and small
+# enough that a blurred body still reaches it. Over the 8 images this accepts
+# 3 candidates, at most ONE per image, which is the selectivity asked for.
+#
+# They are counted as the class "out_of_focus": included in the lacuna count and
+# in thread ownership, because a cell is there and its canaliculi are real, and
+# EXCLUDED from every area and shape measure, because the edge being measured is
+# the blur and not the cell. NOT VALIDATED.
+OUT_OF_FOCUS_MIN_AREA_UM2 = 2.5
+OUT_OF_FOCUS_MAX_ASPECT = 1.5
+OUT_OF_FOCUS_MIN_SOLIDITY = 0.90
+OUT_OF_FOCUS_MIN_CONTRAST = 1.5
+
+# (g) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The
 # pipeline does not act on it.
 CANALICULUS_LENGTH_RANGE_UM = (25.0, 50.0)

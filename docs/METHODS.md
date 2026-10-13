@@ -139,6 +139,10 @@ held out and used to confirm.
 | second pass | dim reach | 0.65 um = 5 px | how far a dim thread may continue past owned skeleton. 10 px was tried and took the skeleton past the 25% guard on four images |
 | unattached | minimum length | 1.3 um = 10 px | about two thread widths, so a component must actually run somewhere before it counts |
 | unattached | minimum aspect | 3.0 | a thread is long and thin; this rejects a patch of background that happens to clear the dim cut |
+| lacunae | glow trim width | 0.5 of the body's own widest inscribed radius | cuts anything narrower than half the body's widest point. Only on a region the aspect rule was about to reject, so it can rescue but never lose |
+| lacunae | out of focus, roundness | aspect at most 1.5, solidity at least 0.90 | a blurred body is round |
+| lacunae | out of focus, contrast | mean at least 1.5x the ring outside | a body glows above its background |
+| lacunae | out of focus, minimum area | 2.5 um2 = 148 px | a round core about 14 px across, far above a speck |
 
 Parameters live as documented constants at the top of `src/lacunae.py`
 and `src/canaliculi.py`, each with a longer provenance comment.
@@ -363,6 +367,15 @@ of both.
 
 **Not validated.** No hand count chose the reach or the fraction.
 
+**How the guards are read.** Two guards hold every change here: no image may gain
+more than 25% of its skeleton length, and none may lose more than 10% of its
+owned length. "Owned length" is read as the **total** owned skeleton of the
+image, not the mean per cell. The per-cell mean moves whenever the lacuna count
+moves, for a reason that has nothing to do with threads: 543_3 gains a lacuna in
+section 9, so its owned length per cell falls 12.2% while the owned skeleton
+itself falls only 1.6%. The total is what answers the question the guard asks,
+which is whether thread was lost.
+
 ### The second, dimmer pass
 
 A canaliculus often fades before it ends. Hysteresis can only grow into what
@@ -428,7 +441,69 @@ glance.
 
 **Not validated.**
 
-## 9. Normalised per-cell measures
+## 9. Lacunae the filters used to miss
+
+Two rules, both general, both applying to every image, neither raising
+`MAX_ASPECT_RATIO` or lowering `MIN_AREA_PX2`.
+
+### Trimming a glow streak before judging a shape
+
+A bright osteocyte often carries a tail of out-of-plane glow, and the threshold
+takes body and tail as one object, which makes it far more elongated than the
+cell is. The aspect filter then rejects a real lacuna for the shape of its glow.
+
+A region that fails **only** the aspect test now gets one second chance: the body
+is opened with a disk of `config.GLOW_TRIM_WIDTH_FRACTION` = 0.5 of its own
+widest inscribed radius, which removes anything narrower than half the body's
+widest point, the largest surviving piece is taken as the body, and every filter
+is applied again to it.
+
+Only on an aspect failure, and that matters. Applied to every region instead, the
+trim pushes four otherwise good lacunae below the area floor while rescuing one,
+a net loss of three over the 8 images. Restricted to the regions the aspect rule
+was about to reject, it can only rescue and never lose.
+
+The fraction is of the body's **own** width, so one constant carries to a large
+and a small lacuna alike. A canalicular thread is about 6 px wide and a lacuna
+body 30 to 90 px across, so half the widest inscribed radius sits far above a
+thread and far below a body: it cuts glow and tails, not cells.
+
+Over the 8 images this rescues exactly one lacuna, on 543_3, whose aspect was
+6.034 against a limit of 6.0 and falls to 5.68 once the streak is off. Where 6.0
+sits: of the 103 candidates at or above the area floor the aspect runs p50 2.84,
+p90 4.58, max 7.70, and only three sit between 5.0 and 7.0, so the cut is in a
+sparse part of the distribution but a narrow one, 5.763 kept against 6.034
+rejected.
+
+### Out-of-focus lacunae
+
+A lacuna lying partly outside the focal plane shows as a round glow whose bright
+core clears the intensity cut but is far smaller than `MIN_AREA_PX2`, so the area
+filter drops it. There are **1,184** such sub-area candidates over the 8 images
+and nearly all are thresholding specks, so the rule has to be the most selective
+one that can be justified. All four tests must pass:
+
+| test | constant | why |
+|---|---|---|
+| round | aspect at most 1.5 | a blurred body is round; a speck on a thread is not |
+| round | solidity at least 0.90 | a body has no ragged edge |
+| brighter than its surroundings | mean at least 1.5x the ring just outside | a body glows above its background; a speck sits on a thread no dimmer than itself |
+| large enough to be a body | at least 2.5 um2, about 148 px | a round core about 14 px across: two thread widths, far above the specks, small enough that a blur still reaches it |
+
+Over the 8 images this accepts **3 candidates, at most one per image**: 542_z06
+(214 px2, contrast 3.46), 542_z18 (235 px2, contrast 1.98) and 682_z29 (175 px2,
+contrast 2.12). Every other combination of plausible values was tried and none
+accepted more than one per image either.
+
+They are the class **out_of_focus**: **in** the lacuna count and **in** thread
+ownership, because a cell is there and its canaliculi are real, and **out** of
+every area and shape measure, because the edge that would be measured is the blur
+and not the cell. Their shape fields come back `None` and the shape summary skips
+them; they keep their id, their centroid, their roots and their ring lengths.
+
+**Not validated.** No hand count chose any of these values.
+
+## 10. Normalised per-cell measures
 
 Appended after all existing columns of the per-lacuna rows and of the
 cross-image table, as interior means. No existing column changes name, order or
@@ -449,7 +524,7 @@ field length density weighted with chain code lengths ($\sqrt{2}$ per diagonal
 step); Sholl crossings at 10 / 20 / 30 px, the skeleton components crossing a
 1.5 px band at that distance, computed without the graph.
 
-## 10. Switches (all off by default)
+## 11. Switches (all off by default)
 
 In `config.py`; each comment names its evidence. They all act on the **lacuna**
 stage: the canalicular method has no switch, because there is only one method.
@@ -466,7 +541,7 @@ With all off, `results/` is reproduced exactly
   labels, 15 to 25 times faster. It changes speed, not output.
 `python src/diagnostics.py switch-check` shows what each one changes on a folder.
 
-## 11. Checks (`src/diagnostics.py`)
+## 12. Checks (`src/diagnostics.py`)
 
 - `reference-check`: 109.25 edges per cell, 24.11 px mean edge length and 6.00 roots per cell on
   543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
@@ -488,7 +563,7 @@ With all off, `results/` is reproduced exactly
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
 
-## 12. Figures
+## 13. Figures
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
 into `results/` (map: `results/README.md`). One display window for the whole
@@ -520,7 +595,7 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
   `2_canaliculi/` are tracked: the skeleton png is an input to
   `validate-network`.
 
-## 13. History
+## 14. History
 
 Earlier experiments, reports and analyses are preserved at the git tag
 `archive-2026-10-13`, which is the repository as it was before the 2026-10-13

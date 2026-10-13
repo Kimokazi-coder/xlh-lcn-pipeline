@@ -375,23 +375,100 @@ def merge_shallow_splits_fast(labels: np.ndarray, mask: np.ndarray, distance: np
     return merged
 
 
+def trim_glow_streak(piece: np.ndarray) -> np.ndarray:
+    """A lacuna body with its glow streak removed.
+
+    The region is opened with a disk of config.GLOW_TRIM_WIDTH_FRACTION of its
+    own widest inscribed radius, so anything narrower than that fraction of the
+    body's widest point is cut away, and the largest surviving piece is the body.
+    The fraction is of the body's OWN width, so the rule carries to a large or a
+    small lacuna without a second constant."""
+    distance = ndi.distance_transform_edt(piece)
+    radius = int(round(config.GLOW_TRIM_WIDTH_FRACTION * float(distance.max())))
+    if radius < 1:
+        return piece
+    opened = morphology.opening(piece, morphology.disk(radius))
+    if not opened.any():
+        return piece
+    labelled = measure.label(opened, connectivity=2)
+    sizes = np.bincount(labelled.ravel())[1:]
+    return labelled == (1 + int(sizes.argmax()))
+
+
+def region_verdict(region, rows: int, cols: int) -> str:
+    """Which filter rejects this region, or "keep". The order is the order the
+    filters are applied in."""
+    if region.area < MIN_AREA_PX2:
+        return "area"
+    if region.area > MAX_AREA_FRACTION_OF_IMAGE * rows * cols:
+        return "area"
+    if region.solidity < MIN_SOLIDITY:
+        return "solidity"
+    minor, major = region.axis_minor_length, region.axis_major_length
+    aspect = (major / minor) if minor > 0 else float("inf")
+    if aspect > MAX_ASPECT_RATIO:
+        return "aspect"
+    return "keep"
+
+
+def find_out_of_focus(label_image: np.ndarray, channel: np.ndarray,
+                      kept: list[tuple]) -> list[tuple]:
+    """[(region, on_border), ...] for candidates that are below MIN_AREA_PX2 but
+    still look like a lacuna body seen out of the focal plane.
+
+    Every test in config must pass: round, clearly brighter than the ring just
+    outside it, and large enough to be a body. The rule is deliberately the most
+    selective one that can be justified, because the sub-area population is
+    mostly thresholding specks and a loose rule would invent hundreds of cells.
+    """
+    rows, cols = label_image.shape
+    taken = {region.label for region, _b in kept}
+    min_area = config.area_px2(config.OUT_OF_FOCUS_MIN_AREA_UM2)
+    found = []
+    for region in measure.regionprops(label_image, intensity_image=channel):
+        if region.label in taken or region.area >= MIN_AREA_PX2:
+            continue
+        if region.area < min_area:
+            continue
+        minor, major = region.axis_minor_length, region.axis_major_length
+        aspect = (major / minor) if minor > 0 else float("inf")
+        if aspect > config.OUT_OF_FOCUS_MAX_ASPECT:
+            continue
+        if region.solidity < config.OUT_OF_FOCUS_MIN_SOLIDITY:
+            continue
+        piece = label_image[region.slice] == region.label
+        ring = (morphology.dilation(piece, morphology.disk(6))
+                & ~morphology.dilation(piece, morphology.disk(2)))
+        if not ring.any():
+            continue
+        around = float(channel[region.slice][ring].mean())
+        if around <= 0 or float(region.intensity_mean) / around < config.OUT_OF_FOCUS_MIN_CONTRAST:
+            continue
+        min_row, min_col, max_row, max_col = region.bbox
+        on_border = min_row == 0 or min_col == 0 or max_row == rows or max_col == cols
+        found.append((region, on_border))
+    return found
+
+
 def filter_regions(label_image: np.ndarray) -> list[tuple]:
     """[(region, on_border), ...] for objects passing the area, solidity and
     aspect filters. Objects touching the frame edge are kept and flagged."""
     rows, cols = label_image.shape
-    max_area = MAX_AREA_FRACTION_OF_IMAGE * rows * cols
     kept = []
     for region in measure.regionprops(label_image):
-        if region.area < MIN_AREA_PX2:
-            continue
-        if region.area > max_area:
-            continue
-        if region.solidity < MIN_SOLIDITY:
-            continue
-        minor = region.axis_minor_length
-        major = region.axis_major_length
-        aspect = (major / minor) if minor > 0 else float("inf")
-        if aspect > MAX_ASPECT_RATIO:
+        verdict = region_verdict(region, rows, cols)
+        if verdict == "aspect":
+            # One second chance, and only for this verdict: the region may be a
+            # real body wearing a glow streak. Judge the trimmed body instead.
+            piece = label_image[region.slice] == region.label
+            body = trim_glow_streak(piece)
+            candidates = measure.regionprops(body.astype(np.int32))
+            if candidates and region_verdict(candidates[0], rows, cols) == "keep":
+                trimmed = np.zeros_like(label_image)
+                trimmed[region.slice][body] = region.label
+                region = measure.regionprops(trimmed)[0]
+                verdict = "keep"
+        if verdict != "keep":
             continue
 
         min_row, min_col, max_row, max_col = region.bbox
@@ -465,7 +542,7 @@ def band_filter(kept: list[tuple], min_share: float) -> list[tuple]:
     return [(region, b) for region, b in kept if opening_share(region) >= min_share]
 
 
-def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple[np.ndarray, list[tuple], float]:
+def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
     """(label_image, kept, t_hi) for one signal channel. The switch steps run
     only when their switch in config.py is on. A given t_hi replaces the
     computed cut (sensitivity diagnostics only)."""
@@ -483,15 +560,20 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple[np.ndarray,
         kept = filter_regions(labels)
     if config.BAND_FILTER_MIN_OPENING_SHARE is not None:
         kept = band_filter(kept, config.BAND_FILTER_MIN_OPENING_SHARE)
-    return labels, kept, t_hi
+    # Out-of-focus lacunae are appended AFTER the in-focus ones, so the ids of
+    # the in-focus lacunae do not move and their ids are the last ones.
+    out_of_focus = find_out_of_focus(labels, channel, kept)
+    out_of_focus_ids = [len(kept) + i for i in range(1, len(out_of_focus) + 1)]
+    kept = kept + out_of_focus
+    return labels, kept, t_hi, out_of_focus_ids
 
 
 def segment_image(image_path: Path, t_hi: float | None = None):
-    """(display, channel, label_image, kept, t_hi) for one image file. A given
-    t_hi replaces the computed cut (sensitivity diagnostics only)."""
+    """(display, channel, label_image, kept, t_hi, out_of_focus_ids) for one image
+    file. A given t_hi replaces the computed cut (sensitivity diagnostics only)."""
     display, channel = load_channel(image_path)
-    labels, kept, t_hi = segment(channel, t_hi)
-    return display, channel, labels, kept, t_hi
+    labels, kept, t_hi, out_of_focus_ids = segment(channel, t_hi)
+    return display, channel, labels, kept, t_hi, out_of_focus_ids
 
 
 # Measurements
@@ -501,7 +583,7 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
     objects and the cut that was used. The counts are how many objects the
     filters kept, which belongs to detection. Every measured number comes from
     src/quantification.py. t_hi: see segment_image."""
-    display, channel, labels, kept, t_hi = segment_image(image_path, t_hi)
+    display, channel, labels, kept, t_hi, out_of_focus_ids = segment_image(image_path, t_hi)
     border = sum(1 for _r, on_border in kept if on_border)
     return {
         "image_path": image_path,
@@ -509,6 +591,10 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
         "labels": labels,
         "kept": kept,
         "t_hi": t_hi,
+        # Lacunae seen out of the focal plane: counted and owning threads, but
+        # excluded from every area and shape measure (config, section f).
+        "out_of_focus_ids": list(out_of_focus_ids),
+        "out_of_focus_count": len(out_of_focus_ids),
         "lacuna_count": len(kept),
         "border_lacuna_count": border,
         "interior_lacuna_count": len(kept) - border,
