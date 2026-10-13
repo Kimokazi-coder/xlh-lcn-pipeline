@@ -81,8 +81,8 @@ import quantification  # noqa: E402
 config.FAST_LACUNA_STAGE = True
 
 RESULTS = config.RESULTS_DIR
-CACHE = ROOT / "results_experiments" / "_cache" / "figures"
-LOG_DIR = ROOT / "experiments" / "logs"
+CACHE = ROOT / ".cache" / "figures"
+LOG_DIR = ROOT / ".cache" / "logs"
 DATA_DIR = config.DATA_DIR / "WT"
 
 # Short image labels, as in the overnight report: config.IMAGE_LABELS, the
@@ -308,7 +308,7 @@ def root_clusters(G, cell_id: int) -> list[tuple[float, float]]:
 
 def pipeline_output(path: Path) -> dict:
     """Default pipeline output for one image, cached in
-    results_experiments/_cache/figures/ (git-ignored)."""
+    .cache/figures/ (git-ignored)."""
     name = short(path)
     npz, js = CACHE / f"{name}.npz", CACHE / f"{name}.json"
     if npz.is_file() and js.is_file():
@@ -388,8 +388,7 @@ def skeleton_rgb(channel: np.ndarray, skeleton: np.ndarray) -> np.ndarray:
 
 # Figures v2: shared data and drawing code ---------------------------------------------
 
-CACHE2 = ROOT / "results_experiments" / "_cache" / "figures_v2"
-TASK2_DIR = ROOT / "experiments"
+CACHE2 = ROOT / ".cache" / "figures_v2"
 
 # Rejected pieces smaller than this are not drawn: they are specks of the
 # lacuna mask (the area filter drops 45% of interior pieces in [81, 373)
@@ -402,8 +401,7 @@ REJECTED_MIN_DRAW_PX2 = 150
 # flagged_structures). Display only; the classification is unchanged.
 CANAL_MARK_MIN_SHARE = 0.5
 
-# One-letter reason for a rejected piece, from the stage replay of
-# experiments/task2_thresholds.py (verdict).
+# One-letter reason for a rejected piece; the cuts are those of src/lacunae.py.
 REASON_LETTER = {"area": "a", "solidity": "S", "aspect": "A"}
 
 
@@ -432,22 +430,26 @@ def results_numbers(path: Path) -> tuple[list, list]:
 
 
 def rejection_reason(region, shape) -> str:
-    """The filter that rejects a piece, by the stage replay of
-    experiments/task2_thresholds.py (its verdict function)."""
-    sys.path.insert(0, str(TASK2_DIR))
-    import task2_thresholds  # noqa: E402
-
-    v = task2_thresholds.verdict(region, shape)
-    for key in ("area", "solidity", "aspect"):
-        if v.startswith(key):
-            return key
-    raise ValueError(f"unexpected verdict {v!r}")
+    """Which cut rejects a piece. The constants are read from src/lacunae.py, in
+    the order that module applies them, so this cannot drift from the pipeline."""
+    rows, cols = shape
+    if region.area < lacunae.MIN_AREA_PX2:
+        return "area"
+    if region.area > lacunae.MAX_AREA_FRACTION_OF_IMAGE * rows * cols:
+        return "area"
+    if region.solidity < lacunae.MIN_SOLIDITY:
+        return "solidity"
+    minor, major = region.axis_minor_length, region.axis_major_length
+    aspect = major / minor if minor > 0 else float("inf")
+    if aspect > lacunae.MAX_ASPECT_RATIO:
+        return "aspect"
+    raise ValueError(f"piece {region.label} is rejected by no cut")
 
 
 def build_image_data(path: Path) -> None:
     """Run the default pipeline (every switch off; the fast lacuna stage,
     identical labels) on one image and cache what the v2 figures draw, in
-    results_experiments/_cache/figures_v2/ (git-ignored)."""
+    .cache/figures_v2/ (git-ignored)."""
     from skimage import measure
 
     name = short(path)
@@ -1971,7 +1973,7 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
     print(fig_name, "written")
 
 
-DEFAULT_FIELD_DIR = ROOT / "results_experiments" / "fixes" / "B3_field_summary"
+DEFAULT_FIELD_DIR = ROOT / ".cache" / "field_summary"
 
 
 def figure_all(tiles_key: Path | None = None, blind_key: Path | None = None,
@@ -2105,7 +2107,7 @@ def main() -> int:
     q.add_argument("-b", dest="blind_key", type=Path, default=None,
                    help="Blinding key for S03 (outside the repository); without it S03 is kept.")
     q.add_argument("-f", dest="field_dir", type=Path, default=DEFAULT_FIELD_DIR,
-                   help="Output folder of field-summary (default: results_experiments/fixes/B3_field_summary).")
+                   help="Output folder of field-summary (default: .cache/field_summary).")
     q = sub.add_parser("tiles", help="Hand-count tiles (raw red, random codes); key outside the repository.")
     q.add_argument("-k", dest="key", type=Path, required=True, help="Key path, outside the repository.")
     args = p.parse_args()
