@@ -29,6 +29,10 @@ Subcommands:
                       value: percent changes of the network measures
     validate-network  roots and Sholl crossings against blind hand counts
                       (and the skeleton against traced threads); -s self-test
+    survey            what the pipeline does to every image before anything is
+                      changed: lacunae, rejected candidates and why, owned,
+                      unowned and pruned skeleton, attachments across a gap
+                      with no signal, faint ridge signal, unattached pieces
     diagnose-untraced why a thread or a blob is missing from the result: the
                       faint ridge signal and unowned skeleton near a lacuna,
                       and the rule that rejected a blob with no outline
@@ -49,6 +53,7 @@ Usage (from the repo root):
     python src/diagnostics.py network-sweep -d data/WT -o OUT_FOLDER
     python src/diagnostics.py validate-network -a ANNOTATION.csv -k KEY_OUTSIDE_REPO.csv -r RESULTS -o OUT
     python src/diagnostics.py validate-network -s
+    python src/diagnostics.py survey -d data/WT -o results/survey
     python src/diagnostics.py diagnose-untraced -i "data/WT/543_3.tif" -o results/diagnosis \
         --lacunae 1,7 --blobs "40,290;480,460;285,855;820,155"
 """
@@ -2108,6 +2113,242 @@ def cmd_diagnose_untraced(args) -> int:
     return 0
 
 
+# survey -------------------------------------------------------------------------
+# What the pipeline is doing to every image, before anything is changed.
+# MEASUREMENT ONLY: it calls the pipeline's own functions, changes no parameter
+# and writes nothing the pipeline reads. Six questions per image: how many
+# lacunae, what was rejected and by which rule, how the skeleton divides into
+# owned, unowned and pruned, how many lacuna attachments cross a gap with no
+# signal in it, how much ridge signal sits below the cut near a lacuna, and how
+# long the unattached skeleton components are.
+
+# The fraction of the low cut a path must carry to count as having signal. This
+# is a MEASUREMENT here, not a rule: nothing in the pipeline uses it yet. 0.7 is
+# the fraction the old gap bridging required.
+SURVEY_SIGNAL_FRACTION = 0.7
+# Faint ridge signal is counted between this fraction of the low cut and the cut.
+SURVEY_FAINT_FLOOR = 0.5
+# How far from a lacuna body counts as near it.
+SURVEY_NEAR_PX = 150
+# Length bands for the unattached components, in micrometres.
+SURVEY_LENGTH_BANDS_UM = (1.0, 2.5, 5.0, 10.0, 25.0)
+
+
+def survey_path_min(signal, r0, c0, r1, c1) -> float:
+    """The dimmest value of `signal` along the straight line between two points,
+    sampled about once per pixel. The minimum, not the mean: one background
+    pixel breaks a thread however bright its ends."""
+    steps = max(2, int(round(float(np.hypot(r1 - r0, c1 - c0)))) + 1)
+    rows, cols = np.linspace(r0, r1, steps), np.linspace(c0, c1, steps)
+    return float(ndi.map_coordinates(signal, [rows, cols], order=1, mode="nearest").min())
+
+
+def survey_rejections(lac: dict) -> dict:
+    """Every candidate region the lacuna stage built, and the first rule in
+    lacunae.filter_regions it fails, which is the rule that rejected it."""
+    labels = lac["labels"]
+    rows, cols = labels.shape
+    max_area = lacunae.MAX_AREA_FRACTION_OF_IMAGE * rows * cols
+    kept_labels = {r.label for r, _b in lac["kept"]}
+    counts = {"kept": 0, "minimum area": 0, "maximum area": 0, "solidity": 0, "aspect ratio": 0}
+    rejected = []
+    for region in measure.regionprops(labels):
+        if region.label in kept_labels:
+            counts["kept"] += 1
+            continue
+        minor, major = region.axis_minor_length, region.axis_major_length
+        aspect = (major / minor) if minor > 0 else float("inf")
+        if region.area < lacunae.MIN_AREA_PX2:
+            why = "minimum area"
+        elif region.area > max_area:
+            why = "maximum area"
+        elif region.solidity < lacunae.MIN_SOLIDITY:
+            why = "solidity"
+        elif aspect > lacunae.MAX_ASPECT_RATIO:
+            why = "aspect ratio"
+        else:
+            why = "unclear"
+        counts[why] = counts.get(why, 0) + 1
+        cy, cx = region.centroid
+        rejected.append({"centroid_xy": [round(float(cx), 1), round(float(cy), 1)],
+                         "area_px2": int(region.area),
+                         "area_um2": round(region.area * config.PIXEL_SIZE_UM_ACQUIRED ** 2, 3),
+                         "solidity": round(float(region.solidity), 4),
+                         "aspect": round(float(aspect), 4) if np.isfinite(aspect) else None,
+                         "rejected_by": why})
+    rejected.sort(key=lambda r: -r["area_px2"])
+    return {"counts": counts, "rejected": rejected}
+
+
+def survey_image(image_path: Path) -> dict:
+    """One image, every question, from the pipeline's own functions."""
+    lab = lacunae.image_label(image_path)
+    lac = lacunae.analyse_image(image_path)
+    _display, channel = lacunae.load_channel(image_path)
+    lacuna_mask, lacuna_id_map = canaliculi.build_lacuna_maps(lac["labels"], lac["kept"])
+    flagged = canaliculi.flagged_structures(channel)
+    preprocessed = canaliculi.preprocess_channel(channel)
+    _cand, ridge_high, response = canaliculi.network_candidate_mask(
+        preprocessed, lacuna_mask, flagged)
+    ridge_low = ridge_high * canaliculi.HYSTERESIS_LOW_FRACTION
+    # The preprocessed channel's own cuts, for the second signal measure.
+    _strict, intensity_high = canaliculi.total_signal_mask(preprocessed)
+    intensity_low = intensity_high * canaliculi.HYSTERESIS_LOW_FRACTION
+
+    net = canaliculi.analyse_network(image_path, lac, channel)
+    skel, owner_map = net["skeleton"], net["owner_map"]
+    pruned = net["skeleton_before_length_prune"] & ~skel
+
+    dist, indices = ndi.distance_transform_edt(lacuna_id_map == 0, return_indices=True)
+    nearest_id = lacuna_id_map[indices[0], indices[1]]
+
+    # Attachments the pipeline makes now, and what signal lies on each path. The
+    # rule in force is distance alone, so every one of these was accepted.
+    attachments = []
+    for node in net["graph"].nodes():
+        if canaliculi._is_cell_node(node):
+            continue
+        r, c = node
+        gap = float(dist[r, c])
+        if gap > canaliculi.LACUNA_ATTACH_GAP_PX:
+            continue
+        if int(nearest_id[r, c]) < 1:
+            continue
+        sr, sc = int(indices[0, r, c]), int(indices[1, r, c])
+        attachments.append({
+            "gap_px": round(gap, 4),
+            "min_intensity": survey_path_min(preprocessed, sr, sc, r, c),
+            "min_response": survey_path_min(response, sr, sc, r, c),
+        })
+    need_i = SURVEY_SIGNAL_FRACTION * intensity_low
+    need_r = SURVEY_SIGNAL_FRACTION * ridge_low
+    empty_i = sum(1 for a in attachments if a["min_intensity"] < need_i)
+    empty_r = sum(1 for a in attachments if a["min_response"] < need_r)
+
+    # Faint ridge signal near a lacuna: real response that never reached the low
+    # cut, so hysteresis could not grow into it from anywhere.
+    near = dist <= SURVEY_NEAR_PX
+    faint = near & (response >= SURVEY_FAINT_FLOOR * ridge_low) & (response < ridge_low)
+
+    # Unattached skeleton: components no lacuna owns, by length.
+    unowned = skel & (owner_map == 0)
+    comp = morphology.label(unowned, connectivity=2)
+    bands = {}
+    comp_lengths = []
+    for i in range(1, int(comp.max()) + 1):
+        n = int((comp == i).sum())
+        comp_lengths.append(n)
+    for n in comp_lengths:
+        um = n * config.PIXEL_SIZE_UM_ACQUIRED
+        name = f"under {SURVEY_LENGTH_BANDS_UM[0]:g} um"
+        for lo, hi in zip(SURVEY_LENGTH_BANDS_UM, SURVEY_LENGTH_BANDS_UM[1:]):
+            if lo <= um < hi:
+                name = f"{lo:g} to {hi:g} um"
+        if um >= SURVEY_LENGTH_BANDS_UM[-1]:
+            name = f"{SURVEY_LENGTH_BANDS_UM[-1]:g} um and over"
+        b = bands.setdefault(name, {"components": 0, "px": 0})
+        b["components"] += 1
+        b["px"] += n
+
+    return {
+        "image_label": lab,
+        "lacunae_detected": len(lac["kept"]),
+        "cuts": {
+            "lacuna_t_hi": round(float(lac["t_hi"]), 6),
+            "ridge_high": round(float(ridge_high), 8),
+            "ridge_low": round(float(ridge_low), 8),
+            "preprocessed_high": round(float(intensity_high), 8),
+            "preprocessed_low": round(float(intensity_low), 8),
+        },
+        "candidate_regions": survey_rejections(lac),
+        "skeleton": {
+            "total_px": int(skel.sum()),
+            "owned_px": int((skel & (owner_map > 0)).sum()),
+            "unowned_px": int(unowned.sum()),
+            "unowned_fraction": round(float(unowned.sum()) / max(1, int(skel.sum())), 4),
+            "pruned_by_50um_px": int(pruned.sum()),
+        },
+        "attachments": {
+            "total": len(attachments),
+            "rule_now": f"distance alone, within {canaliculi.LACUNA_ATTACH_GAP_PX} px",
+            "signal_fraction_tested": SURVEY_SIGNAL_FRACTION,
+            "no_signal_by_preprocessed_intensity": empty_i,
+            "no_signal_by_ridge_response": empty_r,
+            "required_min_intensity": round(need_i, 8),
+            "required_min_response": round(need_r, 8),
+            "path_min_intensity_median": round(float(np.median(
+                [a["min_intensity"] for a in attachments])), 8) if attachments else None,
+            "path_min_response_median": round(float(np.median(
+                [a["min_response"] for a in attachments])), 8) if attachments else None,
+        },
+        "faint_ridge_near_lacunae": {
+            "floor_fraction": SURVEY_FAINT_FLOOR,
+            "px_in_region": int(near.sum()),
+            "px_between_floor_and_low_cut": int(faint.sum()),
+        },
+        "unattached_components": {
+            "count": len(comp_lengths),
+            "px": int(unowned.sum()),
+            "longest_px": max(comp_lengths) if comp_lengths else 0,
+            "by_length": bands,
+        },
+    }
+
+
+def cmd_survey(args) -> int:
+    images = images_from(args)
+    rows = [survey_image(p) for p in images]
+    args.out.mkdir(parents=True, exist_ok=True)
+    path = args.out / "survey.json"
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"status": "measurement only, nothing in the pipeline was changed",
+                   "images": rows}, f, indent=2, default=float)
+
+    print_table(
+        ["image", "lacunae", "skeleton px", "owned", "unowned", "unowned %", "pruned 50um"],
+        [[r["image_label"], r["lacunae_detected"], r["skeleton"]["total_px"],
+          r["skeleton"]["owned_px"], r["skeleton"]["unowned_px"],
+          f'{100 * r["skeleton"]["unowned_fraction"]:.1f}%', r["skeleton"]["pruned_by_50um_px"]]
+         for r in rows], title="Skeleton, per image")
+
+    whys = ["kept", "minimum area", "solidity", "aspect ratio", "maximum area"]
+    print_table(["image"] + whys,
+                [[r["image_label"]] + [r["candidate_regions"]["counts"].get(w, 0) for w in whys]
+                 for r in rows], title="Candidate regions, and the rule that rejected each")
+
+    print_table(["image", "attachments", "no signal (intensity)", "no signal (response)",
+                 "median path min intensity", "required"],
+                [[r["image_label"], r["attachments"]["total"],
+                  r["attachments"]["no_signal_by_preprocessed_intensity"],
+                  r["attachments"]["no_signal_by_ridge_response"],
+                  f'{r["attachments"]["path_min_intensity_median"]:.5f}',
+                  f'{r["attachments"]["required_min_intensity"]:.5f}'] for r in rows],
+                title=f"Attachments crossing a gap with no signal, at "
+                      f"{SURVEY_SIGNAL_FRACTION} of the low cut")
+
+    print_table(["image", "faint ridge px near lacunae", "region px", "share"],
+                [[r["image_label"], r["faint_ridge_near_lacunae"]["px_between_floor_and_low_cut"],
+                  r["faint_ridge_near_lacunae"]["px_in_region"],
+                  f'{100 * r["faint_ridge_near_lacunae"]["px_between_floor_and_low_cut"] / max(1, r["faint_ridge_near_lacunae"]["px_in_region"]):.1f}%']
+                 for r in rows],
+                title=f"Ridge response between {SURVEY_FAINT_FLOOR} and 1.0 of the low cut, "
+                      f"within {SURVEY_NEAR_PX} px of a lacuna")
+
+    band_names = [f"under {SURVEY_LENGTH_BANDS_UM[0]:g} um"] + \
+                 [f"{lo:g} to {hi:g} um" for lo, hi in
+                  zip(SURVEY_LENGTH_BANDS_UM, SURVEY_LENGTH_BANDS_UM[1:])] + \
+                 [f"{SURVEY_LENGTH_BANDS_UM[-1]:g} um and over"]
+    print_table(["image", "components", "px"] + band_names,
+                [[r["image_label"], r["unattached_components"]["count"],
+                  r["unattached_components"]["px"]]
+                 + [r["unattached_components"]["by_length"].get(b, {}).get("px", 0)
+                    for b in band_names] for r in rows],
+                title="Unattached skeleton components, px by component length")
+
+    print(f"\nsurvey -> {path}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2188,6 +2429,14 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_network_sweep, image=None)
+
+    p = sub.add_parser("survey",
+                       help="What the pipeline does to every image (measurement only).")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.set_defaults(func=cmd_survey)
 
     p = sub.add_parser("diagnose-untraced",
                        help="Why a thread or a blob is missing from the result (diagnosis only).")
