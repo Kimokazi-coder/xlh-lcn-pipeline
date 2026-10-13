@@ -1152,7 +1152,7 @@ NETWORK_SWEEP = [
     ("HYSTERESIS_LOW_FRACTION", (0.525, 0.975)),
     ("PRUNE_SPUR_LEN_PX", (3, 5)),
     ("ROOT_MERGE_DIST_PX", (6.0, 10.0)),
-    ("LACUNA_ATTACH_GAP_PX", (7, 13)),
+    ("LACUNA_ATTACH_REACH_PX", (7, 13)),
     ("t_lo scale", (0.8, 0.9, 1.1, 1.2)),
 ]
 SWEEP_DEFAULTS = {name: getattr(canaliculi, name) for name, _v in NETWORK_SWEEP if name != "t_lo scale"}
@@ -1800,7 +1800,7 @@ def untraced_lacuna_report(d: dict, lacuna_id: int, radius_px: int) -> dict:
             continue
         r, c = node
         g = float(gap[r, c])
-        if g <= canaliculi.LACUNA_ATTACH_GAP_PX:
+        if g <= canaliculi.LACUNA_ATTACH_REACH_PX:
             piece = int(pieces_label[r, c])
             attach.append({"node_xy": [int(c), int(r)],
                            "gap_to_body_px": round(g, 4),
@@ -1810,14 +1810,14 @@ def untraced_lacuna_report(d: dict, lacuna_id: int, radius_px: int) -> dict:
     attach.sort(key=lambda a: a["gap_to_body_px"])
     out["ownership_rule"] = {
         "rule": ("canaliculi.attach_lacunae links the lacuna to every skeleton graph node "
-                 f"within LACUNA_ATTACH_GAP_PX = {canaliculi.LACUNA_ATTACH_GAP_PX} px of its body "
+                 f"within LACUNA_ATTACH_REACH_PX = {canaliculi.LACUNA_ATTACH_REACH_PX} px of its body "
                  "whose nearest lacuna is this one, with the gap as the edge weight. "
                  "canaliculi.assign_by_connectivity then runs one multi-source Dijkstra, so every "
                  "node reachable through the skeleton goes to the lacuna whose path is shortest. "
                  "Reachability is through the SKELETON, so once one node is attached the whole "
                  "connected component beyond it is owned, however far it runs, until the "
                  "config.MAX_CANALICULUS_LENGTH_UM prune cuts it back."),
-        "attach_gap_px": canaliculi.LACUNA_ATTACH_GAP_PX,
+        "attach_gap_px": canaliculi.LACUNA_ATTACH_REACH_PX,
         "attached_nodes": len(attach),
         "attached_nodes_detail": attach,
         "node_that_brought_the_largest_piece": max(
@@ -2210,7 +2210,7 @@ def survey_image(image_path: Path) -> dict:
             continue
         r, c = node
         gap = float(dist[r, c])
-        if gap > canaliculi.LACUNA_ATTACH_GAP_PX:
+        if gap > canaliculi.LACUNA_ATTACH_REACH_PX:
             continue
         if int(nearest_id[r, c]) < 1:
             continue
@@ -2270,7 +2270,7 @@ def survey_image(image_path: Path) -> dict:
         },
         "attachments": {
             "total": len(attachments),
-            "rule_now": f"distance alone, within {canaliculi.LACUNA_ATTACH_GAP_PX} px",
+            "rule_now": f"distance alone, within {canaliculi.LACUNA_ATTACH_REACH_PX} px",
             "signal_fraction_tested": SURVEY_SIGNAL_FRACTION,
             "no_signal_by_preprocessed_intensity": empty_i,
             "no_signal_by_ridge_response": empty_r,

@@ -152,7 +152,32 @@ def um(px_value: float) -> float:
 # the one limit that CHANGES a number; everything else here is report only.
 MAX_CANALICULUS_LENGTH_UM = 50.0
 
-# (b) Report only, no pruning. The range a canalicular length is reported
+# (b) How far a lacuna reaches to attach a thread, and the signal that path must
+# carry. A skeleton node is attached to a lacuna only if the straight path from
+# the nearest point of its surface to that node carries signal all the way: the
+# DIMMEST point of the RIDGE RESPONSE along the path must reach
+# LACUNA_ATTACH_MIN_SIGNAL_FRACTION of the response's own low cut. A path across
+# empty space fails at its dimmest point and is refused.
+#
+# The response, not the flattened intensity, because the top-hat flattening digs
+# a trough around every lacuna body, so an intensity test cuts through the middle
+# of the population and refuses real contacts along with empty space (measured:
+# python src/diagnostics.py survey). The response is also what the method
+# thresholds, so the attachment asks the same question the detection asked.
+#
+# 2.6 um is 20 px. The reach was 10 px while attachment went by distance alone,
+# where a longer reach only meant handing a lacuna any network passing nearby.
+# With the signal test deciding, a longer reach is safe and is needed: contact
+# threads sat 10 to 20 px from a body and were left unowned.
+#
+# The fraction is the one the old gap bridging required of a gap before it would
+# join one, measured the same way: the minimum along the path, not the mean,
+# because one background-level pixel breaks a thread however bright its ends.
+# NOT VALIDATED: no hand count chose either value.
+LACUNA_ATTACH_REACH_UM = 2.6
+LACUNA_ATTACH_MIN_SIGNAL_FRACTION = 0.7
+
+# (c) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The
 # pipeline does not act on it.
 CANALICULUS_LENGTH_RANGE_UM = (25.0, 50.0)

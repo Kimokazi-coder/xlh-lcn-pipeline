@@ -223,12 +223,18 @@ MIN_INTERNAL_EDGE_LEN_PX = 6
 # in a few passes.
 GRAPH_CLEANUP_MAX_ITER = 20
 
-# A skeleton node within this distance (px) of a lacuna body is attached to
-# that lacuna. The first guess of 5 left 28 of 98 lacunae with no attachment
-# at all. With the current mask the smallest node-to-body gap per lacuna runs
-# p50 2.24, p95 5.00, max 7.00 px, so 10 attaches every lacuna with room to
-# spare.
-LACUNA_ATTACH_GAP_PX = 10
+# How far a lacuna reaches to attach a thread. Set in micrometres in config.py;
+# see the comment there. Attachment is by SIGNAL, not by distance alone: a node
+# within reach attaches only if the straight path from the lacuna surface to it
+# carries ridge response all the way, so a path across empty space is refused.
+LACUNA_ATTACH_REACH_PX = config.px_int(config.LACUNA_ATTACH_REACH_UM)
+
+# How close a thread must come to a lacuna to count as ATTACHED for the ring
+# attached length measure. This was the ownership reach while ownership went by
+# distance alone, and it stays at that value as a constant of its own: a measure
+# must not change meaning because an ownership rule changed, or a before and
+# after comparison would be reading two different measures.
+RING_ATTACHED_GAP_PX = 10
 
 # Parameters: per-cell measures
 
@@ -398,12 +404,26 @@ def build_lacuna_maps(labels: np.ndarray, kept: list[tuple]) -> tuple[np.ndarray
     return lacuna_id_map > 0, lacuna_id_map
 
 
-def nearest_lacuna_map(lacuna_id_map: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """For every pixel, (distance to the nearest lacuna pixel, that lacuna's
-    id): a Euclidean partition seeded from the lacunae."""
+def nearest_lacuna_map(lacuna_id_map: np.ndarray) -> tuple:
+    """For every pixel, (distance to the nearest lacuna pixel, that lacuna's id,
+    the row and column of that pixel): a Euclidean partition seeded from the
+    lacunae. The third value is the point on a lacuna surface that an attachment
+    path starts from."""
     dist, indices = ndi.distance_transform_edt(lacuna_id_map == 0, return_indices=True)
     nearest_id = lacuna_id_map[indices[0], indices[1]]
-    return dist, nearest_id
+    return dist, nearest_id, indices
+
+
+def path_min_signal(signal: np.ndarray, r0: float, c0: float, r1: float, c1: float) -> float:
+    """The dimmest value of `signal` along the straight line from (r0, c0) to
+    (r1, c1), sampled about once per pixel with bilinear interpolation.
+
+    The minimum, not the mean: one background-level pixel breaks a thread
+    however bright its two ends are."""
+    steps = max(2, int(round(float(np.hypot(r1 - r0, c1 - c0)))) + 1)
+    rows = np.linspace(r0, r1, steps)
+    cols = np.linspace(c0, c1, steps)
+    return float(ndi.map_coordinates(signal, [rows, cols], order=1, mode="nearest").min())
 
 
 # Graph
@@ -557,17 +577,30 @@ def clean_network_graph(G: nx.Graph, dist_to_lacuna: np.ndarray) -> nx.Graph:
     return G
 
 
-def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray, cell_ids: list[int]) -> nx.Graph:
-    """Add a virtual ("cell", id) node per lacuna, linked to every skeleton
-    node within LACUNA_ATTACH_GAP_PX of its body. The link weight is the gap
-    distance, so paths start at the cell boundary."""
+def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                   nearest_index: np.ndarray, cell_ids: list[int], response: np.ndarray,
+                   min_signal: float) -> nx.Graph:
+    """Add a virtual ("cell", id) node per lacuna, linked to every skeleton node
+    within LACUNA_ATTACH_REACH_PX of its body THAT HAS SIGNAL ALL THE WAY TO IT.
+    The link weight is the gap distance, so paths start at the cell boundary.
+
+    Distance alone would hand a lacuna any network that happened to pass nearby,
+    across empty space; the survey found about half of all attachments doing
+    exactly that. So the straight path from the nearest point of the lacuna
+    surface to the node is sampled on the ridge response, and its dimmest point
+    must reach `min_signal`, or the node does not attach to that lacuna."""
     for node in list(G.nodes()):
         r, c = node
         gap = float(dist_to_lacuna[r, c])
-        if gap <= LACUNA_ATTACH_GAP_PX:
-            lacuna_id = int(nearest_id[r, c])
-            if lacuna_id in cell_ids:
-                G.add_edge(("cell", lacuna_id), node, weight=gap)
+        if gap > LACUNA_ATTACH_REACH_PX:
+            continue
+        lacuna_id = int(nearest_id[r, c])
+        if lacuna_id not in cell_ids:
+            continue
+        sr, sc = int(nearest_index[0, r, c]), int(nearest_index[1, r, c])
+        if path_min_signal(response, sr, sc, r, c) < min_signal:
+            continue
+        G.add_edge(("cell", lacuna_id), node, weight=gap)
     return G
 
 
@@ -682,6 +715,7 @@ def thread_end_mask(skeleton: np.ndarray) -> np.ndarray:
 
 def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_mask: np.ndarray,
                               dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                              nearest_index: np.ndarray, response: np.ndarray, min_signal: float,
                               limit_px: float) -> tuple:
     """(skeleton, ownership, how it went). Every skeleton pixel further than
     `limit_px` along the network from a lacuna surface is removed, and ownership
@@ -707,7 +741,8 @@ def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_ma
         rounds += 1
     else:
         raise AssertionError(f"the length prune did not settle in {PRUNE_LENGTH_MAX_ITER} rounds")
-    own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
+    own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id, nearest_index, response,
+                          min_signal)
     return skeleton, own, {"removed_px": removed_total, "rounds": rounds,
                            "limit_px": float(limit_px),
                            "limit_um": config.MAX_CANALICULUS_LENGTH_UM}
@@ -716,14 +751,15 @@ def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_ma
 # Measurements
 
 def build_ownership(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
-                    nearest_id: np.ndarray) -> dict:
+                    nearest_id: np.ndarray, nearest_index: np.ndarray, response: np.ndarray,
+                    min_signal: float) -> dict:
     """The graph, its cleanup, the lacuna attachment and the ownership, with the
     pixel map the verification picture draws. Detection: no measure is taken
     here. src/quantification.py measures from what this returns."""
     cell_ids = list(range(1, len(kept) + 1))
     G, skel_obj = build_network_graph(skeleton)
     clean_network_graph(G, dist_to_lacuna)
-    attach_lacunae(G, dist_to_lacuna, nearest_id, cell_ids)
+    attach_lacunae(G, dist_to_lacuna, nearest_id, nearest_index, cell_ids, response, min_signal)
     owner, node_dist = assign_by_connectivity(G, cell_ids)
     edge_owner = assign_edges(G, owner, node_dist)
     return {
@@ -756,13 +792,20 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     candidate, t_lo, response = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
     skeleton = morphology.skeletonize(candidate)
 
-    dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
+    dist_to_lacuna, nearest_id, nearest_index = nearest_lacuna_map(lacuna_id_map)
+    # Attachment is by signal: the dimmest point of the straight path from a
+    # lacuna surface to a skeleton node must reach this on the ridge response, or
+    # the node does not attach. The cut is the response's own, so it comes from
+    # this image and nothing else.
+    attach_min_signal = (t_lo * HYSTERESIS_LOW_FRACTION
+                         * config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION)
     # The biological length limit: no canaliculus runs further than
     # config.MAX_CANALICULUS_LENGTH_UM from the lacuna that owns it, measured
     # along the network. What lies beyond is pruned and ownership is rebuilt.
     skeleton_before = skeleton
     skeleton, own, prune = prune_beyond_length_limit(
-        kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, MAX_CANALICULUS_LENGTH_PX)
+        kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
+        attach_min_signal, MAX_CANALICULUS_LENGTH_PX)
     return {
         "image_path": image_path,
         "lacunae": lac,
@@ -836,10 +879,15 @@ def parameters(result: dict) -> dict:
         "flagged_dilation_px": FLAGGED_DILATION_PX,
         "flagged_area_px2": float(result["flagged"].sum()),
         "gap_bridging": False,
+        "lacuna_attach_reach_um": config.LACUNA_ATTACH_REACH_UM,
+        "lacuna_attach_reach_px": LACUNA_ATTACH_REACH_PX,
+        "lacuna_attach_min_signal_fraction": config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION,
+        "lacuna_attach_rule": ("a node attaches only if the dimmest ridge response on the straight "
+                               "path from the lacuna surface to it reaches that fraction of the "
+                               "response's own low cut"),
         "prune_spur_len_px": PRUNE_SPUR_LEN_PX,
         "min_internal_edge_len_px": MIN_INTERNAL_EDGE_LEN_PX,
         "graph_cleanup_max_iter": GRAPH_CLEANUP_MAX_ITER,
-        "lacuna_attach_gap_px": LACUNA_ATTACH_GAP_PX,
         "ownership": "graph connectivity, no distance cap",
         "root_merge_dist_px": ROOT_MERGE_DIST_PX,
         "ring_radii_px": list(RING_RADII_PX),

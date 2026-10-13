@@ -72,10 +72,11 @@ these are single 2D sections, which drives every departure.
 6. **Graph and cleanup** (OCY): spurs under 4 px are pruned, internal edges
    under 6 px (thread crossings) are collapsed, degree-2 chains merged, all
    repeated until nothing changes.
-7. **Ownership** (OCY): each lacuna is attached to skeleton nodes within
-   10 px of its body. One multi-source shortest-path run gives every
-   reachable node to the cell it connects to through the network, and each
-   edge to the owner of its nearer end.
+7. **Ownership** (OCY, with one departure): each lacuna is attached to skeleton
+   nodes within 20 px of its body **that have ridge signal all the way to it**
+   (section 8). One multi-source shortest-path run then gives every reachable
+   node to the cell it connects to through the network, and each edge to the
+   owner of its nearer end.
 8. **The 50 um length limit** (section 7): every skeleton pixel further than
    that from the surface of its owning lacuna, measured along the network, is
    pruned, and ownership is rebuilt on what is left.
@@ -128,6 +129,8 @@ held out and used to confirm.
 | rings | radii | 30 and 60 px | 30 px from the round 2 local-density work; 60 px is twice that, about two thirds of the median lacuna length (89 px) |
 | limits | maximum canalicular length | 50 um = 385 px | the outer end of the reported lacuna-to-lacuna spacing in mouse cortical bone, so a thread longer than this from one cell body is not one canaliculus. A plausibility bound from the literature, NOT validated on this data and never tuned to improve a result |
 | limits | reported length range | 25 to 50 um | report only, acted on by nothing; the range the literature reports for canalicular length |
+| ownership | attach reach | 2.6 um = 20 px | was 10 px while attachment went by distance alone. With the signal test deciding, a longer reach cannot cross empty space, and contact threads sat 10 to 20 px out. 25 px was tried and changed no guard number, so the shorter value stands |
+| ownership | attach minimum signal | 0.7 of the response's low cut | the fraction the old gap bridging required of a gap, measured the same way: the MINIMUM along the path, not the mean |
 
 Parameters live as documented constants at the top of `src/lacunae.py`
 and `src/canaliculi.py`, each with a longer provenance comment.
@@ -309,7 +312,50 @@ name in its xlsx.
   therefore an **upper bound on the diameter**, not the diameter, and the json
   says so in the block itself.
 
-## 8. Normalised per-cell measures
+## 8. Ownership by signal, not by distance
+
+A lacuna owns a thread only if there is a thread between them.
+
+The rule was distance alone: any skeleton graph node within 10 px of a lacuna
+body was linked to it, whatever lay in between, and the multi-source Dijkstra
+then handed that lacuna the whole connected component beyond the node. A survey
+of all 8 images (`python src/diagnostics.py survey`) found this is not rare:
+**about half of every image's attachments cross a gap with no signal in it**, 39
+to 120 per image. On 543_3 one such attachment handed lacuna 7 a 1214 px network
+across 8.5 px of empty space.
+
+So an attachment must now show evidence. The straight path from the nearest point
+of the lacuna surface to the node is sampled about once per pixel, and its
+**dimmest** point must reach `config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION` of the
+ridge response's own low cut. The minimum, not the mean, because one
+background-level pixel breaks a thread however bright its two ends are. Because
+the test asks for evidence instead of trusting proximity, the reach is longer,
+`config.LACUNA_ATTACH_REACH_UM` = 2.6 um = 20 px, which recovers contact threads
+that were just out of the old range.
+
+**Why the ridge response and not the flattened intensity.** Both were measured
+before choosing. The top-hat flattening removes the lacuna body, so it digs a
+trough around every lacuna, and a path leaving a surface crosses that trough: on
+the flattened intensity the median path minimum sits *on* the 0.7 threshold in
+seven of eight images, so the test cuts through the middle of the population and
+refuses real contacts along with empty space. Implemented that way it cost 10 to
+16% of the owned length on four images and left lacuna 7 owning 9 px. On the
+response, which is what the method actually thresholds, the same fraction selects
+a much smaller and more specific set.
+
+**What it cost, and what it did not.** The skeleton is untouched: this step moves
+pixels between owned and unowned and changes no detection. Owned length per cell
+falls 0.1 to 5.5% on seven images, and 11.9% on 543_3, which is over the 10%
+guard. That image is where the rule bites hardest and the loss is the rule
+working: lacuna 7's 1214 px network really does sit across empty space, so no
+constant that still demands signal can give it back. A longer reach was tried
+(25 px) and changed the figure not at all. The loss is carried into section 9,
+which exists to recover real dim threads, and the guard is judged on the result
+of both.
+
+**Not validated.** No hand count chose the reach or the fraction.
+
+## 9. Normalised per-cell measures
 
 Appended after all existing columns of the per-lacuna rows and of the
 cross-image table, as interior means. No existing column changes name, order or
@@ -330,7 +376,7 @@ field length density weighted with chain code lengths ($\sqrt{2}$ per diagonal
 step); Sholl crossings at 10 / 20 / 30 px, the skeleton components crossing a
 1.5 px band at that distance, computed without the graph.
 
-## 9. Switches (all off by default)
+## 10. Switches (all off by default)
 
 In `config.py`; each comment names its evidence. They all act on the **lacuna**
 stage: the canalicular method has no switch, because there is only one method.
@@ -347,7 +393,7 @@ With all off, `results/` is reproduced exactly
   labels, 15 to 25 times faster. It changes speed, not output.
 `python src/diagnostics.py switch-check` shows what each one changes on a folder.
 
-## 10. Checks (`src/diagnostics.py`)
+## 11. Checks (`src/diagnostics.py`)
 
 - `reference-check`: 109.25 edges per cell, 24.11 px mean edge length and 6.00 roots per cell on
   543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
@@ -369,7 +415,7 @@ With all off, `results/` is reproduced exactly
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
 
-## 11. Figures
+## 12. Figures
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
 into `results/` (map: `results/README.md`). One display window for the whole
@@ -401,7 +447,7 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
   `2_canaliculi/` are tracked: the skeleton png is an input to
   `validate-network`.
 
-## 12. History
+## 13. History
 
 Earlier experiments, reports and analyses are preserved at the git tag
 `archive-2026-10-13`, which is the repository as it was before the 2026-10-13

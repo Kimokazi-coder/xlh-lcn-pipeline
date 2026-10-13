@@ -235,7 +235,7 @@ NORMALISED_METRICS = [
 #   ring_attached_length_rR_px  skeleton px of the R px ring (the same pixels as
 #                               ring_length_rR_px) that lie in an 8-connected
 #                               component of that ring which reaches within
-#                               canaliculi.LACUNA_ATTACH_GAP_PX of the lacuna: threads that
+#                               canaliculi.RING_ATTACHED_GAP_PX of the lacuna: threads that
 #                               touch the cell, not threads that only pass by
 #   ring_length_w_rR_px         chain code length of the ring: the skeleton as a
 #                               pixel graph, 1 per orthogonal link and sqrt(2)
@@ -395,7 +395,7 @@ def ring_attached_lengths(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, near
     of lacuna i is exactly the pixel set of ring_lengths (skeleton px within
     the radius whose nearest lacuna is i). Its 8-connected components are
     taken within that ring only; a component is attached if one of its pixels
-    lies within canaliculi.LACUNA_ATTACH_GAP_PX of the lacuna masks (the constant the
+    lies within canaliculi.RING_ATTACHED_GAP_PX of the lacuna masks (the constant the
     roots use). The attached length is the pixel count of attached
     components."""
     out = {}
@@ -411,7 +411,7 @@ def ring_attached_lengths(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, near
             labels = measure.label(own, connectivity=2)
             if labels.max() == 0:
                 continue
-            near = own & (dist_to_lacuna[box] <= canaliculi.LACUNA_ATTACH_GAP_PX)
+            near = own & (dist_to_lacuna[box] <= canaliculi.RING_ATTACHED_GAP_PX)
             attached = np.unique(labels[near])
             attached = attached[attached > 0]
             lengths[lacuna_id] = int(np.isin(labels, attached).sum())
@@ -920,7 +920,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
     lacuna_id_map = detection["lacuna_id_map"]
     skeleton = detection["skeleton"]
     kept = kept_from_labels(lacuna_id_map)
-    dist_to_lacuna, nearest_id = canaliculi.nearest_lacuna_map(lacuna_id_map)
+    dist_to_lacuna, nearest_id, _nearest_index = canaliculi.nearest_lacuna_map(lacuna_id_map)
 
     # Lacuna shape, the former measurements_for.
     shape_rows = [
