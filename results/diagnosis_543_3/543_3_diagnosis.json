@@ -1,0 +1,397 @@
+{
+  "status": "diagnosis only: no parameter, threshold or rule was changed",
+  "image": "543_3.tif",
+  "image_label": "543_3",
+  "lacunae_detected_now": 10,
+  "lacuna_cut_t_hi": 0.579848,
+  "ridge_high_cut": 0.02902958,
+  "ridge_low_cut": 0.02177218,
+  "length_prune": {
+    "removed_px": 10604,
+    "rounds": 1,
+    "limit_px": 385.0,
+    "limit_um": 50.0
+  },
+  "part1_canaliculi": [
+    {
+      "lacuna_id": 1,
+      "centroid_xy": [
+        270.9,
+        79.4
+      ],
+      "body_px": 2174,
+      "radius_px": 150,
+      "cuts": {
+        "high_cut": 0.02902958,
+        "low_cut": 0.02177218,
+        "half_of_low_cut": 0.01088609,
+        "rule": "hysteresis on the ridge response: keep above the high cut, and above the low cut where connected to it"
+      },
+      "ridge_response_near": {
+        "pixels_in_region": 77861,
+        "between_half_and_one_low_cut": 9721,
+        "at_or_above_low_cut": 24722,
+        "at_or_above_high_cut": 20722,
+        "what_it_means": "a pixel between 0.5 and 1.0 of the low cut carries ridge signal that no threshold could reach, so it cannot be traced"
+      },
+      "skeleton_near": {
+        "total_px": 2911,
+        "owned_by_this_lacuna_px": 870,
+        "owned_by_any_lacuna_px": 2113,
+        "unowned_px": 798,
+        "removed_by_the_50um_prune_px": 436
+      },
+      "nearest_pixel_owned_by_this_lacuna_px": 2.8284,
+      "nearest_pixel_owned_by_any_lacuna_px": 2.8284,
+      "nearest_skeleton_pixel_px": 2.8284,
+      "owned_pieces": {
+        "measured_on": "the whole frame, so a piece is a true connected component",
+        "count": 4,
+        "pieces": [
+          {
+            "piece": 1,
+            "px": 612,
+            "nearest_px_to_body": 3.1623
+          },
+          {
+            "piece": 2,
+            "px": 164,
+            "nearest_px_to_body": 2.8284
+          },
+          {
+            "piece": 4,
+            "px": 79,
+            "nearest_px_to_body": 9.8489
+          },
+          {
+            "piece": 3,
+            "px": 23,
+            "nearest_px_to_body": 6.4031
+          }
+        ],
+        "largest_piece_px": 612,
+        "largest_piece_nearest_px_to_body": 3.1623,
+        "what_it_means": "if the largest piece does not reach the lacuna buffer, the lacuna was handed that network by the attachment reach and not by a traced thread"
+      },
+      "ownership_rule": {
+        "rule": "canaliculi.attach_lacunae links the lacuna to every skeleton graph node within LACUNA_ATTACH_GAP_PX = 10 px of its body whose nearest lacuna is this one, with the gap as the edge weight. canaliculi.assign_by_connectivity then runs one multi-source Dijkstra, so every node reachable through the skeleton goes to the lacuna whose path is shortest. Reachability is through the SKELETON, so once one node is attached the whole connected component beyond it is owned, however far it runs, until the config.MAX_CANALICULUS_LENGTH_UM prune cuts it back.",
+        "attach_gap_px": 10,
+        "attached_nodes": 4,
+        "attached_nodes_detail": [
+          {
+            "node_xy": [
+              292,
+              71
+            ],
+            "gap_to_body_px": 2.8284,
+            "piece": 2,
+            "piece_px": 164,
+            "gap_is_empty_space": true
+          },
+          {
+            "node_xy": [
+              243,
+              61
+            ],
+            "gap_to_body_px": 3.1623,
+            "piece": 1,
+            "piece_px": 612,
+            "gap_is_empty_space": true
+          },
+          {
+            "node_xy": [
+              284,
+              51
+            ],
+            "gap_to_body_px": 6.4031,
+            "piece": 3,
+            "piece_px": 23,
+            "gap_is_empty_space": true
+          },
+          {
+            "node_xy": [
+              245,
+              85
+            ],
+            "gap_to_body_px": 9.8489,
+            "piece": 4,
+            "piece_px": 79,
+            "gap_is_empty_space": true
+          }
+        ],
+        "node_that_brought_the_largest_piece": {
+          "node_xy": [
+            243,
+            61
+          ],
+          "gap_to_body_px": 3.1623,
+          "piece": 1,
+          "piece_px": 612,
+          "gap_is_empty_space": true
+        }
+      }
+    },
+    {
+      "lacuna_id": 7,
+      "centroid_xy": [
+        198.3,
+        634.7
+      ],
+      "body_px": 1683,
+      "radius_px": 150,
+      "cuts": {
+        "high_cut": 0.02902958,
+        "low_cut": 0.02177218,
+        "half_of_low_cut": 0.01088609,
+        "rule": "hysteresis on the ridge response: keep above the high cut, and above the low cut where connected to it"
+      },
+      "ridge_response_near": {
+        "pixels_in_region": 97940,
+        "between_half_and_one_low_cut": 11093,
+        "at_or_above_low_cut": 30682,
+        "at_or_above_high_cut": 26026,
+        "what_it_means": "a pixel between 0.5 and 1.0 of the low cut carries ridge signal that no threshold could reach, so it cannot be traced"
+      },
+      "skeleton_near": {
+        "total_px": 2736,
+        "owned_by_this_lacuna_px": 749,
+        "owned_by_any_lacuna_px": 1248,
+        "unowned_px": 1488,
+        "removed_by_the_50um_prune_px": 1085
+      },
+      "nearest_pixel_owned_by_this_lacuna_px": 2.2361,
+      "nearest_pixel_owned_by_any_lacuna_px": 2.2361,
+      "nearest_skeleton_pixel_px": 2.2361,
+      "owned_pieces": {
+        "measured_on": "the whole frame, so a piece is a true connected component",
+        "count": 3,
+        "pieces": [
+          {
+            "piece": 2,
+            "px": 1214,
+            "nearest_px_to_body": 8.544
+          },
+          {
+            "piece": 1,
+            "px": 28,
+            "nearest_px_to_body": 6.0
+          },
+          {
+            "piece": 3,
+            "px": 9,
+            "nearest_px_to_body": 2.2361
+          }
+        ],
+        "largest_piece_px": 1214,
+        "largest_piece_nearest_px_to_body": 8.544,
+        "what_it_means": "if the largest piece does not reach the lacuna buffer, the lacuna was handed that network by the attachment reach and not by a traced thread"
+      },
+      "ownership_rule": {
+        "rule": "canaliculi.attach_lacunae links the lacuna to every skeleton graph node within LACUNA_ATTACH_GAP_PX = 10 px of its body whose nearest lacuna is this one, with the gap as the edge weight. canaliculi.assign_by_connectivity then runs one multi-source Dijkstra, so every node reachable through the skeleton goes to the lacuna whose path is shortest. Reachability is through the SKELETON, so once one node is attached the whole connected component beyond it is owned, however far it runs, until the config.MAX_CANALICULUS_LENGTH_UM prune cuts it back.",
+        "attach_gap_px": 10,
+        "attached_nodes": 4,
+        "attached_nodes_detail": [
+          {
+            "node_xy": [
+              191,
+              675
+            ],
+            "gap_to_body_px": 2.2361,
+            "piece": 3,
+            "piece_px": 9,
+            "gap_is_empty_space": true
+          },
+          {
+            "node_xy": [
+              177,
+              619
+            ],
+            "gap_to_body_px": 6.0,
+            "piece": 1,
+            "piece_px": 28,
+            "gap_is_empty_space": true
+          },
+          {
+            "node_xy": [
+              192,
+              683
+            ],
+            "gap_to_body_px": 8.2462,
+            "piece": 3,
+            "piece_px": 9,
+            "gap_is_empty_space": true
+          },
+          {
+            "node_xy": [
+              214,
+              665
+            ],
+            "gap_to_body_px": 8.544,
+            "piece": 2,
+            "piece_px": 1214,
+            "gap_is_empty_space": true
+          }
+        ],
+        "node_that_brought_the_largest_piece": {
+          "node_xy": [
+            214,
+            665
+          ],
+          "gap_to_body_px": 8.544,
+          "piece": 2,
+          "piece_px": 1214,
+          "gap_is_empty_space": true
+        }
+      }
+    }
+  ],
+  "part2_lacuna_detection": [
+    {
+      "point_xy": [
+        40,
+        290
+      ],
+      "intensity": {
+        "at_the_point": 0.992157,
+        "peak_within_30px": 1.0,
+        "mean_over_footprint": 0.765551,
+        "lacuna_cut_t_hi": 0.579848,
+        "peak_over_cut": 1.7246,
+        "footprint": "the candidate region the lacuna stage built"
+      },
+      "size": {
+        "area_px2": 3536,
+        "area_um2": 59.7584,
+        "min_area_px2": 400,
+        "min_area_um2": 6.76
+      },
+      "became_a_candidate_region": true,
+      "rejected_by": "aspect ratio",
+      "rule": "lacunae.filter_regions: aspect 6.0338 > MAX_ASPECT_RATIO 6.0",
+      "nearest_owned_thread": {
+        "lacuna_id": 4,
+        "distance_to_that_thread_px": 75.43,
+        "thread_pixel_xy": [
+          87,
+          349
+        ],
+        "that_lacuna_centroid_xy": [
+          369.9,
+          388.7
+        ]
+      }
+    },
+    {
+      "point_xy": [
+        480,
+        460
+      ],
+      "intensity": {
+        "at_the_point": 0.686275,
+        "peak_within_30px": 0.713725,
+        "mean_over_footprint": 0.635318,
+        "lacuna_cut_t_hi": 0.579848,
+        "peak_over_cut": 1.2309,
+        "footprint": "the candidate region the lacuna stage built"
+      },
+      "size": {
+        "area_px2": 166,
+        "area_um2": 2.8054,
+        "min_area_px2": 400,
+        "min_area_um2": 6.76
+      },
+      "became_a_candidate_region": true,
+      "rejected_by": "minimum area",
+      "rule": "lacunae.filter_regions: area 166.0 px2 < MIN_AREA_PX2 400",
+      "nearest_owned_thread": {
+        "lacuna_id": 4,
+        "distance_to_that_thread_px": 33.24,
+        "thread_pixel_xy": [
+          512,
+          469
+        ],
+        "that_lacuna_centroid_xy": [
+          369.9,
+          388.7
+        ]
+      }
+    },
+    {
+      "point_xy": [
+        285,
+        855
+      ],
+      "intensity": {
+        "at_the_point": 0.643137,
+        "peak_within_30px": 0.678431,
+        "mean_over_footprint": 0.616981,
+        "lacuna_cut_t_hi": 0.579848,
+        "peak_over_cut": 1.17,
+        "footprint": "the candidate region the lacuna stage built"
+      },
+      "size": {
+        "area_px2": 315,
+        "area_um2": 5.3235,
+        "min_area_px2": 400,
+        "min_area_um2": 6.76
+      },
+      "became_a_candidate_region": true,
+      "rejected_by": "minimum area",
+      "rule": "lacunae.filter_regions: area 315.0 px2 < MIN_AREA_PX2 400",
+      "nearest_owned_thread": {
+        "lacuna_id": 9,
+        "distance_to_that_thread_px": 28.6,
+        "thread_pixel_xy": [
+          308,
+          838
+        ],
+        "that_lacuna_centroid_xy": [
+          481.5,
+          780.6
+        ]
+      }
+    },
+    {
+      "point_xy": [
+        820,
+        155
+      ],
+      "intensity": {
+        "at_the_point": 0.529412,
+        "peak_within_30px": 0.701961,
+        "mean_over_footprint": 0.626377,
+        "lacuna_cut_t_hi": 0.579848,
+        "peak_over_cut": 1.2106,
+        "footprint": "the candidate region the lacuna stage built"
+      },
+      "size": {
+        "area_px2": 73,
+        "area_um2": 1.2337,
+        "min_area_px2": 400,
+        "min_area_um2": 6.76
+      },
+      "became_a_candidate_region": true,
+      "rejected_by": "minimum area",
+      "rule": "lacunae.filter_regions: area 73.0 px2 < MIN_AREA_PX2 400",
+      "nearest_owned_thread": {
+        "lacuna_id": 2,
+        "distance_to_that_thread_px": 36.88,
+        "thread_pixel_xy": [
+          856,
+          147
+        ],
+        "that_lacuna_centroid_xy": [
+          916.9,
+          197.1
+        ]
+      }
+    }
+  ],
+  "pictures": [
+    "results/diagnosis_543_3/543_3_lacuna1_region.png",
+    "results/diagnosis_543_3/543_3_lacuna1_region_x4.png",
+    "results/diagnosis_543_3/543_3_lacuna7_region.png",
+    "results/diagnosis_543_3/543_3_lacuna7_region_x4.png",
+    "results/diagnosis_543_3/543_3_blobs_no_outline.png"
+  ]
+}

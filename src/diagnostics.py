@@ -29,6 +29,9 @@ Subcommands:
                       value: percent changes of the network measures
     validate-network  roots and Sholl crossings against blind hand counts
                       (and the skeleton against traced threads); -s self-test
+    diagnose-untraced why a thread or a blob is missing from the result: the
+                      faint ridge signal and unowned skeleton near a lacuna,
+                      and the rule that rejected a blob with no outline
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -46,6 +49,8 @@ Usage (from the repo root):
     python src/diagnostics.py network-sweep -d data/WT -o OUT_FOLDER
     python src/diagnostics.py validate-network -a ANNOTATION.csv -k KEY_OUTSIDE_REPO.csv -r RESULTS -o OUT
     python src/diagnostics.py validate-network -s
+    python src/diagnostics.py diagnose-untraced -i "data/WT/543_3.tif" -o results/diagnosis \
+        --lacunae 1,7 --blobs "40,290;480,460;285,855;820,155"
 """
 
 from __future__ import annotations
@@ -57,6 +62,8 @@ from pathlib import Path
 
 import networkx as nx
 import numpy as np
+from scipy import ndimage as ndi
+from skimage import measure, morphology, segmentation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
@@ -1651,6 +1658,456 @@ def cmd_validate_network(args) -> int:
     return 0 if res["joined"] else 1
 
 
+# diagnose-untraced ---------------------------------------------------------------
+# Why a thread or a blob is not in the result. DIAGNOSIS ONLY: it reads the
+# pipeline's own functions, changes no parameter and writes nothing into the
+# pipeline's own folders. Two parts, matching the two ways something goes
+# missing: the canalicular stage did not trace it, or the lacuna stage did not
+# keep it.
+
+# Pixels this far from a lacuna body count as "near" it.
+UNTRACED_RADIUS_PX = 150
+# The region picture is drawn at 1:1 and again at this upscale, nearest
+# neighbour, so a one-pixel skeleton is visible without inventing a pixel.
+UNTRACED_ZOOM = 4
+# Colours of the two skeleton classes in the region pictures.
+OWNED_COLOUR = (0, 255, 0)
+UNOWNED_COLOUR = (255, 0, 255)
+PRUNED_COLOUR = (255, 215, 0)
+
+
+def _upscale(image, factor: int):
+    return image.repeat(factor, axis=0).repeat(factor, axis=1)
+
+
+def untraced_detection(image_path: Path) -> dict:
+    """Everything both parts need, from the pipeline's own functions, in one
+    pass: the lacuna stage, the ridge response with its two cuts, and the
+    network before and after the length prune."""
+    lac = lacunae.analyse_image(image_path)
+    display, channel = lacunae.load_channel(image_path)
+    lacuna_mask, lacuna_id_map = canaliculi.build_lacuna_maps(lac["labels"], lac["kept"])
+    flagged = canaliculi.flagged_structures(channel)
+    preprocessed = canaliculi.preprocess_channel(channel)
+    # network_candidate_mask returns the ridge response it thresholded, so the
+    # response here is the one the pipeline actually used.
+    _candidate, high_cut, response = canaliculi.network_candidate_mask(
+        preprocessed, lacuna_mask, flagged)
+    net = canaliculi.analyse_network(image_path, lac, channel)
+    return {
+        "label": lacunae.image_label(image_path),
+        "lac": lac, "display": display, "channel": channel,
+        "lacuna_id_map": lacuna_id_map, "lacuna_mask": lacuna_mask,
+        "flagged": flagged, "preprocessed": preprocessed,
+        "response": response,
+        "high_cut": float(high_cut),
+        "low_cut": float(high_cut) * canaliculi.HYSTERESIS_LOW_FRACTION,
+        "skeleton": net["skeleton"],
+        "skeleton_before_prune": net["skeleton_before_length_prune"],
+        "owner_map": net["owner_map"],
+        "graph": net["graph"], "owner": net["owner"], "node_dist": net["node_dist"],
+        "length_prune": net["length_prune"],
+        "t_hi": float(lac["t_hi"]),
+    }
+
+
+def untraced_lacuna_report(d: dict, lacuna_id: int, radius_px: int) -> dict:
+    """One lacuna: the faint ridge signal near it, the skeleton it did not get,
+    and (when it owns a detached network) the rule that gave it that network."""
+    body = d["lacuna_id_map"] == lacuna_id
+    assert body.any(), f"no lacuna with id {lacuna_id}"
+    gap = ndi.distance_transform_edt(~body)
+    near = gap <= radius_px
+
+    response, low, high = d["response"], d["low_cut"], d["high_cut"]
+    skel, before, owner_map = d["skeleton"], d["skeleton_before_prune"], d["owner_map"]
+    # Faint ridge signal: a real response that never reached the low cut, so
+    # hysteresis could not grow into it from anywhere.
+    faint = near & (response >= 0.5 * low) & (response < low)
+    rows, cols = np.nonzero(body)
+    centroid = (float(cols.mean()), float(rows.mean()))
+
+    owned_here = near & skel & (owner_map > 0)
+    mine = near & skel & (owner_map == lacuna_id)
+    unowned = near & skel & (owner_map == 0)
+    pruned = near & before & ~skel
+
+    out = {
+        "lacuna_id": lacuna_id,
+        "centroid_xy": [round(centroid[0], 1), round(centroid[1], 1)],
+        "body_px": int(body.sum()),
+        "radius_px": radius_px,
+        "cuts": {
+            "high_cut": round(high, 8), "low_cut": round(low, 8),
+            "half_of_low_cut": round(0.5 * low, 8),
+            "rule": "hysteresis on the ridge response: keep above the high cut, "
+                    "and above the low cut where connected to it",
+        },
+        "ridge_response_near": {
+            "pixels_in_region": int(near.sum()),
+            "between_half_and_one_low_cut": int(faint.sum()),
+            "at_or_above_low_cut": int((near & (response >= low)).sum()),
+            "at_or_above_high_cut": int((near & (response >= high)).sum()),
+            "what_it_means": "a pixel between 0.5 and 1.0 of the low cut carries ridge "
+                             "signal that no threshold could reach, so it cannot be traced",
+        },
+        "skeleton_near": {
+            "total_px": int((near & skel).sum()),
+            "owned_by_this_lacuna_px": int(mine.sum()),
+            "owned_by_any_lacuna_px": int(owned_here.sum()),
+            "unowned_px": int(unowned.sum()),
+            "removed_by_the_50um_prune_px": int(pruned.sum()),
+        },
+    }
+
+    # Distance from the body to the nearest owned pixel, and to its own.
+    for name, mask in (("nearest_pixel_owned_by_this_lacuna_px", skel & (owner_map == lacuna_id)),
+                       ("nearest_pixel_owned_by_any_lacuna_px", skel & (owner_map > 0)),
+                       ("nearest_skeleton_pixel_px", skel)):
+        out[name] = round(float(gap[mask].min()), 4) if mask.any() else None
+
+    # The owned skeleton as connected pieces. A lacuna whose network really
+    # touches it owns one piece reaching its buffer; a lacuna handed a network
+    # across empty space owns a large piece several px clear of the body.
+    # On the WHOLE frame, not the region: clipping at the region edge would cut a
+    # component into fragments and misstate its size.
+    pieces_label = morphology.label(skel & (owner_map == lacuna_id), connectivity=2)
+    pieces = []
+    for i in range(1, int(pieces_label.max()) + 1):
+        m = pieces_label == i
+        pieces.append({"piece": i, "px": int(m.sum()),
+                       "nearest_px_to_body": round(float(gap[m].min()), 4)})
+    pieces.sort(key=lambda q: -q["px"])
+    out["owned_pieces"] = {
+        "measured_on": "the whole frame, so a piece is a true connected component",
+        "count": len(pieces),
+        "pieces": pieces,
+        "largest_piece_px": pieces[0]["px"] if pieces else 0,
+        "largest_piece_nearest_px_to_body": pieces[0]["nearest_px_to_body"] if pieces else None,
+        "what_it_means": ("if the largest piece does not reach the lacuna buffer, the lacuna was "
+                          "handed that network by the attachment reach and not by a traced thread"),
+    }
+
+    # The attachment rule, which is what hands a lacuna a network across a gap.
+    attach = []
+    for node, cell in d["owner"].items():
+        if cell != lacuna_id or not d["graph"].has_node(node):
+            continue
+        r, c = node
+        g = float(gap[r, c])
+        if g <= canaliculi.LACUNA_ATTACH_GAP_PX:
+            piece = int(pieces_label[r, c])
+            attach.append({"node_xy": [int(c), int(r)],
+                           "gap_to_body_px": round(g, 4),
+                           "piece": piece,
+                           "piece_px": int((pieces_label == piece).sum()) if piece else 0,
+                           "gap_is_empty_space": bool(g > 1.5)})
+    attach.sort(key=lambda a: a["gap_to_body_px"])
+    out["ownership_rule"] = {
+        "rule": ("canaliculi.attach_lacunae links the lacuna to every skeleton graph node "
+                 f"within LACUNA_ATTACH_GAP_PX = {canaliculi.LACUNA_ATTACH_GAP_PX} px of its body "
+                 "whose nearest lacuna is this one, with the gap as the edge weight. "
+                 "canaliculi.assign_by_connectivity then runs one multi-source Dijkstra, so every "
+                 "node reachable through the skeleton goes to the lacuna whose path is shortest. "
+                 "Reachability is through the SKELETON, so once one node is attached the whole "
+                 "connected component beyond it is owned, however far it runs, until the "
+                 "config.MAX_CANALICULUS_LENGTH_UM prune cuts it back."),
+        "attach_gap_px": canaliculi.LACUNA_ATTACH_GAP_PX,
+        "attached_nodes": len(attach),
+        "attached_nodes_detail": attach,
+        "node_that_brought_the_largest_piece": max(
+            (a for a in attach if a["piece_px"]), key=lambda a: a["piece_px"], default=None),
+    }
+    return out
+
+
+def untraced_blob_report(d: dict, x: int, y: int) -> dict:
+    """One blob with no outline: its intensity against the lacuna cut, its size,
+    and the exact rule in src/lacunae.py that rejected it.
+
+    The rules are replayed in the order src/lacunae.py applies them, so the rule
+    named is the first one the object fails, which is the one that rejected it."""
+    channel, t_hi = d["channel"], d["t_hi"]
+    labels = d["lac"]["labels"]
+    kept_labels = {region.label for region, _b in d["lac"]["kept"]}
+    rows, cols = channel.shape
+
+    # The mask the lacuna stage builds, replayed with the pipeline's function.
+    mask, _t = lacunae.multiotsu_lacuna_mask(channel, t_hi)
+    above = channel >= t_hi
+
+    # Which object is here. The label image is the one the pipeline kept, so a
+    # label at this point means the blob did become a candidate region.
+    label_here = int(labels[y, x])
+    if label_here == 0:
+        # Nearest labelled object within a short reach, in case the point is a
+        # few pixels off the blob's centre.
+        near = labels[max(0, y - 15):y + 16, max(0, x - 15):x + 16]
+        vals = [v for v in np.unique(near) if v]
+        label_here = int(vals[0]) if len(vals) == 1 else 0
+
+    region = None
+    if label_here:
+        for r in measure.regionprops(labels):
+            if r.label == label_here:
+                region = r
+                break
+
+    # The blob's footprint, for intensity and area. Above the cut where it
+    # reaches it; otherwise the connected component of the point at the cut the
+    # blob's own peak would need, which is a DIAGNOSTIC probe and no part of the
+    # method: it only describes how far below the cut the blob sits.
+    disc = np.zeros_like(above)
+    yy, xx = np.ogrid[:rows, :cols]
+    disc[(yy - y) ** 2 + (xx - x) ** 2 <= 30 ** 2] = True
+    peak = float(channel[disc].max())
+
+    if region is not None:
+        foot = labels == region.label
+        footprint = "the candidate region the lacuna stage built"
+    elif above[y, x]:
+        foot = morphology.label(above)
+        foot = foot == foot[y, x]
+        footprint = "the connected component of this point above the lacuna cut"
+    else:
+        probe = morphology.label(channel >= 0.5 * t_hi)
+        lab = probe[y, x]
+        foot = (probe == lab) if lab else disc
+        footprint = ("the connected component of this point at HALF the lacuna cut, a "
+                     "diagnostic probe only, because the blob never reaches the cut")
+
+    area_px = int(foot.sum())
+    verdict, detail = None, None
+    if region is not None and region.label in kept_labels:
+        verdict, detail = "kept", "this blob IS a detected lacuna"
+    elif region is not None:
+        # filter_regions, in its own order.
+        max_area = lacunae.MAX_AREA_FRACTION_OF_IMAGE * rows * cols
+        minor, major = region.axis_minor_length, region.axis_major_length
+        aspect = (major / minor) if minor > 0 else float("inf")
+        if region.area < lacunae.MIN_AREA_PX2:
+            verdict = "minimum area"
+            detail = (f"lacunae.filter_regions: area {region.area} px2 < MIN_AREA_PX2 "
+                      f"{lacunae.MIN_AREA_PX2}")
+        elif region.area > max_area:
+            verdict = "maximum area"
+            detail = (f"lacunae.filter_regions: area {region.area} px2 > "
+                      f"MAX_AREA_FRACTION_OF_IMAGE {lacunae.MAX_AREA_FRACTION_OF_IMAGE} "
+                      f"of the frame ({max_area:.0f} px2)")
+        elif region.solidity < lacunae.MIN_SOLIDITY:
+            verdict = "solidity"
+            detail = (f"lacunae.filter_regions: solidity {region.solidity:.4f} < MIN_SOLIDITY "
+                      f"{lacunae.MIN_SOLIDITY}")
+        elif aspect > lacunae.MAX_ASPECT_RATIO:
+            verdict = "aspect ratio"
+            detail = (f"lacunae.filter_regions: aspect {aspect:.4f} > MAX_ASPECT_RATIO "
+                      f"{lacunae.MAX_ASPECT_RATIO}")
+        else:
+            verdict, detail = "unclear", "it passes every filter but is not in kept"
+    elif not above[y, x]:
+        verdict = "threshold"
+        detail = (f"lacunae.multiotsu_lacuna_mask: intensity {float(channel[y, x]):.6f} at this "
+                  f"point and peak {peak:.6f} within 30 px are below the lacuna cut t_hi "
+                  f"{t_hi:.6f}, so the blob never enters the mask and no later rule sees it")
+    elif not mask[y, x]:
+        verdict = "despeckle opening"
+        detail = (f"lacunae.multiotsu_lacuna_mask: above t_hi but removed by the opening with "
+                  f"radius DESPECKLE_OPENING_RADIUS_PX = {lacunae.DESPECKLE_OPENING_RADIUS_PX} px")
+    else:
+        verdict = "threshold"
+        detail = "in the mask but no labelled object survived here"
+
+    # Which detected lacuna owns the nearest owned thread to this blob.
+    owner_map, skel = d["owner_map"], d["skeleton"]
+    owned = skel & (owner_map > 0)
+    nearest_owner = None
+    if owned.any():
+        oy, ox = np.nonzero(owned)
+        dd = np.hypot(oy - y, ox - x)
+        i = int(dd.argmin())
+        cell = int(owner_map[oy[i], ox[i]])
+        body = d["lacuna_id_map"] == cell
+        br, bc = np.nonzero(body)
+        nearest_owner = {
+            "lacuna_id": cell,
+            "distance_to_that_thread_px": round(float(dd[i]), 2),
+            "thread_pixel_xy": [int(ox[i]), int(oy[i])],
+            "that_lacuna_centroid_xy": [round(float(bc.mean()), 1), round(float(br.mean()), 1)],
+        }
+
+    return {
+        "point_xy": [x, y],
+        "intensity": {
+            "at_the_point": round(float(channel[y, x]), 6),
+            "peak_within_30px": round(peak, 6),
+            "mean_over_footprint": round(float(channel[foot].mean()), 6),
+            "lacuna_cut_t_hi": round(t_hi, 6),
+            "peak_over_cut": round(peak / t_hi, 4),
+            "footprint": footprint,
+        },
+        "size": {
+            "area_px2": area_px,
+            "area_um2": round(area_px * config.PIXEL_SIZE_UM_ACQUIRED ** 2, 4),
+            "min_area_px2": lacunae.MIN_AREA_PX2,
+            "min_area_um2": round(lacunae.MIN_AREA_PX2 * config.PIXEL_SIZE_UM_ACQUIRED ** 2, 4),
+        },
+        "became_a_candidate_region": region is not None,
+        "rejected_by": verdict,
+        "rule": detail,
+        "nearest_owned_thread": nearest_owner,
+    }
+
+
+def untraced_region_picture(d: dict, lacuna_id: int, radius_px: int, out_dir: Path) -> list:
+    """The raw channel of the region with EVERY skeleton pixel drawn on it:
+    owned green, unowned magenta, and what the length prune removed gold. Saved
+    at 1:1 and at UNTRACED_ZOOM times nearest neighbour."""
+    from skimage.io import imsave
+
+    body = d["lacuna_id_map"] == lacuna_id
+    gap = ndi.distance_transform_edt(~body)
+    near = gap <= radius_px
+    rows, cols = np.nonzero(near)
+    r0, r1 = int(rows.min()), int(rows.max()) + 1
+    c0, c1 = int(cols.min()), int(cols.max()) + 1
+
+    canvas = d["display"][r0:r1, c0:c1].copy()
+    if canvas.ndim == 2:
+        canvas = np.stack([canvas] * 3, axis=-1)
+    canvas = canvas.astype(np.uint8)
+    sub = lambda m: m[r0:r1, c0:c1]
+    skel, owner_map = d["skeleton"], d["owner_map"]
+    canvas[sub(d["skeleton_before_prune"] & ~skel)] = PRUNED_COLOUR
+    canvas[sub(skel & (owner_map == 0))] = UNOWNED_COLOUR
+    canvas[sub(skel & (owner_map > 0))] = OWNED_COLOUR
+    # The lacuna outline, so the body is unmistakable.
+    canvas[sub(segmentation.find_boundaries(body, mode="outer"))] = (0, 255, 255)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    stem = f"{d['label']}_lacuna{lacuna_id}_region"
+    for name, image in ((f"{stem}.png", canvas),
+                        (f"{stem}_x{UNTRACED_ZOOM}.png", _upscale(canvas, UNTRACED_ZOOM))):
+        path = out_dir / name
+        imsave(path, image, check_contrast=False)
+        written.append(path)
+    return written
+
+
+def untraced_blob_picture(d: dict, blobs: list, out_dir: Path) -> Path:
+    """The whole frame with every blob circled and labelled with what was
+    measured there."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(12, 12), dpi=120)
+    ax.imshow(d["display"])
+    for region, _b in d["lac"]["kept"]:
+        ax.contour(d["lacuna_id_map"] == 0, levels=[0.5], colors="none")
+    ax.contour(d["lacuna_id_map"] > 0, levels=[0.5], colors="#00ffff", linewidths=0.8)
+    for i, b in enumerate(blobs, start=1):
+        x, y = b["point_xy"]
+        ax.add_patch(plt.Circle((x, y), 45, fill=False, color="#ffd700", lw=1.6))
+        text = (f"{i}  ({x},{y})\n"
+                f"peak {b['intensity']['peak_within_30px']:.3f} / cut "
+                f"{b['intensity']['lacuna_cut_t_hi']:.3f} = "
+                f"{b['intensity']['peak_over_cut']:.2f}\n"
+                f"area {b['size']['area_px2']} px2 = {b['size']['area_um2']:.1f} um2\n"
+                f"rejected by: {b['rejected_by']}")
+        ax.annotate(text, (x, y), xytext=(x + 55, y + 55), color="#ffd700", fontsize=7.5,
+                    bbox=dict(boxstyle="round,pad=0.3", fc="black", ec="#ffd700", alpha=0.75))
+    ax.set_title(f"{d['label']}: four blobs with no lacuna outline. Cyan: the "
+                 f"{len(d['lac']['kept'])} detected lacunae. Diagnosis only, no rule changed.",
+                 fontsize=10)
+    ax.set_axis_off()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{d['label']}_blobs_no_outline.png"
+    fig.savefig(path, bbox_inches="tight", metadata={"CreationDate": None})
+    plt.close(fig)
+    return path
+
+
+def cmd_diagnose_untraced(args) -> int:
+    lacuna_ids = [int(v) for v in args.lacunae.split(",")] if args.lacunae else []
+    blobs = []
+    if args.blobs:
+        for part in args.blobs.split(";"):
+            x, y = part.split(",")
+            blobs.append((int(x), int(y)))
+
+    d = untraced_detection(args.image)
+    out_dir = args.out
+    report = {
+        "status": "diagnosis only: no parameter, threshold or rule was changed",
+        "image": args.image.name,
+        "image_label": d["label"],
+        "lacunae_detected_now": len(d["lac"]["kept"]),
+        "lacuna_cut_t_hi": round(d["t_hi"], 6),
+        "ridge_high_cut": round(d["high_cut"], 8),
+        "ridge_low_cut": round(d["low_cut"], 8),
+        "length_prune": d["length_prune"],
+        "part1_canaliculi": [],
+        "part2_lacuna_detection": [],
+        "pictures": [],
+    }
+
+    for lacuna_id in lacuna_ids:
+        r = untraced_lacuna_report(d, lacuna_id, args.radius)
+        report["part1_canaliculi"].append(r)
+        for p in untraced_region_picture(d, lacuna_id, args.radius, out_dir):
+            report["pictures"].append(p.as_posix())
+
+    for x, y in blobs:
+        report["part2_lacuna_detection"].append(untraced_blob_report(d, x, y))
+    if blobs:
+        report["pictures"].append(
+            untraced_blob_picture(d, report["part2_lacuna_detection"], out_dir).as_posix())
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{d['label']}_diagnosis.json"
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(report, f, indent=2, default=float)
+
+    print(f"{d['label']}: {len(d['lac']['kept'])} lacunae detected now; "
+          f"lacuna cut t_hi {d['t_hi']:.6f}; ridge high cut {d['high_cut']:.8f}, "
+          f"low cut {d['low_cut']:.8f}")
+    for r in report["part1_canaliculi"]:
+        s, g = r["skeleton_near"], r["ridge_response_near"]
+        print(f"\n  lacuna {r['lacuna_id']} at {r['centroid_xy']}, within {r['radius_px']} px:")
+        print(f"    faint ridge signal (0.5 to 1.0 of the low cut): "
+              f"{g['between_half_and_one_low_cut']} px")
+        print(f"    skeleton {s['total_px']} px: owned by it {s['owned_by_this_lacuna_px']}, "
+              f"owned by any {s['owned_by_any_lacuna_px']}, unowned {s['unowned_px']}, "
+              f"pruned by the 50 um limit {s['removed_by_the_50um_prune_px']}")
+        pc = r["owned_pieces"]
+        print(f"    nearest pixel it owns: {r['nearest_pixel_owned_by_this_lacuna_px']} px from "
+              f"the body; attached nodes within "
+              f"{r['ownership_rule']['attach_gap_px']} px: {r['ownership_rule']['attached_nodes']}")
+        print(f"    owned skeleton in {pc['count']} piece(s); largest {pc['largest_piece_px']} px, "
+              f"nearest {pc['largest_piece_nearest_px_to_body']} px from the body")
+        bringer = r["ownership_rule"]["node_that_brought_the_largest_piece"]
+        if bringer:
+            print(f"    the largest piece came in through the node at "
+                  f"(x={bringer['node_xy'][0]}, y={bringer['node_xy'][1]}) across a "
+                  f"{bringer['gap_to_body_px']} px gap"
+                  + ("  <- empty space, no thread there" if bringer["gap_is_empty_space"] else ""))
+    for i, b in enumerate(report["part2_lacuna_detection"], start=1):
+        n = b["nearest_owned_thread"]
+        print(f"\n  blob {i} at {b['point_xy']}: peak {b['intensity']['peak_within_30px']:.4f} vs "
+              f"cut {b['intensity']['lacuna_cut_t_hi']:.4f} "
+              f"({b['intensity']['peak_over_cut']:.2f}x), "
+              f"area {b['size']['area_px2']} px2 = {b['size']['area_um2']:.1f} um2")
+        print(f"    rejected by: {b['rejected_by']}  ({b['rule']})")
+        if n:
+            print(f"    nearest owned thread belongs to lacuna {n['lacuna_id']} "
+                  f"at {n['that_lacuna_centroid_xy']}, {n['distance_to_that_thread_px']} px away")
+    print(f"\nreport -> {path}")
+    for p in report["pictures"]:
+        print(f"picture -> {p}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1731,6 +2188,17 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_network_sweep, image=None)
+
+    p = sub.add_parser("diagnose-untraced",
+                       help="Why a thread or a blob is missing from the result (diagnosis only).")
+    p.add_argument("-i", dest="image", type=Path, required=True, help="One .tif image.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.add_argument("--lacunae", default="", help="Lacuna ids to diagnose, as ID1,ID2.")
+    p.add_argument("--blobs", default="",
+                   help="Blobs with no outline, as X,Y;X,Y in the 1024 px frame.")
+    p.add_argument("--radius", type=int, default=UNTRACED_RADIUS_PX,
+                   help=f"How far from a lacuna body counts as near (default {UNTRACED_RADIUS_PX} px).")
+    p.set_defaults(func=cmd_diagnose_untraced)
 
     p = sub.add_parser("validate-network", help="Pipeline roots and Sholl crossings against blind hand counts.")
     p.add_argument("-a", dest="annotation", type=Path, default=None, help="Annotation CSV (code, hand_roots).")
