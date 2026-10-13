@@ -1,6 +1,6 @@
 # Raw tiles for a blind hand trace
 
-**Pixel size 0.13 um/px, rounded, unconfirmed per image.** Pre-validation.
+**Pixel size 0.13 um/px.** Pre-validation.
 
 These tiles are the raw image and nothing else. No mask, no skeleton and no result of any
 method is drawn on them, so a trace made here cannot be steered by what any method found.

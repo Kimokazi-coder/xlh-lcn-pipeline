@@ -1,6 +1,6 @@
 # Figure review, figures v2
 
-**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); every old and new path: [results/RENAMES.csv](../results/RENAMES.csv)). Links pinned to a commit keep the old paths.
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); every old and new path: [results/RENAMES.csv](../results/RENAMES.csv)). The `figures_out/` paths quoted below are where each value was written at the time; that folder is retired and the files are at the git tag `archive-2026-10-13`.
 
 Each exported PNG is viewed at 1000 px wide (a column-width preview) and as a 100% crop of its densest
 region. Defects found, what was changed, and what remains. At most two rounds per figure.
@@ -104,7 +104,7 @@ the operating system's random source, so it cannot be rebuilt from the repositor
 ## P1 rejected candidates (overview F1, contact sheets F2)
 
 Rejected pieces of at least 150 px² after the re-merge, with the filter that rejects each by the stage
-replay of `experiments/task2_thresholds.py` (verdict): 542_z06 12, 542_z18 2, 543-2 0, 543_3 4,
+cuts of `src/lacunae.py` (`make_figures.rejection_reason`): 542_z06 12, 542_z18 2, 543-2 0, 543_3 4,
 543_z13 1, 682_z08 10, 682_z23 6, 682_z29 7. The three named cases come out as expected: 543_3 near
 (40,310) A (aspect 6.03), 542_z06 near (230,300) S (solidity 0.452), 542_z06 near (5,930) a (301 px²).
 

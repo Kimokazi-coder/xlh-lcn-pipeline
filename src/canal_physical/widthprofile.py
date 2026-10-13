@@ -13,7 +13,7 @@ objective's numerical aperture, the emission wavelength and the pinhole are
 unknown, so no theoretical point spread function is computed anywhere and none is
 subtracted.
 
-**Pixel size 0.13 um/px, rounded, unconfirmed per image.** Pre-validation.
+**Pixel size 0.13 um/px.** Pre-validation.
 
 Method, per skeleton pixel:
 

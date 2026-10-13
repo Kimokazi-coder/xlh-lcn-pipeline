@@ -7,7 +7,7 @@ light Gaussian, a white top-hat and subtraction of the histogram mode
 canaliculi.preprocess_channel is called unchanged rather than copied, so the two
 methods cannot drift apart here.
 
-**Pixel size 0.13 um/px, rounded, unconfirmed per image.** Pre-validation.
+**Pixel size 0.13 um/px.** Pre-validation.
 """
 from __future__ import annotations
 

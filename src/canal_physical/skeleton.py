@@ -7,7 +7,7 @@ micrometres, and `check_parameters_match_current` asserts that at 0.13 um/px the
 are the pixel values the imported code already uses, so there is one source of
 truth and no value can drift quietly.
 
-**Pixel size 0.13 um/px, rounded, unconfirmed per image.** Pre-validation.
+**Pixel size 0.13 um/px.** Pre-validation.
 """
 from __future__ import annotations
 

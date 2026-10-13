@@ -6,7 +6,7 @@ not because it is bright. Everything else, the flattening before it and the
 skeleton, bridging, cleanup and ownership after it, is the current method's code,
 imported and unchanged.
 
-**Pixel size 0.13 um/px, rounded, unconfirmed per image.** Pre-validation.
+**Pixel size 0.13 um/px.** Pre-validation.
 
 Why Sato rather than Frangi: both are Hessian based, and Sato's tubeness keeps a
 single response per scale without Frangi's second shape term, which is tuned for

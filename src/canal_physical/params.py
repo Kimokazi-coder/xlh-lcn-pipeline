@@ -2,8 +2,9 @@
 
 Each length is written in micrometres and converted to pixels with the pixel
 size of this branch, so the method is stated in physical units and the pixel
-values follow from them. **Pixel size 0.13 um/px, rounded, unconfirmed per
-image.** Pre-validation: nothing here has been checked against manual counts.
+values follow from them. **Pixel size 0.13 um/px**, from the acquisition record,
+confirmed for all 8 images and rounded to two decimals. Pre-validation: nothing
+here has been checked against manual counts.
 
 The micrometre values are chosen so that the pixel values of the current method
 come back exactly at 0.13 um/px, which keeps the two methods comparable. Where a
@@ -21,7 +22,7 @@ from dataclasses import asdict, dataclass
 import config
 
 # Every output of this branch carries this label.
-PIXEL_LABEL = "pixel size 0.13 um/px, rounded, unconfirmed"
+PIXEL_LABEL = "pixel size 0.13 um/px, confirmed for all 8 images"
 
 # The tuning set of the current method (docs/METHODS.md section 2). Any new
 # value is chosen on these three images only; the other five confirm it once.
@@ -33,8 +34,8 @@ HELD_OUT_IMAGES = ("542_z18", "543_3", "543_z13", "682_z08", "682_z23")
 class Params:
     """Parameters in micrometres. Use px() and px_int() to get pixels."""
 
-    # Acquisition record, rounded, not confirmed per image. The z step of
-    # 0.44 um is not used: these are single 2D sections.
+    # Acquisition record, confirmed for all 8 images, rounded to two decimals.
+    # The z step of 0.44 um is not used: these are single 2D sections.
     # The value lives in config.py so this branch has one source of truth.
     pixel_size_um: float = config.PIXEL_SIZE_UM_CANAL_PHYSICAL
 
@@ -127,7 +128,7 @@ class Params:
         """(name, value in um, value in px, what it is) for every parameter, for
         the report and the json. A share or an angle has no pixel value."""
         rows = [
-            ("pixel_size_um", self.pixel_size_um, None, "um per pixel, rounded, unconfirmed"),
+            ("pixel_size_um", self.pixel_size_um, None, "um per pixel, acquisition record"),
             ("sigma_um", list(self.sigma_um), self.sigmas_px(), "ridge scales"),
             ("hysteresis_low_fraction", self.hysteresis_low_fraction, None, "share of the high cut"),
             ("lacuna_buffer_um", self.lacuna_buffer_um, self.px_int(self.lacuna_buffer_um), "buffer around a lacuna"),

@@ -2,7 +2,8 @@
 
 Everything the pipeline and the figure code produce, per image and for all images together.
 **Pre-validation**: no number here has been checked against manual counts. **Pixel units**: the images
-carry no micron scale, so lengths are px, areas px² and densities px⁻¹; no micron value is used anywhere.
+pixel size is 0.13 um/px (acquisition record, all 8 images, rounded to two decimals), but the
+pipeline reports px, px² and px⁻¹ so that a fresh run still equals this folder at tolerance 0.
 The thresholds are image-relative: each image's cuts come from its own histogram. The data are 8 wild-type
 (WT) sections. Method and parameters: [docs/METHODS.md](../docs/METHODS.md); where to start:
 [docs/START_HERE.md](../docs/START_HERE.md).
@@ -141,7 +142,7 @@ interior means in the cross-image table:
 - `roots_per_100px_perimeter`: $100 \cdot \text{roots} / P$.
 
 `docs/METHODS.md` does not define the next columns yet; their definitions are those of
-[docs/reports/CANALICULI_V2_REPORT.md](../docs/reports/CANALICULI_V2_REPORT.md) (section "New columns"):
+the canaliculi v2 report, tag `archive-2026-10-13` (section "New columns"):
 
 - `ring_attached_length_r30_px`, `ring_attached_length_r60_px`: ring length pixels (same pixel set as
   `ring_length_rR_px`) in 8-connected components of the ring that reach within 10 px of the lacuna.

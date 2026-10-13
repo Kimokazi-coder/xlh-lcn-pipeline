@@ -1,17 +1,23 @@
 # Methods
 
 How the pipeline works, where every parameter value came from, what it
-cannot do yet, and the decisions behind its current shape. Condensed on
-2026-09-30 from the project's running notes (PROGRESS.md,
-DECISIONS_NEEDED.md and the round reports), which are kept in `archive/`.
+cannot do yet, and the decisions behind its current shape.
 
 **Status: pre-validation.** No output has been checked against manual
-(ImageJ) counts. **Units: pixels.** The images carry no usable micron
-calibration (7 of 8 have no resolution tags; one reports a generic 300 DPI),
-so `PIXEL_SIZE_UM` is `None` and nothing is converted. **Data: 8 wild-type
-(WT) confocal optical sections** (`data/WT/`, red channel, 1024 x 1024 px).
-No Hyp or Hyp;Enpp1 image has been processed, and periosteocytic lesions
-(POLs) are not measured.
+(ImageJ) counts.
+
+**Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
+confirmed for all 8 images and rounded to two decimals. The pipeline reports
+px and px² all the same: `PIXEL_SIZE_UM` is deliberately `None`, because it is
+recorded in every result's parameters block and switches every scale bar to
+micrometres, so setting it would change the recorded values and a fresh run
+would no longer equal `results/` at tolerance 0. Convert with 0.13 um/px where
+a physical length is wanted; the experimental ridge method (section 7) works in
+micrometres throughout.
+
+**Data: 8 wild-type (WT) confocal optical sections** (`data/WT/`, red channel,
+1024 x 1024 px). No Hyp or Hyp;Enpp1 image has been processed, and
+periosteocytic lesions (POLs) are not measured.
 
 ## 1. Pipeline steps
 
@@ -201,7 +207,8 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 | 2026-09-29 | Hybrid detector's connectivity override not adopted (3 of 4 examined additions were mesh). Detection stays v2. |
 | 2026-09-29 | Thin band objects, the leaked outline and the unfilled hole recorded as known cases; nothing changed. |
 | 2026-09-29 | Reach measured; a reach cap and ownership-free measures (roots, ring lengths) built; the cap left off. |
-| 2026-09-30 | Final cleanup: the code keeps only the default path; alternatives (v3 and hybrid detectors, adjacent-pair merge, reach cap, ridge and other preprocessing, other assignment and counting methods, exclusion mask) are preserved in `archive/`. Headline measures fixed as roots per cell, ring length 30 px and field length density. |
+| 2026-09-30 | Final cleanup: the code keeps only the default path; alternatives (v3 and hybrid detectors, adjacent-pair merge, reach cap, ridge and other preprocessing, other assignment and counting methods, exclusion mask) are preserved at the git tag `archive-2026-10-13`. Headline measures fixed as roots per cell, ring length 30 px and field length density. |
+| 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. The experimental method keeps three variants: A, P2 and P5. |
 
 ## 6. Open questions
 
@@ -211,36 +218,50 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 3. The two thin objects on vascular bands: exclude or keep.
 4. Whether the thesis's primary outcome is per field or per cell.
 
-## 7. History
+## 7. The experimental ridge method
 
-`archive/` holds every earlier script, report and result, and the git tag
-`archive-before-cleanup` marks the repository as it was before this
-cleanup. Checking out that tag reproduces any earlier analysis.
+`src/canal_physical/`, not the pipeline. It changes one idea of the canalicular
+stage: instead of hysteresis on the flattened intensity it thresholds a
+multiscale ridge response (`skimage.filters.sato`, bright ridges), with every
+scale set in micrometres from the pixel size rather than from the earlier mask.
+The flattening, the lacuna buffer, the vascular handling, the bridging rule, the
+graph cleanup, the ownership and the ring radii stay exactly as the current
+method has them, so one idea changes at a time.
 
-## 8. Overnight experiments (2026-10-01)
+| variant | what |
+|---|---|
+| A | the current method, as it stands |
+| P2 | ridge, sigmas 0.17, 0.21 and 0.26 um |
+| P5 | P2 with gap bridging off |
 
-Branch `overnight-fixes`. Experiments only: nothing in `src/` uses them and no default changed.
-Report: `docs/reports/OVERNIGHT_REPORT.md`; outputs in `results_experiments/<task>/`.
+P2 and P5 carry the same scales and the same cut, so they differ by that one
+switch and nothing else, and the difference between their numbers is the effect
+of bridging alone.
 
-- `experiments/task0_cache.py`: cache of the default results, timing, and checks that the copied steps reproduce the pipeline.
-- `experiments/task1_artefact.py`: TIFF tags, FFT and banding, axis-aligned skeleton runs (682_z08 lattice), notch filter.
-- `experiments/task2_thresholds.py`: why visible bodies are missed, the cuts against brightness, sensitivity grid of both cuts and a pooled cut.
-- `experiments/task3_lacunae.py`: crumb loss, saddle audit (straight line against widest path), band objects, opening, holes, their network-level effect, a narrower crumb rule, crops.
-- `experiments/task4_size.py`: size dependence of roots and ring lengths, and normalised forms.
-- `experiments/task5_density.py`: green and blue channels, draft bone ROI, field density three ways, the 542_z06 vertical line.
-- `experiments/task6_repeat.py`: field groups from centroid matches and repeatability across sections.
+Beside the pipeline's own measures it reports the width measured **on the image**
+(the full width at half maximum of the intensity profile across the thread: it
+includes the optical blur, so it is an upper bound on the diameter, not the
+diameter), the contrast against each variant's own background, and the
+axis-aligned runs and pixel-grid rectangles a grid-following detector produces.
 
-## 9. Additions on branch publication-fixes (2026-10-02)
+`python src/canal_physical/physical.py --dir data/WT` writes `results_ridge/`:
+the comparison table (`comparison_all_images.csv` and `.xlsx`,
+`comparison_summary.csv`), a README with every parameter and the provenance, and
+per image the three variants side by side. Every run asserts that each
+micrometre parameter converts back to exactly the pixel value the imported
+pipeline code uses, and that variant A still equals `results/` at tolerance 0
+with a pixel-identical verification image.
 
-Pre-validation, pixel units. With every switch off, the pipeline reproduces `results/` exactly
-(`python src/diagnostics.py regression`).
+**Nothing about this method is validated.** No variant has been checked against
+a manual count, none is called better than another, and nothing was tuned to
+improve a result or to approach a published value.
 
-### Normalised per-cell measures (appended columns)
+## 8. Normalised per-cell measures
 
-Appended after all existing columns of the per-lacuna rows (`<label>_canaliculi_results.json` and the
-`per_lacuna` sheet) and of `summary_all_images.csv` and `.xlsx` (as interior means). No existing column
-changes name, order or value. They answer the size dependence found overnight (roots and ring length
-rise with lacuna area; `docs/reports/OVERNIGHT_REPORT.md`, task 4.1).
+Appended after all existing columns of the per-lacuna rows and of the
+cross-image table, as interior means. No existing column changes name, order or
+value. They answer the size dependence found earlier: roots and ring length rise
+with lacuna area.
 
 | column | definition |
 |---|---|
@@ -250,12 +271,16 @@ rise with lacuna area; `docs/reports/OVERNIGHT_REPORT.md`, task 4.1).
 | `ring_density_r30`, `ring_density_r60` | $L_r / A_r$, with $L_r$ the ring length (px$^{-1}$) |
 | `roots_per_100px_perimeter` | $100 \cdot \text{roots} / P$ |
 
-Definitions as in `experiments/task4_size.py`; the 784 per-lacuna values of the 8 WT images equal
-that script's values to the stored digits.
+Added later: ring attached length 30 / 60 px (the ring length pixels in threads
+reaching within 10 px of the lacuna, passing threads left out); ring length and
+field length density weighted with chain code lengths ($\sqrt{2}$ per diagonal
+step); Sholl crossings at 10 / 20 / 30 px, the skeleton components crossing a
+1.5 px band at that distance, computed without the graph.
 
-### Switches (all off by default)
+## 9. Switches (all off by default)
 
-In `config.py`; each comment names its evidence. With all off, `results/` is reproduced exactly.
+In `config.py`; each comment names its evidence. With all off, `results/` is
+reproduced exactly (`python src/diagnostics.py regression`).
 
 - `NARROW_CRUMB_RULE` (False): after the filters, a dropped watershed piece joins a kept lacuna if it
   touches only that lacuna and at least half of it lies inside the lacuna's convex hull
@@ -264,57 +289,67 @@ In `config.py`; each comment names its evidence. With all off, `results/` is rep
 - `BAND_FILTER_MIN_OPENING_SHARE` (None): kept objects keeping less than this share of their area after
   an opening with a 5 px disk are rejected (0.515 sits in a gap that rests on two objects).
 - `FAST_LACUNA_STAGE` (False): bounding-box versions of the watershed split and the re-merge; identical
-  labels, 15 to 25 times faster.
+  labels, 15 to 25 times faster. It changes speed, not output.
+- `BAND_LINE_FILTER` (False): removes the zone around straight skeleton runs that reach the vascular
+  mask. No value is recommended, so it refuses to run until `BAND_LINE_MIN_LEN_PX` and
+  `BAND_LINE_REACH_PX` are set deliberately.
 
-`python src/diagnostics.py switch-check` shows what each changes on a folder.
+`python src/diagnostics.py switch-check` shows what each one changes on a folder.
 
-### New subcommands of `src/diagnostics.py`
+## 10. Checks (`src/diagnostics.py`)
 
+- `reference-check`: 62.33 edges per cell, 27.41 px mean edge length and 21 gap bridges on 543-2.
 - `regression`: regenerate every image into an ignored folder and compare every json and summary number
   with `results/` at tolerance 0 (provenance ignored), with and without the fast stage.
 - `switch-check`: each switch on alone; every lacuna whose area, roots or ring 30 px change.
 - `fast-check`: fast against original lacuna stage, labels pixel for pixel at $t_\mathrm{hi}$ 0.8 to 1.2.
-- `blind` / `unblind`: coded copies (pixel data only) with the key outside the repository; join a key to
-  a summary table.
-- `sensitivity`: both Otsu cuts scaled 0.8 to 1.2, alone and together, and one pooled cut; percent
-  changes of roots per cell, ring 30 px, field density, lacuna count and bridges.
+- `blind` / `unblind`: coded copies (pixel data only), key outside the repository; join a key to a table.
+- `sensitivity`: both Otsu cuts scaled 0.8 to 1.2, alone, together and pooled; percent changes of roots
+  per cell, ring 30 px, field density, lacuna count and bridges.
 - `field-summary`: fields from lacuna centroid matching (25 px), per-field means; the field is the unit.
+- `network-sweep`: one network parameter at a time at a low and a high value.
+- `validate-network`: roots and Sholl crossings against the blind hand counts, and the skeleton against
+  the traced threads. The tiles to trace are in `manual_trace/`; what may be tuned afterwards is fixed
+  in advance in `docs/NETWORK_TUNING_PROTOCOL.md`.
 
-Every json output also carries a `provenance` block (git commit, dirty flag, library versions, config
-hash), and `requirements.txt` pins the versions.
+Every json output carries a `provenance` block (git commit, dirty flag, library
+versions, config hash), and `requirements.txt` pins the versions.
 
-### Figures
+## 11. Figures
 
-`figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts) into `results/` (see
-`results/README.md`): a per-image figure for each image (now `<label>_figure_overview` in
-`results/<label>/3_publication_figures/`), a contact sheet (now Fig01), a
-lacuna-cut sensitivity figure (now Fig03), a per-field plot (now Fig04) and a supplementary figure of two
-switches (now S01); they were called F1 to F5 on branch publication-fixes and were renamed on branch
-figures-v2 (section 10), so that no figure name looks like a field name. One display window for the whole
-dataset (1st and 99.8th percentile of the pooled red channel); interior lacunae cyan, frame-edge
-lacunae yellow; skeleton white over the image at 60%; scale bars in pixels. Captions:
-`figures/captions.md`; review notes: `figures/REVIEW.md`.
+`figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
+into `results/` (map: `results/README.md`). One display window for the whole
+dataset (1st and 99.8th percentile of the pooled red channel); interior lacunae
+cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
+`figures/captions.md`; review notes: `figures/REVIEW.md` and
+`figures/REVIEW_V2.md`, which also list the defects still unfixed.
 
-## 10. Figures v2 (branch figures-v2, 2026-10-02)
-
-Pre-validation, pixel units. Figures only: `src/`, `config.py` and `results/` are unchanged. Report:
-`docs/reports/FIGURES_V2_REPORT.md`; map of the figures: `results/README.md`.
-
-- **Network overlay** (`results/<label>/3_publication_figures/<label>_figure_network`, `all_images/figures/main/Fig02` for
-  543-2). The skeleton
-  is drawn as vector segments between the centres of 8-connected neighbouring pixels, so the drawn set
-  is exactly the skeleton. A skeleton pixel is vermillion if it lies in the 30 px ring of an interior
-  lacuna by the pipeline's own rule (distance to the lacuna masks at most 30 px, nearest lacuna from
-  `canaliculi.nearest_lacuna_map`), white otherwise; roots are magenta dots at the root cluster
-  centres. Per interior lacuna, the vermillion pixels equal `ring_length_r30_px` and the dots equal
-  `roots_count` (asserted).
+- **Per-image overview** (`<label>_figure_overview`), the contact sheet (Fig01),
+  the lacuna-cut sensitivity figure (Fig03), the per-field plot (Fig04) and the
+  switch examples (S01).
+- **Network overlay** (`<label>_figure_network`, and `all_images/figures/main/Fig02`
+  for 543-2). The skeleton is drawn as vector segments between the centres of
+  8-connected neighbouring pixels, so the drawn set is exactly the skeleton. A
+  skeleton pixel is vermillion if it lies in the 30 px ring of an interior
+  lacuna by the pipeline's own rule, white otherwise; roots are magenta dots at
+  the root cluster centres. Per interior lacuna the vermillion pixels equal
+  `ring_length_r30_px` and the dots equal `roots_count` (asserted).
 - **Gallery and hand-count tiles.** Every interior lacuna in a 240 px tile at 3x
-  (`<label>_figure_cell_gallery`), and the same crops of the raw red channel under random codes for
-  counting roots by hand (`results/validation_tiles/`, key outside the repository).
-- **Figure fixes.** Rejected lacuna-scale candidates (at least 150 px²) are drawn with the filter that
-  rejects them; one colour per meaning; figure ids Fig01 to Fig04 and S01 to S03 and fields Field 1 to
-  Field 4; the per-field plot from zero with 682_z08 marked; count lines with interior, frame-edge and
-  rejected counts; "c" for a lacuna inside a flagged canal region; insets at least 60 px from the frame;
-  a fixed display window, with per-image window variants for display only.
-- **Regenerate** with `python -u figures/make_figures.py all`; `check` compares the drawing data with
-  `results/`.
+  (`<label>_figure_cell_gallery`), and the same crops of the raw red channel
+  under random codes for counting roots by hand (`results/validation_tiles/`,
+  key outside the repository).
+- **Rejected candidates** (at least 150 px²) carry the filter that rejected
+  them, one colour per meaning; "c" marks a lacuna inside a flagged canal
+  region; insets sit at least 60 px from the frame.
+- **Regenerate** with `python -u figures/make_figures.py all`; `check` compares
+  the drawing data with `results/`. Every figure it draws is reproducible, so
+  none is tracked. The pipeline's own stage pictures under `1_lacunae/` and
+  `2_canaliculi/` are tracked: the skeleton png is an input to
+  `validate-network`.
+
+## 12. History
+
+Earlier experiments, reports and analyses are preserved at the git tag
+`archive-2026-10-13`, which is the repository as it was before the 2026-10-13
+cleanup. Checking out that tag reproduces any earlier analysis. `main` is the
+only branch.

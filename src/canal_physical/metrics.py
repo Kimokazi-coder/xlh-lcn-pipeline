@@ -16,8 +16,8 @@ Conversions at s = 0.13 um/px: a length in px times s is um; an area in px^2
 times s^2 is um^2; a length density in px^-1 divided by s is um of thread per
 um^2 of tissue, because (px / px^2) / s = (px s) / (px s)^2.
 
-**Pixel size 0.13 um/px, rounded, unconfirmed per image.** Pre-validation: no
-number here has been checked against a manual count.
+**Pixel size 0.13 um/px.** Pre-validation: no number here has been checked
+against a manual count.
 """
 from __future__ import annotations
 

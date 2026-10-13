@@ -14,7 +14,7 @@ The hand counts must be made without seeing any pipeline output (section 9).
 ## 2. What may be tuned, and the grid
 
 Only the network parameters of the sweep (`python src/diagnostics.py network-sweep`, results in
-`results_experiments/canal_v2/S1_network_sweep.md`), each over the values of that sweep plus the default:
+the network sweep, tag `archive-2026-10-13`), each over the values of that sweep plus the default:
 
 | parameter (in `src/canaliculi.py`) | default | grid |
 |---|---|---|
@@ -77,7 +77,7 @@ are reported. The held-out fields are not used again for tuning.
 ## 7. What goes into the repository
 
 The grid, the tuning and held-out field lists, every metric of every grid value, the chosen values with
-the rule step that chose them, and the held-out result, under `results_experiments/`, with a new
+the rule step that chose them, and the held-out result, in a new folder of its own, with a new
 `regression` reference only if a default is changed deliberately, in its own commit.
 
 ## 8. Hyp before use

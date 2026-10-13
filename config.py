@@ -102,24 +102,21 @@ INVERT_SIGNAL = False
 
 # Spatial calibration
 
-# Microns per pixel. None, so every output stays in pixel units: the image
-# files carry no usable calibration (7 of 8 have no resolution tags; one
-# reports a generic 300 DPI). A real value has to come from the confocal
-# acquisition record. Do not guess one.
+# Microns per pixel for the PIPELINE's own outputs. Deliberately None, so every
+# pipeline number stays in pixel units. The physical scale is known: the confocal
+# acquisition record gives 0.13 um/px, confirmed for all 8 images and rounded to
+# two decimals, and it lives in PIXEL_SIZE_UM_CANAL_PHYSICAL below. It is not set
+# here because PIXEL_SIZE_UM is recorded in the parameters block of every result
+# (lacunae.parameters, canaliculi.parameters) and switches every figure scale bar
+# to micrometres: setting it would change those recorded values and the figures,
+# so a fresh run would no longer equal results/ at tolerance 0. The units of the
+# pipeline's output are a choice; the calibration is not missing.
 PIXEL_SIZE_UM = None
 
-# Branch canal-physical only. The acquisition record gives 0.13 um per pixel in
-# x and y (the 0.44 um z step is not used: these are single 2D sections). The
-# value is ROUNDED and NOT CONFIRMED PER IMAGE, so every output of that branch
-# carries the label "pixel size 0.13 um/px, rounded, unconfirmed".
-#
-# It is a separate constant rather than a value for PIXEL_SIZE_UM above, because
-# PIXEL_SIZE_UM is recorded in the parameters block of every result (see
-# lacunae.parameters and canaliculi.parameters) and switches every figure scale
-# bar to micrometres. Setting it would change those recorded values and the
-# figures, so a fresh run would no longer equal results/ at tolerance 0. The
-# experiment needs a physical scale, not a change to the pipeline's output, so
-# PIXEL_SIZE_UM stays None and the default behaviour is unchanged.
+# The physical scale, for the experimental ridge method. The acquisition record
+# gives 0.13 um per pixel in x and y, confirmed for all 8 images and rounded to
+# two decimals (the 0.44 um z step is not used: these are single 2D sections).
+# It is a separate constant from PIXEL_SIZE_UM above for the reason given there.
 PIXEL_SIZE_UM_CANAL_PHYSICAL = 0.13
 
 # Output

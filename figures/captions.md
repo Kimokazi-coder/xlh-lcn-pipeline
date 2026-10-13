@@ -119,7 +119,7 @@ rejected candidates of at least 150 px² (`Fig03_threshold_sensitivity_counts.js
 the total count in 542_z06 (16 to 11; bodies fuse or fail a shape filter) and raises it in 543-2 and
 682_z29 (12 to 13, 13 to 15). No default is changed. Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT. Full grid, both cuts:
-`results_experiments/fixes/B2_sensitivity.md`.
+the B2 sensitivity run, tag `archive-2026-10-13`.
 
 ## Fig04_per_field (and Fig04_per_field_merged)
 
