@@ -104,7 +104,7 @@ INVERT_SIGNAL = False
 # Microns per pixel for the PIPELINE's own outputs. Deliberately None, so every
 # pipeline number stays in pixel units. The physical scale is known: the confocal
 # acquisition record gives 0.13 um/px, confirmed for all 8 images and rounded to
-# two decimals, and it lives in PIXEL_SIZE_UM_CANAL_PHYSICAL below. It is not set
+# two decimals, and it lives in PIXEL_SIZE_UM_ACQUIRED below. It is not set
 # here because PIXEL_SIZE_UM is recorded in the parameters block of every result
 # (lacunae.parameters, canaliculi.parameters) and switches every figure scale bar
 # to micrometres: setting it would change those recorded values and the figures,
@@ -112,11 +112,50 @@ INVERT_SIGNAL = False
 # pipeline's output are a choice; the calibration is not missing.
 PIXEL_SIZE_UM = None
 
-# The physical scale, for the experimental ridge method. The acquisition record
-# gives 0.13 um per pixel in x and y, confirmed for all 8 images and rounded to
-# two decimals (the 0.44 um z step is not used: these are single 2D sections).
-# It is a separate constant from PIXEL_SIZE_UM above for the reason given there.
-PIXEL_SIZE_UM_CANAL_PHYSICAL = 0.13
+# The physical scale. The acquisition record gives 0.13 um per pixel in x and y,
+# confirmed for all 8 images and rounded to two decimals (the 0.44 um z step is
+# not used: these are single 2D sections). Every length below in micrometres is
+# converted to pixels with this, and it is a separate constant from
+# PIXEL_SIZE_UM above for the reason given there.
+PIXEL_SIZE_UM_ACQUIRED = 0.13
+
+
+def px(um: float) -> float:
+    """Micrometres to pixels, at the acquisition pixel size."""
+    return um / PIXEL_SIZE_UM_ACQUIRED
+
+
+def px_int(um: float) -> int:
+    """Micrometres to a whole number of pixels."""
+    return int(round(um / PIXEL_SIZE_UM_ACQUIRED))
+
+
+def um(px_value: float) -> float:
+    """Pixels to micrometres."""
+    return px_value * PIXEL_SIZE_UM_ACQUIRED
+
+
+# Biological limits
+# Fixed, and identical for every image: no limit below is fitted to the data, and
+# none is tuned per image. Each is written in micrometres, which is the parameter,
+# and converted once with PIXEL_SIZE_UM_ACQUIRED, which gives the pixel value the
+# code uses. NOTHING HERE IS VALIDATED: no limit has been checked against a
+# manual count on this data, and the ranges are what the osteocyte literature
+# reports for mouse cortical bone, used as a plausibility bound and never as a
+# threshold that tunes a result.
+
+# (a) The longest a canaliculus may be, measured ALONG THE NETWORK from the
+# surface of the lacuna that owns it. Beyond this the skeleton is pruned.
+# 50 um is the outer end of the reported lacuna-to-lacuna spacing in cortical
+# bone, so a thread longer than this from one cell body is not one canaliculus:
+# it is a tracing error, or it belongs to a lacuna outside the section. This is
+# the one limit that CHANGES a number; everything else here is report only.
+MAX_CANALICULUS_LENGTH_UM = 50.0
+
+# (b) Report only, no pruning. The range a canalicular length is reported
+# against, so a reader can see what share of threads falls inside it. The
+# pipeline does not act on it.
+CANALICULUS_LENGTH_RANGE_UM = (25.0, 50.0)
 
 # Output
 

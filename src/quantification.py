@@ -845,6 +845,75 @@ def network_rows(kept: list[tuple], detection: dict, dist_to_lacuna: np.ndarray,
     return rows
 
 
+def biological_limits_report(detection: dict, net_rows: list[dict], width: np.ndarray,
+                             sample: np.ndarray, precision: int) -> dict:
+    """REPORT ONLY. Nothing here prunes, filters or changes a measure; it exists
+    so the tracing can be judged against what an osteocyte is known to look
+    like. None of it is validated against a manual count on this data.
+
+    Lengths come from the ownership distances the network already computed, so a
+    thread length is measured along the network from the surface of the lacuna
+    that owns it, never as a straight line."""
+    low_um, high_um = config.CANALICULUS_LENGTH_RANGE_UM
+    # The comparison is made in PIXELS, against the same whole-pixel bounds the
+    # code applies, so the report cannot disagree with the prune. 50 um is 385 px
+    # at 0.13 um/px, and 385 px is 50.05 um, so comparing a micrometre length
+    # against 50.00 would put a thread the prune kept just outside the range.
+    low_px, high_px = config.px_int(low_um), config.px_int(high_um)
+    skeleton = detection["skeleton"]
+
+    # A thread is the run from a lacuna surface to a thread tip. Its length is
+    # the tip's distance along the network, by the same geodesic measure the
+    # length limit prunes on, so the two cannot disagree.
+    dist_map = canaliculi.network_distance_map(skeleton, detection["lacuna_mask"])
+    tips = canaliculi.thread_end_mask(skeleton) & np.isfinite(dist_map)
+    dist_px = dist_map[tips]
+    lengths = config.um(dist_px)
+
+    def share(mask) -> float | None:
+        return round(float(mask.mean()), precision) if dist_px.size else None
+
+    roots = [r["roots_count"] for r in net_rows if not r["on_border"]]
+    width_um = config.um(width[sample]) if sample.any() else np.asarray([])
+
+    return {
+        "status": "report only, nothing is pruned or filtered by this block",
+        "validated": False,
+        "thread_length": {
+            "definition": "along the network from the owning lacuna's surface to a thread end",
+            "range_um": [low_um, high_um],
+            "range_px_applied": [low_px, high_px],
+            "range_um_applied": [round(config.um(low_px), 4), round(config.um(high_px), 4)],
+            "n_threads": int(lengths.size),
+            "median_um": round(float(np.median(lengths)), precision) if lengths.size else None,
+            "p10_um": round(float(np.percentile(lengths, 10)), precision) if lengths.size else None,
+            "p90_um": round(float(np.percentile(lengths, 90)), precision) if lengths.size else None,
+            "max_um": round(float(lengths.max()), precision) if lengths.size else None,
+            "fraction_in_range": share((dist_px >= low_px) & (dist_px <= high_px)),
+            "fraction_below_range": share(dist_px < low_px),
+            "fraction_above_range": share(dist_px > high_px),
+        },
+        "roots_per_lacuna": {
+            "definition": "threads leaving the lacuna surface, interior lacunae only",
+            "n_lacunae": len(roots),
+            "median": round(float(np.median(roots)), precision) if roots else None,
+            "min": int(min(roots)) if roots else None,
+            "max": int(max(roots)) if roots else None,
+        },
+        "apparent_width": {
+            "definition": "2 x the distance transform of the mask at each sampled skeleton pixel",
+            "is_an_upper_bound": True,
+            "why": ("it includes the optical blur, which widens a thread beyond its true size, and no "
+                    "point spread function is subtracted: the numerical aperture, the emission "
+                    "wavelength and the pinhole are unknown. It is an apparent width in the image, "
+                    "not a canalicular diameter."),
+            "median_um": round(float(np.median(width_um)), precision) if width_um.size else None,
+            "p10_um": round(float(np.percentile(width_um, 10)), precision) if width_um.size else None,
+            "p90_um": round(float(np.percentile(width_um, 90)), precision) if width_um.size else None,
+        },
+    }
+
+
 def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = None) -> dict:
     """Every measure of one image, from what detection saved."""
     precision = config.CSV_FLOAT_PRECISION
@@ -881,6 +950,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
 
     field = field_metrics(skeleton, detection["graph"], detection["lacuna_mask"],
                                      len(kept), precision, detection["vascular"], roi_mask)
+    limits = biological_limits_report(detection, net_rows, width, sample, precision)
     return {
         "image_path": image_path,
         "label": detection["label"],
@@ -894,6 +964,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
         "field": field,
         "width": width_image_measures(width, sample, precision),
         "width_values": width[sample],
+        "biological_limits": limits,
         "parameters": {
             "lacunae": detection["lacunae_detection"]["parameters"],
             "canaliculi": detection["canaliculi_detection"]["parameters"],

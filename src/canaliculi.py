@@ -31,9 +31,13 @@ single 2D optical sections, which is behind every departure from it.
     6. Ownership: each lacuna is a virtual source attached to skeleton nodes
        near its body; one multi-source shortest-path run gives every
        reachable node to the cell it connects to through the network, and
-       every edge to the owner of its nearer end (OCY_assign_dist.m). There
-       is no limit on distance.
-    7. Measure, per lacuna and per field (below).
+       every edge to the owner of its nearer end (OCY_assign_dist.m).
+    7. Apply the biological length limit: every skeleton pixel further than
+       config.MAX_CANALICULUS_LENGTH_UM from the surface of its owning lacuna,
+       measured ALONG THE NETWORK, is pruned, and ownership is rebuilt on what
+       is left, to a fixed point. A pixel that no lacuna reaches within the
+       limit is not pruned; it simply stays unowned.
+    8. Measure, per lacuna and per field (below).
 
 Measures:
     HEADLINE (they do not depend on which cell owns which thread)
@@ -184,6 +188,19 @@ FLAGGED_MIN_MAJOR_AXIS_PX = 420.0
 # the far field: 0.70x at 0 to 4 px, then 0.96x, 1.09x, 1.01x, 1.01x. It is at
 # baseline from about 4 px out, so 4 px, not more.
 FLAGGED_DILATION_PX = 4
+
+# Parameters: the biological length limit
+# The longest a canaliculus may be, along the network from the surface of the
+# lacuna that owns it. Set in micrometres in config.py and converted here, so the
+# micrometre value is the parameter and this follows from it. Nothing about it is
+# validated; see config.MAX_CANALICULUS_LENGTH_UM for where the value comes from.
+MAX_CANALICULUS_LENGTH_PX = config.px_int(config.MAX_CANALICULUS_LENGTH_UM)
+
+# The prune can cut a path and leave what was behind it unreachable, which can
+# push another pixel past the limit, so it repeats. This bounds the repetition;
+# it is never reached in practice and exists so a pathological image cannot loop.
+PRUNE_LENGTH_MAX_ITER = 10
+
 
 # Parameters: graph and ownership
 
@@ -631,6 +648,71 @@ def build_owner_pixel_map(shape: tuple[int, int], skel_obj, G: nx.Graph, edge_ow
     return owner_map
 
 
+def network_distance_map(skeleton: np.ndarray, lacuna_mask: np.ndarray) -> np.ndarray:
+    """For every skeleton pixel, its distance in px from the nearest lacuna
+    SURFACE measured ALONG THE NETWORK. inf where no lacuna reaches it.
+
+    This is a geodesic distance on the skeleton itself: a path may travel only
+    along skeleton pixels and across the lacuna buffer that separates a thread
+    from the body it belongs to, and a diagonal step costs sqrt(2)
+    (skimage.graph.MCP_Geometric). Every lacuna body is a source at distance 0,
+    so the distance is measured from the surface outward and the shortest path
+    decides which lacuna a thread is measured from, which is the rule ownership
+    already uses.
+
+    It is deliberately independent of the network graph and its cleanup, so the
+    length limit is enforced on the same quantity the report measures."""
+    from skimage.graph import MCP_Geometric
+
+    if not skeleton.any() or not lacuna_mask.any():
+        return np.full(skeleton.shape, np.inf, dtype=np.float64)
+    buffered = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
+    costs = np.where(skeleton | buffered, 1.0, np.inf)
+    mcp = MCP_Geometric(costs, fully_connected=True)
+    dist, _traceback = mcp.find_costs(np.argwhere(lacuna_mask))
+    return np.where(skeleton, dist, np.inf)
+
+
+def thread_end_mask(skeleton: np.ndarray) -> np.ndarray:
+    """Skeleton pixels with exactly one skeleton neighbour: the tip of a thread."""
+    neighbours = ndi.convolve(skeleton.astype(np.uint8), np.ones((3, 3), dtype=np.uint8),
+                                  mode="constant", cval=0) - skeleton
+    return skeleton & (neighbours == 1)
+
+
+def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_mask: np.ndarray,
+                              dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
+                              limit_px: float) -> tuple:
+    """(skeleton, ownership, how it went). Every skeleton pixel further than
+    `limit_px` along the network from a lacuna surface is removed, and ownership
+    is built on what is left.
+
+    Removing a pixel can cut a path and leave what lay behind it reachable only
+    by a longer way round, which can push another pixel past the limit, so this
+    repeats to a fixed point.
+
+    A pixel that no lacuna reaches at all is NOT pruned: there is no lacuna to
+    measure a length from, so the limit says nothing about it and it stays in the
+    skeleton, unowned."""
+    removed_total = 0
+    rounds = 0
+    for _ in range(PRUNE_LENGTH_MAX_ITER):
+        dist_map = network_distance_map(skeleton, lacuna_mask)
+        beyond = skeleton & np.isfinite(dist_map) & (dist_map > limit_px)
+        n = int(beyond.sum())
+        if n == 0:
+            break
+        skeleton = skeleton & ~beyond
+        removed_total += n
+        rounds += 1
+    else:
+        raise AssertionError(f"the length prune did not settle in {PRUNE_LENGTH_MAX_ITER} rounds")
+    own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
+    return skeleton, own, {"removed_px": removed_total, "rounds": rounds,
+                           "limit_px": float(limit_px),
+                           "limit_um": config.MAX_CANALICULUS_LENGTH_UM}
+
+
 # Measurements
 
 def build_ownership(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
@@ -675,7 +757,12 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     skeleton = morphology.skeletonize(candidate)
 
     dist_to_lacuna, nearest_id = nearest_lacuna_map(lacuna_id_map)
-    own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id)
+    # The biological length limit: no canaliculus runs further than
+    # config.MAX_CANALICULUS_LENGTH_UM from the lacuna that owns it, measured
+    # along the network. What lies beyond is pruned and ownership is rebuilt.
+    skeleton_before = skeleton
+    skeleton, own, prune = prune_beyond_length_limit(
+        kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, MAX_CANALICULUS_LENGTH_PX)
     return {
         "image_path": image_path,
         "lacunae": lac,
@@ -684,6 +771,8 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "lacuna_mask": lacuna_mask,
         "candidate": candidate,
         "skeleton": skeleton,
+        "skeleton_before_length_prune": skeleton_before,
+        "length_prune": prune,
         "flagged": flagged,
         "ridge_response": response,
         "t_lo": t_lo,
@@ -754,6 +843,12 @@ def parameters(result: dict) -> dict:
         "ownership": "graph connectivity, no distance cap",
         "root_merge_dist_px": ROOT_MERGE_DIST_PX,
         "ring_radii_px": list(RING_RADII_PX),
+        # The biological length limit, in micrometres and in the pixels it became.
+        "max_canaliculus_length_um": config.MAX_CANALICULUS_LENGTH_UM,
+        "max_canaliculus_length_px": MAX_CANALICULUS_LENGTH_PX,
+        "length_prune_removed_px": result["length_prune"]["removed_px"],
+        "length_prune_rounds": result["length_prune"]["rounds"],
+        "canaliculus_length_range_um": list(config.CANALICULUS_LENGTH_RANGE_UM),
     }
 
 
