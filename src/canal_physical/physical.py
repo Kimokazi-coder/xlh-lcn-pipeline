@@ -357,16 +357,21 @@ def verification_matches_pipeline(label: str, path: Path) -> tuple:
 
 def write_figures(label: str, display, detections: dict, lac: dict, params,
                   out_dir: Path) -> dict:
-    """The one figure of one image: the three variants side by side, as a png.
-    Returns what the checks need.
+    """Every figure of one image. Returns what the checks need.
 
-    Variant A's pipeline style verification picture is drawn too, compared with
-    the committed one in results/<label>/2_canaliculi/, and then deleted. It is a
-    byte for byte duplicate of a file the repository already holds, so keeping it
-    would only cost space, but drawing it is the check that variant A really is
-    the pipeline."""
-    import tempfile
+    Two kinds. The side by side png puts the variants in one picture with the
+    skeleton one pixel wide, which is the comparison. The verification pngs are
+    the pipeline's own picture, one per variant, drawn by the pipeline's own
+    canaliculi.save_verification at the image's own size, 1024 x 1024: each
+    lacuna outlined and the skeleton it owns thickened, in its colour, over the
+    full brightness original. Unowned skeleton is not drawn there, so the two
+    kinds answer different questions and neither replaces the other.
 
+    verification_A.png must be what save_verification writes and nothing else:
+    it is checked pixel for pixel against the committed
+    results/<label>/2_canaliculi/<label>_canaliculi_verification.png, which is
+    how this run proves variant A really is the pipeline. The other two are left
+    unreduced in the same way, so the three can be compared."""
     folder = out_dir / label
     colors = canaliculi.lacuna_colors(len(lac["kept"]))
 
@@ -382,11 +387,9 @@ def write_figures(label: str, display, detections: dict, lac: dict, params,
     reserved = list(colors.values()) + [UNOWNED_COLOUR, (255, 255, 255)]
     save_png(both, folder / f"{label}_compare.png", reserved)
 
-    temporary = Path(tempfile.gettempdir()) / f"{label}_verification_A_check.png"
-    pipeline_style(lac, display, detections["A"], temporary)
-    checks = {"verification": verification_matches_pipeline(label, temporary)}
-    temporary.unlink(missing_ok=True)
-    return checks
+    for key in VARIANT_KEYS:
+        pipeline_style(lac, display, detections[key], folder / f"verification_{key}.png")
+    return {"verification": verification_matches_pipeline(label, folder / "verification_A.png")}
 
 
 def fixed_workbook(wb, path: Path) -> None:
@@ -677,9 +680,16 @@ def write_readme(out_dir: Path, params, image_paths: dict, means: dict) -> None:
         "every variant, with the summary of means and the notes |",
         "| `comparison_summary.csv` | the means over the images and the change from A |",
         "| `<label>/<label>_compare.png` | " + ", then ".join(VARIANT_KEYS)
-        + f" side by side, {COMPARE_UPSCALE}x |",
+        + f" side by side, one pixel skeleton, {COMPARE_UPSCALE}x |",
+        "| `<label>/verification_<variant>.png` | the pipeline's own picture of that variant, "
+        "1024 x 1024, by `canaliculi.save_verification`: each lacuna outlined and the skeleton it owns "
+        "thickened, in its colour, over the full brightness original. Unowned skeleton is not drawn |",
         "",
-        "The comparison is written as an indexed png with the skeleton colours",
+        "`verification_A.png` is checked pixel for pixel against the committed",
+        "`results/<label>/2_canaliculi/<label>_canaliculi_verification.png` on every run, which is how",
+        "the run proves that variant A is the pipeline and not a copy of it.",
+        "",
+        "The side by side comparison is written as an indexed png with the skeleton colours",
         "held in reserved palette slots, so **every skeleton colour is exact** and only the background is",
         "quantised. A plain quantisation was measured first and moved all 14 overlay colours, which would",
         "have made the colours meaningless. The background error is a mean of about 1 level out of 255.",

@@ -74,9 +74,14 @@ and draws only what is owned.
 |---|---|
 | `comparison_all_images.csv` and `.xlsx` | the comparison table: every measure, every image, every variant, with the summary of means and the notes |
 | `comparison_summary.csv` | the means over the images and the change from A |
-| `<label>/<label>_compare.png` | P5, then A, then P2 side by side, 2x |
+| `<label>/<label>_compare.png` | P5, then A, then P2 side by side, one pixel skeleton, 2x |
+| `<label>/verification_<variant>.png` | the pipeline's own picture of that variant, 1024 x 1024, by `canaliculi.save_verification`: each lacuna outlined and the skeleton it owns thickened, in its colour, over the full brightness original. Unowned skeleton is not drawn |
 
-The comparison is written as an indexed png with the skeleton colours
+`verification_A.png` is checked pixel for pixel against the committed
+`results/<label>/2_canaliculi/<label>_canaliculi_verification.png` on every run, which is how
+the run proves that variant A is the pipeline and not a copy of it.
+
+The side by side comparison is written as an indexed png with the skeleton colours
 held in reserved palette slots, so **every skeleton colour is exact** and only the background is
 quantised. A plain quantisation was measured first and moved all 14 overlay colours, which would
 have made the colours meaningless. The background error is a mean of about 1 level out of 255.
@@ -87,7 +92,7 @@ have made the colours meaningless. The background error is a mean of about 1 lev
 python src/canal_physical/physical.py --dir data/WT
 ```
 
-Commit `f9c64381ec332f1d1ce983d4057ff713205758df`, tracked files clean: False. Config hash `4026503a93d224d7`.
+Commit `e2b8e11ac9bea9d96a8e8291ae90ce7390028539`, tracked files clean: False. Config hash `4026503a93d224d7`.
 
 ## Every length, in micrometres and pixels
 
