@@ -567,6 +567,117 @@ def summarize_network(rows: list[dict], precision: int) -> dict:
     return stats
 
 
+# Network shape, report only
+# Restored from src/canal_physical/ablation.py at tag archive-2026-10-13, where
+# they were written to ask whether a detector is following the pixel grid rather
+# than the tissue, with the loop measures added beside them.
+#
+# NOTHING HERE FILTERS OR PRUNES. In particular no loop is ever removed: a loop
+# may be a tracing artefact or a real anastomosis, and these measures record how
+# many there are without deciding which.
+
+# A run this long or longer, perfectly horizontal or vertical, is counted. 8 px
+# is about 1 um at 0.13 um/px: over that distance a real thread curves, and these
+# images carry faint axis-aligned banding.
+STRAIGHT_RUN_MIN_PX = 8
+
+# Two nodes count as lying on one axis-aligned side if their rows or their
+# columns differ by at most this, which allows the one pixel of slack a cleaned
+# graph node can carry.
+RECTANGLE_TOLERANCE_PX = 1
+
+
+def straight_run_mask(skeleton: np.ndarray, min_length: int = STRAIGHT_RUN_MIN_PX) -> np.ndarray:
+    """Skeleton pixels inside a perfectly horizontal or vertical run of at least
+    `min_length` pixels.
+
+    A run is a maximal set of consecutive skeleton pixels along one image row or
+    one image column. A pixel that belongs to a long run in either direction is
+    marked. Diagonal and curved stretches are never marked, however long, so this
+    counts only structure that follows the pixel grid."""
+    marked = np.zeros_like(skeleton, dtype=bool)
+    for axis in (0, 1):
+        work = skeleton if axis == 1 else skeleton.T
+        out = np.zeros_like(work, dtype=bool)
+        for i in range(work.shape[0]):
+            line = work[i]
+            if not line.any():
+                continue
+            # Run boundaries along this line.
+            padded = np.concatenate(([False], line, [False]))
+            edges = np.flatnonzero(padded[1:] != padded[:-1])
+            for start, stop in zip(edges[0::2], edges[1::2]):
+                if stop - start >= min_length:
+                    out[i, start:stop] = True
+        marked |= out if axis == 1 else out.T
+    return marked
+
+
+def rectangle_count(graph) -> int:
+    """Closed loops of four nodes in the cleaned skeleton graph whose four sides
+    are all axis-aligned.
+
+    The loops come from networkx.cycle_basis, which gives one independent cycle
+    per loop in the graph, so this counts independent four-node loops and not
+    every way of walking one. A side counts as axis-aligned when its two nodes
+    share a row or a column to within RECTANGLE_TOLERANCE_PX. A real network has
+    no reason to close a rectangle on the pixel grid."""
+    real = canaliculi.real_subgraph(graph)
+    count = 0
+    for cycle in nx.cycle_basis(real):
+        if len(cycle) != 4:
+            continue
+        sides = list(zip(cycle, cycle[1:] + cycle[:1]))
+        if all(abs(u[0] - v[0]) <= RECTANGLE_TOLERANCE_PX or abs(u[1] - v[1]) <= RECTANGLE_TOLERANCE_PX
+               for u, v in sides):
+            count += 1
+    return count
+
+
+def loop_measures(graph) -> dict:
+    """How much of the network closes on itself.
+
+    loop_count is the number of independent cycles, the cyclomatic number
+    E - V + C, which is how many edges would have to be cut to leave a forest.
+    loop_edge_share is the share of real edges lying on at least one cycle: an
+    edge that is not a bridge is on a cycle, so this is 1 minus the bridge share.
+
+    A canalicular network is mostly tree-like out from each cell, so a high share
+    is worth looking at. It is reported, not acted on."""
+    import networkx as nx
+
+    real = canaliculi.real_subgraph(graph)
+    n_edges = real.number_of_edges()
+    if n_edges == 0:
+        return {"loop_count": 0, "loop_edge_share": None, "edge_count_real": 0}
+    components = nx.number_connected_components(real)
+    loops = n_edges - real.number_of_nodes() + components
+    bridges = sum(1 for _e in nx.bridges(real))
+    return {
+        "loop_count": int(loops),
+        "loop_edge_share": round((n_edges - bridges) / n_edges, 6),
+        "edge_count_real": int(n_edges),
+    }
+
+
+def network_shape_measures(skeleton: np.ndarray, graph, precision: int) -> dict:
+    """The report-only shape block: how much of the skeleton follows the pixel
+    grid, and how much of the network closes on itself."""
+    total = int(skeleton.sum())
+    straight = straight_run_mask(skeleton)
+    out = {
+        "status": "report only, nothing here filters or prunes",
+        "skeleton_px": total,
+        "straight_run_min_px": STRAIGHT_RUN_MIN_PX,
+        "straight_run_px": int(straight.sum()),
+        "straight_run_fraction": round(float(straight.sum()) / total, precision) if total else None,
+        "rectangle_count": rectangle_count(graph),
+        "rectangle_tolerance_px": RECTANGLE_TOLERANCE_PX,
+    }
+    out.update(loop_measures(graph))
+    return out
+
+
 def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_lacunae: int, precision: int,
                   flagged: np.ndarray | None = None, roi: np.ndarray | None = None,
                   unattached: np.ndarray | None = None) -> dict:
@@ -987,6 +1098,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
                                      len(kept), precision, detection["vascular"], roi_mask,
                                      detection.get("unattached"))
     limits = biological_limits_report(detection, net_rows, width, sample, precision)
+    shape = network_shape_measures(skeleton, detection["graph"], precision)
     return {
         "image_path": image_path,
         "label": detection["label"],
@@ -1001,6 +1113,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
         "width": width_image_measures(width, sample, precision),
         "width_values": width[sample],
         "biological_limits": limits,
+        "network_shape": shape,
         "parameters": {
             "lacunae": detection["lacunae_detection"]["parameters"],
             "canaliculi": detection["canaliculi_detection"]["parameters"],
@@ -1124,6 +1237,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "field": result["field"],
         "width": result["width"],
         "biological_limits": result["biological_limits"],
+        "network_shape": result["network_shape"],
         "lacunae": result["rows"],
         "parameters": result["parameters"],
         "provenance": lacunae.provenance(),

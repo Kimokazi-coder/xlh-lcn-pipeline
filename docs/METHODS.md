@@ -503,7 +503,31 @@ them; they keep their id, their centroid, their roots and their ring lengths.
 
 **Not validated.** No hand count chose any of these values.
 
-## 10. Normalised per-cell measures
+## 10. Network shape, report only
+
+Four measures that ask whether the traced network looks like tissue or like the
+pixel grid, and how much of it closes on itself. **Nothing here filters or
+prunes**, and in particular **no loop is ever removed**: a loop may be a tracing
+artefact or a real anastomosis, and these record how many there are without
+deciding which.
+
+| measure | what it is |
+|---|---|
+| `straight_run_fraction` | share of skeleton pixels inside a perfectly horizontal or vertical run of at least 8 px. A canaliculus has no reason to follow a row or a column, and these images carry faint axis-aligned banding, so a high share means the detector is following the grid |
+| `rectangle_count` | closed loops of four graph nodes whose four sides are all axis-aligned, to one pixel of slack. A real network has no reason to close a rectangle on the grid |
+| `loop_count` | independent cycles, the cyclomatic number E - V + C: how many edges would have to be cut to leave a forest |
+| `loop_edge_share` | share of real edges lying on at least one cycle, which is one minus the bridge share |
+
+The first two are restored verbatim from the ablation at tag
+`archive-2026-10-13`, where they were written for exactly this question. The two
+loop measures are new.
+
+`python src/diagnostics.py shape-picture -d data/WT -o results/network_shape`
+draws them: every skeleton pixel one pixel wide over the raw image, axis-aligned
+runs in blue, skeleton lying on a cycle in red, the rest green, lacunae outlined
+cyan.
+
+## 11. Normalised per-cell measures
 
 Appended after all existing columns of the per-lacuna rows and of the
 cross-image table, as interior means. No existing column changes name, order or
@@ -524,7 +548,7 @@ field length density weighted with chain code lengths ($\sqrt{2}$ per diagonal
 step); Sholl crossings at 10 / 20 / 30 px, the skeleton components crossing a
 1.5 px band at that distance, computed without the graph.
 
-## 11. Switches (all off by default)
+## 12. Switches (all off by default)
 
 In `config.py`; each comment names its evidence. They all act on the **lacuna**
 stage: the canalicular method has no switch, because there is only one method.
@@ -541,7 +565,7 @@ With all off, `results/` is reproduced exactly
   labels, 15 to 25 times faster. It changes speed, not output.
 `python src/diagnostics.py switch-check` shows what each one changes on a folder.
 
-## 12. Checks (`src/diagnostics.py`)
+## 13. Checks (`src/diagnostics.py`)
 
 - `reference-check`: 109.25 edges per cell, 24.11 px mean edge length and 6.00 roots per cell on
   543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
@@ -563,7 +587,7 @@ With all off, `results/` is reproduced exactly
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
 
-## 13. Figures
+## 14. Figures
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
 into `results/` (map: `results/README.md`). One display window for the whole

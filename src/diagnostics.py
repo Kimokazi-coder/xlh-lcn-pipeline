@@ -29,6 +29,8 @@ Subcommands:
                       value: percent changes of the network measures
     validate-network  roots and Sholl crossings against blind hand counts
                       (and the skeleton against traced threads); -s self-test
+    shape-picture     draw what the report-only shape measures count: the
+                      axis-aligned runs, the skeleton on a cycle
     survey            what the pipeline does to every image before anything is
                       changed: lacunae, rejected candidates and why, owned,
                       unowned and pruned skeleton, attachments across a gap
@@ -2349,6 +2351,78 @@ def cmd_survey(args) -> int:
     return 0
 
 
+# shape-picture ------------------------------------------------------------------
+# What the report-only shape measures count, drawn on the image. DIAGNOSIS ONLY.
+# Axis-aligned runs are the thing to look at: a canaliculus has no reason to run
+# perfectly along a row or a column, so a skeleton that does is following the
+# pixel grid or the banding in the image rather than the tissue.
+
+STRAIGHT_RUN_COLOUR = (0, 128, 255)   # blue: on an axis-aligned run
+LOOP_COLOUR = (255, 0, 0)             # red: on a cycle, not a bridge
+PLAIN_COLOUR = (0, 255, 0)            # green: ordinary skeleton
+
+
+def shape_picture(image_path: Path, out_dir: Path) -> Path:
+    """The skeleton over the raw image: axis-aligned runs in blue, skeleton on a
+    cycle in red, the rest green, lacunae outlined cyan. Every skeleton pixel is
+    drawn, one pixel wide."""
+    import networkx as nx
+    from skimage.io import imsave
+
+    lab = lacunae.image_label(image_path)
+    lac = lacunae.analyse_image(image_path)
+    display, channel = lacunae.load_channel(image_path)
+    net = canaliculi.analyse_network(image_path, lac, channel)
+    skel, graph = net["skeleton"], net["graph"]
+
+    canvas = display.copy()
+    if canvas.ndim == 2:
+        canvas = np.stack([canvas] * 3, axis=-1)
+    canvas = canvas.astype(np.uint8)
+    canvas[skel] = PLAIN_COLOUR
+
+    # Skeleton lying on a cycle: every real edge that is not a bridge, painted
+    # through the pixel paths the graph kept.
+    real = canaliculi.real_subgraph(graph)
+    on_cycle = np.zeros_like(skel)
+    if real.number_of_edges():
+        bridges = {frozenset(e) for e in nx.bridges(real)}
+        for u, v in real.edges():
+            if frozenset((u, v)) in bridges:
+                continue
+            for node in (u, v):
+                r, c = node
+                on_cycle[max(0, r - 1):r + 2, max(0, c - 1):c + 2] = True
+        on_cycle &= skel
+    canvas[on_cycle] = LOOP_COLOUR
+    canvas[quantification.straight_run_mask(skel)] = STRAIGHT_RUN_COLOUR
+    canvas[segmentation.find_boundaries(net["lacuna_id_map"] > 0, mode="outer")] = (0, 255, 255)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{lab}_network_shape.png"
+    imsave(path, canvas, check_contrast=False)
+    return path
+
+
+def cmd_shape_picture(args) -> int:
+    rows = []
+    for image_path in images_from(args):
+        path = shape_picture(image_path, args.out)
+        lab = lacunae.image_label(image_path)
+        lac = lacunae.analyse_image(image_path)
+        _d, channel = lacunae.load_channel(image_path)
+        net = canaliculi.analyse_network(image_path, lac, channel)
+        shape = quantification.network_shape_measures(net["skeleton"], net["graph"], 4)
+        rows.append([lab, shape["skeleton_px"], shape["straight_run_px"],
+                     shape["straight_run_fraction"], shape["rectangle_count"],
+                     shape["loop_count"], shape["loop_edge_share"]])
+        print(f"picture -> {path.as_posix()}", flush=True)
+    print_table(["image", "skeleton px", "axis-aligned px", "straight run fraction",
+                 "rectangles", "loops", "loop edge share"], rows,
+                title="Network shape, report only: nothing here filters or prunes")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2429,6 +2503,14 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_network_sweep, image=None)
+
+    p = sub.add_parser("shape-picture",
+                       help="Draw what the report-only shape measures count.")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.set_defaults(func=cmd_shape_picture)
 
     p = sub.add_parser("survey",
                        help="What the pipeline does to every image (measurement only).")
