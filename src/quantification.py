@@ -1085,6 +1085,7 @@ def save_json(result: dict, out_path: Path) -> None:
         "summary": result["summary"],
         "field": result["field"],
         "width": result["width"],
+        "biological_limits": result["biological_limits"],
         "lacunae": result["rows"],
         "parameters": result["parameters"],
         "provenance": lacunae.provenance(),
@@ -1138,6 +1139,17 @@ def save_xlsx(result: dict, out_path: Path) -> None:
     for key, unit, _extra, _col in WIDTH_IMAGE_METRICS:
         kind = "headline" if key == "width_median_px" else "reported"
         width_sheet.append([key, kind, result["width"][key], unit])
+
+    # The biological limits, report only. Flattened so every value is readable
+    # beside its name, with the units in the name as everywhere else here.
+    limits_sheet = wb.create_sheet("biological_limits")
+    limits_sheet.append(["block", "item", "value"])
+    for block, body in result["biological_limits"].items():
+        if not isinstance(body, dict):
+            limits_sheet.append(["", block, body])
+            continue
+        for item, value in body.items():
+            limits_sheet.append([block, item, str(value) if isinstance(value, list) else value])
 
     per_lacuna = wb.create_sheet("per_lacuna")
     columns = lacuna_columns(result["rows"])

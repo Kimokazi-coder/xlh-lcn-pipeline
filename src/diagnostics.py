@@ -98,14 +98,16 @@ def images_from(args) -> list[Path]:
 
 REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
 
-# The regression check for the default pipeline, fixed on 2026-09-28 when
-# hysteresis and gap bridging became the defaults (before that it was 37.00
-# Means are over interior lacunae, rounded to
-# 2 decimals.
+# The quick check that the default pipeline still gives what it gave. Fixed on
+# 2026-10-13, when the ridge method with gap bridging off became the one method
+# and the 50 um length limit was added. Means are over interior lacunae, rounded
+# to 2 decimals. The third number was "gap bridges added", which no longer
+# exists; roots per cell takes its place, being a headline measure that does not
+# depend on ownership and the one a manual count will be compared against.
 REFERENCE_VALUES = [
-    ("edges per interior cell (mean edge_count)", 62.33),
-    ("mean edge length, px (interior mean of mean_edge_length_px)", 27.41),
-    ("gap bridges added", 21),
+    ("edges per interior cell (mean edge_count)", 109.25),
+    ("mean edge length, px (interior mean of mean_edge_length_px)", 24.11),
+    ("roots per interior cell (mean roots_count)", 6.0),
 ]
 
 
@@ -115,7 +117,7 @@ def cmd_reference_check(args) -> int:
     measured = [
         round(s["edge_count"]["mean"], 2),
         round(s["mean_edge_length_px"]["mean"], 2),
-        len(result["bridges"]),
+        round(s["roots_count"]["mean"], 2),
     ]
     rows, ok = [], True
     for (name, expected), value in zip(REFERENCE_VALUES, measured):
