@@ -44,6 +44,9 @@ Subcommands:
                       rule that holds every touching thread away from a named
                       lacuna, and a census of roots, owned px and touching but
                       unowned px for every lacuna of every image
+    contact-handover  the contact rule on against off, pixel by pixel: what
+                      each lacuna gained, what it lost, and whether what it lost
+                      went to a body nearer that skeleton than its own
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -65,6 +68,7 @@ Usage (from the repo root):
     python src/diagnostics.py diagnose-untraced -i "data/WT/543_3.tif" -o results/diagnosis \
         --lacunae 1,7 --blobs "40,290;480,460;285,855;820,155"
     python src/diagnostics.py contact -o results/contact --points "543_3:340,250" --pictures
+    python src/diagnostics.py contact-handover -d data/WT -o results/contact_census
 """
 
 from __future__ import annotations
@@ -2563,21 +2567,36 @@ CONTACT_ZOOM = 4
 CONTACT_PICTURE_RADIUS_PX = 120
 
 
-def contact_detection(image_path: Path) -> dict:
+def contact_detection(image_path: Path, contact_reach_px: int | None = None) -> dict:
     """One image through the pipeline's own functions, with everything both
     parts of the contact report read: the ridge response with its cuts and the
     threshold the attach test uses, the skeleton before and after the 50 um
     prune, the cleaned graph with its ownership, and the Euclidean partition
-    attachment is decided on."""
-    lac = lacunae.analyse_image(image_path)
-    display, channel = lacunae.load_channel(image_path)
-    net = canaliculi.analyse_network(image_path, lac, channel)
+    attachment is decided on.
+
+    `contact_reach_px` replaces canaliculi.CONTACT_REACH_PX for this run only,
+    the module-override idiom the sweep diagnostics use; 0 turns the contact
+    rule off, which is the behaviour before it existed. The default, None,
+    leaves the pipeline exactly as it is configured."""
+    saved = canaliculi.CONTACT_REACH_PX
+    if contact_reach_px is not None:
+        canaliculi.CONTACT_REACH_PX = int(contact_reach_px)
+    try:
+        lac = lacunae.analyse_image(image_path)
+        display, channel = lacunae.load_channel(image_path)
+        net = canaliculi.analyse_network(image_path, lac, channel)
+        reach_used = canaliculi.CONTACT_REACH_PX
+    finally:
+        # A worker process runs several images: put the default back, so no
+        # setting leaks into the next one.
+        canaliculi.CONTACT_REACH_PX = saved
     high = float(net["t_lo"])
     low = high * canaliculi.HYSTERESIS_LOW_FRACTION
     dist, nearest_id, nearest_index = canaliculi.nearest_lacuna_map(net["lacuna_id_map"])
     return {
         "label": lacunae.image_label(image_path),
         "image_path": image_path,
+        "contact_reach_px": reach_used,
         "lac": lac,
         "display": display,
         "n_lacunae": len(lac["kept"]),
@@ -2591,7 +2610,9 @@ def contact_detection(image_path: Path) -> dict:
         # The exact number attach_lacunae compares a path minimum against.
         "attach_min_signal": low * config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION,
         "skeleton": net["skeleton"],
+        "skeleton_first_pass": net["skeleton_first_pass"],
         "skeleton_before_prune": net["skeleton_before_length_prune"],
+        "dim_pass_px": net["dim_pass_px"],
         "unattached": net["unattached"],
         "owner_map": net["owner_map"],
         "graph": net["graph"],
@@ -2659,7 +2680,11 @@ def contact_image_summary(d: dict, rows: list, near_px: int) -> dict:
     return {
         "image_label": d["label"],
         "lacunae": len(rows),
+        "contact_reach_px": d["contact_reach_px"],
         "skeleton_px": int(skel.sum()),
+        # Detection, which no ownership rule may touch.
+        "first_pass_skeleton_px": int(d["skeleton_first_pass"].sum()),
+        "dim_pass_px": int(d["dim_pass_px"]),
         "owned_px": int((skel & (owner_map > 0)).sum()),
         "unowned_px": int((skel & (owner_map == 0)).sum()),
         "unattached_px": int(d["unattached"].sum()),
@@ -2763,15 +2788,18 @@ def contact_lacuna_report(d: dict, lacuna_id: int, near_px: int, point: list | N
         path_min = canaliculi.path_min_signal(d["response"], sr, sc, r, c)
         passes = path_min >= d["attach_min_signal"]
         attached = G.has_edge(("cell", lacuna_id), node)
+        contact = attached and g <= d["contact_reach_px"]
         final = d["owner"].get(node)
         if final == lacuna_id:
-            rule = "owned by this lacuna"
+            rule = ("owned by this lacuna, attached by contact" if contact
+                    else "owned by this lacuna")
         elif nearest != lacuna_id:
             rule = (f"nearest-lacuna partition: attach_lacunae tests a node only against its "
                     f"nearest lacuna, which is lacuna {nearest} here")
-        elif not passes:
+        elif not attached:
             rule = (f"attach signal test: the dimmest point of the path is {path_min:.8f}, "
-                    f"below the required {d['attach_min_signal']:.8f}")
+                    f"below the required {d['attach_min_signal']:.8f}, and {g:.1f} px is beyond "
+                    f"the {d['contact_reach_px']} px contact reach")
         elif final is None:
             rule = "attached to this lacuna but the node is unowned"
         else:
@@ -2786,6 +2814,7 @@ def contact_lacuna_report(d: dict, lacuna_id: int, near_px: int, point: list | N
             "required_min_response": round(d["attach_min_signal"], 8),
             "passes_signal_test": bool(passes),
             "attached_to_this_lacuna": bool(attached),
+            "attached_by": ("contact" if contact else "signal" if attached else None),
             "final_owner": final,
             "graph_px_from_this_lacuna": (round(float(dist_from_here[node]), 1)
                                           if node in dist_from_here else None),
@@ -2817,9 +2846,11 @@ def contact_lacuna_report(d: dict, lacuna_id: int, near_px: int, point: list | N
         elif not any(n["nearest_lacuna_id"] == lacuna_id for n in comp_nodes):
             rule = ("nearest-lacuna partition: every node of this thread near the body is "
                     "nearer another lacuna, so this lacuna was never tested against it")
-        elif not any(n["passes_signal_test"] for n in comp_nodes
-                     if n["nearest_lacuna_id"] == lacuna_id):
-            rule = "attach signal test refused every node of this thread"
+        elif not any(n["attached_to_this_lacuna"] for n in comp_nodes):
+            out_px = min(n["gap_to_body_px"] for n in comp_nodes
+                         if n["nearest_lacuna_id"] == lacuna_id)
+            rule = (f"attach signal test refused every node of this thread; the nearest lies "
+                    f"{out_px} px out, beyond the {d['contact_reach_px']} px contact reach")
         elif owners:
             rule = (f"shortest path assignment: attached here, but lacuna "
                     f"{max(owners, key=owners.get)} reaches it on a shorter path")
@@ -2951,9 +2982,9 @@ def _contact_one(job: tuple) -> dict:
     """One image in a worker process: the census rows, the per-image summary and
     the full report for any point named on this image. Everything it returns is
     JSON-able, so the arrays stay in the worker."""
-    path_str, points, near_px, picture_dir, radius_px, tag = job
+    path_str, points, near_px, picture_dir, radius_px, tag, contact_reach_px = job
     image_path = Path(path_str)
-    d = contact_detection(image_path)
+    d = contact_detection(image_path, contact_reach_px)
     rows = contact_census_rows(d, near_px)
     reports, pictures = [], []
     for x, y in points:
@@ -2973,6 +3004,7 @@ def _contact_one(job: tuple) -> dict:
         "pictures": pictures,
         "cuts": {"high_cut": round(d["high_cut"], 8), "low_cut": round(d["low_cut"], 8),
                  "attach_min_signal": round(d["attach_min_signal"], 8)},
+        "contact_reach_px": d["contact_reach_px"],
     }
 
 
@@ -2997,7 +3029,7 @@ def cmd_contact(args) -> int:
         raise SystemExit(f"--points names images that are not in the run: {sorted(unknown)}")
     picture_dir = str(args.out / "pictures") if args.pictures else ""
     jobs = [(str(p), points.get(lacunae.image_label(p), []), args.near,
-             picture_dir, args.radius, args.tag) for p in images]
+             picture_dir, args.radius, args.tag, args.contact_reach) for p in images]
     workers = max(1, min(args.workers, len(jobs)))
     with ProcessPoolExecutor(max_workers=workers) as ex:
         out = list(ex.map(_contact_one, jobs))
@@ -3035,6 +3067,8 @@ def cmd_contact(args) -> int:
         "tag": args.tag,
         "near_px": args.near,
         "roots_floor": CONTACT_ROOTS_FLOOR,
+        "contact_reach_px": (canaliculi.CONTACT_REACH_PX if args.contact_reach is None
+                             else args.contact_reach),
         "attach_reach_px": canaliculi.LACUNA_ATTACH_REACH_PX,
         "attach_min_signal_fraction": config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION,
         "cuts_per_image": {o["summary"]["image_label"]: o["cuts"] for o in out},
@@ -3087,10 +3121,16 @@ def cmd_contact(args) -> int:
                   f"{t['px_within_the_band']} in the band, nearest {t['nearest_px_to_body']} px, "
                   f"owners {t['owners_px'] or 'none'}")
             print(f"      {t['rule']}")
+        by_contact = sum(1 for n in r["nodes_within_the_attach_reach"]
+                         if n["attached_by"] == "contact")
+        print(f"  attachments: {by_contact} by contact, "
+              f"{sum(1 for n in r['nodes_within_the_attach_reach'] if n['attached_by'] == 'signal')}"
+              f" by signal, of {len(r['nodes_within_the_attach_reach'])} nodes within "
+              f"{canaliculi.LACUNA_ATTACH_REACH_PX} px")
         refused = [n for n in r["nodes_within_the_attach_reach"]
-                   if n["nearest_lacuna_id"] == r["lacuna_id"] and not n["passes_signal_test"]]
+                   if n["nearest_lacuna_id"] == r["lacuna_id"] and not n["attached_to_this_lacuna"]]
         if refused:
-            print(f"    nodes the signal test refused ({len(refused)} of "
+            print(f"    nodes it did not attach ({len(refused)} of "
                   f"{len(r['nodes_within_the_attach_reach'])} within "
                   f"{canaliculi.LACUNA_ATTACH_REACH_PX} px):")
             for n in refused[:6]:
@@ -3133,6 +3173,212 @@ def cmd_contact(args) -> int:
     print(f"\nreport -> {json_path}\ntable  -> {csv_path}")
     for p in pictures:
         print(f"picture -> {p}")
+    return 0
+
+
+# contact-handover ---------------------------------------------------------------
+# What changed hands when the contact rule was turned on, pixel by pixel.
+#
+# MEASUREMENT ONLY. Each image is run twice in one process, once with
+# canaliculi.CONTACT_REACH_PX = 0 (the behaviour before the rule) and once as
+# configured, and every skeleton pixel one lacuna owned before is followed to
+# where it went. That is what the per-lacuna guard is read on: a lacuna may lose
+# owned skeleton, but only to a lacuna whose body is NEARER that skeleton than
+# its own, which is the rule doing its work rather than taking something away.
+#
+# A pixel a lacuna owned before can go four ways, and they are counted apart:
+#   to a lacuna that touches that thread    the guard's exception: the body the
+#                           thread touches took it. "Touches" is the rule's own
+#                           word: the taker holds that thread through a CONTACT
+#                           attachment, a graph edge of weight 0, on that same
+#                           connected component.
+#   to a lacuna no nearer   reported beside it: the taker's body is no nearer
+#                           those pixels in a straight line than the old owner's.
+#                           Ownership runs along the network and not in straight
+#                           lines, so this is a weaker test than the one above
+#                           and the two are counted separately.
+#   to no one               a loss the guard does not excuse
+#   off the skeleton        the dim pass is seeded from OWNED skeleton, so more
+#                           ownership means more seeds and the mask, and with it
+#                           the centre line, can move by a pixel. Detection
+#                           itself is unchanged: the first-pass skeleton is
+#                           identical, which the contact census reports.
+
+# A lacuna is listed in full when it loses at least this share of its owned
+# skeleton. A REPORTING line; the guard itself is at 25%.
+HANDOVER_LIST_LOSS = 0.05
+HANDOVER_GUARD_LOSS = 0.25
+
+
+def _handover_one(job: tuple) -> dict:
+    path_str, near_px = job
+    image_path = Path(path_str)
+    before = contact_detection(image_path, 0)
+    after = contact_detection(image_path, None)
+    o0, o1 = before["owner_map"], after["owner_map"]
+    skel1 = after["skeleton"]
+    n = before["n_lacunae"]
+    assert n == after["n_lacunae"], "the lacuna stage must not depend on an ownership rule"
+
+    # Which lacuna touches which thread, in the rule's own terms: a contact
+    # attachment is the graph edge of weight 0 that attach_lacunae adds inside
+    # canaliculi.CONTACT_REACH_PX, and the thread is the connected component the
+    # attached node lies on.
+    comp1 = morphology.label(skel1, connectivity=2)
+    touches = set()
+    for u, v, data in after["graph"].edges(data=True):
+        if canaliculi._is_cell_node(u) == canaliculi._is_cell_node(v):
+            continue
+        cell, node = (u, v) if canaliculi._is_cell_node(u) else (v, u)
+        if float(data.get("weight", 1.0)) == 0.0:
+            touches.add((int(cell[1]), int(comp1[node[0], node[1]])))
+
+    # Distance from every pixel to each body, so "nearer" can be answered for
+    # the exact pixels that changed hands.
+    gaps = {i: contact_body_gap(before, i)[1] for i in range(1, n + 1)}
+
+    rows = []
+    for lacuna_id in range(1, n + 1):
+        had = o0 == lacuna_id
+        has = o1 == lacuna_id
+        lost = had & ~has
+        gained = has & ~had
+        off_skeleton = int((lost & ~skel1).sum())
+        to_none = int((lost & skel1 & (o1 == 0)).sum())
+        to_nearer = to_farther = to_touching = 0
+        takers: dict = {}
+        taken = lost & skel1 & (o1 > 0)
+        if taken.any():
+            mine_gap = gaps[lacuna_id]
+            for other in (int(v) for v in np.unique(o1[taken])):
+                m = taken & (o1 == other)
+                nearer = int((m & (gaps[other] < mine_gap)).sum())
+                on_touched = int(sum((m & (comp1 == c)).sum()
+                                     for c in (int(v) for v in np.unique(comp1[m]))
+                                     if (other, c) in touches))
+                px = int(m.sum())
+                to_nearer += nearer
+                to_farther += px - nearer
+                to_touching += on_touched
+                takers[other] = {"px": px, "nearer_px": nearer,
+                                 "on_a_thread_it_touches_px": on_touched}
+        owned0, owned1 = int(had.sum()), int(has.sum())
+        rows.append({
+            "image_label": before["label"],
+            "lacuna_id": lacuna_id,
+            "centroid_xy": contact_centroid(before["lacuna_id_map"] == lacuna_id),
+            "owned_px_before": owned0,
+            "owned_px_after": owned1,
+            "change_px": owned1 - owned0,
+            "change_pct": round(100.0 * (owned1 - owned0) / owned0, 2) if owned0 else None,
+            "roots_before": quantification.cell_root_count(before["graph"], lacuna_id),
+            "roots_after": quantification.cell_root_count(after["graph"], lacuna_id),
+            "lost_px": int(lost.sum()),
+            "lost_to_a_lacuna_that_touches_that_thread_px": to_touching,
+            "lost_to_a_nearer_lacuna_px": to_nearer,
+            "lost_to_a_lacuna_no_nearer_px": to_farther,
+            "lost_to_no_one_px": to_none,
+            "lost_off_the_skeleton_px": off_skeleton,
+            "lost_to": takers,
+            "gained_px": int(gained.sum()),
+            "gained_from_unowned_px": int((gained & (o0 == 0)).sum()),
+            "gained_from_another_lacuna_px": int((gained & (o0 > 0)).sum()),
+        })
+    return {
+        "image_label": before["label"],
+        "lacunae": n,
+        "first_pass_skeleton_px_before": int(before["skeleton_first_pass"].sum()),
+        "first_pass_skeleton_px_after": int(after["skeleton_first_pass"].sum()),
+        "skeleton_px_before": int(before["skeleton"].sum()),
+        "skeleton_px_after": int(skel1.sum()),
+        "owned_px_before": int((before["skeleton"] & (o0 > 0)).sum()),
+        "owned_px_after": int((skel1 & (o1 > 0)).sum()),
+        "rows": rows,
+    }
+
+
+def cmd_contact_handover(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    jobs = [(str(p), args.near) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        out = list(ex.map(_handover_one, jobs))
+    rows = [r for o in out for r in o["rows"]]
+
+    over = [r for r in rows if r["change_pct"] is not None
+            and r["change_pct"] <= -100 * HANDOVER_GUARD_LOSS]
+    unexcused = [r for r in rows
+                 if r["lost_px"] - r["lost_to_a_lacuna_that_touches_that_thread_px"]
+                 - r["lost_off_the_skeleton_px"] > 0]
+    detection_held = all(o["first_pass_skeleton_px_before"] == o["first_pass_skeleton_px_after"]
+                         for o in out)
+    report = {
+        "status": "measurement only: each image run twice, nothing in the pipeline was changed",
+        "contact_reach_px": canaliculi.CONTACT_REACH_PX,
+        "guard_loss_fraction": HANDOVER_GUARD_LOSS,
+        "detection_unchanged_on_every_image": detection_held,
+        "lacunae": len(rows),
+        "lacunae_that_gained": sum(1 for r in rows if r["change_px"] > 0),
+        "lacunae_unchanged": sum(1 for r in rows if r["change_px"] == 0),
+        "lacunae_that_lost": sum(1 for r in rows if r["change_px"] < 0),
+        "lacunae_past_the_guard": [f"{r['image_label']} lacuna {r['lacuna_id']}" for r in over],
+        "lacunae_losing_px_to_a_body_that_does_not_touch_that_thread":
+            [f"{r['image_label']} lacuna {r['lacuna_id']}" for r in unexcused],
+        "lost_px_total": sum(r["lost_px"] for r in rows),
+        "lost_to_a_lacuna_that_touches_that_thread_px_total":
+            sum(r["lost_to_a_lacuna_that_touches_that_thread_px"] for r in rows),
+        "lost_to_a_nearer_lacuna_px_total": sum(r["lost_to_a_nearer_lacuna_px"] for r in rows),
+        "lost_to_no_one_px_total": sum(r["lost_to_no_one_px"] for r in rows),
+        "lost_off_the_skeleton_px_total": sum(r["lost_off_the_skeleton_px"] for r in rows),
+        "per_image": [{k: v for k, v in o.items() if k != "rows"} for o in out],
+        "per_lacuna": rows,
+    }
+    args.out.mkdir(parents=True, exist_ok=True)
+    path = args.out / "contact_handover.json"
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(report, f, indent=2, default=float)
+
+    print_table(["image", "lacunae", "first-pass skel", "skeleton", "owned"],
+                [[o["image_label"], o["lacunae"],
+                  f"{o['first_pass_skeleton_px_before']} -> {o['first_pass_skeleton_px_after']}",
+                  f"{o['skeleton_px_before']} -> {o['skeleton_px_after']}",
+                  f"{o['owned_px_before']} -> {o['owned_px_after']}"] for o in out],
+                title=f"Contact reach {canaliculi.CONTACT_REACH_PX} px against 0 px, per image")
+    listed = sorted((r for r in rows if r["change_pct"] is not None
+                     and r["change_pct"] <= -100 * HANDOVER_LIST_LOSS),
+                    key=lambda r: r["change_pct"])
+    print_table(["image", "id", "owned before", "after", "change", "roots", "lost px",
+                 "to a body that touches it", "to a nearer body", "to no one",
+                 "off the skeleton"],
+                [[r["image_label"], r["lacuna_id"], r["owned_px_before"], r["owned_px_after"],
+                  f"{r['change_pct']:+.1f}%", f"{r['roots_before']} -> {r['roots_after']}",
+                  r["lost_px"], r["lost_to_a_lacuna_that_touches_that_thread_px"],
+                  r["lost_to_a_nearer_lacuna_px"], r["lost_to_no_one_px"],
+                  r["lost_off_the_skeleton_px"]] for r in listed],
+                title=f"\nEvery lacuna losing at least {100 * HANDOVER_LIST_LOSS:.0f}% of its "
+                      f"owned skeleton")
+    print(f"\nDetection unchanged on every image (first-pass skeleton pixel for pixel): "
+          f"{detection_held}")
+    print(f"{report['lacunae_that_gained']} lacunae gained, {report['lacunae_unchanged']} "
+          f"unchanged, {report['lacunae_that_lost']} lost.")
+    print(f"Past the {100 * HANDOVER_GUARD_LOSS:.0f}% guard: "
+          f"{report['lacunae_past_the_guard'] or 'none'}.")
+    for r in over:
+        print(f"  {r['image_label']} lacuna {r['lacuna_id']}: {r['lost_px']} px lost, "
+              f"{r['lost_to_a_lacuna_that_touches_that_thread_px']} to a body that touches that "
+              f"thread, {r['lost_to_a_nearer_lacuna_px']} to a nearer body, "
+              f"{r['lost_to_no_one_px']} to no one, "
+              f"{r['lost_off_the_skeleton_px']} off the skeleton; roots "
+              f"{r['roots_before']} -> {r['roots_after']}; taken by {r['lost_to']}")
+    print(f"Of {report['lost_px_total']} px that changed hands, "
+          f"{report['lost_to_a_lacuna_that_touches_that_thread_px_total']} went to a lacuna that "
+          f"touches that thread, {report['lost_to_no_one_px_total']} to no one and "
+          f"{report['lost_off_the_skeleton_px_total']} off the skeleton.")
+    print(f"Lacunae that lost skeleton to a body that does not touch that thread: "
+          f"{report['lacunae_losing_px_to_a_body_that_does_not_touch_that_thread'] or 'none'}.")
+    print(f"\nreport -> {path}")
     return 0
 
 
@@ -3285,9 +3531,26 @@ def main() -> None:
                    help=f"Half-width of those pictures (default {CONTACT_PICTURE_RADIUS_PX} px).")
     p.add_argument("--tag", default="now",
                    help="Name of this run, used in the output file names (default: now).")
+    p.add_argument("--contact-reach", dest="contact_reach", type=int, default=None,
+                   help=f"Replace canaliculi.CONTACT_REACH_PX for this run; 0 turns the contact "
+                        f"rule off, which is the behaviour before it (default: the configured "
+                        f"{canaliculi.CONTACT_REACH_PX} px).")
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_contact)
+
+    p = sub.add_parser("contact-handover",
+                       help="What changed hands when the contact rule was turned on.")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.add_argument("--near", type=int, default=CONTACT_CENSUS_NEAR_PX,
+                   help=f"How close to a body counts as touching it (default "
+                        f"{CONTACT_CENSUS_NEAR_PX} px).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each (two runs each).")
+    p.set_defaults(func=cmd_contact_handover)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

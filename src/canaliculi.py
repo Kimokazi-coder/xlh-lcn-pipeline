@@ -29,9 +29,11 @@ single 2D optical sections, which is behind every departure from it.
        short spurs, collapse crossing artefacts, merge degree-2 chains
        (OCY's Skel2Graph3D with THR_BRANCH).
     6. Ownership: each lacuna is a virtual source attached to skeleton nodes
-       near its body; one multi-source shortest-path run gives every
-       reachable node to the cell it connects to through the network, and
-       every edge to the owner of its nearer end (OCY_assign_dist.m).
+       near its body, by CONTACT within config.CONTACT_REACH_PX (no test, at
+       weight 0, so a touched lacuna owns what touches it) and by SIGNAL beyond
+       it; one multi-source shortest-path run gives every reachable node to the
+       cell it connects to through the network, and every edge to the owner of
+       its nearer end (OCY_assign_dist.m).
     7. Apply the biological length limit: every skeleton pixel further than
        config.MAX_CANALICULUS_LENGTH_UM from the surface of its owning lacuna,
        measured ALONG THE NETWORK, is pruned, and ownership is rebuilt on what
@@ -228,6 +230,13 @@ GRAPH_CLEANUP_MAX_ITER = 20
 # within reach attaches only if the straight path from the lacuna surface to it
 # carries ridge response all the way, so a path across empty space is refused.
 LACUNA_ATTACH_REACH_PX = config.px_int(config.LACUNA_ATTACH_REACH_UM)
+
+# How close a skeleton node must be to a lacuna body to attach to it by CONTACT:
+# no signal test, and at weight 0, so the touched lacuna reaches it before any
+# neighbour can. Already in pixels in config.py; see the comment there. Setting
+# it to 0 turns the rule off, which is how the before and after runs of the
+# contact diagnostic are made.
+CONTACT_REACH_PX = config.CONTACT_REACH_PX
 
 # How close a thread must come to a lacuna to count as ATTACHED for the ring
 # attached length measure. This was the ownership reach while ownership went by
@@ -588,15 +597,29 @@ def clean_network_graph(G: nx.Graph, dist_to_lacuna: np.ndarray) -> nx.Graph:
 def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
                    nearest_index: np.ndarray, cell_ids: list[int], response: np.ndarray,
                    min_signal: float) -> nx.Graph:
-    """Add a virtual ("cell", id) node per lacuna, linked to every skeleton node
-    within LACUNA_ATTACH_REACH_PX of its body THAT HAS SIGNAL ALL THE WAY TO IT.
-    The link weight is the gap distance, so paths start at the cell boundary.
+    """Add a virtual ("cell", id) node per lacuna, linked to the skeleton nodes
+    near its body. Every node is offered to its NEAREST lacuna only, and that
+    lacuna takes it under one of two rules:
 
-    Distance alone would hand a lacuna any network that happened to pass nearby,
-    across empty space; the survey found about half of all attachments doing
-    exactly that. So the straight path from the nearest point of the lacuna
-    surface to the node is sampled on the ridge response, and its dimmest point
-    must reach `min_signal`, or the node does not attach to that lacuna."""
+    CONTACT, within CONTACT_REACH_PX of the body: no test, at weight 0. Inside
+    that reach there is no empty space between body and node to cross, so there
+    is nothing for a signal test to decide, and the weight is 0 because the
+    thread starts at the surface. The zero weight is the whole point: it makes
+    contact happen before the shortest path assignment that follows, so a lacuna
+    that is touched owns what touches it and no neighbour can reach that node
+    first and swallow the thread. Without it the flattening decides: the top-hat
+    digs a trough around every body, and a path leaving a surface crosses that
+    trough at its dimmest point, so the signal test below refused threads that
+    visibly touch the cell (92 of 108 lacunae had skeleton within 8 px of the
+    body that they did not own: python src/diagnostics.py contact).
+
+    SIGNAL, from there out to LACUNA_ATTACH_REACH_PX, at weight = the gap, so
+    the path starts at the cell boundary. Distance alone would hand a lacuna any
+    network that happened to pass nearby, across empty space; the survey found
+    about half of all attachments doing exactly that. So the straight path from
+    the nearest point of the lacuna surface to the node is sampled on the ridge
+    response, and its dimmest point must reach `min_signal`, or the node does not
+    attach to that lacuna."""
     for node in list(G.nodes()):
         r, c = node
         gap = float(dist_to_lacuna[r, c])
@@ -604,6 +627,9 @@ def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarr
             continue
         lacuna_id = int(nearest_id[r, c])
         if lacuna_id not in cell_ids:
+            continue
+        if gap <= CONTACT_REACH_PX:
+            G.add_edge(("cell", lacuna_id), node, weight=0.0)
             continue
         sr, sc = int(nearest_index[0, r, c]), int(nearest_index[1, r, c])
         if path_min_signal(response, sr, sc, r, c) < min_signal:
@@ -879,6 +905,11 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     preprocessed = preprocess_channel(channel)
     candidate, t_lo, response = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
     skeleton = morphology.skeletonize(candidate)
+    # What the ridge threshold alone traced. Nothing about ownership enters it,
+    # so it is the skeleton an ownership rule must leave pixel for pixel alone;
+    # the dim pass below is seeded from OWNED skeleton and so does follow
+    # ownership, by design (section 8 of docs/METHODS.md).
+    skeleton_first_pass = skeleton
 
     dist_to_lacuna, nearest_id, nearest_index = nearest_lacuna_map(lacuna_id_map)
     # Attachment is by signal: the dimmest point of the straight path from a
@@ -923,6 +954,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "unattached": unattached,
         "unattached_px": int(unattached.sum()),
         "skeleton": skeleton,
+        "skeleton_first_pass": skeleton_first_pass,
         "skeleton_before_length_prune": skeleton_before,
         "length_prune": prune,
         "flagged": flagged,
@@ -1010,6 +1042,7 @@ def parameters(result: dict) -> dict:
         "lacuna_attach_reach_um": config.LACUNA_ATTACH_REACH_UM,
         "lacuna_attach_reach_px": LACUNA_ATTACH_REACH_PX,
         "lacuna_attach_min_signal_fraction": config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION,
+        "contact_reach_px": CONTACT_REACH_PX,
         "lacuna_attach_rule": ("a node attaches only if the dimmest ridge response on the straight "
                                "path from the lacuna surface to it reaches that fraction of the "
                                "response's own low cut"),

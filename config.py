@@ -186,6 +186,35 @@ MAX_CANALICULUS_LENGTH_UM = 50.0
 LACUNA_ATTACH_REACH_UM = 2.6
 LACUNA_ATTACH_MIN_SIGNAL_FRACTION = 0.7
 
+# CONTACT. A skeleton node this close to a lacuna body attaches to its nearest
+# lacuna with NO signal test, and attaches at weight 0. The zero weight is what
+# makes contact happen BEFORE the shortest path assignment: the touched lacuna
+# starts at its own surface with nothing in between, so no neighbour can reach
+# that node on a shorter path and take the thread that touches it. Beyond this
+# reach nothing changes: LACUNA_ATTACH_MIN_SIGNAL_FRACTION above governs, out to
+# LACUNA_ATTACH_REACH_UM.
+#
+# Why a band with no test at all. The top-hat flattening removes the lacuna
+# body, which digs a trough around every one of them, so the straight path from
+# a surface to a node 2 to 4 px out crosses that trough at its dimmest point and
+# the test refuses a thread that visibly touches the cell. Measured on all 8 WT
+# images before the rule (python src/diagnostics.py contact): 92 of 108 lacunae
+# had skeleton within 8 px of the body that they did not own, 12.2% of all
+# touching skeleton, and 7 lacunae owned nothing at all. On the four lacunae the
+# rule was opened on, the test refused 8 of 17, 11 of 11, 5 of 6 and 8 of 10 of
+# the graph nodes within the attach reach, the nearest of them 2.8 to 3.2 px
+# from the body. Inside this reach there is no empty space for an attachment to
+# cross, which is what contact means and is why the test can be dropped here and
+# only here.
+#
+# This is the one limit written in PIXELS and not in micrometres, because it is
+# pixel geometry and not a biological length: the network mask has every body
+# plus canaliculi.LACUNA_DILATION_PX = 2 px cut out of it, so a thread's centre
+# line can never sit nearer than about 3 px to a body, and 6 px is that buffer
+# plus one thread half width (p50 3.0 px). 6 px is 0.78 um.
+# NOT VALIDATED: no hand count chose this reach.
+CONTACT_REACH_PX = 6
+
 # (c) The second, dimmer pass. A canaliculus that leaves a lacuna often fades
 # before it ends, and the survey found 11 to 13% of the area within 150 px of a
 # lacuna carrying ridge response between half the low cut and the low cut: real

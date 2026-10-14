@@ -72,11 +72,13 @@ these are single 2D sections, which drives every departure.
 6. **Graph and cleanup** (OCY): spurs under 4 px are pruned, internal edges
    under 6 px (thread crossings) are collapsed, degree-2 chains merged, all
    repeated until nothing changes.
-7. **Ownership** (OCY, with one departure): each lacuna is attached to skeleton
-   nodes within 20 px of its body **that have ridge signal all the way to it**
-   (section 8). One multi-source shortest-path run then gives every reachable
-   node to the cell it connects to through the network, and each edge to the
-   owner of its nearer end.
+7. **Ownership** (OCY, with two departures): each lacuna is attached to skeleton
+   nodes near its body, by **contact** within 6 px (no test, at weight 0, so a
+   lacuna that is touched owns what touches it) and beyond that only to nodes
+   **that have ridge signal all the way to it**, out to 20 px (section 8). One
+   multi-source shortest-path run then gives every reachable node to the cell it
+   connects to through the network, and each edge to the owner of its nearer
+   end.
 8. **Second, dimmer pass** (section 8): continue the threads a lacuna owns into
    response down to half the low cut, no further than 5 px past where the owned
    skeleton already reaches, then redo the graph and the ownership on the grown
@@ -134,6 +136,7 @@ held out and used to confirm.
 | limits | maximum canalicular length | 50 um = 385 px | the outer end of the reported lacuna-to-lacuna spacing in mouse cortical bone, so a thread longer than this from one cell body is not one canaliculus. A plausibility bound from the literature, NOT validated on this data and never tuned to improve a result |
 | limits | reported length range | 25 to 50 um | report only, acted on by nothing; the range the literature reports for canalicular length |
 | ownership | attach reach | 2.6 um = 20 px | was 10 px while attachment went by distance alone. With the signal test deciding, a longer reach cannot cross empty space, and contact threads sat 10 to 20 px out. 25 px was tried and changed no guard number, so the shorter value stands |
+| ownership | contact reach | 6 px = 0.78 um | the 2 px mask buffer plus one thread half width (p50 3.0 px), so it is the band in which a thread can touch a body at all. In pixels, not micrometres, because it is pixel geometry. Inside it a node attaches with no signal test and at weight 0; measured cause in section 8 |
 | ownership | attach minimum signal | 0.7 of the response's low cut | the fraction the old gap bridging required of a gap, measured the same way: the MINIMUM along the path, not the mean |
 | second pass | dim cut | 0.5 of the response's low cut | the floor the survey measured the faint band against |
 | second pass | dim reach | 0.65 um = 5 px | how far a dim thread may continue past owned skeleton. 10 px was tried and took the skeleton past the 25% guard on four images |
@@ -524,6 +527,74 @@ neighbour takes the whole connected component.
 The pictures are in `results/contact_census/pictures/` (green: owned by this
 lacuna, orange: owned by another, magenta: unowned, gold: cut by the 50 um
 limit, cyan: the body).
+
+### Contact: a lacuna owns the thread that touches it
+
+The census above says what is wrong and which rule does it, so the rule is where
+the fix goes. A skeleton node within `config.CONTACT_REACH_PX` = 6 px (0.78 um)
+of a lacuna body attaches to its nearest lacuna **with no signal test**, and
+attaches **at weight 0**.
+
+Both halves matter.
+
+- **No test**, because inside 6 px there is nothing for the test to decide. The
+  mask has every body plus a 2 px buffer cut out of it, so a thread's centre line
+  can never sit nearer than about 3 px to a body, and 6 px is that buffer plus
+  one thread half width (p50 3.0 px). There is no room in that band for the
+  empty space the test exists to refuse, while there is quite enough for the
+  trough the top-hat digs around every body, which is what the test was actually
+  refusing.
+- **At weight 0**, because that is what puts contact *before* the shortest path
+  assignment. The attachment edge carries the gap as its weight, so a lacuna
+  that attaches 5 px out starts 5 px behind one that attaches at its own
+  surface. A contact thread starts at the surface: there is nothing in between
+  to cross. With the weight at 0 the touched lacuna reaches that node at
+  distance 0, which no neighbour can beat on any path, so **a lacuna that is
+  touched owns what touches it and no neighbour can swallow it**. Everything
+  past that node is still decided by the same multi-source Dijkstra on the same
+  network distances, and nothing else changes.
+
+Beyond 6 px nothing changes at all: the signal test still governs, out to
+`config.LACUNA_ATTACH_REACH_UM` = 20 px, and the 50 um prune is untouched.
+
+Setting `canaliculi.CONTACT_REACH_PX` to 0 turns the rule off and reproduces the
+pipeline exactly as it was, which is how the before runs below are made
+(`--contact-reach 0`): checked, and every census number of the before run is
+identical to the run made before the rule existed.
+
+**The four lacunae.** Band figures are the skeleton within 8 px of the body,
+then within 20 px, as its own / unowned / another lacuna's.
+
+| lacuna | roots | owned px | 8 px band | 20 px band | cut by the 50 um limit |
+|---|---|---|---|---|---|
+| 542_z06 id 15 (400, 952) | 5 **6** | 770 **770** | 44/3/0 **44/3/0** | 115/31/0 **115/31/0** | 9 / 38 |
+| 543_3 id 3 (340, 251) | 0 **3** | 0 **881** | 0/4/10 **16/0/0** | 0/29/52 **69/14/0** | 16 / 63 |
+| 543_3 id 8 (198, 635) | 1 **2** | 11 **11** | 8/8/0 **8/7/0** | 11/42/0 **11/41/0** | 0 / 17 |
+| 543_3 id 1 (271, 79) | 2 **3** | 158 **811** | 4/9/0 **7/3/0** | 20/60/14 **41/36/14** | 0 / 0 |
+
+Pictures, before and after, in `results/contact_census/pictures/`
+(`<label>_lacuna<id>_before.png` and `_after.png`, and `_x4` of each).
+
+- **543_3 id 3**, which owned nothing: it now owns 881 px and 3 roots, and the
+  two threads that touch it (3596 px and 2679 px) are shared with the
+  neighbours instead of being handed to them whole. Its 8 px band went from 0 of
+  14 px to 16 of 16.
+- **543_3 id 1**: 158 px to 811 px, 2 roots to 3. The thread on its left, 664 px
+  long and unowned before, is now its.
+- **542_z06 id 15**: 5 roots to 6, owned length unchanged. Within 8 px it
+  already owned 44 of 47 px before the rule, so there was little there to
+  recover. What is missing beside this body is **not an ownership failure**: 38
+  px within 20 px of it were cut by the 50 um length limit, and the rest sit 9 to
+  20 px out across paths whose dimmest point is 0.0055 to 0.0170 against the
+  0.0195 the signal test asks.
+- **543_3 id 8**, the stub: 1 root to 2, owned length unchanged at 11 px. This
+  one is **not fixed**, and the measurement says why. Every thread near it
+  except the stub lies 7.0 px or further from the body, past the contact reach,
+  and the straight paths to them carry 0.0000 to 0.0144 against the 0.0152 the
+  signal test asks, 0 to 57% of it. The space between this body and those
+  threads is genuinely dark, not a trough beside a bright thread. Reaching them
+  would mean setting the contact reach from this one lacuna, which is the kind
+  of per-image tuning this pipeline does not do.
 
 ## 9. Lacunae the filters used to miss
 

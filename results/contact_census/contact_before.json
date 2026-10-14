@@ -3,6 +3,7 @@
   "tag": "before",
   "near_px": 8,
   "roots_floor": 3,
+  "contact_reach_px": 0,
   "attach_reach_px": 20,
   "attach_min_signal_fraction": 0.7,
   "cuts_per_image": {
@@ -66,7 +67,10 @@
     {
       "image_label": "542_z06",
       "lacunae": 19,
+      "contact_reach_px": 0,
       "skeleton_px": 39224,
+      "first_pass_skeleton_px": 38842,
+      "dim_pass_px": 38718,
       "owned_px": 28514,
       "unowned_px": 10710,
       "unattached_px": 375,
@@ -87,7 +91,10 @@
     {
       "image_label": "542_z18",
       "lacunae": 13,
+      "contact_reach_px": 0,
       "skeleton_px": 36672,
+      "first_pass_skeleton_px": 37584,
+      "dim_pass_px": 29895,
       "owned_px": 22862,
       "unowned_px": 13810,
       "unattached_px": 372,
@@ -108,7 +115,10 @@
     {
       "image_label": "543-2",
       "lacunae": 12,
+      "contact_reach_px": 0,
       "skeleton_px": 37787,
+      "first_pass_skeleton_px": 45028,
+      "dim_pass_px": 40283,
       "owned_px": 29152,
       "unowned_px": 8635,
       "unattached_px": 465,
@@ -129,7 +139,10 @@
     {
       "image_label": "543_3",
       "lacunae": 13,
+      "contact_reach_px": 0,
       "skeleton_px": 35600,
+      "first_pass_skeleton_px": 45929,
+      "dim_pass_px": 33135,
       "owned_px": 21261,
       "unowned_px": 14339,
       "unattached_px": 224,
@@ -150,7 +163,10 @@
     {
       "image_label": "543_z13",
       "lacunae": 11,
+      "contact_reach_px": 0,
       "skeleton_px": 41364,
+      "first_pass_skeleton_px": 44036,
+      "dim_pass_px": 34812,
       "owned_px": 28210,
       "unowned_px": 13154,
       "unattached_px": 256,
@@ -171,7 +187,10 @@
     {
       "image_label": "682_z08",
       "lacunae": 11,
+      "contact_reach_px": 0,
       "skeleton_px": 35081,
+      "first_pass_skeleton_px": 37393,
+      "dim_pass_px": 33667,
       "owned_px": 25932,
       "unowned_px": 9149,
       "unattached_px": 1011,
@@ -192,7 +211,10 @@
     {
       "image_label": "682_z23",
       "lacunae": 14,
+      "contact_reach_px": 0,
       "skeleton_px": 36044,
+      "first_pass_skeleton_px": 42338,
+      "dim_pass_px": 31574,
       "owned_px": 24002,
       "unowned_px": 12042,
       "unattached_px": 560,
@@ -213,7 +235,10 @@
     {
       "image_label": "682_z29",
       "lacunae": 15,
+      "contact_reach_px": 0,
       "skeleton_px": 33573,
+      "first_pass_skeleton_px": 40336,
+      "dim_pass_px": 29342,
       "owned_px": 23274,
       "unowned_px": 10299,
       "unattached_px": 513,
@@ -2327,6 +2352,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 2.2,
           "graph_px_from_its_owner": 2.2,
@@ -2344,6 +2370,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 2.8,
           "graph_px_from_its_owner": 2.8,
@@ -2361,6 +2388,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 15,
           "graph_px_from_this_lacuna": 17.0,
           "graph_px_from_its_owner": 17.0,
@@ -2378,6 +2406,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 3.2,
           "graph_px_from_its_owner": 3.2,
@@ -2395,6 +2424,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 4.1,
           "graph_px_from_its_owner": 4.1,
@@ -2412,6 +2442,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 4.2,
           "graph_px_from_its_owner": 4.2,
@@ -2429,6 +2460,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 5.0,
           "graph_px_from_its_owner": 5.0,
@@ -2446,6 +2478,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 6.0,
           "graph_px_from_its_owner": 6.0,
@@ -2463,6 +2496,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 6.3,
           "graph_px_from_its_owner": 6.3,
@@ -2480,11 +2514,12 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 240,
-          "rule": "attach signal test: the dimmest point of the path is 0.00547365, below the required 0.01950723"
+          "rule": "attach signal test: the dimmest point of the path is 0.00547365, below the required 0.01950723, and 9.1 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2497,6 +2532,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 15,
           "graph_px_from_this_lacuna": 212.0,
           "graph_px_from_its_owner": 212.0,
@@ -2514,11 +2550,12 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 236,
-          "rule": "attach signal test: the dimmest point of the path is 0.00377760, below the required 0.01950723"
+          "rule": "attach signal test: the dimmest point of the path is 0.00377760, below the required 0.01950723, and 10.4 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2531,6 +2568,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 15,
           "graph_px_from_this_lacuna": 19.8,
           "graph_px_from_its_owner": 19.8,
@@ -2548,11 +2586,12 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 217,
-          "rule": "attach signal test: the dimmest point of the path is 0.00081223, below the required 0.01950723"
+          "rule": "attach signal test: the dimmest point of the path is 0.00081223, below the required 0.01950723, and 14.0 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2565,6 +2604,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 15,
           "graph_px_from_this_lacuna": 16.3,
           "graph_px_from_its_owner": 16.3,
@@ -2582,11 +2622,12 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 198,
-          "rule": "attach signal test: the dimmest point of the path is 0.00000000, below the required 0.01950723"
+          "rule": "attach signal test: the dimmest point of the path is 0.00000000, below the required 0.01950723, and 18.8 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2599,6 +2640,7 @@
           "required_min_response": 0.01950723,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 15,
           "graph_px_from_this_lacuna": 51.0,
           "graph_px_from_its_owner": 51.0,
@@ -2676,7 +2718,7 @@
           "nodes_within_the_attach_reach": 4,
           "nodes_with_this_lacuna_as_nearest": 4,
           "nodes_passing_the_signal_test": 0,
-          "rule": "attach signal test refused every node of this thread"
+          "rule": "attach signal test refused every node of this thread; the nearest lies 3.0 px out, beyond the 0 px contact reach"
         },
         {
           "component": 14,
@@ -2691,7 +2733,7 @@
           "nodes_within_the_attach_reach": 2,
           "nodes_with_this_lacuna_as_nearest": 2,
           "nodes_passing_the_signal_test": 0,
-          "rule": "attach signal test refused every node of this thread"
+          "rule": "attach signal test refused every node of this thread; the nearest lies 4.1231 px out, beyond the 0 px contact reach"
         },
         {
           "component": 45,
@@ -2704,7 +2746,7 @@
           "nodes_within_the_attach_reach": 2,
           "nodes_with_this_lacuna_as_nearest": 2,
           "nodes_passing_the_signal_test": 0,
-          "rule": "attach signal test refused every node of this thread"
+          "rule": "attach signal test refused every node of this thread; the nearest lies 4.1231 px out, beyond the 0 px contact reach"
         }
       ],
       "nodes_within_the_attach_reach": [
@@ -2719,11 +2761,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 5,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 77.7,
           "component": 52,
-          "rule": "attach signal test: the dimmest point of the path is 0.01161396, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.01161396, below the required 0.01524053, and 3.0 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2736,11 +2779,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 4,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 351.0,
           "component": 14,
-          "rule": "attach signal test: the dimmest point of the path is 0.00899373, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00899373, below the required 0.01524053, and 4.1 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2753,11 +2797,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 45,
-          "rule": "attach signal test: the dimmest point of the path is 0.01283251, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.01283251, below the required 0.01524053, and 4.1 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2770,11 +2815,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 5,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 81.3,
           "component": 52,
-          "rule": "attach signal test: the dimmest point of the path is 0.00074251, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00074251, below the required 0.01524053, and 10.3 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2787,11 +2833,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 5,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 68.3,
           "component": 52,
-          "rule": "attach signal test: the dimmest point of the path is 0.00966971, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00966971, below the required 0.01524053, and 12.0 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2804,11 +2851,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 5,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 77.3,
           "component": 52,
-          "rule": "attach signal test: the dimmest point of the path is 0.00291102, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00291102, below the required 0.01524053, and 13.9 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2821,11 +2869,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 48,
-          "rule": "attach signal test: the dimmest point of the path is 0.00313515, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00313515, below the required 0.01524053, and 15.3 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2838,11 +2887,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 48,
-          "rule": "attach signal test: the dimmest point of the path is 0.00175444, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00175444, below the required 0.01524053, and 17.5 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2855,11 +2905,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 45,
-          "rule": "attach signal test: the dimmest point of the path is 0.01283251, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.01283251, below the required 0.01524053, and 18.2 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2872,11 +2923,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 55,
-          "rule": "attach signal test: the dimmest point of the path is 0.00040058, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00040058, below the required 0.01524053, and 18.6 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -2889,11 +2941,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 4,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 334.8,
           "component": 14,
-          "rule": "attach signal test: the dimmest point of the path is 0.00899373, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00899373, below the required 0.01524053, and 19.1 px is beyond the 0 px contact reach"
         }
       ],
       "rules_in_force": {
@@ -2975,7 +3028,7 @@
           "nodes_within_the_attach_reach": 1,
           "nodes_with_this_lacuna_as_nearest": 1,
           "nodes_passing_the_signal_test": 0,
-          "rule": "attach signal test refused every node of this thread"
+          "rule": "attach signal test refused every node of this thread; the nearest lies 6.0 px out, beyond the 0 px contact reach"
         }
       ],
       "nodes_within_the_attach_reach": [
@@ -2990,6 +3043,7 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 8,
           "graph_px_from_this_lacuna": 21.0,
           "graph_px_from_its_owner": 21.0,
@@ -3007,11 +3061,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 91,
-          "rule": "attach signal test: the dimmest point of the path is 0.00876533, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00876533, below the required 0.01524053, and 6.0 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3024,11 +3079,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 100,
-          "rule": "attach signal test: the dimmest point of the path is 0.00000000, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00000000, below the required 0.01524053, and 8.5 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3041,6 +3097,7 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 8,
           "graph_px_from_this_lacuna": 10.2,
           "graph_px_from_its_owner": 10.2,
@@ -3058,11 +3115,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 108,
-          "rule": "attach signal test: the dimmest point of the path is 0.01323418, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.01323418, below the required 0.01524053, and 17.0 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3075,11 +3133,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 108,
-          "rule": "attach signal test: the dimmest point of the path is 0.00879869, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00879869, below the required 0.01524053, and 18.4 px is beyond the 0 px contact reach"
         }
       ],
       "rules_in_force": {
@@ -3146,7 +3205,7 @@
           "nodes_within_the_attach_reach": 1,
           "nodes_with_this_lacuna_as_nearest": 1,
           "nodes_passing_the_signal_test": 0,
-          "rule": "attach signal test refused every node of this thread"
+          "rule": "attach signal test refused every node of this thread; the nearest lies 3.1623 px out, beyond the 0 px contact reach"
         },
         {
           "component": 3,
@@ -3174,7 +3233,7 @@
           "nodes_within_the_attach_reach": 1,
           "nodes_with_this_lacuna_as_nearest": 1,
           "nodes_passing_the_signal_test": 0,
-          "rule": "attach signal test refused every node of this thread"
+          "rule": "attach signal test refused every node of this thread; the nearest lies 6.4031 px out, beyond the 0 px contact reach"
         }
       ],
       "nodes_within_the_attach_reach": [
@@ -3189,11 +3248,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 1,
-          "rule": "attach signal test: the dimmest point of the path is 0.00920937, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00920937, below the required 0.01524053, and 3.2 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3206,6 +3266,7 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 1,
           "graph_px_from_this_lacuna": 4.2,
           "graph_px_from_its_owner": 4.2,
@@ -3223,11 +3284,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 18,
-          "rule": "attach signal test: the dimmest point of the path is 0.00731099, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00731099, below the required 0.01524053, and 6.4 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3240,11 +3302,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 26,
-          "rule": "attach signal test: the dimmest point of the path is 0.01211315, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.01211315, below the required 0.01524053, and 9.8 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3257,11 +3320,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 4,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 317.0,
           "component": 14,
-          "rule": "attach signal test: the dimmest point of the path is 0.00194907, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00194907, below the required 0.01524053, and 11.2 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3274,11 +3338,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 28,
-          "rule": "attach signal test: the dimmest point of the path is 0.00148303, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00148303, below the required 0.01524053, and 14.0 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3291,11 +3356,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": null,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": null,
           "component": 10,
-          "rule": "attach signal test: the dimmest point of the path is 0.00121335, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00121335, below the required 0.01524053, and 15.1 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3308,11 +3374,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 4,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 380.1,
           "component": 14,
-          "rule": "attach signal test: the dimmest point of the path is 0.00772526, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00772526, below the required 0.01524053, and 17.1 px is beyond the 0 px contact reach"
         },
         {
           "node_xy": [
@@ -3325,6 +3392,7 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": true,
           "attached_to_this_lacuna": true,
+          "attached_by": "signal",
           "final_owner": 1,
           "graph_px_from_this_lacuna": 17.5,
           "graph_px_from_its_owner": 17.5,
@@ -3342,11 +3410,12 @@
           "required_min_response": 0.01524053,
           "passes_signal_test": false,
           "attached_to_this_lacuna": false,
+          "attached_by": null,
           "final_owner": 4,
           "graph_px_from_this_lacuna": null,
           "graph_px_from_its_owner": 309.5,
           "component": 14,
-          "rule": "attach signal test: the dimmest point of the path is 0.00000000, below the required 0.01524053"
+          "rule": "attach signal test: the dimmest point of the path is 0.00000000, below the required 0.01524053, and 17.7 px is beyond the 0 px contact reach"
         }
       ],
       "rules_in_force": {
