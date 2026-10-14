@@ -441,6 +441,90 @@ glance.
 
 **Not validated.**
 
+### Does a lacuna own the threads that touch it? A census
+
+Measured before anything was changed, with the pipeline's own functions:
+
+```
+python src/diagnostics.py contact -d data/WT -o results/contact_census --tag before \
+    --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures
+```
+
+The question is narrow. Take the band 8 px wide around each lacuna body
+(`diagnostics.CONTACT_CENSUS_NEAR_PX`), which is the 2 px mask buffer plus one
+thread half width, so a thread whose centre line lies in it is drawn against the
+body in the verification picture and a reader expects the lacuna to own it. Who
+owns that skeleton?
+
+Over the 8 images and 108 lacunae, in that band:
+
+| | |
+|---|---|
+| lacunae with skeleton in the band they do not own | 92 of 108 |
+| touched by unowned skeleton | 86 |
+| touched by another lacuna's skeleton | 21 |
+| band skeleton owned by the body it touches | 5909 px |
+| band skeleton unowned | 685 px |
+| band skeleton owned by another lacuna | 136 px |
+
+So **12.2% of the skeleton that touches a body belongs to something else**, and
+it is not a few bad cases: every image has it, 7 lacunae own nothing at all, and
+26 of 108 have fewer than 3 roots. Widened to the 20 px attach reach
+(`--tag before_reach20 --near 20`) it is 105 of 108 lacunae and 22.3% of the
+touching skeleton.
+
+| image | lacunae | roots per lacuna | under 3 roots | no roots | touched by unowned | touched by another's | band unowned px | band another's px |
+|---|---|---|---|---|---|---|---|---|
+| 542_z06 | 19 | 9.84 | 1 | 0 | 15 | 2 | 135 | 18 |
+| 542_z18 | 13 | 5.38 | 4 | 1 | 12 | 3 | 128 | 17 |
+| 543-2 | 12 | 3.58 | 7 | 2 | 10 | 5 | 69 | 39 |
+| 543_3 | 13 | 2.31 | 9 | 4 | 9 | 3 | 83 | 20 |
+| 543_z13 | 11 | 4.36 | 2 | 0 | 10 | 1 | 55 | 5 |
+| 682_z08 | 11 | 8.00 | 0 | 0 | 9 | 2 | 69 | 16 |
+| 682_z23 | 14 | 5.57 | 1 | 0 | 11 | 4 | 70 | 16 |
+| 682_z29 | 15 | 5.53 | 2 | 0 | 10 | 1 | 76 | 5 |
+
+**The four lacunae the census was opened on.** Band figures are 8 px, then
+20 px, which is the attach reach.
+
+| lacuna | roots | owns | band skeleton | its own | unowned | another lacuna's | cut by the 50 um limit |
+|---|---|---|---|---|---|---|---|
+| 542_z06 (400, 952) id 15 | 5 | 770 px | 47 / 146 | 44 / 115 | 3 / 31 | 0 / 0 | 9 / 38 |
+| 543_3 (340, 251) id 3 | 0 | 0 px | 14 / 81 | 0 / 0 | 4 / 29 | 10 / 52 | 16 / 63 |
+| 543_3 (198, 635) id 8 | 1 | 11 px | 16 / 53 | 8 / 11 | 8 / 42 | 0 / 0 | 0 / 17 |
+| 543_3 (271, 79) id 1 | 2 | 158 px | 13 / 94 | 4 / 20 | 9 / 60 | 0 / 14 | 0 / 0 |
+
+**Which rule is responsible, lacuna by lacuna.** Not one of these threads is a
+tracing failure. In each 8 px band, every pixel at or above the low cut is in
+the network mask: 0 px missing in all four. The threads are there, drawn, and
+they belong to no one.
+
+- **542_z06 id 15.** 8 of the 17 graph nodes within the attach reach are
+  refused by the attach signal test, at path minima 0.0000 to 0.0170 against the
+  0.0195 the test asks for. The nearest refused node sits 2.8 px from the body.
+- **543_3 id 3**, the lacuna that had a large network before the ownership rule
+  and now has none: **11 of 11** nodes within the attach reach are refused by the
+  signal test, the nearest 3.0 px out with a path minimum of 0.0116 against
+  0.0152. Having attached nothing, it is then a spectator: the two threads that
+  touch it (3596 px and 2679 px) go to lacunae 4 and 5, which did attach.
+- **543_3 id 8**, which owns a stub: 5 of its 6 nodes are refused, the nearest
+  2.8 px out at 0.0144 against 0.0152, which is 5% under the line.
+- **543_3 id 1**: 8 of 10 refused, the nearest 3.2 px out at 0.0092.
+
+So one rule does nearly all of it, and it is the attach signal test, exactly
+where section 8 warned the flattening would bite: the top-hat digs a trough
+around every body, and a path that leaves a surface crosses that trough at its
+dimmest point. On the response the trough is shallower than on the intensity,
+which is why the response was chosen, but at 2 to 4 px from a body it is still
+deep enough to refuse a thread that visibly touches it. The second rule, the
+multi-source Dijkstra, then multiplies the damage: a lacuna that attaches
+nothing cannot compete for the thread against a neighbour that did, so the
+neighbour takes the whole connected component.
+
+The pictures are in `results/contact_census/pictures/` (green: owned by this
+lacuna, orange: owned by another, magenta: unowned, gold: cut by the 50 um
+limit, cyan: the body).
+
 ## 9. Lacunae the filters used to miss
 
 Two rules, both general, both applying to every image, neither raising
@@ -641,6 +725,9 @@ With all off, `results/` is reproduced exactly
 - `validate-network`: roots and Sholl crossings against the blind hand counts, and the skeleton against
   the traced threads. The tiles to trace are in `manual_trace/`; what may be tuned afterwards is fixed
   in advance in `docs/NETWORK_TUNING_PROTOCOL.md`.
+- `contact`: does each lacuna own the threads that touch it. Per named lacuna, the one rule that holds
+  every touching thread away from it; per image and over the set, roots, owned px, and the skeleton
+  within 8 px of a body that the body does not own. Measurement only.
 
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
