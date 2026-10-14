@@ -47,6 +47,10 @@ Subcommands:
     contact-handover  the contact rule on against off, pixel by pixel: what
                       each lacuna gained, what it lost, and whether what it lost
                       went to a body nearer that skeleton than its own
+    ridge-background  does the skeleton follow the local background of the ridge
+                      response, which one global cut would make it do, rather
+                      than thread presence: the local background map, the tile
+                      density against it, and the correlation per image
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -69,6 +73,7 @@ Usage (from the repo root):
         --lacunae 1,7 --blobs "40,290;480,460;285,855;820,155"
     python src/diagnostics.py contact -o results/contact --points "543_3:340,250" --pictures
     python src/diagnostics.py contact-handover -d data/WT -o results/contact_census
+    python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background
 """
 
 from __future__ import annotations
@@ -3439,6 +3444,320 @@ def cmd_contact_handover(args) -> int:
     return 0
 
 
+# ridge-background ---------------------------------------------------------------
+# Does the skeleton follow local brightness instead of thread presence?
+#
+# MEASUREMENT ONLY, and a TEST with its decision rule fixed before it ran. The
+# ridge response is thresholded with ONE cut per image, from that image's own
+# histogram. If a dim corner of a field carries real threads, a global cut will
+# miss them there while passing a mesh of them where the field is bright. The
+# signature of that failure is a positive relation between the LOCAL BACKGROUND
+# of the ridge response and the LOCAL SKELETON DENSITY: where the floor is
+# higher, more of the image clears one fixed cut.
+#
+# The decision rule, written down before the numbers were seen:
+#   proceed only if the median Spearman rho over the 8 images is at least +0.50
+#   and at least 7 of the 8 images are positive. Anything less is reported as
+#   weak and the work stops there.
+# Spearman and not Pearson is the headline, because the relation has no reason
+# to be linear and one bright tile should not carry the answer.
+
+# The local background: the percentile of the ridge response taken in windows of
+# this size, with every lacuna body and its mask buffer left out, on a grid of
+# this stride, then smoothed over the grid and resampled to the full frame.
+# A low percentile, because the background is what the quiet part of a window
+# sits at, not what its threads do; 25 keeps enough pixels per window to be
+# stable (a 100 px window holds 10,000 of them).
+RIDGE_BACKGROUND_PERCENTILE = 25
+RIDGE_BACKGROUND_WINDOW_PX = 100
+RIDGE_BACKGROUND_STRIDE_PX = 50
+# Smoothing of the grid, in grid cells, so the map is a field and not a staircase.
+RIDGE_BACKGROUND_SMOOTH_CELLS = 1.0
+# Tiles the density is counted in. The brief's unit, and one tile holds a few
+# whole threads.
+RIDGE_TILE_PX = 100
+# A tile is used only if this much of it is outside the lacuna bodies and their
+# buffer, which is where a thread could be traced at all.
+RIDGE_TILE_MIN_AVAILABLE = 0.25
+# The gate.
+RIDGE_GATE_MEDIAN_RHO = 0.50
+RIDGE_GATE_MIN_POSITIVE = 7
+
+
+def ridge_background_map(response: np.ndarray, excluded: np.ndarray) -> np.ndarray:
+    """The local background of the ridge response, same shape as the response.
+
+    In each RIDGE_BACKGROUND_WINDOW_PX window on a RIDGE_BACKGROUND_STRIDE_PX
+    grid, the RIDGE_BACKGROUND_PERCENTILE percentile of the response over the
+    pixels that are not `excluded` (the lacuna bodies and their buffer, which
+    carry no thread by construction). The grid is then smoothed over
+    RIDGE_BACKGROUND_SMOOTH_CELLS cells and resampled to the frame, so the map
+    is a slowly varying field rather than a staircase."""
+    height, width = response.shape
+    half = RIDGE_BACKGROUND_WINDOW_PX // 2
+    centres_r = np.arange(0, height, RIDGE_BACKGROUND_STRIDE_PX)
+    centres_c = np.arange(0, width, RIDGE_BACKGROUND_STRIDE_PX)
+    grid = np.zeros((centres_r.size, centres_c.size), dtype=np.float64)
+    usable = ~excluded
+    fallback = float(np.percentile(response[usable], RIDGE_BACKGROUND_PERCENTILE)) \
+        if usable.any() else 0.0
+    for i, r in enumerate(centres_r):
+        r0, r1 = max(0, r - half), min(height, r + half)
+        for j, c in enumerate(centres_c):
+            c0, c1 = max(0, c - half), min(width, c + half)
+            window = response[r0:r1, c0:c1][usable[r0:r1, c0:c1]]
+            grid[i, j] = (float(np.percentile(window, RIDGE_BACKGROUND_PERCENTILE))
+                          if window.size else fallback)
+    grid = ndi.gaussian_filter(grid, RIDGE_BACKGROUND_SMOOTH_CELLS, mode="nearest")
+    # Resample the grid to the frame: the grid cell (i, j) sits at the pixel
+    # (i * stride, j * stride), so the map is a bilinear interpolation of it.
+    rows = np.arange(height) / RIDGE_BACKGROUND_STRIDE_PX
+    cols = np.arange(width) / RIDGE_BACKGROUND_STRIDE_PX
+    rr, cc = np.meshgrid(rows, cols, indexing="ij")
+    return ndi.map_coordinates(grid, [rr, cc], order=1, mode="nearest")
+
+
+def ridge_tiles(d: dict, background: np.ndarray) -> list:
+    """One row per RIDGE_TILE_PX tile: the mean local background in it, and the
+    skeleton density over the area where a thread could be traced."""
+    skel = d["skeleton"]
+    excluded = d["buffered_lacunae"]
+    height, width = skel.shape
+    height = int(height)
+    width = int(width)
+    rows = []
+    for r0 in range(0, height, RIDGE_TILE_PX):
+        for c0 in range(0, width, RIDGE_TILE_PX):
+            r1, c1 = min(height, r0 + RIDGE_TILE_PX), min(width, c0 + RIDGE_TILE_PX)
+            area = (r1 - r0) * (c1 - c0)
+            free = int((~excluded[r0:r1, c0:c1]).sum())
+            if free < RIDGE_TILE_MIN_AVAILABLE * area:
+                continue
+            tile = skel[r0:r1, c0:c1]
+            px = int(tile.sum())
+            owned = int((tile & (d["owner_map"][r0:r1, c0:c1] > 0)).sum())
+            rows.append({
+                "image_label": d["label"],
+                "tile_xy": [c0, r0],
+                "quadrant": ("top" if r0 + RIDGE_TILE_PX <= height / 2 else "bottom")
+                            + " " + ("left" if c0 + RIDGE_TILE_PX <= width / 2 else "right"),
+                "area_px": int(area),
+                "free_px": free,
+                "skeleton_px": px,
+                "owned_px": owned,
+                "owned_fraction": round(owned / px, 6) if px else None,
+                "skeleton_density_per_free_px": round(px / free, 6),
+                "owned_density_per_free_px": round(owned / free, 6),
+                "skeleton_density_per_px": round(px / area, 6),
+                "background": round(float(background[r0:r1, c0:c1].mean()), 10),
+            })
+    return rows
+
+
+def _ridge_one(job: tuple) -> dict:
+    path_str, out_dir = job
+    from scipy import stats
+
+    d = contact_detection(Path(path_str))
+    background = ridge_background_map(d["response"], d["buffered_lacunae"])
+    rows = ridge_tiles(d, background)
+    x = np.array([r["background"] for r in rows], dtype=float)
+    y = np.array([r["skeleton_density_per_free_px"] for r in rows], dtype=float)
+    rho, rho_p = stats.spearmanr(x, y)
+    r_lin, r_p = stats.pearsonr(x, y)
+    # The same tiles, asked about ownership: the attach signal test is a fixed
+    # fraction of the SAME global cut, so if a dim area is punished anywhere it
+    # should show here as well as in the density.
+    owned_y = np.array([r["owned_density_per_free_px"] for r in rows], dtype=float)
+    frac = np.array([r["owned_fraction"] for r in rows if r["owned_fraction"] is not None],
+                    dtype=float)
+    frac_x = np.array([r["background"] for r in rows if r["owned_fraction"] is not None],
+                      dtype=float)
+    rho_owned, rho_owned_p = stats.spearmanr(x, owned_y)
+    rho_frac, rho_frac_p = stats.spearmanr(frac_x, frac)
+    quadrants = {}
+    for name in sorted({r["quadrant"] for r in rows}):
+        sub = [r for r in rows if r["quadrant"] == name]
+        sk = sum(r["skeleton_px"] for r in sub)
+        quadrants[name] = {
+            "tiles": len(sub),
+            "background_mean": round(float(np.mean([r["background"] for r in sub])), 10),
+            "skeleton_density_per_free_px": round(sk / sum(r["free_px"] for r in sub), 6),
+            "owned_fraction": round(sum(r["owned_px"] for r in sub) / sk, 4) if sk else None,
+        }
+    # The dimmest and brightest quarters of the tiles, which is where the
+    # hypothesis says the damage is.
+    order = np.argsort(x)
+    quarter = max(1, len(order) // 4)
+    dim, bright = order[:quarter], order[-quarter:]
+    picture = ridge_background_picture(d, background, rows, Path(out_dir), float(rho))
+    return {
+        "image_label": d["label"],
+        "tiles": len(rows),
+        "spearman_rho": round(float(rho), 4),
+        "spearman_p": float(rho_p),
+        "pearson_r": round(float(r_lin), 4),
+        "pearson_p": float(r_p),
+        "background_min": round(float(x.min()), 10),
+        "background_median": round(float(np.median(x)), 10),
+        "background_max": round(float(x.max()), 10),
+        "background_ratio_max_over_min": round(float(x.max() / x.min()), 3) if x.min() else None,
+        "density_dim_quarter": round(float(y[dim].mean()), 6),
+        "density_bright_quarter": round(float(y[bright].mean()), 6),
+        "density_bright_over_dim": (round(float(y[bright].mean() / y[dim].mean()), 3)
+                                    if y[dim].mean() else None),
+        "spearman_rho_owned_density": round(float(rho_owned), 4),
+        "spearman_rho_owned_fraction": round(float(rho_frac), 4),
+        "spearman_p_owned_fraction": float(rho_frac_p),
+        "owned_fraction_dim_quarter": round(float(np.mean(
+            [rows[i]["owned_fraction"] for i in dim if rows[i]["owned_fraction"] is not None])), 4),
+        "owned_fraction_bright_quarter": round(float(np.mean(
+            [rows[i]["owned_fraction"] for i in bright
+             if rows[i]["owned_fraction"] is not None])), 4),
+        "quadrants": quadrants,
+        "ridge_high_cut": round(d["high_cut"], 8),
+        "ridge_low_cut": round(d["low_cut"], 8),
+        "skeleton_px": int(d["skeleton"].sum()),
+        "picture": picture.as_posix(),
+        "rows": rows,
+    }
+
+
+def ridge_background_picture(d: dict, background: np.ndarray, rows: list, out_dir: Path,
+                             rho: float | None = None) -> Path:
+    """The local background map beside the image's own verification picture,
+    with the tile density against the background under them."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    verification = d["display"].copy()
+    n = d["n_lacunae"]
+    colors = canaliculi.lacuna_colors(n)
+    for lacuna_id in range(1, n + 1):
+        color = colors[lacuna_id]
+        verification[segmentation.find_boundaries(d["lacuna_id_map"] == lacuna_id,
+                                                  mode="outer")] = color
+        owned = d["skeleton"] & (d["owner_map"] == lacuna_id)
+        if owned.any():
+            verification[morphology.dilation(owned, morphology.disk(1))] = color
+
+    fig = plt.figure(figsize=(16, 6.4), dpi=130)
+    ax1 = fig.add_subplot(1, 3, 1)
+    im = ax1.imshow(background, cmap="magma")
+    ax1.set_title(f"{d['label']}: local background of the ridge response\n"
+                  f"(p{RIDGE_BACKGROUND_PERCENTILE} in {RIDGE_BACKGROUND_WINDOW_PX} px windows, "
+                  f"bodies masked)", fontsize=8)
+    ax1.set_axis_off()
+    fig.colorbar(im, ax=ax1, fraction=0.046)
+
+    ax2 = fig.add_subplot(1, 3, 2)
+    ax2.imshow(verification)
+    ax2.set_title(f"{d['label']}: what the pipeline owns\n"
+                  f"(each lacuna and the threads it owns, unowned not drawn)", fontsize=8)
+    ax2.set_axis_off()
+
+    ax3 = fig.add_subplot(1, 3, 3)
+    x = [r["background"] for r in rows]
+    y = [r["skeleton_density_per_free_px"] for r in rows]
+    ax3.scatter(x, y, s=14, alpha=0.7, color="#1f77b4")
+    ax3.set_xlabel("local background of the ridge response", fontsize=8)
+    ax3.set_ylabel(f"skeleton px per free px, {RIDGE_TILE_PX} px tiles", fontsize=8)
+    ax3.set_title("one point per tile"
+                  + ("" if rho is None else f", Spearman rho {rho:+.3f}"), fontsize=8)
+    ax3.tick_params(labelsize=7)
+    fig.suptitle("Measurement only: the cut was not changed. If these rise together, one global "
+                 "cut is following local brightness.", fontsize=9)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{d['label']}_ridge_background.png"
+    fig.savefig(path, bbox_inches="tight", metadata={"CreationDate": None})
+    plt.close(fig)
+    return path
+
+
+def cmd_ridge_background(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    args.out.mkdir(parents=True, exist_ok=True)
+    jobs = [(str(p), str(args.out)) for p in images]
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(jobs)))) as ex:
+        out = list(ex.map(_ridge_one, jobs))
+
+    rhos = [o["spearman_rho"] for o in out]
+    median_rho = float(np.median(rhos))
+    positive = sum(1 for v in rhos if v > 0)
+    strong = median_rho >= RIDGE_GATE_MEDIAN_RHO and positive >= RIDGE_GATE_MIN_POSITIVE
+    report = {
+        "status": "measurement only: no parameter, threshold or rule was changed",
+        "question": ("does the skeleton follow the LOCAL BACKGROUND of the ridge response, which "
+                     "one global cut would make it do, rather than thread presence"),
+        "decision_rule_fixed_before_running": {
+            "proceed_if_median_spearman_rho_at_least": RIDGE_GATE_MEDIAN_RHO,
+            "and_images_positive_at_least": RIDGE_GATE_MIN_POSITIVE,
+            "of_images": len(out),
+        },
+        "background": {
+            "percentile": RIDGE_BACKGROUND_PERCENTILE,
+            "window_px": RIDGE_BACKGROUND_WINDOW_PX,
+            "stride_px": RIDGE_BACKGROUND_STRIDE_PX,
+            "smooth_cells": RIDGE_BACKGROUND_SMOOTH_CELLS,
+            "excluded": "every lacuna body plus the mask buffer",
+        },
+        "tile_px": RIDGE_TILE_PX,
+        "median_spearman_rho": round(median_rho, 4),
+        "images_with_positive_rho": positive,
+        "result": "STRONG" if strong else "WEAK",
+        "per_image": [{k: v for k, v in o.items() if k != "rows"} for o in out],
+    }
+    with open(args.out / "ridge_background.json", "w", encoding="utf-8", newline="\n") as f:
+        json.dump(report, f, indent=2, default=float)
+    with open(args.out / "ridge_background_tiles.csv", "w", encoding="utf-8", newline="") as f:
+        cols = ["image_label", "tile_xy", "quadrant", "area_px", "free_px", "skeleton_px",
+                "owned_px", "owned_fraction", "skeleton_density_per_free_px",
+                "owned_density_per_free_px", "skeleton_density_per_px", "background"]
+        w = csv.writer(f)
+        w.writerow(cols)
+        for o in out:
+            for r in o["rows"]:
+                w.writerow([r[c] if c != "tile_xy" else f"{r[c][0]},{r[c][1]}" for c in cols])
+
+    print_table(["image", "tiles", "Spearman rho", "p", "Pearson r", "background min",
+                 "median", "max", "max/min", "density dim 1/4", "bright 1/4", "bright/dim"],
+                [[o["image_label"], o["tiles"], f"{o['spearman_rho']:+.3f}", f"{o['spearman_p']:.1e}",
+                  f"{o['pearson_r']:+.3f}", f"{o['background_min']:.6f}",
+                  f"{o['background_median']:.6f}", f"{o['background_max']:.6f}",
+                  o["background_ratio_max_over_min"], f"{o['density_dim_quarter']:.4f}",
+                  f"{o['density_bright_quarter']:.4f}", o["density_bright_over_dim"]]
+                 for o in out],
+                title=f"Local background of the ridge response against skeleton density, "
+                      f"{RIDGE_TILE_PX} px tiles")
+    print_table(["image", "rho, skeleton density", "rho, owned density",
+                 "rho, owned fraction", "owned fraction dim 1/4", "bright 1/4"],
+                [[o["image_label"], f"{o['spearman_rho']:+.3f}",
+                  f"{o['spearman_rho_owned_density']:+.3f}",
+                  f"{o['spearman_rho_owned_fraction']:+.3f}",
+                  f"{o['owned_fraction_dim_quarter']:.3f}",
+                  f"{o['owned_fraction_bright_quarter']:.3f}"] for o in out],
+                title="\nThe same tiles, asked about ownership")
+    print(f"\nMedian Spearman rho {median_rho:+.3f} over {len(out)} images, "
+          f"{positive} of {len(out)} positive.")
+    owned_rhos = [o["spearman_rho_owned_fraction"] for o in out]
+    print(f"Median Spearman rho for the OWNED FRACTION of the skeleton in a tile: "
+          f"{float(np.median(owned_rhos)):+.3f}, "
+          f"{sum(1 for v in owned_rhos if v > 0)} of {len(out)} positive.")
+    print(f"Gate fixed before running: rho at least {RIDGE_GATE_MEDIAN_RHO:+.2f} and at least "
+          f"{RIDGE_GATE_MIN_POSITIVE} of {len(out)} positive.")
+    print(f"RESULT: {report['result']}" + (
+        ": the skeleton follows local brightness, so normalizing the response by the local "
+        "background is worth doing." if strong else
+        ": the relation is not strong enough to blame the global cut. The work stops here."))
+    print(f"\nreport -> {args.out / 'ridge_background.json'}")
+    for o in out:
+        print(f"picture -> {o['picture']}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -3611,6 +3930,16 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each (two runs each).")
     p.set_defaults(func=cmd_contact_handover)
+
+    p = sub.add_parser("ridge-background",
+                       help="Does the skeleton follow local brightness? (measurement only)")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_ridge_background)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

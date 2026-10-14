@@ -1,0 +1,422 @@
+{
+  "status": "measurement only: no parameter, threshold or rule was changed",
+  "question": "does the skeleton follow the LOCAL BACKGROUND of the ridge response, which one global cut would make it do, rather than thread presence",
+  "decision_rule_fixed_before_running": {
+    "proceed_if_median_spearman_rho_at_least": 0.5,
+    "and_images_positive_at_least": 7,
+    "of_images": 8
+  },
+  "background": {
+    "percentile": 25,
+    "window_px": 100,
+    "stride_px": 50,
+    "smooth_cells": 1.0,
+    "excluded": "every lacuna body plus the mask buffer"
+  },
+  "tile_px": 100,
+  "median_spearman_rho": 0.1731,
+  "images_with_positive_rho": 7,
+  "result": "WEAK",
+  "per_image": [
+    {
+      "image_label": "542_z06",
+      "tiles": 121,
+      "spearman_rho": 0.5255,
+      "spearman_p": 6.046214795889025e-10,
+      "pearson_r": 0.5202,
+      "pearson_p": 9.600357008346807e-10,
+      "background_min": 0.0002164914,
+      "background_median": 0.0005939461,
+      "background_max": 0.0017347609,
+      "background_ratio_max_over_min": 8.013,
+      "density_dim_quarter": 0.0334,
+      "density_bright_quarter": 0.050727,
+      "density_bright_over_dim": 1.519,
+      "spearman_rho_owned_density": 0.4327,
+      "spearman_rho_owned_fraction": 0.2844,
+      "spearman_p_owned_fraction": 0.001572831667667929,
+      "owned_fraction_dim_quarter": 0.5321,
+      "owned_fraction_bright_quarter": 0.8504,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.0005369111,
+          "skeleton_density_per_free_px": 0.036345,
+          "owned_fraction": 0.5772
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.000725321,
+          "skeleton_density_per_free_px": 0.038713,
+          "owned_fraction": 0.72
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.0005250228,
+          "skeleton_density_per_free_px": 0.035892,
+          "owned_fraction": 0.6795
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.0007554178,
+          "skeleton_density_per_free_px": 0.046308,
+          "owned_fraction": 0.9116
+        }
+      },
+      "ridge_high_cut": 0.03715663,
+      "ridge_low_cut": 0.02786747,
+      "skeleton_px": 39229,
+      "picture": "results/ridge_background/542_z06_ridge_background.png"
+    },
+    {
+      "image_label": "542_z18",
+      "tiles": 121,
+      "spearman_rho": 0.5036,
+      "spearman_p": 3.908722712914046e-09,
+      "pearson_r": 0.551,
+      "pearson_p": 5.80540867191732e-11,
+      "background_min": 0.0002740001,
+      "background_median": 0.000624683,
+      "background_max": 0.0010842927,
+      "background_ratio_max_over_min": 3.957,
+      "density_dim_quarter": 0.02619,
+      "density_bright_quarter": 0.044939,
+      "density_bright_over_dim": 1.716,
+      "spearman_rho_owned_density": 0.3743,
+      "spearman_rho_owned_fraction": 0.2307,
+      "spearman_p_owned_fraction": 0.010905309072449557,
+      "owned_fraction_dim_quarter": 0.5156,
+      "owned_fraction_bright_quarter": 0.7499,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.0005628172,
+          "skeleton_density_per_free_px": 0.028801,
+          "owned_fraction": 0.2973
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.0005622987,
+          "skeleton_density_per_free_px": 0.038562,
+          "owned_fraction": 0.8288
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.00067107,
+          "skeleton_density_per_free_px": 0.034167,
+          "owned_fraction": 0.6891
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.0008569569,
+          "skeleton_density_per_free_px": 0.045044,
+          "owned_fraction": 0.7881
+        }
+      },
+      "ridge_high_cut": 0.03412555,
+      "ridge_low_cut": 0.02559416,
+      "skeleton_px": 36688,
+      "picture": "results/ridge_background/542_z18_ridge_background.png"
+    },
+    {
+      "image_label": "543-2",
+      "tiles": 121,
+      "spearman_rho": 0.1552,
+      "spearman_p": 0.08911090102336794,
+      "pearson_r": 0.2038,
+      "pearson_p": 0.024934729293131404,
+      "background_min": 0.0007631384,
+      "background_median": 0.0011920019,
+      "background_max": 0.0019457235,
+      "background_ratio_max_over_min": 2.55,
+      "density_dim_quarter": 0.035046,
+      "density_bright_quarter": 0.039592,
+      "density_bright_over_dim": 1.13,
+      "spearman_rho_owned_density": 0.0164,
+      "spearman_rho_owned_fraction": -0.1426,
+      "spearman_p_owned_fraction": 0.11860291444430926,
+      "owned_fraction_dim_quarter": 0.7616,
+      "owned_fraction_bright_quarter": 0.5864,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.0012244492,
+          "skeleton_density_per_free_px": 0.039566,
+          "owned_fraction": 0.8538
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.0011700358,
+          "skeleton_density_per_free_px": 0.032443,
+          "owned_fraction": 0.7705
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.0011840637,
+          "skeleton_density_per_free_px": 0.042184,
+          "owned_fraction": 0.7972
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.0011724533,
+          "skeleton_density_per_free_px": 0.034282,
+          "owned_fraction": 0.6864
+        }
+      },
+      "ridge_high_cut": 0.03122886,
+      "ridge_low_cut": 0.02342165,
+      "skeleton_px": 37700,
+      "picture": "results/ridge_background/543-2_ridge_background.png"
+    },
+    {
+      "image_label": "543_3",
+      "tiles": 121,
+      "spearman_rho": 0.191,
+      "spearman_p": 0.03589171026973863,
+      "pearson_r": 0.1033,
+      "pearson_p": 0.2594880920927155,
+      "background_min": 0.0004519231,
+      "background_median": 0.0011084575,
+      "background_max": 0.0018680365,
+      "background_ratio_max_over_min": 4.134,
+      "density_dim_quarter": 0.032611,
+      "density_bright_quarter": 0.036881,
+      "density_bright_over_dim": 1.131,
+      "spearman_rho_owned_density": 0.0911,
+      "spearman_rho_owned_fraction": -0.0334,
+      "spearman_p_owned_fraction": 0.7221062154418715,
+      "owned_fraction_dim_quarter": 0.6333,
+      "owned_fraction_bright_quarter": 0.6439,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.001152849,
+          "skeleton_density_per_free_px": 0.034027,
+          "owned_fraction": 0.2394
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.0011657036,
+          "skeleton_density_per_free_px": 0.036636,
+          "owned_fraction": 0.8354
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.0010801731,
+          "skeleton_density_per_free_px": 0.032681,
+          "owned_fraction": 0.8816
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.001077099,
+          "skeleton_density_per_free_px": 0.036323,
+          "owned_fraction": 0.8514
+        }
+      },
+      "ridge_high_cut": 0.02902958,
+      "ridge_low_cut": 0.02177218,
+      "skeleton_px": 35656,
+      "picture": "results/ridge_background/543_3_ridge_background.png"
+    },
+    {
+      "image_label": "543_z13",
+      "tiles": 121,
+      "spearman_rho": -0.0199,
+      "spearman_p": 0.8288035497306869,
+      "pearson_r": 0.0292,
+      "pearson_p": 0.7501847079936591,
+      "background_min": 0.0006729859,
+      "background_median": 0.0009528214,
+      "background_max": 0.0014471172,
+      "background_ratio_max_over_min": 2.15,
+      "density_dim_quarter": 0.040769,
+      "density_bright_quarter": 0.040208,
+      "density_bright_over_dim": 0.986,
+      "spearman_rho_owned_density": -0.1296,
+      "spearman_rho_owned_fraction": -0.1918,
+      "spearman_p_owned_fraction": 0.035117598218981604,
+      "owned_fraction_dim_quarter": 0.6903,
+      "owned_fraction_bright_quarter": 0.5073,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.0009686965,
+          "skeleton_density_per_free_px": 0.035258,
+          "owned_fraction": 0.822
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.0010319119,
+          "skeleton_density_per_free_px": 0.040159,
+          "owned_fraction": 0.4925
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.0009662795,
+          "skeleton_density_per_free_px": 0.039641,
+          "owned_fraction": 0.6364
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.0009437902,
+          "skeleton_density_per_free_px": 0.046423,
+          "owned_fraction": 0.8067
+        }
+      },
+      "ridge_high_cut": 0.02633446,
+      "ridge_low_cut": 0.01975084,
+      "skeleton_px": 41377,
+      "picture": "results/ridge_background/543_z13_ridge_background.png"
+    },
+    {
+      "image_label": "682_z08",
+      "tiles": 121,
+      "spearman_rho": 0.5718,
+      "spearman_p": 7.337299279292969e-12,
+      "pearson_r": 0.5696,
+      "pearson_p": 9.195804950905782e-12,
+      "background_min": 0.0001463029,
+      "background_median": 0.0007331341,
+      "background_max": 0.0013531453,
+      "background_ratio_max_over_min": 9.249,
+      "density_dim_quarter": 0.015586,
+      "density_bright_quarter": 0.042988,
+      "density_bright_over_dim": 2.758,
+      "spearman_rho_owned_density": 0.4215,
+      "spearman_rho_owned_fraction": 0.1428,
+      "spearman_p_owned_fraction": 0.13854144302829016,
+      "owned_fraction_dim_quarter": 0.4853,
+      "owned_fraction_bright_quarter": 0.6373,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.0006868506,
+          "skeleton_density_per_free_px": 0.042598,
+          "owned_fraction": 0.8166
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.0006534918,
+          "skeleton_density_per_free_px": 0.030176,
+          "owned_fraction": 0.5197
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.0007876489,
+          "skeleton_density_per_free_px": 0.045454,
+          "owned_fraction": 0.9294
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.0007446454,
+          "skeleton_density_per_free_px": 0.021558,
+          "owned_fraction": 0.5602
+        }
+      },
+      "ridge_high_cut": 0.03031142,
+      "ridge_low_cut": 0.02273357,
+      "skeleton_px": 35082,
+      "picture": "results/ridge_background/682_z08_ridge_background.png"
+    },
+    {
+      "image_label": "682_z23",
+      "tiles": 121,
+      "spearman_rho": 0.1426,
+      "spearman_p": 0.11876042282896443,
+      "pearson_r": 0.2273,
+      "pearson_p": 0.01216126696820701,
+      "background_min": 0.0001676996,
+      "background_median": 0.0006883056,
+      "background_max": 0.0014976735,
+      "background_ratio_max_over_min": 8.931,
+      "density_dim_quarter": 0.025801,
+      "density_bright_quarter": 0.034688,
+      "density_bright_over_dim": 1.344,
+      "spearman_rho_owned_density": 0.0811,
+      "spearman_rho_owned_fraction": 0.0297,
+      "spearman_p_owned_fraction": 0.7507924923010295,
+      "owned_fraction_dim_quarter": 0.5198,
+      "owned_fraction_bright_quarter": 0.5825,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.0005477098,
+          "skeleton_density_per_free_px": 0.03805,
+          "owned_fraction": 0.8567
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.0005826046,
+          "skeleton_density_per_free_px": 0.031888,
+          "owned_fraction": 0.3256
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.0007554147,
+          "skeleton_density_per_free_px": 0.038591,
+          "owned_fraction": 0.848
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.0008631907,
+          "skeleton_density_per_free_px": 0.033681,
+          "owned_fraction": 0.6417
+        }
+      },
+      "ridge_high_cut": 0.02813929,
+      "ridge_low_cut": 0.02110447,
+      "skeleton_px": 36058,
+      "picture": "results/ridge_background/682_z23_ridge_background.png"
+    },
+    {
+      "image_label": "682_z29",
+      "tiles": 121,
+      "spearman_rho": 0.1487,
+      "spearman_p": 0.10358053927162997,
+      "pearson_r": 0.2229,
+      "pearson_p": 0.013991876096932577,
+      "background_min": 0.0001247208,
+      "background_median": 0.0004548893,
+      "background_max": 0.0009323701,
+      "background_ratio_max_over_min": 7.476,
+      "density_dim_quarter": 0.026066,
+      "density_bright_quarter": 0.03527,
+      "density_bright_over_dim": 1.353,
+      "spearman_rho_owned_density": 0.1409,
+      "spearman_rho_owned_fraction": 0.0628,
+      "spearman_p_owned_fraction": 0.5027871684003054,
+      "owned_fraction_dim_quarter": 0.5498,
+      "owned_fraction_bright_quarter": 0.6193,
+      "quadrants": {
+        "bottom left": {
+          "tiles": 30,
+          "background_mean": 0.0003882862,
+          "skeleton_density_per_free_px": 0.036077,
+          "owned_fraction": 0.7828
+        },
+        "bottom right": {
+          "tiles": 36,
+          "background_mean": 0.0004057738,
+          "skeleton_density_per_free_px": 0.030882,
+          "owned_fraction": 0.4417
+        },
+        "top left": {
+          "tiles": 25,
+          "background_mean": 0.0005440373,
+          "skeleton_density_per_free_px": 0.040744,
+          "owned_fraction": 0.7594
+        },
+        "top right": {
+          "tiles": 30,
+          "background_mean": 0.0005678541,
+          "skeleton_density_per_free_px": 0.025182,
+          "owned_fraction": 0.8308
+        }
+      },
+      "ridge_high_cut": 0.02460137,
+      "ridge_low_cut": 0.01845103,
+      "skeleton_px": 33616,
+      "picture": "results/ridge_background/682_z29_ridge_background.png"
+    }
+  ]
+}

@@ -924,6 +924,10 @@ With all off, `results/` is reproduced exactly
 - `contact-handover`: each image run twice, contact on and off, and every owned pixel followed to where
   it went: what each lacuna gained, what it lost, and whether what it lost went to a lacuna that
   touches that thread. This is where the per-lacuna 25% guard is read.
+- `ridge-background`: does the skeleton follow the local background of the ridge response, which one
+  global cut would make it do, rather than thread presence. The background map beside the image's own
+  ownership picture, the tile density against it, and the correlation per image. Measurement only; its
+  answer is section 17.
 
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
@@ -1012,3 +1016,94 @@ Earlier experiments, reports and analyses are preserved at the git tag
 `archive-2026-10-13`, which is the repository as it was before the 2026-10-13
 cleanup. Checking out that tag reproduces any earlier analysis. `main` is the
 only branch.
+
+## 17. Tests that found nothing to change
+
+Negative results, kept because they are the reason a change was not made.
+
+### Does one global ridge cut follow local brightness? No, not enough to act on
+
+**The question.** The ridge response is thresholded with ONE cut per image, from
+that image's own histogram. If a field is dim in one corner, a global cut could
+miss real threads there while passing a mesh of them where the field is bright.
+The signature would be a positive relation between the **local background of the
+ridge response** and the **local skeleton density**: where the floor is higher,
+more of the image clears one fixed cut.
+
+**The test**, measurement only
+(`python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background`).
+The local background is the 25th percentile of the ridge response in 100 px
+windows on a 50 px grid, with every lacuna body and its mask buffer left out,
+smoothed over the grid and resampled to the frame. Skeleton density is counted
+in 100 px tiles over the area where a thread could be traced, which is the tile
+minus the bodies and their buffer. Spearman, not Pearson, is the headline,
+because the relation has no reason to be linear and one bright tile should not
+carry the answer.
+
+**The gate, fixed before the numbers were seen:** proceed only if the median
+Spearman rho over the 8 images is at least **+0.50** and at least **7 of 8**
+images are positive.
+
+| image | tiles | Spearman rho | p | background min, median, max | max/min | density, dimmest quarter | brightest quarter | bright/dim |
+|---|---|---|---|---|---|---|---|---|
+| 542_z06 | 121 | **+0.525** | 6e-10 | 0.000216, 0.000594, 0.001735 | 8.0 | 0.0334 | 0.0507 | 1.52 |
+| 542_z18 | 121 | **+0.504** | 4e-09 | 0.000274, 0.000625, 0.001084 | 4.0 | 0.0262 | 0.0449 | 1.72 |
+| 543-2 | 121 | +0.155 | 0.09 | 0.000763, 0.001192, 0.001946 | 2.6 | 0.0350 | 0.0396 | 1.13 |
+| 543_3 | 121 | +0.191 | 0.04 | 0.000452, 0.001108, 0.001868 | 4.1 | 0.0326 | 0.0369 | 1.13 |
+| 543_z13 | 121 | -0.020 | 0.83 | 0.000673, 0.000953, 0.001447 | 2.2 | 0.0408 | 0.0402 | 0.99 |
+| 682_z08 | 121 | **+0.572** | 7e-12 | 0.000146, 0.000733, 0.001353 | 9.2 | 0.0156 | 0.0430 | 2.76 |
+| 682_z23 | 121 | +0.143 | 0.12 | 0.000168, 0.000688, 0.001498 | 8.9 | 0.0258 | 0.0347 | 1.34 |
+| 682_z29 | 121 | +0.149 | 0.10 | 0.000125, 0.000455, 0.000932 | 7.5 | 0.0261 | 0.0353 | 1.35 |
+
+**Median rho +0.173, 7 of 8 positive, 3 of 8 at or above +0.50. The gate is not
+met: WEAK.** The sign is consistent, so the effect is real and not nothing: over
+the set, the brightest quarter of tiles carries 1.13 to 2.76 times the skeleton
+density of the dimmest quarter. But a median rho of 0.17 is about 3% of the
+variance in tile density, and a 100 px tile's density varies by a factor of ten
+between neighbours at the same background (see the scatter in any picture). The
+global cut is not what decides where threads are drawn. Normalizing the response
+by this background would therefore be a large change to detection on weak
+evidence, so **it was not made and nothing in the pipeline was touched**.
+
+The dynamic range is not the explanation either: 682_z23 and 682_z29 have
+background ratios of 8.9 and 7.5 across the frame, as wide as the three images
+that do correlate, and rho of +0.14 and +0.15.
+
+### What the same tiles say instead
+
+Each tile was also asked what share of the skeleton in it is **owned**, because
+the attach signal test is a fixed fraction of the same global cut and would be
+punished by a dim corner in the same way.
+
+| image | rho, skeleton density | rho, owned density | rho, owned fraction | owned fraction, dimmest quarter | brightest quarter |
+|---|---|---|---|---|---|
+| 542_z06 | +0.525 | +0.433 | +0.284 | 0.532 | 0.850 |
+| 542_z18 | +0.504 | +0.374 | +0.231 | 0.516 | 0.750 |
+| 543-2 | +0.155 | +0.016 | -0.143 | 0.762 | 0.586 |
+| 543_3 | +0.191 | +0.091 | -0.033 | 0.633 | 0.644 |
+| 543_z13 | -0.020 | -0.130 | -0.192 | 0.690 | 0.507 |
+| 682_z08 | +0.572 | +0.421 | +0.143 | 0.485 | 0.637 |
+| 682_z23 | +0.143 | +0.081 | +0.030 | 0.520 | 0.583 |
+| 682_z29 | +0.149 | +0.141 | +0.063 | 0.550 | 0.619 |
+
+Median rho for the owned fraction: **+0.046**, 5 of 8 positive, two images
+negative at -0.14 and -0.19. Ownership does not follow local brightness at all.
+
+**The lower left of 543_3, by quadrant.** This is the area the hypothesis was
+raised on, and it is where the hypothesis fails hardest:
+
+| quadrant of 543_3 | local background | skeleton density | owned fraction |
+|---|---|---|---|
+| top left | 0.001080 | 0.0327 | 0.88 |
+| top right | 0.001077 | 0.0363 | 0.85 |
+| bottom right | 0.001166 | 0.0366 | 0.84 |
+| **bottom left** | **0.001153** | **0.0340** | **0.24** |
+
+The lower left has the **second highest** local background of the four
+quadrants, not the lowest, and its skeleton density is ordinary. What is
+different there is that **76% of the skeleton it carries belongs to no lacuna**,
+against 12 to 16% everywhere else in the image. The threads in the lower left of
+543_3 are traced. They are not owned, which is an ownership question (section 8),
+not a threshold one, and it is the same question the lacuna at (198, 635) raises:
+the threads nearest it lie 7.0 px or further from its body, past the contact
+reach, across paths the signal test refuses.
