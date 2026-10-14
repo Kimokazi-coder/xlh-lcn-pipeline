@@ -116,8 +116,9 @@ def images_from(args) -> list[Path]:
 REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
 
 # The quick check that the default pipeline still gives what it gave. Fixed on
-# 2026-10-13, after ownership by signal, the two dimmer tiers and the two new
-# lacuna rules. Means are over interior lacunae, rounded
+# 2026-10-14, after the four lacuna rules of config section g. 543-2 is one of
+# the images the acceptance test holds still, so these moved only with the
+# canalicular changes, not with the lacuna ones. Means are over interior lacunae, rounded
 # to 2 decimals. The third number was "gap bridges added", which no longer
 # exists; roots per cell takes its place, being a headline measure that does not
 # depend on ownership and the one a manual count will be compared against.

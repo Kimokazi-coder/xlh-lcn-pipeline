@@ -145,11 +145,12 @@ SHAPE_FIELDS = ["area_px2", "major_axis_length_px", "minor_axis_length_px", "asp
 
 
 def region_to_measurement(lacuna_id: int, region, on_border: bool, precision: int,
-                          out_of_focus: bool = False) -> dict:
-    """One lacuna's shape. An out-of-focus lacuna reports NO shape: every field
-    in SHAPE_FIELDS comes back None, because the edge that would be measured is
-    the blur and not the cell. It keeps its id, its centroid and its flag, so it
-    still counts as a cell and still owns its threads."""
+                          no_shape: bool = False, lacuna_class: str = "ordinary") -> dict:
+    """One lacuna's shape. A lacuna of the "dim" or "out_of_focus" class reports
+    NO shape: every field in SHAPE_FIELDS comes back None, because what would be
+    measured is the blur or the frame and not the cell. It keeps its id, its
+    centroid and its class, so it still counts as a cell and still owns its
+    threads."""
     minor = region.axis_minor_length
     major = region.axis_major_length
     aspect_ratio = (major / minor) if minor > 0 else float("inf")
@@ -163,7 +164,7 @@ def region_to_measurement(lacuna_id: int, region, on_border: bool, precision: in
         "solidity": round(float(region.solidity), precision),
         "orientation_rad": round(float(region.orientation), precision),
     }
-    if out_of_focus:
+    if no_shape:
         shape = {k: None for k in shape}
     return {
         "lacuna_id": lacuna_id,
@@ -171,7 +172,9 @@ def region_to_measurement(lacuna_id: int, region, on_border: bool, precision: in
         "centroid_row_px": round(float(row), precision),
         "centroid_col_px": round(float(col), precision),
         "on_border": bool(on_border),
-        "out_of_focus": bool(out_of_focus),
+        "lacuna_class": lacuna_class,
+        "out_of_focus": bool(lacuna_class == "out_of_focus"),
+        "dim": bool(lacuna_class == "dim"),
     }
 
 
@@ -193,7 +196,7 @@ def summarize_lacuna_shape(measurements: list[dict], precision: int) -> dict:
     is the blur and not the cell, so averaging it would move a shape statistic
     for a reason that is not a shape."""
     interior = [m for m in measurements
-                if not m["on_border"] and not m.get("out_of_focus")]
+                if not m["on_border"] and m.get("lacuna_class", "ordinary") == "ordinary"]
     n = len(interior)
 
     stats = {"interior_lacuna_count": n, "units": "px"}
@@ -898,10 +901,11 @@ def load_detection(out_root: Path, label: str) -> dict:
         "node_dist": graph_data["node_dist"],
         "edge_owner": graph_data["edge_owner"],
         "lacunae_detection": json.loads(needed["lacunae_detection"].read_text(encoding="utf-8")),
-        # Out-of-focus lacunae, as detection recorded them: counted and owning
-        # threads, but carrying no area or shape.
-        "out_of_focus_ids": json.loads(
-            needed["lacunae_detection"].read_text(encoding="utf-8")).get("out_of_focus_ids") or [],
+        # Lacunae carrying no area or shape, as detection recorded them.
+        "no_shape_ids": json.loads(
+            needed["lacunae_detection"].read_text(encoding="utf-8")).get("no_shape_ids") or [],
+        "lacuna_classes": json.loads(
+            needed["lacunae_detection"].read_text(encoding="utf-8")).get("lacuna_classes") or {},
         "canaliculi_detection": json.loads(needed["canaliculi_detection"].read_text(encoding="utf-8")),
     }
 
@@ -1079,9 +1083,15 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
     dist_to_lacuna, nearest_id, _nearest_index = canaliculi.nearest_lacuna_map(lacuna_id_map)
 
     # Lacuna shape, the former measurements_for.
-    out_of_focus = set(detection.get("out_of_focus_ids") or ())
+    no_shape = set(detection.get("no_shape_ids") or ())
+    classes = detection.get("lacuna_classes") or {}
+    class_of = {}
+    for name, ids in classes.items():
+        for lacuna_id in ids:
+            class_of[int(lacuna_id)] = name
     shape_rows = [
-        region_to_measurement(lacuna_id, region, on_border, precision, lacuna_id in out_of_focus)
+        region_to_measurement(lacuna_id, region, on_border, precision, lacuna_id in no_shape,
+                              class_of.get(lacuna_id, "ordinary"))
         for lacuna_id, (region, on_border) in enumerate(kept, start=1)
     ]
     border = sum(1 for _region, on_border in kept if on_border)
@@ -1199,7 +1209,8 @@ def detection_in_memory(result: dict) -> dict:
         "lacunae_detection": {
             "parameters": {**lacunae.parameters(), "computed_threshold_t_hi": lac["t_hi"]},
         },
-        "out_of_focus_ids": list(lac.get("out_of_focus_ids") or ()),
+        "no_shape_ids": list(lac.get("no_shape_ids") or ()),
+        "lacuna_classes": lac.get("lacuna_classes") or {},
         "canaliculi_detection": {
             "parameters": canaliculi.parameters(result),
         },

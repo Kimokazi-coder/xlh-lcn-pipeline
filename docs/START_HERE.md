@@ -51,6 +51,19 @@ Report only, in each image's `biological_limits` json block and xlsx sheet: per-
 25 to 50 um range, roots per lacuna, and the apparent width, which **includes the optical blur** and is
 an upper bound rather than a diameter.
 
+## Lacunae
+
+Four rules in `config.py` find lacunae the plain area, solidity and frame filters
+miss: a **dim** sub-area body (big enough, compact, and crucially **not**
+saturated), an object the **frame cuts** at a scaled area floor, a large ragged
+body with a **thick process**, and a **merge** of one osteocyte that a thin dark
+band split in two. A measurement of all 173 candidates over the 8 images chose
+every value; notably "brighter than its surroundings" turned out to run backwards
+and is not used for this. METHODS section 9 has the detail.
+
+Lacunae found this way are the classes **dim** and **out_of_focus**: counted and
+owning their threads, but carrying no area or shape measure.
+
 ## What each folder holds
 
 | folder | contents |

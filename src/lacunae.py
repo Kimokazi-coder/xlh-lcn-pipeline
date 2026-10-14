@@ -681,15 +681,15 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
     out_of_focus = find_out_of_focus(labels, channel, kept)
     out_of_focus_ids = [len(kept) + i for i in range(1, len(out_of_focus) + 1)]
     kept = kept + out_of_focus
-    return labels, kept, t_hi, out_of_focus_ids + dim_ids
+    return labels, kept, t_hi, {"dim": dim_ids, "out_of_focus": out_of_focus_ids}
 
 
 def segment_image(image_path: Path, t_hi: float | None = None):
     """(display, channel, label_image, kept, t_hi, out_of_focus_ids) for one image
     file. A given t_hi replaces the computed cut (sensitivity diagnostics only)."""
     display, channel = load_channel(image_path)
-    labels, kept, t_hi, out_of_focus_ids = segment(channel, t_hi)
-    return display, channel, labels, kept, t_hi, out_of_focus_ids
+    labels, kept, t_hi, classes = segment(channel, t_hi)
+    return display, channel, labels, kept, t_hi, classes
 
 
 # Measurements
@@ -699,7 +699,7 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
     objects and the cut that was used. The counts are how many objects the
     filters kept, which belongs to detection. Every measured number comes from
     src/quantification.py. t_hi: see segment_image."""
-    display, channel, labels, kept, t_hi, out_of_focus_ids = segment_image(image_path, t_hi)
+    display, channel, labels, kept, t_hi, classes = segment_image(image_path, t_hi)
     border = sum(1 for _r, on_border in kept if on_border)
     return {
         "image_path": image_path,
@@ -707,10 +707,14 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
         "labels": labels,
         "kept": kept,
         "t_hi": t_hi,
-        # Lacunae seen out of the focal plane: counted and owning threads, but
-        # excluded from every area and shape measure (config, section f).
-        "out_of_focus_ids": list(out_of_focus_ids),
-        "out_of_focus_count": len(out_of_focus_ids),
+        # Lacunae with no shape measure: counted and owning threads, but excluded
+        # from every area and shape measure, because what would be measured is
+        # the blur or the frame and not the cell. Two classes, two rules:
+        # "dim" (config section g) and "out_of_focus" (config section f).
+        "lacuna_classes": {k: list(v) for k, v in classes.items()},
+        "no_shape_ids": sorted(set(classes["dim"]) | set(classes["out_of_focus"])),
+        "dim_count": len(classes["dim"]),
+        "out_of_focus_count": len(classes["out_of_focus"]),
         "lacuna_count": len(kept),
         "border_lacuna_count": border,
         "interior_lacuna_count": len(kept) - border,
@@ -853,11 +857,12 @@ def save_detection_json(result: dict, out_path: Path) -> None:
             "outlines": f"{image_label(result['image_path'])}_{config.SUFFIX_LACUNAE_OUTLINES}",
         },
         "parameters": {**parameters(), "computed_threshold_t_hi": result["t_hi"]},
-        # Which lacunae were kept as out-of-focus (config, section f). Saved
+        # Which lacunae carry no shape measure, and under which rule. Saved
         # because quantification must measure them the same way whether it works
         # from memory or from these files: they are counted and they own threads,
         # but they carry no area or shape.
-        "out_of_focus_ids": list(result.get("out_of_focus_ids") or ()),
+        "lacuna_classes": result.get("lacuna_classes") or {},
+        "no_shape_ids": list(result.get("no_shape_ids") or ()),
         "provenance": provenance(),
     }
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -475,6 +475,64 @@ p90 4.58, max 7.70, and only three sit between 5.0 and 7.0, so the cut is in a
 sparse part of the distribution but a narrow one, 5.763 kept against 6.034
 rejected.
 
+### What the measurement said, and why the expected rule was wrong
+
+Before any rule was written, every object the lacuna threshold produced at 100 px²
+or more over all 8 images was tabulated with its features, 173 of them
+(`python src/diagnostics.py lacuna-candidates -d data/WT -o results/survey`).
+
+The rule everyone expects is "a missed lacuna is clearly brighter than its
+surroundings". **The data says the opposite.** Measured as the mean inside over
+the mean of a ring just outside, the lacunae a review found missing score **1.17
+to 1.58**, while ordinary thresholding specks reach **4.87**. The test runs
+backwards, and for a physical reason worth keeping in mind: a real lacuna is
+ringed by its own dense canaliculi, which lift the ring it is being compared
+with, while a speck sits on dark background with nothing around it.
+
+What does separate them is that these lacunae are **dim**. A lacuna lying partly
+outside the focal plane has a core that never saturates: the missed ones peak at
+**0.678 to 0.792**, and the next object up in the whole pool peaks at **0.824**.
+That is a clean gap, and the rule is built on it as an **upper** bound on
+brightness. Contrast is kept, but only in the thick-process rule below, where a
+high value is the point.
+
+### Four rules for the lacunae the filters miss
+
+All in `config.py` section g, all identical for every image, none of them
+lowering `MIN_AREA_PX2` or raising `MAX_ASPECT_RATIO` for anything else.
+
+| rule | test | why |
+|---|---|---|
+| **g1 dim sub-area** | area ≥ 2.7 um² (160 px), solidity ≥ 0.80, peak ≤ 0.82 | big enough to be a body, compact, and dim: the gap above |
+| **g2 cut by the frame** | area floor × 0.75 (300 px), solidity ≥ 0.85 | the frame cuts the object, so the floor is scaled; the stricter solidity is needed, because at the scaled floor alone two objects in an image that must not change would be admitted |
+| **g3 thick process** | area ≥ 16.9 um² (1000 px), contrast ≥ 2.5, solidity ≥ 0.40 | a large, bright, ragged region is a body with a thick process, not debris. One object over the 8 images qualifies; the next ragged one is a quarter of the area |
+| **g4 dark band merge** | shared border ≥ 150 px, dip ≥ 0.75 of the dimmer body, and **never between two objects that are both already lacunae** | a thin dark band can split one osteocyte in two. The third condition is what stops the rule fusing two real neighbouring cells: without it two lacunae in 682_z29 merge and the count falls |
+
+The merge runs **before** anything is filtered, so a rescued body is judged whole.
+
+Lacunae accepted by g1 to g3 are the class **dim**, beside **out_of_focus**
+below: counted, owning their threads, and carrying **no area or shape measure**,
+because what would be measured is the blur or the frame and not the cell. Every
+per-lacuna row says which class it is, and the shape summary uses ordinary
+lacunae only.
+
+**The acceptance test.** A review of all 8 images named what the detector should
+find. It passes on every image, and the four images that had to stay still did:
+
+| image | before | after | expected | the review's targets |
+|---|---|---|---|---|
+| 542_z06 | 17 | **19** | 19 | (226,311) ragged body found by g3; (4,934) frame-cut found by g2 |
+| 542_z18 | 13 | 13 | 13 | unchanged |
+| 543-2 | 12 | 12 | 12 | unchanged |
+| 543_3 | 11 | **13** | — | (481,458) and (286,857) found by g1; the osteocyte at (877,546) that a dark band split is one 1625 px object again |
+| 543_z13 | 11 | 11 | 11 | unchanged |
+| 682_z08 | 10 | **11** | 11 | (977,347) found by g1 |
+| 682_z23 | 14 | 14 | 14 | unchanged |
+| 682_z29 | 14 | **15** | 15 | (872,724) and (846,734) merged by g4 into one 663 px lacuna |
+
+108 lacunae over the 8 images, up from 102. **Not validated**: the review is an
+eye on the images, not a hand count, and no value here was chosen against one.
+
 ### Out-of-focus lacunae
 
 A lacuna lying partly outside the focal plane shows as a round glow whose bright
