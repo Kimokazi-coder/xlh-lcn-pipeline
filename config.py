@@ -258,6 +258,39 @@ DIM_THREAD_REACH_UM = 0.65
 UNATTACHED_MIN_LENGTH_UM = 1.3
 UNATTACHED_MIN_ASPECT = 3.0
 
+# (f) The glow zone, and the lower cut inside it. METHODS section 18 measured
+# what empties the ring of skeleton around every lacuna: of the pixels there
+# carrying a ridge response of at least half the low cut, the hysteresis LOW CUT
+# drops 59.9%, which is 27 times every other stage of the pipeline together. The
+# reason is not that the glow raises the floor, which was measured and is false
+# (the top-hat leaves a median of exactly 0 in those rings, lower than the tissue
+# beyond them, and nothing is saturated): it is that a thread's own contrast
+# there runs at 31 to 71% of what the same tissue shows 40 px further out, so one
+# global cut keeps a quarter of the mask it keeps elsewhere.
+#
+# So inside each lacuna's own glow zone, and only there, the response is accepted
+# down to GLOW_ZONE_CUT_FRACTION of the low cut, and only where it CONTINUES mask
+# that the global cut already produced. Outside the zones nothing changes.
+#
+# The zone is never a fixed width: it is each lacuna's own glow extent, the
+# distance at which its radial profile on the RAW channel falls to
+# GLOW_PROFILE_FRACTION of its surface excess above the local background, the
+# median over 180 rays (canaliculi.glow_extent_px). A fixed width would bias
+# against exactly the lacunae a periosteocytic lesion widens, which is the
+# comparison this pipeline exists to make.
+#
+# GLOW_PROFILE_FRACTION = 0.10: the profile has fallen to a tenth of its height
+# above the background, which is where a decaying glow stops being distinguishable
+# from the tissue around it. Not validated; no hand count chose it.
+# GLOW_ZONE_CUT_FRACTION = 0.5: the same floor the second dim pass already uses
+# (section 8), so the pipeline has one definition of "dim" and not two.
+# GLOW_ZONE_MAX_UM: a cap, so a lacuna whose profile never falls (a saturated
+# field, a lesion filling the frame) cannot claim the image. 8 um is just past
+# the widest empty ring measured in the set, 7.69 um.
+GLOW_PROFILE_FRACTION = 0.10
+GLOW_ZONE_CUT_FRACTION = 0.5
+GLOW_ZONE_MAX_UM = 8.0
+
 # (e) Trimming a glow streak off a lacuna body. A bright osteocyte often carries
 # a tail of out-of-plane glow, and the threshold takes body and tail as one
 # object, which makes it far more elongated than the cell is. The aspect filter

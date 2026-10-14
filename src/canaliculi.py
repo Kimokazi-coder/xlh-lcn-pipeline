@@ -22,9 +22,15 @@ single 2D optical sections, which is behind every departure from it.
        they connect to confidently bright ones. Both cuts come from the
        response's own histogram. Inside vascular-canal structures ("flagged",
        found on the raw channel) only already-bright pixels are kept.
-    4. Remove the lacuna bodies (plus a 2 px buffer) and small specks, then
-       skeletonize to one-pixel centre lines. There is no gap bridging: a gap
-       is left as a gap.
+    4. Remove the lacuna bodies (plus a 2 px buffer) and small specks. Then,
+       inside each lacuna's own GLOW ZONE and nowhere else, accept the response
+       down to config.GLOW_ZONE_CUT_FRACTION of the low cut where it continues
+       mask the global cut already produced: one global cut empties a ring
+       around every body, where a thread's contrast runs at a third to two
+       thirds of normal (section 18 of docs/METHODS.md). The zone is the
+       lacuna's own glow extent, measured on the raw channel, never a fixed
+       width. Then skeletonize to one-pixel centre lines. There is no gap
+       bridging: a gap is left as a gap.
     5. Turn the skeleton into a graph and clean it to a fixed point: prune
        short spurs, collapse crossing artefacts, merge degree-2 chains
        (OCY's Skel2Graph3D with THR_BRANCH).
@@ -191,6 +197,24 @@ FLAGGED_MIN_MAJOR_AXIS_PX = 420.0
 # the far field: 0.70x at 0 to 4 px, then 0.96x, 1.09x, 1.01x, 1.01x. It is at
 # baseline from about 4 px out, so 4 px, not more.
 FLAGGED_DILATION_PX = 4
+
+# Parameters: the glow zone
+
+# How the radial glow profile of a lacuna is sampled, on the RAW channel.
+# 180 rays is one every 2 degrees, which is finer than the body outline's own
+# steps; the step along a ray is half a pixel; the profile is smoothed over 3
+# samples so one dark pixel cannot end it; and the local background is the
+# median of the raw channel in this ring around the body, every lacuna body
+# excluded. The ring starts beyond the widest glow the cap allows and is 20 px
+# deep, which is enough pixels for a stable median.
+GLOW_PROFILE_ANGLES = 180
+GLOW_PROFILE_STEP_PX = 0.5
+GLOW_PROFILE_SMOOTH = 3
+GLOW_BACKGROUND_BAND_PX = (70.0, 90.0)
+
+# The widest a glow zone may be. Set in micrometres in config.py; see the
+# comment there.
+GLOW_ZONE_MAX_PX = config.px_int(config.GLOW_ZONE_MAX_UM)
 
 # Parameters: the biological length limit
 # The longest a canaliculus may be, along the network from the surface of the
@@ -411,6 +435,161 @@ def network_candidate_mask(
     candidate = signal & ~buffered_lacunae
     candidate = morphology.remove_small_objects(candidate, min_size=MIN_THREAD_OBJECT_PX2)
     return candidate, t_lo, response
+
+
+# The glow a lacuna casts, and the zone that follows it
+
+def _moving_average(values: np.ndarray, window: int) -> np.ndarray:
+    """A centred moving average along the last axis, edges repeated. One dark
+    pixel on a ray must not end a profile by itself."""
+    if window <= 1:
+        return values
+    pad = window // 2
+    padded = np.pad(values, ((0, 0), (pad, pad)), mode="edge")
+    kernel = np.ones(window, dtype=np.float64) / window
+    return np.apply_along_axis(lambda row: np.convolve(row, kernel, mode="valid"), 1, padded)
+
+
+def glow_extent_px(channel: np.ndarray, lacuna_id_map: np.ndarray, n_lacunae: int) -> np.ndarray:
+    """How far each lacuna's glow reaches beyond its body, in px, indexed by
+    lacuna id (index 0 unused). Measured on the RAW channel, never on the
+    flattened one, because the flattening is what removes the glow.
+
+    A bright osteocyte is surrounded by out-of-plane glow, and a thread that
+    leaves it is traced only where that glow ends: METHODS section 18 measured
+    the ridge response at 31 to 71% of its value 40 px further out, which is why
+    one global cut empties a ring around every body. The width of that ring is a
+    property of each lacuna and not a constant, and it is what widens in Hyp
+    bone with a periosteocytic lesion, so every rule built on it has to be built
+    on the lacuna's own measurement.
+
+    Per lacuna:
+      - the LOCAL BACKGROUND is the median of the raw channel in the ring
+        GLOW_BACKGROUND_BAND_PX around the body, every lacuna body left out, so
+        it is this lacuna's own surroundings and not the image's;
+      - GLOW_PROFILE_ANGLES rays leave the centroid, and along each one the
+        distance is the true distance to the body, so a concave body is measured
+        from its real edge;
+      - the profile is the raw channel along the ray, smoothed over
+        GLOW_PROFILE_SMOOTH samples, and the surface value is its mean within
+        1.5 px of the body edge;
+      - the ray's extent is the first distance at which the profile falls to
+        config.GLOW_PROFILE_FRACTION of the surface value's excess above the
+        background, that is to background + fraction x (surface - background);
+      - a ray that leaves the frame or enters another lacuna before it answers
+        is censored; a ray whose surface is already at or below the background
+        has no glow and answers 0;
+      - the lacuna's extent is the MEDIAN over the rays that answered, capped at
+        GLOW_ZONE_MAX_PX.
+    """
+    height, width = channel.shape
+    all_bodies = lacuna_id_map > 0
+    extents = np.zeros(n_lacunae + 1, dtype=np.float64)
+    if GLOW_ZONE_MAX_PX <= 0:
+        return extents  # the rule turned off, which is how a before run is made
+    angles = np.linspace(0.0, 2.0 * np.pi, GLOW_PROFILE_ANGLES, endpoint=False)
+    sin_a, cos_a = np.sin(angles), np.cos(angles)
+    cap = float(GLOW_ZONE_MAX_PX)
+
+    for lacuna_id in range(1, n_lacunae + 1):
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        rows, cols = np.nonzero(body)
+        r0, c0 = float(rows.mean()), float(cols.mean())
+        gap = ndi.distance_transform_edt(~body)
+
+        ring = ((gap >= GLOW_BACKGROUND_BAND_PX[0]) & (gap <= GLOW_BACKGROUND_BAND_PX[1])
+                & ~all_bodies)
+        background = float(np.median(channel[ring])) if ring.any() else float(
+            np.median(channel[~all_bodies]))
+
+        radius = float(np.hypot(rows - r0, cols - c0).max())
+        steps = np.arange(0.0, radius + cap + 2.0, GLOW_PROFILE_STEP_PX)
+        rr = r0 + steps[None, :] * sin_a[:, None]
+        cc = c0 + steps[None, :] * cos_a[:, None]
+        in_frame = (rr >= 0) & (rr <= height - 1) & (cc >= 0) & (cc <= width - 1)
+        d = ndi.map_coordinates(gap, [rr, cc], order=1, mode="nearest")
+        v = ndi.map_coordinates(channel, [rr, cc], order=1, mode="nearest")
+        other = ndi.map_coordinates((all_bodies & ~body).astype(np.uint8), [rr, cc],
+                                    order=0, mode="nearest") > 0
+
+        n_ang, n_s = rr.shape
+        index = np.arange(n_s)[None, :]
+        in_body = d < 0.5
+        crossed = in_body.any(axis=1)
+        last_in = np.where(crossed, n_s - 1 - np.argmax(in_body[:, ::-1], axis=1), n_s)
+        after = index > last_in[:, None]
+        blocked = after & (~in_frame | other)
+        first_block = np.where(blocked.any(axis=1), np.argmax(blocked, axis=1), n_s)
+        usable = after & (index < first_block[:, None]) & (d <= cap)
+
+        at_edge = usable & (d <= 1.5)
+        have_edge = at_edge.any(axis=1)
+        surface = np.where(have_edge,
+                           (v * at_edge).sum(axis=1) / np.maximum(at_edge.sum(axis=1), 1),
+                           np.nan)
+        excess = surface - background
+        threshold = background + config.GLOW_PROFILE_FRACTION * excess
+
+        smooth = _moving_average(v, GLOW_PROFILE_SMOOTH)
+        below = usable & (smooth <= threshold[:, None])
+        answered = below.any(axis=1)
+        first_below = np.argmax(below, axis=1)
+        extent_ray = np.where(answered, d[np.arange(n_ang), first_below], np.nan)
+        reached = usable.any(axis=1) & ((d * usable).max(axis=1) >= cap - GLOW_PROFILE_STEP_PX)
+        extent_ray = np.where(np.isnan(extent_ray) & reached, cap, extent_ray)
+        extent_ray = np.where(have_edge & (excess <= 0.0), 0.0, extent_ray)
+
+        good = crossed & have_edge & ~np.isnan(extent_ray)
+        extent = float(np.median(extent_ray[good])) if good.any() else 0.0
+        extents[lacuna_id] = min(extent, cap)
+    return extents
+
+
+def glow_zone_mask(lacuna_id_map: np.ndarray, extents: np.ndarray) -> np.ndarray:
+    """The union of every lacuna's own glow zone: pixels within that lacuna's
+    glow extent of its body. Where two zones overlap the pixel is in both, which
+    is what a union means; nothing here decides ownership."""
+    zone = np.zeros(lacuna_id_map.shape, dtype=bool)
+    for lacuna_id in range(1, extents.size):
+        if extents[lacuna_id] <= 0:
+            continue
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        zone |= ndi.distance_transform_edt(~body) <= extents[lacuna_id]
+    return zone
+
+def grow_in_glow_zone(candidate: np.ndarray, response: np.ndarray, t_hi: float,
+                      zone: np.ndarray, lacuna_mask: np.ndarray,
+                      flagged: np.ndarray) -> np.ndarray:
+    """The pixels a lower cut adds INSIDE the glow zones, and nowhere else.
+
+    One global cut empties a ring around every lacuna: METHODS section 18
+    measured the ridge response there at 31 to 71% of what the same tissue shows
+    40 px further out, and found the hysteresis low cut dropping 59.9% of
+    everything visible in those rings, 27 times every other stage together.
+
+    So inside each lacuna's own glow zone the response is accepted down to
+    config.GLOW_ZONE_CUT_FRACTION of the low cut, under the two limits that make
+    it a continuation and not a flood:
+      - it must CONNECT to mask the global cut already produced, which is the
+        only seed, so nothing is created in open field, and
+      - it may only lie inside a zone, which is each lacuna's own glow extent
+        and never a fixed width.
+    Outside the zones the mask is exactly what the global cut gave. The lacuna
+    bodies and their buffer stay cut out, and inside a flagged vascular
+    structure only already-bright pixels survive, both as in hysteresis_mask."""
+    if not zone.any():
+        return candidate
+    low = t_hi * HYSTERESIS_LOW_FRACTION
+    floor = low * config.GLOW_ZONE_CUT_FRACTION
+    buffered = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
+    extra = zone & (response >= floor) & ~buffered
+    if flagged.any():
+        extra &= ~(flagged & (response < t_hi))
+    return ndi.binary_propagation(candidate, mask=candidate | extra)
 
 
 def build_lacuna_maps(labels: np.ndarray, kept: list[tuple]) -> tuple[np.ndarray, np.ndarray]:
@@ -905,6 +1084,14 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     flagged = flagged_structures(channel)
     preprocessed = preprocess_channel(channel)
     candidate, t_lo, response = network_candidate_mask(preprocessed, lacuna_mask, flagged, t_lo)
+    # The glow zone: inside each lacuna's own glow, and only there, a lower cut,
+    # seeded from the mask the global cut already produced (section 18). The
+    # extent is measured on the RAW channel, never on the flattened one, which
+    # is what removes the glow.
+    glow_extents = glow_extent_px(channel, lacuna_id_map, len(kept))
+    glow_zone = glow_zone_mask(lacuna_id_map, glow_extents)
+    candidate_before_glow_zone = candidate
+    candidate = grow_in_glow_zone(candidate, response, t_lo, glow_zone, lacuna_mask, flagged)
     skeleton = morphology.skeletonize(candidate)
     # What the ridge threshold alone traced. Nothing about ownership enters it,
     # so it is the skeleton an ownership rule must leave pixel for pixel alone;
@@ -958,6 +1145,10 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "skeleton": skeleton,
         "skeleton_first_pass": skeleton_first_pass,
         "candidate_first_pass": candidate_first_pass,
+        "candidate_before_glow_zone": candidate_before_glow_zone,
+        "glow_zone": glow_zone,
+        "glow_extents_px": glow_extents,
+        "glow_zone_added_px": int((candidate_before_glow_zone ^ candidate_first_pass).sum()),
         "skeleton_before_length_prune": skeleton_before,
         "length_prune": prune,
         "flagged": flagged,
@@ -1046,6 +1237,10 @@ def parameters(result: dict) -> dict:
         "lacuna_attach_reach_px": LACUNA_ATTACH_REACH_PX,
         "lacuna_attach_min_signal_fraction": config.LACUNA_ATTACH_MIN_SIGNAL_FRACTION,
         "contact_reach_px": CONTACT_REACH_PX,
+        "glow_profile_fraction": config.GLOW_PROFILE_FRACTION,
+        "glow_zone_cut_fraction": config.GLOW_ZONE_CUT_FRACTION,
+        "glow_zone_max_um": config.GLOW_ZONE_MAX_UM,
+        "glow_zone_max_px": GLOW_ZONE_MAX_PX,
         "lacuna_attach_rule": ("a node attaches only if the dimmest ridge response on the straight "
                                "path from the lacuna surface to it reaches that fraction of the "
                                "response's own low cut"),

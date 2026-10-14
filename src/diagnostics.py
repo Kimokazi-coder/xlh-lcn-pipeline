@@ -54,6 +54,9 @@ Subcommands:
     empty-zone        what makes the hole in the skeleton around a lacuna: how
                       wide it is, and which stage of the pipeline drops each
                       visible pixel inside it
+    glow-check        the glow zone rule on against off: the skeleton inside
+                      and outside the zones, the empty width, roots, owned and
+                      unowned px, and the three checks that rule has to pass
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -78,6 +81,7 @@ Usage (from the repo root):
     python src/diagnostics.py contact-handover -d data/WT -o results/contact_census
     python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background
     python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone
+    python src/diagnostics.py glow-check -d data/WT -o results/glow_zone --pictures 543-2,543_3
 """
 
 from __future__ import annotations
@@ -4318,6 +4322,235 @@ def cmd_empty_zone(args) -> int:
     return 0
 
 
+# glow-check ---------------------------------------------------------------------
+# The glow zone rule on against off, on every image.
+#
+# MEASUREMENT ONLY: each image is run twice in one process, once with
+# canaliculi.GLOW_ZONE_MAX_PX = 0, which turns the rule off and is the pipeline
+# as it was, and once as configured. The zone used to split "inside" from
+# "outside" is the one the ON run computed, so both runs are measured against
+# the same regions.
+#
+# The three checks the work has to pass:
+#   the skeleton OUTSIDE the zones is unchanged
+#   the empty width shrinks on every image
+#   roots per lacuna do not fall on any image
+
+
+def _glow_run(image_path: Path, glow_max_px: int | None) -> dict:
+    """One run of the pipeline with the glow zone cap replaced, and everything
+    the check reads from it."""
+    saved = canaliculi.GLOW_ZONE_MAX_PX
+    if glow_max_px is not None:
+        canaliculi.GLOW_ZONE_MAX_PX = int(glow_max_px)
+    try:
+        d = contact_detection(image_path)
+    finally:
+        canaliculi.GLOW_ZONE_MAX_PX = saved
+    return d
+
+
+def _glow_widths(d: dict) -> list:
+    """The empty width of every lacuna of one run."""
+    d["skeleton_distance"] = ndi.distance_transform_edt(~d["skeleton"])
+    out = []
+    for lacuna_id in range(1, d["n_lacunae"] + 1):
+        r = empty_zone_sectors(d, lacuna_id)
+        out.append(r["empty_width_px"])
+    return out
+
+
+def _glow_one(job: tuple) -> dict:
+    path_str, out_dir, pictures_for = job
+    image_path = Path(path_str)
+    after = _glow_run(image_path, None)
+    before = _glow_run(image_path, 0)
+    zone = after["net"]["glow_zone"]
+    extents = after["net"]["glow_extents_px"][1:]
+
+    rows = []
+    wa, wb = _glow_widths(after), _glow_widths(before)
+    for i in range(after["n_lacunae"]):
+        rows.append({
+            "image_label": after["label"],
+            "lacuna_id": i + 1,
+            "glow_extent_px": round(float(extents[i]), 2),
+            "glow_extent_um": round(config.um(float(extents[i])), 3),
+            "empty_width_before_px": wb[i],
+            "empty_width_after_px": wa[i],
+            "roots_before": quantification.cell_root_count(before["graph"], i + 1),
+            "roots_after": quantification.cell_root_count(after["graph"], i + 1),
+            "owned_px_before": int((before["owner_map"] == i + 1).sum()),
+            "owned_px_after": int((after["owner_map"] == i + 1).sum()),
+        })
+
+    def side(d, mask):
+        skel = d["skeleton"]
+        return {"skeleton_px": int((skel & mask).sum()),
+                "mask_px": int((d["candidate_first_pass"] & mask).sum()),
+                "first_pass_skeleton_px": int((d["skeleton_first_pass"] & mask).sum()),
+                "owned_px": int((skel & mask & (d["owner_map"] > 0)).sum()),
+                "unowned_px": int((skel & mask & (d["owner_map"] == 0)).sum())}
+
+    widths_b = [w for w in wb if w is not None]
+    widths_a = [w for w in wa if w is not None]
+    roots_b = [r["roots_before"] for r in rows]
+    roots_a = [r["roots_after"] for r in rows]
+    pictures = []
+    if pictures_for:
+        pictures = glow_before_after_pictures(before, after, Path(out_dir))
+    return {
+        "image_label": after["label"],
+        "lacunae": after["n_lacunae"],
+        "glow_extent_px": {
+            "min": round(float(np.min(extents)), 2),
+            "median": round(float(np.median(extents)), 2),
+            "max": round(float(np.max(extents)), 2),
+            "at_the_cap": int((extents >= canaliculi.GLOW_ZONE_MAX_PX - 1e-9).sum()),
+        },
+        "zone_px": int(zone.sum()),
+        "mask_added_in_the_zone_px": int(after["net"]["glow_zone_added_px"]),
+        "inside_the_zone": {"before": side(before, zone), "after": side(after, zone)},
+        "outside_the_zone": {"before": side(before, ~zone), "after": side(after, ~zone)},
+        "skeleton_px": {"before": int(before["skeleton"].sum()),
+                        "after": int(after["skeleton"].sum())},
+        "owned_px": {"before": int((before["skeleton"] & (before["owner_map"] > 0)).sum()),
+                     "after": int((after["skeleton"] & (after["owner_map"] > 0)).sum())},
+        "unowned_px": {"before": int((before["skeleton"] & (before["owner_map"] == 0)).sum()),
+                       "after": int((after["skeleton"] & (after["owner_map"] == 0)).sum())},
+        "empty_width_px": {"before": round(float(np.median(widths_b)), 2) if widths_b else None,
+                           "after": round(float(np.median(widths_a)), 2) if widths_a else None},
+        "roots_per_lacuna": {"before": round(float(np.mean(roots_b)), 3),
+                             "after": round(float(np.mean(roots_a)), 3)},
+        "lacunae_under_3_roots": {"before": sum(1 for v in roots_b if v < CONTACT_ROOTS_FLOOR),
+                                  "after": sum(1 for v in roots_a if v < CONTACT_ROOTS_FLOOR)},
+        "length_prune_px": {"before": int(before["length_prune"]["removed_px"]),
+                            "after": int(after["length_prune"]["removed_px"])},
+        "dim_pass_px": {"before": int(before["dim_pass_px"]), "after": int(after["dim_pass_px"])},
+        "unattached_px": {"before": int(before["unattached"].sum()),
+                          "after": int(after["unattached"].sum())},
+        "pictures": pictures,
+        "rows": rows,
+    }
+
+
+def glow_before_after_pictures(before: dict, after: dict, out_dir: Path) -> list:
+    """The skeleton and the verification picture of one image, before and after,
+    into results/before_after/ (or wherever the caller asks)."""
+    from skimage.io import imsave
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for tag, d in (("glow_before", before), ("glow_after", after)):
+        path = out_dir / f"{d['label']}_{tag}_skeleton.png"
+        imsave(path, (d["skeleton"] * 255).astype(np.uint8), check_contrast=False)
+        written.append(path.as_posix())
+        path = out_dir / f"{d['label']}_{tag}.png"
+        canaliculi.save_verification(d["net"], path)
+        written.append(path.as_posix())
+    return written
+
+
+def cmd_glow_check(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    wanted = {s.strip() for s in args.pictures.split(",") if s.strip()}
+    jobs = [(str(p), str(args.before_after), lacunae.image_label(p) in wanted) for p in images]
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(jobs)))) as ex:
+        out = list(ex.map(_glow_one, jobs))
+
+    # The mask outside a zone cannot change: the growth is a propagation whose
+    # mask is the old candidate plus pixels inside the zones, so every pixel it
+    # adds is inside one. The SKELETON outside can still move, through the two
+    # later stages that depend on what the mask holds: the 50 um prune keeps
+    # thread it used to cut once the zone connects it to a body, and the dim
+    # pass is seeded from owned skeleton. Both are reported beside the check.
+    outside_held = all(o["outside_the_zone"]["before"]["mask_px"]
+                       == o["outside_the_zone"]["after"]["mask_px"] for o in out)
+    outside_skeleton_held = all(o["outside_the_zone"]["before"]["skeleton_px"]
+                                == o["outside_the_zone"]["after"]["skeleton_px"] for o in out)
+    shrank = all(o["empty_width_px"]["after"] <= o["empty_width_px"]["before"] for o in out)
+    roots_held = all(o["roots_per_lacuna"]["after"] >= o["roots_per_lacuna"]["before"]
+                     for o in out)
+    rows = [r for o in out for r in o["rows"]]
+    report = {
+        "status": "measurement only: each image run twice, nothing in the pipeline was changed",
+        "glow_profile_fraction": config.GLOW_PROFILE_FRACTION,
+        "glow_zone_cut_fraction": config.GLOW_ZONE_CUT_FRACTION,
+        "glow_zone_max_px": canaliculi.GLOW_ZONE_MAX_PX,
+        "checks": {
+            "mask_outside_the_zones_unchanged": outside_held,
+            "skeleton_outside_the_zones_unchanged": outside_skeleton_held,
+            "empty_width_shrinks_on_every_image": shrank,
+            "roots_per_lacuna_do_not_fall": roots_held,
+        },
+        "per_image": [{k: v for k, v in o.items() if k != "rows"} for o in out],
+        "per_lacuna": rows,
+    }
+    args.out.mkdir(parents=True, exist_ok=True)
+    with open(args.out / "glow_check.json", "w", encoding="utf-8", newline="\n") as f:
+        json.dump(report, f, indent=2, default=float)
+    with open(args.out / "glow_check_per_lacuna.csv", "w", encoding="utf-8", newline="") as f:
+        cols = list(rows[0].keys())
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        w.writerows(rows)
+
+    pct = lambda b, a: f"{100.0 * (a - b) / b:+.2f}%" if b else "n/a"
+    print_table(["image", "glow extent px: min, median, max", "at the cap", "zone px",
+                 "mask added"],
+                [[o["image_label"],
+                  f"{o['glow_extent_px']['min']}, {o['glow_extent_px']['median']}, "
+                  f"{o['glow_extent_px']['max']}",
+                  o["glow_extent_px"]["at_the_cap"], o["zone_px"],
+                  o["mask_added_in_the_zone_px"]] for o in out],
+                title="The glow zone of each image")
+    print_table(["image", "mask outside the zones", "skeleton outside the zones",
+                 "of which the 50 um prune kept", "dim pass px"],
+                [[o["image_label"],
+                  f"{o['outside_the_zone']['before']['mask_px']} -> "
+                  f"{o['outside_the_zone']['after']['mask_px']}",
+                  f"{o['outside_the_zone']['before']['skeleton_px']} -> "
+                  f"{o['outside_the_zone']['after']['skeleton_px']} "
+                  f"({o['outside_the_zone']['after']['skeleton_px'] - o['outside_the_zone']['before']['skeleton_px']:+d})",
+                  f"{o['length_prune_px']['before'] - o['length_prune_px']['after']:+d}",
+                  f"{o['dim_pass_px']['before']} -> {o['dim_pass_px']['after']}"] for o in out],
+                title="\nWhat moves outside the zones, and why")
+    print_table(["image", "skeleton inside the zones", "outside the zones",
+                 "empty width px", "roots per lacuna", "under 3 roots", "owned px", "unowned px"],
+                [[o["image_label"],
+                  f"{o['inside_the_zone']['before']['skeleton_px']} -> "
+                  f"{o['inside_the_zone']['after']['skeleton_px']} "
+                  f"({pct(o['inside_the_zone']['before']['skeleton_px'], o['inside_the_zone']['after']['skeleton_px'])})",
+                  f"{o['outside_the_zone']['before']['skeleton_px']} -> "
+                  f"{o['outside_the_zone']['after']['skeleton_px']}",
+                  f"{o['empty_width_px']['before']} -> {o['empty_width_px']['after']}",
+                  f"{o['roots_per_lacuna']['before']} -> {o['roots_per_lacuna']['after']}",
+                  f"{o['lacunae_under_3_roots']['before']} -> {o['lacunae_under_3_roots']['after']}",
+                  f"{o['owned_px']['before']} -> {o['owned_px']['after']}",
+                  f"{o['unowned_px']['before']} -> {o['unowned_px']['after']}"] for o in out],
+                title="\nBefore and after, per image")
+    print(f"\nMASK outside the zones unchanged:     {outside_held}")
+    print(f"skeleton outside the zones unchanged: {outside_skeleton_held} "
+          f"(it moves with the 50 um prune and the dim pass, both reported above)")
+    print(f"empty width shrinks on every image:   {shrank}")
+    print(f"roots per lacuna do not fall:         {roots_held}")
+    fell = [f"{r['image_label']} lacuna {r['lacuna_id']} "
+            f"({r['roots_before']} -> {r['roots_after']})"
+            for r in rows if r["roots_after"] < r["roots_before"]]
+    print(f"lacunae whose roots fell: {fell or 'none'}")
+    grew = [f"{r['image_label']} lacuna {r['lacuna_id']} "
+            f"({r['empty_width_before_px']} -> {r['empty_width_after_px']})"
+            for r in rows if (r["empty_width_after_px"] or 0) > (r["empty_width_before_px"] or 0)]
+    print(f"lacunae whose hole grew: {grew or 'none'}")
+    print(f"\nreport -> {args.out / 'glow_check.json'}")
+    for o in out:
+        for p in o["pictures"]:
+            print(f"picture -> {p}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -4510,6 +4743,22 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_empty_zone)
+
+    p = sub.add_parser("glow-check",
+                       help="The glow zone rule on against off, on every image.")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.add_argument("--pictures", default="",
+                   help="Image labels, comma separated, to write before and after skeleton and "
+                        "verification pictures for.")
+    p.add_argument("--before-after", dest="before_after", type=Path,
+                   default=config.RESULTS_DIR / "before_after",
+                   help="Where those pictures go (default: results/before_after).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each (two runs each).")
+    p.set_defaults(func=cmd_glow_check)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

@@ -136,6 +136,9 @@ held out and used to confirm.
 | limits | maximum canalicular length | 50 um = 385 px | the outer end of the reported lacuna-to-lacuna spacing in mouse cortical bone, so a thread longer than this from one cell body is not one canaliculus. A plausibility bound from the literature, NOT validated on this data and never tuned to improve a result |
 | limits | reported length range | 25 to 50 um | report only, acted on by nothing; the range the literature reports for canalicular length |
 | ownership | attach reach | 2.6 um = 20 px | was 10 px while attachment went by distance alone. With the signal test deciding, a longer reach cannot cross empty space, and contact threads sat 10 to 20 px out. 25 px was tried and changed no guard number, so the shorter value stands |
+| glow zone | profile fraction | 0.10 of the surface excess | where a decaying glow stops being distinguishable from the tissue around it; the zone it gives runs 3.9 to 33.2 px over the 8 images and reaches the existing mask on 107 of 108 lacunae |
+| glow zone | cut inside the zone | 0.5 of the low cut | the floor the second dim pass already uses, so "dim" has one meaning in the pipeline |
+| glow zone | maximum extent | 8 um = 62 px | a cap, just past the widest empty ring measured (7.69 um), so a lacuna whose profile never falls cannot claim the image. No lacuna in the set reaches it |
 | ownership | contact reach | 6 px = 0.78 um | the 2 px mask buffer plus one thread half width (p50 3.0 px), so it is the band in which a thread can touch a body at all. In pixels, not micrometres, because it is pixel geometry. Inside it a node attaches with no signal test and at weight 0; measured cause in section 8 |
 | ownership | attach minimum signal | 0.7 of the response's low cut | the fraction the old gap bridging required of a gap, measured the same way: the MINIMUM along the path, not the mean |
 | second pass | dim cut | 0.5 of the response's low cut | the floor the survey measured the faint band against |
@@ -931,6 +934,9 @@ With all off, `results/` is reproduced exactly
 - `empty-zone`: what makes the hole in the skeleton around a lacuna. How wide it is, by angular sector;
   what the hole holds against the band immediately beyond it; and which stage of the pipeline drops each
   visible pixel inside it. Measurement only; its answer is section 18.
+- `glow-check`: the glow zone rule on against off, each image run twice. The skeleton inside and outside
+  the zones, the empty width, roots, owned and unowned px, and the three checks the rule has to pass.
+  `canaliculi.GLOW_ZONE_MAX_PX = 0` is what turns it off.
 
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
@@ -1250,3 +1256,52 @@ Profiles for the five widest holes in the set, which is a rule and not a list of
 coordinates, are in `results/empty_zone/`: the neighbourhood with the hole, its
 core and the control band outlined, beside the radial profiles of raw, flattened
 and response with the cuts drawn on them.
+
+### The fix: a lower cut inside each lacuna's own glow zone
+
+The stage is the hysteresis low cut, so the fix is at that cut, and only where
+the measurement says the cut is wrong.
+
+**The zone.** Each lacuna's own **glow extent**
+(`canaliculi.glow_extent_px`), measured on the **raw** channel, never on the
+flattened one, because the flattening is what removes the glow. 180 rays leave
+the centroid; along each one the distance is the true distance to the body, so a
+concave body is measured from its real edge; the profile is the raw channel,
+smoothed over 3 samples; the surface value is its mean within 1.5 px of the
+edge; the local background is the median of the raw channel in the ring 70 to 90
+px out with every lacuna body left out. The ray's extent is the first distance
+at which the profile falls to `config.GLOW_PROFILE_FRACTION` = **0.10** of the
+surface's excess above that background, and the lacuna's extent is the median
+over the rays that answered, capped at `config.GLOW_ZONE_MAX_UM` = 8 um = 62 px.
+A ray that leaves the frame or enters another lacuna is censored; a ray whose
+surface is already at the background answers 0.
+
+**It is never a fixed width.** That is the point. A fixed ring would be measured
+on wild-type bone and then applied unchanged to the Hyp bone whose
+periosteocytic lesions widen exactly this zone, which would bias the comparison
+the project exists to make. Measured on the 8 WT images the extents run 3.9 to
+33.2 px, a factor of 8.5 between lacunae of the same set, and no lacuna reaches
+the cap.
+
+**The cut inside it.** Inside the union of the zones, and nowhere else, the
+ridge response is accepted down to `config.GLOW_ZONE_CUT_FRACTION` = **0.5** of
+the low cut, under one limit: it must **connect to mask the global cut already
+produced** (`canaliculi.grow_in_glow_zone`, a binary propagation seeded by that
+mask). So nothing is created in open field, the lacuna bodies and their buffer
+stay cut out, and inside a flagged vascular structure only already-bright pixels
+survive, both exactly as in the first pass. 0.5 is the floor the second dim pass
+already uses (section 8), so the pipeline has one definition of "dim" and not
+two.
+
+**Outside the zones the mask is bit for bit what it was**, which the check below
+confirms on all 8 images. The 50 um cap, the contact rule and the dim pass are
+untouched.
+
+**What was rejected, and why.** Subtracting each lacuna's radial glow profile
+before the ridge filter was the other option in the brief. The measurement rules
+it out: the top-hat already leaves a median of exactly 0.00000 inside these
+rings, lower than the tissue beyond them, so the glow is gone before the ridge
+filter ever runs and there is nothing left to subtract. What is low there is the
+thread's own contrast, which no background subtraction can raise.
+
+**Not validated.** No hand count chose the fraction, the cut or the cap.
