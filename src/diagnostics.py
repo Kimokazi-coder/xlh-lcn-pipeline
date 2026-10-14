@@ -29,6 +29,8 @@ Subcommands:
                       value: percent changes of the network measures
     validate-network  roots and Sholl crossings against blind hand counts
                       (and the skeleton against traced threads); -s self-test
+    lacuna-candidates every object the lacuna threshold produced, with the
+                      features that might tell a lacuna from a speck
     shape-picture     draw what the report-only shape measures count: the
                       axis-aligned runs, the skeleton on a cycle
     survey            what the pipeline does to every image before anything is
@@ -63,6 +65,7 @@ Usage (from the repo root):
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
@@ -2423,6 +2426,100 @@ def cmd_shape_picture(args) -> int:
     return 0
 
 
+# lacuna-candidates --------------------------------------------------------------
+# Every object the lacuna threshold produced, with the features that might tell a
+# real lacuna from a speck. MEASUREMENT ONLY: it calls the pipeline's own
+# functions, changes no parameter and writes nothing the pipeline reads.
+#
+# The question it exists to answer is which feature separates the lacunae the eye
+# finds from everything else, so a rule can be chosen on the data rather than on
+# one image.
+
+# Candidates smaller than this are not worth tabulating: they are thresholding
+# specks by any reading. This is a floor for the TABLE, not for the pipeline.
+CANDIDATE_MIN_AREA_PX2 = 100
+
+# The ring just outside an object, used for "brighter than its surroundings":
+# from this far out to this far out, so the ring sits off the object's own edge.
+CANDIDATE_RING_INNER_PX = 2
+CANDIDATE_RING_OUTER_PX = 6
+
+
+def candidate_features(label_image, channel, region, kept_labels: set, t_hi: float) -> dict:
+    """One candidate's features. `contrast` is the mean inside over the mean in a
+    ring just outside, which asks whether the object glows above its own
+    background rather than above the image's."""
+    piece = label_image[region.slice] == region.label
+    ring = (morphology.dilation(piece, morphology.disk(CANDIDATE_RING_OUTER_PX))
+            & ~morphology.dilation(piece, morphology.disk(CANDIDATE_RING_INNER_PX)))
+    sub = channel[region.slice]
+    around = float(sub[ring].mean()) if ring.any() else 0.0
+    minor, major = region.axis_minor_length, region.axis_major_length
+    aspect = (major / minor) if minor > 0 else float("inf")
+    rows, cols = label_image.shape
+    min_row, min_col, max_row, max_col = region.bbox
+    on_border = bool(min_row == 0 or min_col == 0 or max_row == rows or max_col == cols)
+    return {
+        "x": round(float(region.centroid[1]), 1),
+        "y": round(float(region.centroid[0]), 1),
+        "area_px2": int(region.area),
+        "area_um2": round(region.area * config.PIXEL_SIZE_UM_ACQUIRED ** 2, 3),
+        "aspect": round(float(aspect), 4) if np.isfinite(aspect) else None,
+        "solidity": round(float(region.solidity), 4),
+        "peak": round(float(region.intensity_max), 4),
+        "mean": round(float(region.intensity_mean), 4),
+        "ring_mean": round(around, 4),
+        "contrast": round(float(region.intensity_mean) / around, 4) if around > 0 else None,
+        "peak_over_cut": round(float(region.intensity_max) / t_hi, 4) if t_hi else None,
+        "on_border": on_border,
+        "kept": bool(region.label in kept_labels),
+    }
+
+
+def cmd_lacuna_candidates(args) -> int:
+    rows = []
+    for image_path in images_from(args):
+        label = lacunae.image_label(image_path)
+        lac = lacunae.analyse_image(image_path)
+        _display, channel = lacunae.load_channel(image_path)
+        labels = lac["labels"]
+        kept_labels = {r.label for r, _b in lac["kept"]}
+        for region in measure.regionprops(labels, intensity_image=channel):
+            if region.area < CANDIDATE_MIN_AREA_PX2:
+                continue
+            rows.append({"image": label,
+                         **candidate_features(labels, channel, region, kept_labels,
+                                              float(lac["t_hi"]))})
+        print(f"  {label}: {sum(1 for r in rows if r['image'] == label)} candidates "
+              f"at or above {CANDIDATE_MIN_AREA_PX2} px2", flush=True)
+
+    args.out.mkdir(parents=True, exist_ok=True)
+    fields = list(rows[0].keys())
+    csv_path = args.out / "lacuna_candidates.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+    json_path = args.out / "lacuna_candidates.json"
+    with open(json_path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"status": "measurement only, nothing in the pipeline was changed",
+                   "min_area_px2": CANDIDATE_MIN_AREA_PX2,
+                   "ring_px": [CANDIDATE_RING_INNER_PX, CANDIDATE_RING_OUTER_PX],
+                   "candidates": rows}, f, indent=2, default=float)
+
+    kept = [r for r in rows if r["kept"]]
+    rej = [r for r in rows if not r["kept"]]
+    print(f"\n{len(rows)} candidates at or above {CANDIDATE_MIN_AREA_PX2} px2: "
+          f"{len(kept)} kept, {len(rej)} rejected")
+    for name in ("contrast", "peak_over_cut", "area_px2", "aspect", "solidity"):
+        k = np.array([r[name] for r in kept if r[name] is not None], float)
+        j = np.array([r[name] for r in rej if r[name] is not None], float)
+        print(f"  {name:14s} kept p10 {np.percentile(k,10):7.3f} p50 {np.median(k):7.3f}   "
+              f"rejected p50 {np.median(j):7.3f} p90 {np.percentile(j,90):7.3f}")
+    print(f"\ntable -> {csv_path}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2503,6 +2600,14 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder (CSV, markdown, per-run json).")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_network_sweep, image=None)
+
+    p = sub.add_parser("lacuna-candidates",
+                       help="Feature table of every lacuna candidate (measurement only).")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.set_defaults(func=cmd_lacuna_candidates)
 
     p = sub.add_parser("shape-picture",
                        help="Draw what the report-only shape measures count.")

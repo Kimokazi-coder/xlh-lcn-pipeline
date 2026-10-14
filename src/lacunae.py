@@ -411,6 +411,114 @@ def region_verdict(region, rows: int, cols: int) -> str:
     return "keep"
 
 
+def region_contrast(label_image: np.ndarray, channel: np.ndarray, region) -> float:
+    """Mean intensity inside the region over the mean of a ring just outside it.
+
+    Note what this does NOT measure: a real lacuna is ringed by its own dense
+    canaliculi, which lift the ring, so a dim lacuna scores LOW here. It is used
+    only where a high value is the point, in the thick-process rule."""
+    piece = label_image[region.slice] == region.label
+    ring = (morphology.dilation(piece, morphology.disk(6))
+            & ~morphology.dilation(piece, morphology.disk(2)))
+    if not ring.any():
+        return 0.0
+    around = float(channel[region.slice][ring].mean())
+    return (float(region.intensity_mean) / around) if around > 0 else 0.0
+
+
+def merge_dark_band_splits(label_image: np.ndarray, channel: np.ndarray) -> np.ndarray:
+    """One osteocyte split in two by a thin dark band becomes one region again.
+
+    Two regions merge when all three hold: they are adjacent along a shared
+    border of at least config.MERGE_MIN_SHARED_PX, the gap between them is no
+    darker than config.MERGE_MIN_DIP_FRACTION of the dimmer body (a shallow dip,
+    not a real separation), and they are NOT BOTH already lacunae. The last
+    condition is what stops the rule fusing two real neighbouring cells: a merge
+    may rescue a fragment into a body, or join two sub-area pieces, and nothing
+    else."""
+    labels = label_image.copy()
+    regions = {r.label: r for r in measure.regionprops(labels, intensity_image=channel)
+               if r.area >= 100}
+    rows, cols = labels.shape
+    max_area = MAX_AREA_FRACTION_OF_IMAGE * rows * cols
+    merged = True
+    while merged:
+        merged = False
+        regions = {r.label: r for r in measure.regionprops(labels, intensity_image=channel)
+                   if r.area >= 100}
+        keys = sorted(regions)
+        for i, a in enumerate(keys):
+            for b in keys[i + 1:]:
+                if a not in regions or b not in regions:
+                    continue
+                ra, rb = regions[a], regions[b]
+                if ra.area >= MIN_AREA_PX2 and rb.area >= MIN_AREA_PX2:
+                    continue  # both are lacunae already: never fuse two real cells
+                if ra.area + rb.area > max_area:
+                    continue
+                mask_a, mask_b = labels == a, labels == b
+                shared = (morphology.dilation(mask_a, morphology.disk(6))
+                          & morphology.dilation(mask_b, morphology.disk(6)))
+                if int(shared.sum()) < config.MERGE_MIN_SHARED_PX:
+                    continue
+                gap = shared & ~mask_a & ~mask_b
+                if not gap.any():
+                    continue
+                dimmer = min(float(ra.intensity_mean), float(rb.intensity_mean))
+                if dimmer <= 0:
+                    continue
+                if float(channel[gap].mean()) / dimmer < config.MERGE_MIN_DIP_FRACTION:
+                    continue
+                labels[mask_b | gap] = a
+                merged = True
+                break
+            if merged:
+                break
+    return labels
+
+
+def find_additional_lacunae(label_image: np.ndarray, channel: np.ndarray,
+                            kept: list[tuple]) -> list[tuple]:
+    """[(region, on_border), ...] for lacunae the area, solidity and frame rules
+    miss. Three rules, each from config, each general and identical for every
+    image; see the comment there for how every value was chosen.
+
+    g1 a sub-area candidate that is big enough, compact and DIM
+    g2 an object cut by the frame, at a scaled area floor and a stricter solidity
+    g3 a large, bright, ragged region: a body with a thick process
+    """
+    rows, cols = label_image.shape
+    taken = {region.label for region, _b in kept}
+    dim_min_area = config.area_px2(config.DIM_LACUNA_MIN_AREA_UM2)
+    border_floor = int(round(config.BORDER_AREA_FRACTION * MIN_AREA_PX2))
+    thick_min_area = config.area_px2(config.THICK_PROCESS_MIN_AREA_UM2)
+    found = []
+    for region in measure.regionprops(label_image, intensity_image=channel):
+        if region.label in taken:
+            continue
+        min_row, min_col, max_row, max_col = region.bbox
+        on_border = min_row == 0 or min_col == 0 or max_row == rows or max_col == cols
+        minor, major = region.axis_minor_length, region.axis_major_length
+        aspect = (major / minor) if minor > 0 else float("inf")
+        if aspect > MAX_ASPECT_RATIO or region.area > MAX_AREA_FRACTION_OF_IMAGE * rows * cols:
+            continue
+        keep = False
+        if on_border:
+            keep = (region.area >= border_floor
+                    and region.solidity >= config.BORDER_MIN_SOLIDITY)
+        elif region.area >= thick_min_area and region.solidity < MIN_SOLIDITY:
+            keep = (region.solidity >= config.THICK_PROCESS_MIN_SOLIDITY
+                    and region_contrast(label_image, channel, region)
+                    >= config.THICK_PROCESS_MIN_CONTRAST)
+        elif region.area < MIN_AREA_PX2:
+            keep = (region.area >= dim_min_area
+                    and region.solidity >= config.DIM_LACUNA_MIN_SOLIDITY
+                    and float(region.intensity_max) <= config.DIM_LACUNA_MAX_PEAK)
+        if keep:
+            found.append((region, bool(on_border)))
+    return found
+
+
 def find_out_of_focus(label_image: np.ndarray, channel: np.ndarray,
                       kept: list[tuple]) -> list[tuple]:
     """[(region, on_border), ...] for candidates that are below MIN_AREA_PX2 but
@@ -551,6 +659,9 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
     labels = (watershed_split_fast if fast else watershed_split)(mask)
     distance = ndi.distance_transform_edt(mask)
     labels = (merge_shallow_splits_fast if fast else merge_shallow_splits)(labels, mask, distance)
+    # A thin dark band can split one osteocyte in two; put it back together
+    # before anything is filtered (config, section g4).
+    labels = merge_dark_band_splits(labels, channel)
     kept = filter_regions(labels)
     if config.NARROW_CRUMB_RULE:
         labels = join_enclosed_crumbs(labels, kept)
@@ -560,12 +671,17 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
         kept = filter_regions(labels)
     if config.BAND_FILTER_MIN_OPENING_SHARE is not None:
         kept = band_filter(kept, config.BAND_FILTER_MIN_OPENING_SHARE)
-    # Out-of-focus lacunae are appended AFTER the in-focus ones, so the ids of
-    # the in-focus lacunae do not move and their ids are the last ones.
+    # Lacunae the plain filters miss, appended AFTER the ones they keep, so the
+    # ids of the ordinary lacunae never move. Both classes carry no area or shape
+    # measure: "dim" for the three rules of config section g, "out_of_focus" for
+    # the round blurred cores of section f.
+    dim = find_additional_lacunae(labels, channel, kept)
+    dim_ids = [len(kept) + i for i in range(1, len(dim) + 1)]
+    kept = kept + dim
     out_of_focus = find_out_of_focus(labels, channel, kept)
     out_of_focus_ids = [len(kept) + i for i in range(1, len(out_of_focus) + 1)]
     kept = kept + out_of_focus
-    return labels, kept, t_hi, out_of_focus_ids
+    return labels, kept, t_hi, out_of_focus_ids + dim_ids
 
 
 def segment_image(image_path: Path, t_hi: float | None = None):

@@ -279,7 +279,53 @@ OUT_OF_FOCUS_MAX_ASPECT = 1.5
 OUT_OF_FOCUS_MIN_SOLIDITY = 0.90
 OUT_OF_FOCUS_MIN_CONTRAST = 1.5
 
-# (g) Report only, no pruning. The range a canalicular length is reported
+# (g) Lacunae the area, solidity and frame rules used to miss. Every value below
+# was chosen from the feature table of all 173 candidates of 100 px2 or more over
+# the 8 images (python src/diagnostics.py lacuna-candidates), not from one image.
+#
+# WHAT THE DATA SAID, and it was not what was expected. "Clearly brighter than
+# its surroundings" does NOT find these lacunae: measured as the mean inside over
+# the mean of a ring just outside, the missed lacunae score 1.17 to 1.58 while
+# ordinary specks reach 4.87, so that test runs BACKWARDS. The reason is physical:
+# a real lacuna is ringed by its own dense canaliculi, which lift the ring, while
+# a speck sits on dark background. What does separate them is that an
+# out-of-focus lacuna is DIM: its core never saturates. Over the whole pool the
+# missed lacunae peak at 0.678 to 0.792 and the next object up peaks at 0.824, a
+# clean gap, so the rule is an upper bound on brightness, not a lower one.
+#
+# (g1) A sub-area candidate is a lacuna if it is big enough, compact, and dim.
+DIM_LACUNA_MIN_AREA_UM2 = 2.7       # 160 px, the smallest missed lacuna is 166
+DIM_LACUNA_MIN_SOLIDITY = 0.80      # compact; the dimmest kept one is 0.824
+DIM_LACUNA_MAX_PEAK = 0.82          # in the gap: targets reach 0.792, the next is 0.824
+#
+# (g2) An object cut by the frame is only partly in the field, so the area floor
+# is scaled by this. It is held to a stricter solidity than an interior object,
+# because less of it is visible and a fragment of a thread must not qualify: at
+# the scaled floor alone, two objects in an image that must not change would be
+# admitted, and the solidity test is what excludes them.
+BORDER_AREA_FRACTION = 0.75         # 300 px of the 400 px floor
+BORDER_MIN_SOLIDITY = 0.85
+#
+# (g3) A large, bright, ragged region is a body with a thick process, not debris,
+# so the solidity floor is lowered for it alone. Only one object over the 8
+# images qualifies; the next ragged object is a quarter of the area.
+THICK_PROCESS_MIN_AREA_UM2 = 16.9   # 1000 px
+THICK_PROCESS_MIN_CONTRAST = 2.5    # mean inside over the ring just outside
+THICK_PROCESS_MIN_SOLIDITY = 0.40
+#
+# (g4) A thin dark band can split one osteocyte in two. Two regions merge when
+# they are adjacent along a long shared border AND the dip between them is
+# shallow AND they are not both already lacunae. The last condition is what keeps
+# the rule from fusing two real neighbouring cells: a merge may rescue a fragment
+# into a body, or join two sub-area pieces, and nothing else.
+MERGE_MIN_SHARED_PX = 150           # the target pairs share 201 and 543 px
+MERGE_MIN_DIP_FRACTION = 0.75       # gap mean over the dimmer body's mean; 0.757 and 0.829
+#
+# Lacunae accepted by (g1) to (g3) are the class "dim": counted and owning
+# threads, excluded from area and shape measures, exactly like out_of_focus.
+# MIN_AREA_PX2 is NOT lowered for everything. NOT VALIDATED.
+
+# (h) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The
 # pipeline does not act on it.
 CANALICULUS_LENGTH_RANGE_UM = (25.0, 50.0)
