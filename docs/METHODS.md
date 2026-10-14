@@ -244,6 +244,7 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 | 2026-10-13 | ONE canalicular method: the ridge method with gap bridging off, ablation variant D, at sigmas 3.0, 3.6 and 4.2 px. The intensity threshold, gap bridging, the band-wall filter and every other variant are deleted and live at the tag. |
 | 2026-10-13 | The 50 um length limit is adopted, measured along the network, and prunes. Two report-only limits are added beside it. Nothing about any of them is validated. |
 | 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. |
+| 2026-10-14 | The GLOW ZONE is adopted: inside each lacuna's own glow extent, measured on the raw channel, the ridge response is accepted down to half the low cut where it continues mask the global cut already produced. One global cut was emptying a ring around every body, 27.4 px wide at the median, by dropping 59.9% of everything visible there (section 18). Outside the zones the mask is unchanged. 543-2 reference becomes 146.42 / 21.99 / 7.67. Not validated. |
 | 2026-10-14 | CONTACT is adopted: a skeleton node within 6 px of a body attaches to its nearest lacuna with no signal test and at weight 0, so a lacuna that is touched owns what touches it and no neighbour can swallow it. The signal test keeps governing from 6 to 20 px and the 50 um prune is untouched. 543-2 reference becomes 128.42 / 19.53 / 5.92. Not validated. |
 
 ## 6. Open questions
@@ -904,7 +905,7 @@ With all off, `results/` is reproduced exactly
 
 ## 13. Checks (`src/diagnostics.py`)
 
-- `reference-check`: 128.42 edges per cell, 19.53 px mean edge length and 5.92 roots per cell on
+- `reference-check`: 146.42 edges per cell, 21.99 px mean edge length and 7.67 roots per cell on
   543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
   being a headline measure that does not depend on ownership.
 - `regression`: regenerate every image into an ignored folder and compare every json and summary number

@@ -22,8 +22,14 @@ channel goes through a **Sato ridge filter at sigmas 3.0, 3.6 and 4.2 px**, the 
 with hysteresis at a low cut of 0.75, the lacuna bodies and small specks are removed, and the result is
 skeletonized. **There is no gap bridging.**
 
-A lacuna then owns a thread only where there is **signal all the way to it**, not merely because it is
-close. A **second dimmer pass** continues the threads it owns into response down to half the low cut, no
+Inside each lacuna's own **glow zone**, and nowhere else, the response is then accepted down to half
+the low cut where it continues mask the global cut already gave: one global cut empties a ring around
+every body, 27.4 px wide at the median, because a thread's contrast there runs at a third to two thirds
+of normal. The zone is that lacuna's own glow extent, measured on the raw channel, and never a fixed
+width, because that zone is what widens in Hyp bone (METHODS section 18).
+
+A lacuna owns what **touches** it, within 6 px, with no test; beyond that it owns a thread only where
+there is **signal all the way to it**, not merely because it is close. A **second dimmer pass** continues the threads it owns into response down to half the low cut, no
 more than 5 px past where the confident skeleton stopped. The **50 um length limit** prunes what runs too
 far. Dim thread-shaped structure that no lacuna owns is kept separately as **unattached**: in the field
 density, never per lacuna. Every value is in `config.py`; METHODS sections 8 and 9 say where each came
@@ -46,7 +52,7 @@ and never as thresholds tuned to improve a result.
 
 The length limit measures **along the network** from the surface of the owning lacuna, as a geodesic
 distance on the skeleton, and prunes what lies beyond. A pixel no lacuna reaches within the limit is not
-pruned; it stays, unowned. On these 8 images it removes 3 to 27% of the skeleton, 17% over all of them.
+pruned; it stays, unowned. On these 8 images it removes 1.7 to 20.4% of the skeleton it is applied to, 9.8% over all of them, counting what the final prune removes against what it leaves (`length_prune.removed_px` of each run). The glow zone of METHODS section 18 lowered this: a thread that could not reach a body within 50 um along the network was being deleted, and the zone joins it to the body it belongs to.
 Report only, in each image's `biological_limits` json block and xlsx sheet: per-thread length against the
 25 to 50 um range, roots per lacuna, and the apparent width, which **includes the optical blur** and is
 an upper bound rather than a diameter.
@@ -107,7 +113,7 @@ From the repository root, with the project's Python (3.9, the venv):
 python src/lacunae.py --dir data/WT                      # feature 1 detection (-o DIR for another folder)
 python src/canaliculi.py --dir data/WT                   # feature 2 detection
 python src/quantification.py --dir data/WT               # every measure and both tables
-python src/diagnostics.py reference-check                # must PASS: 128.42 / 19.53 / 5.92 on 543-2
+python src/diagnostics.py reference-check                # must PASS: 146.42 / 21.99 / 7.67 on 543-2
 python src/diagnostics.py regression                     # every number against results/, tolerance 0
 python src/diagnostics.py switch-check                   # what each switch changes
 python -u figures/make_figures.py all                    # every figure, into results/

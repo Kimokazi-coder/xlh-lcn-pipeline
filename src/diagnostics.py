@@ -138,17 +138,17 @@ def images_from(args) -> list[Path]:
 REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
 
 # The quick check that the default pipeline still gives what it gave. Fixed on
-# 2026-10-14, after the contact rule of config.CONTACT_REACH_PX (METHODS
-# section 8). 543-2 is one of
+# 2026-10-14, after the glow zone of config.GLOW_PROFILE_FRACTION (METHODS
+# section 18). 543-2 is one of
 # the images the acceptance test holds still, so these moved only with the
 # canalicular changes, not with the lacuna ones. Means are over interior lacunae, rounded
 # to 2 decimals. The third number was "gap bridges added", which no longer
 # exists; roots per cell takes its place, being a headline measure that does not
 # depend on ownership and the one a manual count will be compared against.
 REFERENCE_VALUES = [
-    ("edges per interior cell (mean edge_count)", 128.42),
-    ("mean edge length, px (interior mean of mean_edge_length_px)", 19.53),
-    ("roots per interior cell (mean roots_count)", 5.92),
+    ("edges per interior cell (mean edge_count)", 146.42),
+    ("mean edge length, px (interior mean of mean_edge_length_px)", 21.99),
+    ("roots per interior cell (mean roots_count)", 7.67),
 ]
 
 
@@ -4555,7 +4555,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("reference-check", help="Run 543-2 and check 128.42 / 19.53 / 5.92.")
+    p = sub.add_parser("reference-check", help="Run 543-2 and check 146.42 / 21.99 / 7.67.")
     p.add_argument("--image", type=Path, default=REFERENCE_IMAGE, help=argparse.SUPPRESS)
     p.set_defaults(func=cmd_reference_check)
 

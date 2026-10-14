@@ -43,11 +43,15 @@
     "dim_thread_cut_fraction": 0.5,
     "dim_thread_reach_um": 0.65,
     "dim_thread_reach_px": 5,
-    "dim_pass_added_px": 32087,
+    "dim_pass_added_px": 33213,
     "lacuna_attach_reach_um": 2.6,
     "lacuna_attach_reach_px": 20,
     "lacuna_attach_min_signal_fraction": 0.7,
     "contact_reach_px": 6,
+    "glow_profile_fraction": 0.1,
+    "glow_zone_cut_fraction": 0.5,
+    "glow_zone_max_um": 8.0,
+    "glow_zone_max_px": 62,
     "lacuna_attach_rule": "a node attaches only if the dimmest ridge response on the straight path from the lacuna surface to it reaches that fraction of the response's own low cut",
     "prune_spur_len_px": 4,
     "min_internal_edge_len_px": 6,
@@ -60,7 +64,7 @@
     ],
     "max_canaliculus_length_um": 50.0,
     "max_canaliculus_length_px": 385,
-    "length_prune_removed_px": 7402,
+    "length_prune_removed_px": 5544,
     "length_prune_rounds": 1,
     "canaliculus_length_range_um": [
       25.0,
@@ -68,7 +72,7 @@
     ]
   },
   "provenance": {
-    "git_commit": "8cac6088b4c2c4f6ed8cf338fd234981318e14b1",
+    "git_commit": "baa51eacc14666ebc0e077031a3f984c7d4bd7b1",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -79,7 +83,7 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "bdb8bb0e31a62776",
+    "config_hash": "7ccdbafa5b619183",
     "config_hash_covers": [
       "ALL_IMAGES_ARCHIVE_DIR",
       "ALL_IMAGES_DIR",
@@ -101,7 +105,10 @@
       "DISPLAY_WINDOW_FILE",
       "FAST_LACUNA_STAGE",
       "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "GLOW_PROFILE_FRACTION",
       "GLOW_TRIM_WIDTH_FRACTION",
+      "GLOW_ZONE_CUT_FRACTION",
+      "GLOW_ZONE_MAX_UM",
       "IMAGE_LABELS",
       "INVERT_SIGNAL",
       "LACUNA_ATTACH_MIN_SIGNAL_FRACTION",

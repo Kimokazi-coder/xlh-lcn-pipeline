@@ -32,20 +32,27 @@ There is **one** method. A canaliculus is found because it is a thin bright
 3. Threshold the response with hysteresis, the low cut at 0.75 of the high cut.
    Both cuts come from the response's own histogram. Inside vascular-canal
    structures only already-bright pixels are kept.
-4. Remove the lacuna bodies plus a 2 px buffer and small specks, then
-   skeletonize. **There is no gap bridging**: a gap is left as a gap.
-5. Graph, cleanup, and ownership by shortest path through the network. A lacuna
-   attaches to a thread only where there is **signal all the way to it**: the
-   dimmest point of the straight path from the lacuna surface must reach 0.7 of
-   the response's low cut, within 20 px.
-6. A **second, dimmer pass** continues the threads a lacuna owns into response
+4. Remove the lacuna bodies plus a 2 px buffer and small specks.
+5. Inside each lacuna's own **glow zone**, and nowhere else, accept the response
+   down to half the low cut where it continues mask the global cut already gave.
+   One global cut empties a ring around every body, 27.4 px wide at the median,
+   because a thread's contrast there runs at a third to two thirds of normal
+   (METHODS section 18). The zone is that lacuna's own glow extent, measured on
+   the **raw** channel, and never a fixed width. Then skeletonize. **There is no
+   gap bridging**: a gap is left as a gap.
+6. Graph, cleanup, and ownership by shortest path through the network. A lacuna
+   owns what **touches** it, within 6 px, with no test and before the shortest
+   path assignment; beyond that it attaches to a thread only where there is
+   **signal all the way to it**, the dimmest point of the straight path from the
+   lacuna surface reaching 0.7 of the response's low cut, within 20 px.
+7. A **second, dimmer pass** continues the threads a lacuna owns into response
    down to half the low cut, no more than 5 px past where the owned skeleton
    already reaches, then redoes the graph and the ownership.
-7. Apply the **50 um length limit** (below) and rebuild ownership.
-8. Find **unattached** dim threads: thread-shaped structure no lacuna owns, kept
+8. Apply the **50 um length limit** (below) and rebuild ownership.
+9. Find **unattached** dim threads: thread-shaped structure no lacuna owns, kept
    only if at least 1.3 um long and three times longer than wide. Counted in the
    field density, never per lacuna.
-9. Measure.
+10. Measure.
 
 This was variant D of the ablation that compared it against the older intensity
 threshold; that comparison is preserved at the git tag `archive-2026-10-13`. **No
@@ -89,8 +96,7 @@ unowned. 50 um is the outer end of the reported lacuna-to-lacuna spacing in
 cortical bone, so a thread longer than that from one cell body is not one
 canaliculus.
 
-On these 8 images the limit removes 3 to 27% of the skeleton, 17% over all of
-them.
+On these 8 images the limit removes 1.7 to 20.4% of the skeleton it is applied to, 9.8% over all of them, counting what the final prune removes against what it leaves (`length_prune.removed_px` of each run). The glow zone of METHODS section 18 lowered this: a thread that could not reach a body within 50 um along the network was being deleted, and the zone joins it to the body it belongs to.
 
 **Report only**, in the `biological_limits` block of each image's json and the
 sheet of the same name in its xlsx: per-thread length against the 25 to 50 um
@@ -144,7 +150,7 @@ folder run, `results/all_images/quantification/quantification_all_images.xlsx`,
 Check it:
 
 ```
-python src/diagnostics.py reference-check    # must PASS: 128.42 / 19.53 / 5.92 on 543-2
+python src/diagnostics.py reference-check    # must PASS: 146.42 / 21.99 / 7.67 on 543-2
 python src/diagnostics.py regression         # every number against results/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
 python src/diagnostics.py --help             # every other diagnostic
@@ -195,14 +201,14 @@ together.
 
 | image | lacunae (interior) | roots per cell | ring 30 px per cell (px) | field density px⁻¹ |
 |---|---|---|---|---|
-| 542_WT_2_z06c1-2 | 19 (15) | 14.07 | 447.7 | 0.0390 |
-| 542_WT_2_z18c1-2 | 13 (11) | 8.36 | 400.5 | 0.0364 |
-| 543-2 | 12 (12) | 5.92 | 271.6 | 0.0368 |
-| 543_3 | 13 (12) | 4.33 | 243.3 | 0.0348 |
-| 543_z13c1-2 | 11 (11) | 6.36 | 311.0 | 0.0402 |
-| 682_z08c1-2 | 11 (9) | 10.67 | 415.1 | 0.0345 |
-| 682_z23c-2 | 14 (11) | 7.45 | 315.8 | 0.0353 |
-| 682_z29c1-3 | 15 (13) | 6.15 | 264.5 | 0.0329 |
+| 542_WT_2_z06c1-2 | 19 (15) | 14.53 | 473.2 | 0.0396 |
+| 542_WT_2_z18c1-2 | 13 (11) | 10.36 | 452.7 | 0.0380 |
+| 543-2 | 12 (12) | 7.67 | 340.4 | 0.0394 |
+| 543_3 | 13 (12) | 6.00 | 290.8 | 0.0372 |
+| 543_z13c1-2 | 11 (11) | 7.45 | 351.2 | 0.0420 |
+| 682_z08c1-2 | 11 (9) | 12.56 | 454.1 | 0.0360 |
+| 682_z23c-2 | 14 (11) | 8.64 | 348.4 | 0.0375 |
+| 682_z29c1-3 | 15 (13) | 7.00 | 299.6 | 0.0360 |
 
 The figures under `results/<label>/3_publication_figures/` are regenerated by
 `python -u figures/make_figures.py all` and are not tracked. The pipeline's own
