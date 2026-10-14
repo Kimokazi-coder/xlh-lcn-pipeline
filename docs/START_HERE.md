@@ -107,7 +107,7 @@ From the repository root, with the project's Python (3.9, the venv):
 python src/lacunae.py --dir data/WT                      # feature 1 detection (-o DIR for another folder)
 python src/canaliculi.py --dir data/WT                   # feature 2 detection
 python src/quantification.py --dir data/WT               # every measure and both tables
-python src/diagnostics.py reference-check                # must PASS: 127.00 / 17.44 / 3.58 on 543-2
+python src/diagnostics.py reference-check                # must PASS: 128.42 / 19.53 / 5.92 on 543-2
 python src/diagnostics.py regression                     # every number against results/, tolerance 0
 python src/diagnostics.py switch-check                   # what each switch changes
 python -u figures/make_figures.py all                    # every figure, into results/

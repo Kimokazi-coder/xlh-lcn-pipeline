@@ -241,6 +241,7 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 | 2026-10-13 | ONE canalicular method: the ridge method with gap bridging off, ablation variant D, at sigmas 3.0, 3.6 and 4.2 px. The intensity threshold, gap bridging, the band-wall filter and every other variant are deleted and live at the tag. |
 | 2026-10-13 | The 50 um length limit is adopted, measured along the network, and prunes. Two report-only limits are added beside it. Nothing about any of them is validated. |
 | 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. |
+| 2026-10-14 | CONTACT is adopted: a skeleton node within 6 px of a body attaches to its nearest lacuna with no signal test and at weight 0, so a lacuna that is touched owns what touches it and no neighbour can swallow it. The signal test keeps governing from 6 to 20 px and the 50 um prune is untouched. 543-2 reference becomes 128.42 / 19.53 / 5.92. Not validated. |
 
 ## 6. Open questions
 
@@ -900,7 +901,7 @@ With all off, `results/` is reproduced exactly
 
 ## 13. Checks (`src/diagnostics.py`)
 
-- `reference-check`: 109.25 edges per cell, 24.11 px mean edge length and 6.00 roots per cell on
+- `reference-check`: 128.42 edges per cell, 19.53 px mean edge length and 5.92 roots per cell on
   543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
   being a headline measure that does not depend on ownership.
 - `regression`: regenerate every image into an ignored folder and compare every json and summary number
@@ -928,6 +929,16 @@ Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
 
 ## 14. Figures
+
+**`make_figures.py all` currently fails on 96 of its figures, and it failed in
+the same way before the contact rule** (checked by running it at the previous
+commit, 69a6a38). Two causes, both in the figure script's readers and neither in
+the pipeline: it unpacks `canaliculi.nearest_lacuna_map` into two values where
+that function has returned three since ownership began testing signal, and it
+asserts on `area_px2` for every lacuna, which the dim and out-of-focus classes
+deliberately do not carry (section 9). Nothing here was changed to repair it,
+because the figure layer is its own piece of work and this change was an
+ownership rule. The numbers the figures draw are in `results/` and are current.
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
 into `results/` (map: `results/README.md`). One display window for the whole

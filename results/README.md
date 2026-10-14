@@ -43,6 +43,14 @@ results/
     4_archive_not_used/     kept for history, not a result (see Archive)
     5_quantification/       every measured number: <label>_quantification.json, .xlsx and .pdf
   validation_tiles/         tiles for counting roots by hand
+  before_after/             whole-frame verification pictures of one rule change each; its own README
+                            says which pair documents which change
+  contact_census/           does each lacuna own the threads that touch it (diagnostics.py contact and
+                            contact-handover): the tables before and after the contact rule, and
+                            pictures/ with four lacunae close up
+  survey/                   what the pipeline does to every image, measured before a change
+  network_shape/            what the report-only shape measures count, drawn
+  diagnosis_543_3/          why one thread or blob was missing, on one image
 ```
 
 The label is the short image name. The table from the image file name to the label is

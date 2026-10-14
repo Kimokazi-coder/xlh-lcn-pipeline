@@ -71,8 +71,9 @@ image name of config.IMAGE_LABELS; see lacunae.image_label and result_path):
 After a --dir run, also results/all_images/summary_all_images.xlsx and .csv
 (one row per image; see write_summary_table).
 
-Regression check: 543-2 must give 62.33 edges per interior cell, 27.41 px
-mean edge length (python src/diagnostics.py reference-check).
+Regression check: 543-2 must give 128.42 edges per interior cell, 19.53 px
+mean edge length and 5.92 roots per interior cell
+(python src/diagnostics.py reference-check).
 
 Usage (from the repo root):
     python src/canaliculi.py --dir data/WT

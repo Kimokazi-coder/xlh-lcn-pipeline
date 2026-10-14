@@ -125,16 +125,17 @@ def images_from(args) -> list[Path]:
 REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
 
 # The quick check that the default pipeline still gives what it gave. Fixed on
-# 2026-10-14, after the four lacuna rules of config section g. 543-2 is one of
+# 2026-10-14, after the contact rule of config.CONTACT_REACH_PX (METHODS
+# section 8). 543-2 is one of
 # the images the acceptance test holds still, so these moved only with the
 # canalicular changes, not with the lacuna ones. Means are over interior lacunae, rounded
 # to 2 decimals. The third number was "gap bridges added", which no longer
 # exists; roots per cell takes its place, being a headline measure that does not
 # depend on ownership and the one a manual count will be compared against.
 REFERENCE_VALUES = [
-    ("edges per interior cell (mean edge_count)", 127.0),
-    ("mean edge length, px (interior mean of mean_edge_length_px)", 17.44),
-    ("roots per interior cell (mean roots_count)", 3.58),
+    ("edges per interior cell (mean edge_count)", 128.42),
+    ("mean edge length, px (interior mean of mean_edge_length_px)", 19.53),
+    ("roots per interior cell (mean roots_count)", 5.92),
 ]
 
 
@@ -3011,11 +3012,17 @@ def _contact_one(job: tuple) -> dict:
     """One image in a worker process: the census rows, the per-image summary and
     the full report for any point named on this image. Everything it returns is
     JSON-able, so the arrays stay in the worker."""
-    path_str, points, near_px, picture_dir, radius_px, tag, contact_reach_px = job
+    path_str, points, near_px, picture_dir, radius_px, tag, contact_reach_px, verif_dir = job
     image_path = Path(path_str)
     d = contact_detection(image_path, contact_reach_px)
     rows = contact_census_rows(d, near_px)
     reports, pictures = [], []
+    if verif_dir:
+        # The pipeline's own verification picture, drawn from this run, so the
+        # same picture can be made with the rule on and off.
+        path = Path(verif_dir) / f"{d['label']}_{tag}.png"
+        canaliculi.save_verification(d["net"], path)
+        pictures.append(path.as_posix())
     for x, y in points:
         lacuna_id = contact_point_lacuna(d, int(x), int(y))
         if lacuna_id < 1:
@@ -3057,8 +3064,11 @@ def cmd_contact(args) -> int:
     if unknown:
         raise SystemExit(f"--points names images that are not in the run: {sorted(unknown)}")
     picture_dir = str(args.out / "pictures") if args.pictures else ""
+    verif_dir = str(args.verification) if args.verification else ""
+    if verif_dir:
+        args.verification.mkdir(parents=True, exist_ok=True)
     jobs = [(str(p), points.get(lacunae.image_label(p), []), args.near,
-             picture_dir, args.radius, args.tag, args.contact_reach) for p in images]
+             picture_dir, args.radius, args.tag, args.contact_reach, verif_dir) for p in images]
     workers = max(1, min(args.workers, len(jobs)))
     with ProcessPoolExecutor(max_workers=workers) as ex:
         out = list(ex.map(_contact_one, jobs))
@@ -3433,7 +3443,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("reference-check", help="Run 543-2 and check 62.33 / 27.41 / 21.")
+    p = sub.add_parser("reference-check", help="Run 543-2 and check 128.42 / 19.53 / 5.92.")
     p.add_argument("--image", type=Path, default=REFERENCE_IMAGE, help=argparse.SUPPRESS)
     p.set_defaults(func=cmd_reference_check)
 
@@ -3574,6 +3584,9 @@ def main() -> None:
                         f"{CONTACT_CENSUS_NEAR_PX} px).")
     p.add_argument("--pictures", action="store_true",
                    help="Also draw the region of each named lacuna.")
+    p.add_argument("--verification", type=Path, default=None,
+                   help="Also write each image's whole-frame verification picture into this "
+                        "folder, named <label>_<tag>.png: the before and after picture of a rule.")
     p.add_argument("--radius", type=int, default=CONTACT_PICTURE_RADIUS_PX,
                    help=f"Half-width of those pictures (default {CONTACT_PICTURE_RADIUS_PX} px).")
     p.add_argument("--tag", default="now",
