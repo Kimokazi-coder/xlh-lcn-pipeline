@@ -911,6 +911,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     # the dim pass below is seeded from OWNED skeleton and so does follow
     # ownership, by design (section 8 of docs/METHODS.md).
     skeleton_first_pass = skeleton
+    candidate_first_pass = candidate
 
     dist_to_lacuna, nearest_id, nearest_index = nearest_lacuna_map(lacuna_id_map)
     # Attachment is by signal: the dimmest point of the straight path from a
@@ -956,6 +957,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "unattached_px": int(unattached.sum()),
         "skeleton": skeleton,
         "skeleton_first_pass": skeleton_first_pass,
+        "candidate_first_pass": candidate_first_pass,
         "skeleton_before_length_prune": skeleton_before,
         "length_prune": prune,
         "flagged": flagged,

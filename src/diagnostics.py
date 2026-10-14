@@ -51,6 +51,9 @@ Subcommands:
                       response, which one global cut would make it do, rather
                       than thread presence: the local background map, the tile
                       density against it, and the correlation per image
+    empty-zone        what makes the hole in the skeleton around a lacuna: how
+                      wide it is, and which stage of the pipeline drops each
+                      visible pixel inside it
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -74,6 +77,7 @@ Usage (from the repo root):
     python src/diagnostics.py contact -o results/contact --points "543_3:340,250" --pictures
     python src/diagnostics.py contact-handover -d data/WT -o results/contact_census
     python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background
+    python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone
 """
 
 from __future__ import annotations
@@ -2616,6 +2620,7 @@ def contact_detection(image_path: Path, contact_reach_px: int | None = None) -> 
         "lacuna_id_map": net["lacuna_id_map"],
         "lacuna_mask": net["lacuna_mask"],
         "candidate": net["candidate"],
+        "candidate_first_pass": net["candidate_first_pass"],
         "response": net["ridge_response"],
         "flagged": net["flagged"],
         "high_cut": high,
@@ -3758,6 +3763,561 @@ def cmd_ridge_background(args) -> int:
     return 0
 
 
+# empty-zone ---------------------------------------------------------------------
+# Why is there a hole in the skeleton around a lacuna?
+#
+# MEASUREMENT ONLY. Three questions, all answered on all 8 images.
+#
+#   1. How wide is the hole? The frame around each lacuna is cut into
+#      EMPTY_SECTORS angular sectors, and a sector's empty width is the smallest
+#      distance to the body over the SKELETON PIXELS that lie in it; the
+#      lacuna's empty width is the median over the sectors that answered.
+#      Measured on the skeleton's own pixels, because a ray marched outward runs
+#      along the corridor between two threads and reports a hole where a thread
+#      sits 3 px to the side.
+#
+#   2. Is there anything in the hole to recover? The zone is compared with the
+#      EMPTY_REFERENCE_BAND_PX band immediately beyond it in the same sectors,
+#      which is the same tissue, the same directions and the same depth of
+#      field, differing only in being past the hole. Raw, flattened and ridge
+#      response are compared at p50, p90, p99 and max. If the hole holds thread
+#      contrast like the band beyond it, something downstream is losing it; if
+#      it does not, no threshold can be blamed.
+#
+#   3. What removes what is there? Inside the zone, every pixel that is VISIBLE
+#      in the sense the brief fixed, a ridge response of at least
+#      EMPTY_VISIBLE_FRACTION of the low cut, is followed through the stages in
+#      the order the pipeline applies them and attributed to the FIRST stage
+#      that drops it:
+#        below the low cut            the hysteresis threshold, which no
+#                                     connectivity can rescue
+#        hysteresis, not connected    between the cuts with no bright seed
+#        vascular no-growth           inside a flagged structure and under the
+#                                     high cut, where hysteresis may add nothing
+#        lacuna body buffer           inside the body plus LACUNA_DILATION_PX
+#        despeckled                   in the mask, under MIN_THREAD_OBJECT_PX2
+#        kept in the mask             not lost at all
+#      The dim pass is counted separately as a rescue, and the 50 um prune on
+#      the skeleton, which is where it acts.
+#
+# Saturation is counted too, because a thread lying on a glow that is already at
+# the sensor's ceiling has no contrast left to find and no stage can be blamed
+# for it. Profiles are saved for the EMPTY_PROFILE_LACUNAE widest holes in the
+# set, which is a rule and not a list of coordinates.
+
+# Angular sectors the frame around a body is cut into, 2 degrees each.
+EMPTY_SECTORS = 180
+# How far out a sector looks for skeleton before it is censored.
+EMPTY_MAX_SEARCH_PX = 150
+# The threads that bound the hole carry their own mask inward from their centre
+# lines, so a rim of mask lies inside the hole that belongs to them. The CORE of
+# the hole is what is left after that rim is taken off: every pixel further than
+# this from any skeleton pixel. One thread half width (p50 3.0 px) plus one, so
+# the rim is removed and no more.
+EMPTY_RIM_PX = 4
+# The control band: this much of each ray immediately beyond the hole.
+EMPTY_REFERENCE_BAND_PX = 40
+# "Visible in the raw image", as the brief defines it: a ridge response of at
+# least this fraction of the low cut. The same floor the dim pass uses.
+EMPTY_VISIBLE_FRACTION = 0.5
+# A raw pixel at or above this fraction of the channel's maximum is saturated.
+EMPTY_SATURATION_FRACTION = 0.99
+# How many lacunae get a saved profile: the widest holes in the whole set.
+EMPTY_PROFILE_LACUNAE = 5
+
+
+def _empty_window(body: np.ndarray, shape: tuple) -> tuple:
+    """The bounding box of the body grown by EMPTY_MAX_SEARCH_PX."""
+    rows, cols = np.nonzero(body)
+    return (max(0, int(rows.min()) - EMPTY_MAX_SEARCH_PX),
+            min(shape[0], int(rows.max()) + EMPTY_MAX_SEARCH_PX + 1),
+            max(0, int(cols.min()) - EMPTY_MAX_SEARCH_PX),
+            min(shape[1], int(cols.max()) + EMPTY_MAX_SEARCH_PX + 1))
+
+
+def _empty_sector_widths(sector: np.ndarray, near: np.ndarray, sub_gap: np.ndarray,
+                         sub_skel: np.ndarray, blocked: np.ndarray) -> np.ndarray:
+    """The smallest distance to the body over the skeleton pixels of each
+    sector, nan where the sector has none or is blocked by another body."""
+    widths = np.full(EMPTY_SECTORS, np.inf)
+    sel = near & sub_skel
+    np.minimum.at(widths, sector[sel], sub_gap[sel])
+    return np.where(np.isfinite(widths) & (blocked > widths), widths, np.nan)
+
+
+def empty_zone_sectors(d: dict, lacuna_id: int) -> dict:
+    """One lacuna: how far out the skeleton starts in each angular sector, the
+    hole that follows, and the control band immediately beyond it.
+
+    Measured on the skeleton's OWN pixels. The frame around the body is cut into
+    EMPTY_SECTORS sectors, and a sector's empty width is the smallest distance
+    to the body over the skeleton pixels that lie in it. A ray marched outward
+    would instead run along the corridor between two threads and report a hole
+    where a thread sits 3 px to the side; this cannot, because any skeleton
+    pixel in the sector ends it. A sector with no skeleton within
+    EMPTY_MAX_SEARCH_PX, or with another lacuna body nearer than its skeleton,
+    is censored and left out."""
+    body = d["lacuna_id_map"] == lacuna_id
+    rows, cols = np.nonzero(body)
+    r0, c0 = float(rows.mean()), float(cols.mean())
+    gap = ndi.distance_transform_edt(~body)
+    shape = body.shape
+    r_lo, r_hi, c_lo, c_hi = _empty_window(body, shape)
+
+    sub_gap = gap[r_lo:r_hi, c_lo:c_hi]
+    sub_skel = d["skeleton"][r_lo:r_hi, c_lo:c_hi]
+    sub_other = ((d["lacuna_id_map"] > 0) & ~body)[r_lo:r_hi, c_lo:c_hi]
+    rr, cc = np.indices(sub_gap.shape)
+    ang = np.arctan2(rr + r_lo - r0, cc + c_lo - c0) % (2.0 * np.pi)
+    sector = (np.round(ang / (2.0 * np.pi) * EMPTY_SECTORS).astype(np.int64)) % EMPTY_SECTORS
+    near = (sub_gap > 0) & (sub_gap <= EMPTY_MAX_SEARCH_PX)
+
+    blocked = np.full(EMPTY_SECTORS, np.inf)
+    sel = near & sub_other
+    np.minimum.at(blocked, sector[sel], sub_gap[sel])
+    widths = _empty_sector_widths(sector, near, sub_gap, sub_skel, blocked)
+    # The same measurement against the skeleton as it was BEFORE the 50 um
+    # prune, which is the one stage after skeletonization that can delete a
+    # centre line. If the hole is much smaller here, the prune is what opened it.
+    before = _empty_sector_widths(
+        sector, near, sub_gap,
+        d["skeleton_before_prune"][r_lo:r_hi, c_lo:c_hi], blocked)
+
+    w = np.where(np.isfinite(widths), widths, -1.0)[sector]
+    zone = np.zeros(shape, dtype=bool)
+    zone[r_lo:r_hi, c_lo:c_hi] = (sub_gap > 0) & (sub_gap <= w)
+    reference = np.zeros(shape, dtype=bool)
+    reference[r_lo:r_hi, c_lo:c_hi] = (sub_gap > w) & (sub_gap <= w + EMPTY_REFERENCE_BAND_PX) \
+        & (w >= 0)
+    outside = d["lacuna_id_map"] > 0
+    zone &= ~outside
+    reference &= ~outside
+    # The core: the hole minus the mask rim of the threads that bound it.
+    core = zone & (d["skeleton_distance"] > EMPTY_RIM_PX)
+    good = np.isfinite(widths)
+    return {
+        "lacuna_id": lacuna_id,
+        "centroid_xy": [round(c0, 1), round(r0, 1)],
+        "body_px": int(body.sum()),
+        "empty_width_px": round(float(np.median(widths[good])), 3) if good.any() else None,
+        "empty_width_um": (round(config.um(float(np.median(widths[good]))), 4)
+                           if good.any() else None),
+        "empty_width_p10_px": (round(float(np.percentile(widths[good], 10)), 3)
+                               if good.any() else None),
+        "empty_width_p90_px": (round(float(np.percentile(widths[good], 90)), 3)
+                               if good.any() else None),
+        "empty_width_max_px": round(float(widths[good].max()), 3) if good.any() else None,
+        "empty_width_before_the_prune_px": (round(float(np.nanmedian(before)), 3)
+                                            if np.isfinite(before).any() else None),
+        "sectors_opened_by_the_prune": int(np.sum(
+            np.isfinite(before) & np.isfinite(widths) & (widths > before + 1.0))),
+        "sectors_answered": int(good.sum()),
+        "sectors_total": int(EMPTY_SECTORS),
+        "zone_px": int(zone.sum()),
+        "core_px": int(core.sum()),
+        "reference_px": int(reference.sum()),
+        "zone": zone,
+        "core": core,
+        "reference": reference,
+    }
+
+
+def _empty_levels(values: np.ndarray) -> dict:
+    if values.size == 0:
+        return {"p50": None, "p90": None, "p99": None, "max": None}
+    return {"p50": round(float(np.percentile(values, 50)), 8),
+            "p90": round(float(np.percentile(values, 90)), 8),
+            "p99": round(float(np.percentile(values, 99)), 8),
+            "max": round(float(values.max()), 8)}
+
+
+def _empty_region(d: dict, region: np.ndarray) -> dict:
+    """What one region holds: the levels of each image, how much of it is mask
+    and skeleton, and how WIDE that mask is. The width is the point: a broad
+    blob of mask yields a single centre line however much mask it is, while the
+    same area as separate threads yields one line each."""
+    n = max(1, int(region.sum()))
+    mask = region & d["candidate"]
+    width = d["mask_width"][mask]
+    return {
+        "raw": _empty_levels(d["channel"][region]),
+        "flattened": _empty_levels(d["flattened"][region]),
+        "response": _empty_levels(d["response"][region]),
+        "mask_px": int(mask.sum()),
+        "mask_fraction": round(float(mask.sum()) / n, 4),
+        "mask_width_px": round(float(width.mean()), 3) if width.size else None,
+        "mask_width_p90_px": round(float(np.percentile(width, 90)), 3) if width.size else None,
+        "skeleton_px": int((region & d["skeleton"]).sum()),
+        "skeleton_fraction": round(float((region & d["skeleton"]).sum()) / n, 4),
+        "skeleton_per_mask_px": (round(float((region & d["skeleton"]).sum()) / int(mask.sum()), 4)
+                                 if mask.any() else None),
+        "saturated_px": int((region & (d["channel"] >= EMPTY_SATURATION_FRACTION
+                                       * float(d["channel"].max()))).sum()),
+    }
+
+
+def empty_zone_stages(d: dict, zone: np.ndarray, core: np.ndarray,
+                      reference: np.ndarray) -> dict:
+    """What the hole holds against what the band beyond it holds, and which
+    stage drops each visible pixel in it. The accounting is done on the CORE,
+    which is the hole without the mask rim of the threads that bound it, since
+    that rim is theirs and is in the mask already."""
+    response, low, high = d["response"], d["low_cut"], d["high_cut"]
+    raw, flat = d["channel"], d["flattened"]
+    visible_cut = EMPTY_VISIBLE_FRACTION * low
+
+    core_before = zone & (d["skeleton_before_prune_distance"] > EMPTY_RIM_PX)
+    visible = core & (response >= visible_cut)
+    below_low = visible & (response < low)
+    between = visible & (response >= low) & (response < high)
+    not_connected = between & ~d["hysteresis_signal"]
+    in_canal = not_connected & d["flagged"]
+    kept_by_hysteresis = visible & d["hysteresis_signal"]
+    in_buffer = kept_by_hysteresis & d["buffered_lacunae"]
+    despeckled = kept_by_hysteresis & ~d["buffered_lacunae"] & ~d["candidate_first_pass"]
+    in_mask = visible & d["candidate_first_pass"]
+    rescued = core & (response < low) & d["candidate"] & ~d["candidate_first_pass"]
+
+    out = {
+        "zone_px": int(zone.sum()),
+        "core_px": int(core.sum()),
+        "reference_px": int(reference.sum()),
+        "in_the_hole_with_its_rim": _empty_region(d, zone),
+        "in_the_core": _empty_region(d, core),
+        "in_the_band_beyond": _empty_region(d, reference),
+        "cuts": {"low": round(low, 8), "high": round(high, 8),
+                 "visible": round(visible_cut, 8),
+                 "saturation_level": round(EMPTY_SATURATION_FRACTION * float(raw.max()), 6)},
+        "visible_px": int(visible.sum()),
+        "visible_fraction_of_core": round(float(visible.sum()) / max(1, int(core.sum())), 4),
+        "lost_at": {
+            "below_the_low_cut": int(below_low.sum()),
+            "hysteresis_not_connected": int((not_connected & ~in_canal).sum()),
+            "vascular_no_growth": int(in_canal.sum()),
+            "lacuna_body_buffer": int(in_buffer.sum()),
+            "despeckled": int(despeckled.sum()),
+        },
+        "kept_in_the_mask": int(in_mask.sum()),
+        "rescued_by_the_dim_pass": int(rescued.sum()),
+        "skeleton_px_cut_by_the_50um_prune": int(
+            (zone & d["skeleton_before_prune"] & ~d["skeleton"]).sum()),
+        "skeleton_px_in_the_hole": int((zone & d["skeleton"]).sum()),
+        "skeleton_px_in_the_hole_before_the_prune": int(
+            (zone & d["skeleton_before_prune"]).sum()),
+        # The same core taken against the skeleton as it was BEFORE the 50 um
+        # prune. Mask with no centre line within EMPTY_RIM_PX is either mask the
+        # skeletonization never ran a line into, or mask whose line the prune
+        # deleted; the difference between these two numbers is the prune's share.
+        "mask_fraction_in_the_core": _empty_region(d, core)["mask_fraction"],
+        "mask_fraction_in_the_core_before_the_prune": round(float(
+            (core_before & d["candidate"]).sum()) / max(1, int(core_before.sum())), 4),
+    }
+    for key in ("mask_fraction", "skeleton_fraction"):
+        a, b = out["in_the_core"][key], out["in_the_band_beyond"][key]
+        out[f"{key}_core_over_band"] = round(a / b, 4) if b else None
+    return out
+
+
+def empty_zone_profile(d: dict, lacuna_id: int, max_px: float) -> dict:
+    """The radial profile around one lacuna: every pixel in the frame around it
+    binned by its distance to the body, 1 px per bin, so each bin is a complete
+    annulus and the median over a bin is a median over angles with no sampling
+    in between. Other lacuna bodies are left out."""
+    body = d["lacuna_id_map"] == lacuna_id
+    gap = ndi.distance_transform_edt(~body)
+    r_lo, r_hi, c_lo, c_hi = _empty_window(body, body.shape)
+    cut = lambda m: m[r_lo:r_hi, c_lo:c_hi]
+    sub_gap = cut(gap)
+    usable = (sub_gap > 0) & (sub_gap <= max_px) & ~cut((d["lacuna_id_map"] > 0) & ~body)
+    series = {"raw": cut(d["channel"]), "flattened": cut(d["flattened"]),
+              "response": cut(d["response"])}
+    mask, skel = cut(d["candidate"]), cut(d["skeleton"])
+    pruned = cut(d["skeleton_before_prune"]) & ~skel
+    width = cut(d["mask_width"])
+    out = {k: [] for k in ("distance_px", "raw", "flattened", "flattened_p99", "response",
+                           "response_p99", "mask_fraction", "skeleton_fraction",
+                           "pruned_fraction", "mask_width_px")}
+    for lo in np.arange(0.0, max_px, 1.0):
+        sel = usable & (sub_gap >= lo) & (sub_gap < lo + 1.0)
+        if not sel.any():
+            continue
+        out["distance_px"].append(float(lo))
+        for name, values in series.items():
+            out[name].append(float(np.median(values[sel])))
+        out["flattened_p99"].append(float(np.percentile(series["flattened"][sel], 99)))
+        out["response_p99"].append(float(np.percentile(series["response"][sel], 99)))
+        out["mask_fraction"].append(float(mask[sel].mean()))
+        out["skeleton_fraction"].append(float(skel[sel].mean()))
+        out["pruned_fraction"].append(float(pruned[sel].mean()))
+        on_mask = sel & mask
+        out["mask_width_px"].append(float(width[on_mask].mean()) if on_mask.any() else 0.0)
+    return out
+
+
+def empty_zone_picture(d: dict, record: dict, profile: dict, out_dir: Path) -> Path:
+    """The profiles of one lacuna beside its own neighbourhood, with the hole
+    and the control band drawn on it."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    lacuna_id = record["lacuna_id"]
+    body = d["lacuna_id_map"] == lacuna_id
+    gap = ndi.distance_transform_edt(~body)
+    near = gap <= (record["empty_width_px"] or 20.0) + EMPTY_REFERENCE_BAND_PX + 5
+    rows, cols = np.nonzero(near)
+    r0, r1 = int(rows.min()), int(rows.max()) + 1
+    c0, c1 = int(cols.min()), int(cols.max()) + 1
+    canvas = d["display"][r0:r1, c0:c1].copy().astype(np.uint8)
+    sub = lambda m: m[r0:r1, c0:c1]
+    canvas[sub(d["candidate"] & ~d["skeleton"])] = (110, 0, 110)
+    canvas[sub(d["skeleton_before_prune"] & ~d["skeleton"])] = PRUNED_COLOUR
+    canvas[sub(d["skeleton"])] = UNOWNED_COLOUR
+    canvas[sub(d["skeleton"] & (d["owner_map"] > 0))] = OWNED_COLOUR
+    # The hole and the control band as outlines, so nothing underneath is hidden.
+    canvas[sub(segmentation.find_boundaries(record["zone"], mode="outer"))] = (255, 255, 255)
+    canvas[sub(segmentation.find_boundaries(record["core"], mode="outer"))] = (0, 180, 255)
+    canvas[sub(segmentation.find_boundaries(record["reference"], mode="outer"))] = (0, 200, 0)
+    canvas[sub(segmentation.find_boundaries(body, mode="outer"))] = (0, 255, 255)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.5), dpi=130)
+    ax1.imshow(canvas)
+    ax1.set_title(f"{d['label']} lacuna {lacuna_id} at {record['centroid_xy']}: "
+                  f"empty width {record['empty_width_px']} px = {record['empty_width_um']} um\n"
+                  f"white: the hole, blue: its core, green: the control band, magenta: mask, "
+                  f"gold: cut by the 50 um prune, pink or green: skeleton", fontsize=8)
+    ax1.set_axis_off()
+
+    x = profile["distance_px"]
+    ax2.plot(x, profile["raw"], color="#d62728", label="raw, median over rays")
+    ax2.plot(x, profile["flattened"], color="#2ca02c", label="flattened, median")
+    ax2.plot(x, profile["flattened_p99"], color="#2ca02c", ls="--", lw=1,
+             label="flattened, p99 (a thread would be here)")
+    ax2.set_xlabel("distance from the body edge (px)", fontsize=8)
+    ax2.set_ylabel("intensity", fontsize=8)
+    ax2.axvline(record["empty_width_px"] or 0, color="#555555", ls="--", lw=1,
+                label="empty width")
+    ax3 = ax2.twinx()
+    ax3.plot(x, profile["response_p99"], color="#1f77b4", ls="--", lw=1,
+             label="response, p99")
+    ax3.plot(x, profile["response"], color="#1f77b4", label="response, median")
+    ax3.axhline(d["high_cut"], color="#1f77b4", ls=":", lw=1, label="high cut")
+    ax3.axhline(d["low_cut"], color="#17becf", ls="-.", lw=1, label="low cut")
+    ax3.axhline(EMPTY_VISIBLE_FRACTION * d["low_cut"], color="#9467bd", ls=":", lw=1,
+                label="half the low cut")
+    ax3.set_ylabel("ridge response", fontsize=8)
+    lines = ax2.get_lines() + ax3.get_lines()
+    ax2.legend(lines, [l.get_label() for l in lines], fontsize=6, loc="upper right")
+    ax2.tick_params(labelsize=7)
+    ax3.tick_params(labelsize=7)
+    ax2.set_title("radial profiles, over 180 rays", fontsize=8)
+    ax4 = ax2.inset_axes([0.08, 0.58, 0.40, 0.38])
+    ax4.plot(x, profile["mask_fraction"], color="#9467bd", lw=1, label="mask")
+    ax4.plot(x, profile["skeleton_fraction"], color="#e377c2", lw=1, label="skeleton")
+    ax4.plot(x, np.array(profile["mask_width_px"]) / 100.0, color="#8c564b", lw=1,
+             label="mask width / 100 px")
+    ax4.set_title("coverage and mask width", fontsize=6)
+    ax4.tick_params(labelsize=5)
+    ax4.legend(fontsize=5)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{d['label']}_lacuna{lacuna_id}_empty_zone.png"
+    fig.savefig(path, bbox_inches="tight", metadata={"CreationDate": None})
+    plt.close(fig)
+    return path
+
+
+def _empty_one(job: tuple) -> dict:
+    path_str, out_dir, profile_ids = job
+    d = contact_detection(Path(path_str))
+    d["channel"] = lacunae.load_channel(Path(path_str))[1]
+    d["flattened"] = canaliculi.preprocess_channel(d["channel"])
+    # Twice the distance transform inside the mask: the local width of the mask
+    # at every mask pixel.
+    d["mask_width"] = 2.0 * ndi.distance_transform_edt(d["candidate"])
+    d["skeleton_distance"] = ndi.distance_transform_edt(~d["skeleton"])
+    d["skeleton_before_prune_distance"] = ndi.distance_transform_edt(~d["skeleton_before_prune"])
+    rows, pictures = [], []
+    zone_all = np.zeros(d["skeleton"].shape, dtype=bool)
+    core_all = np.zeros(d["skeleton"].shape, dtype=bool)
+    ref_all = np.zeros(d["skeleton"].shape, dtype=bool)
+    for lacuna_id in range(1, d["n_lacunae"] + 1):
+        record = empty_zone_sectors(d, lacuna_id)
+        zone_all |= record["zone"]
+        core_all |= record["core"]
+        ref_all |= record["reference"]
+        stages = empty_zone_stages(d, record["zone"], record["core"], record["reference"])
+        if lacuna_id in profile_ids:
+            profile = empty_zone_profile(
+                d, lacuna_id, (record["empty_width_px"] or 20.0) + EMPTY_REFERENCE_BAND_PX)
+            pictures.append(empty_zone_picture(d, record, profile, Path(out_dir)).as_posix())
+        row = {k: v for k, v in record.items() if k not in ("zone", "core", "reference")}
+        row["image_label"] = d["label"]
+        row["stages"] = stages
+        rows.append(row)
+    ref_all &= ~zone_all
+    return {
+        "image_label": d["label"],
+        "lacunae": d["n_lacunae"],
+        "cuts": {"high": round(d["high_cut"], 8), "low": round(d["low_cut"], 8)},
+        "zone_total_px": int(zone_all.sum()),
+        "core_total_px": int(core_all.sum()),
+        "image_stages": empty_zone_stages(d, zone_all, core_all, ref_all),
+        "rows": rows,
+        "pictures": pictures,
+    }
+
+
+def cmd_empty_zone(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    args.out.mkdir(parents=True, exist_ok=True)
+    # Pass 1 measures; the widest holes in the whole set then get a profile, so
+    # which lacunae are drawn is a rule and not a list of coordinates.
+    jobs = [(str(p), str(args.out), ()) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        out = list(ex.map(_empty_one, jobs))
+    widest = sorted(((r["empty_width_px"] or 0.0, o["image_label"], r["lacuna_id"])
+                     for o in out for r in o["rows"]), reverse=True)[:EMPTY_PROFILE_LACUNAE]
+    wanted: dict = {}
+    for _w, label, lacuna_id in widest:
+        wanted.setdefault(label, []).append(lacuna_id)
+    jobs = [(str(p), str(args.out), tuple(wanted.get(lacunae.image_label(p), ())))
+            for p in images if lacunae.image_label(p) in wanted]
+    with ProcessPoolExecutor(max_workers=max(1, min(workers, len(jobs)))) as ex:
+        drawn = list(ex.map(_empty_one, jobs))
+    pictures = [p for o in drawn for p in o["pictures"]]
+
+    all_rows = [r for o in out for r in o["rows"]]
+    widths = np.array([r["empty_width_px"] for r in all_rows
+                       if r["empty_width_px"] is not None], dtype=float)
+    stage_names = ["below_the_low_cut", "hysteresis_not_connected", "vascular_no_growth",
+                   "lacuna_body_buffer", "despeckled"]
+    totals = {k: sum(o["image_stages"]["lost_at"][k] for o in out) for k in stage_names}
+    totals_visible = sum(o["image_stages"]["visible_px"] for o in out)
+    totals_kept = sum(o["image_stages"]["kept_in_the_mask"] for o in out)
+    report = {
+        "status": "measurement only: no parameter, threshold or rule was changed",
+        "question": "what makes the hole in the skeleton around a lacuna",
+        "definitions": {
+            "empty_width": ("the smallest distance from the body edge to a skeleton pixel in "
+                            f"an angular sector, median over the {EMPTY_SECTORS} sectors that "
+                            "answered"),
+            "zone": "the filled star between each body and its own sector widths",
+            "reference": (f"the {EMPTY_REFERENCE_BAND_PX} px of each sector immediately beyond "
+                          "the hole"),
+            "visible": f"ridge response of at least {EMPTY_VISIBLE_FRACTION} of the low cut",
+            "stage_order": stage_names,
+        },
+        "empty_width_px": {
+            "lacunae": int(widths.size),
+            "min": round(float(widths.min()), 2), "median": round(float(np.median(widths)), 2),
+            "p90": round(float(np.percentile(widths, 90)), 2),
+            "max": round(float(widths.max()), 2),
+        },
+        "empty_width_um": {
+            "min": round(config.um(float(widths.min())), 3),
+            "median": round(config.um(float(np.median(widths))), 3),
+            "p90": round(config.um(float(np.percentile(widths, 90))), 3),
+            "max": round(config.um(float(widths.max())), 3),
+        },
+        "all_images": {
+            "zone_px": sum(o["zone_total_px"] for o in out),
+            "visible_px": totals_visible,
+            "kept_in_the_mask": totals_kept,
+            "lost_at": totals,
+            "rescued_by_the_dim_pass": sum(o["image_stages"]["rescued_by_the_dim_pass"]
+                                           for o in out),
+            "skeleton_px_cut_by_the_50um_prune": sum(
+                o["image_stages"]["skeleton_px_cut_by_the_50um_prune"] for o in out),
+        },
+        "per_image": [{k: v for k, v in o.items() if k != "rows"} for o in out],
+        "per_lacuna": all_rows,
+        "profiles_drawn_for_the_widest": [f"{lab} lacuna {i} ({w:.1f} px)"
+                                          for w, lab, i in widest],
+        "pictures": pictures,
+    }
+    with open(args.out / "empty_zone.json", "w", encoding="utf-8", newline="\n") as f:
+        json.dump(report, f, indent=2, default=float)
+    with open(args.out / "empty_zone_per_lacuna.csv", "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["image_label", "lacuna_id", "centroid_x", "centroid_y", "body_px",
+                    "empty_width_px", "empty_width_um", "zone_px", "visible_px",
+                    "kept_in_the_mask"] + stage_names
+                   + ["core_px", "core_flattened_p99", "band_flattened_p99",
+                      "core_response_p99", "band_response_p99"])
+        for r in all_rows:
+            s = r["stages"]
+            w.writerow([r["image_label"], r["lacuna_id"], r["centroid_xy"][0], r["centroid_xy"][1],
+                        r["body_px"], r["empty_width_px"], r["empty_width_um"], r["zone_px"],
+                        s["visible_px"], s["kept_in_the_mask"]]
+                       + [s["lost_at"][k] for k in stage_names]
+                       + [r["core_px"], s["in_the_core"]["flattened"]["p99"],
+                          s["in_the_band_beyond"]["flattened"]["p99"],
+                          s["in_the_core"]["response"]["p99"],
+                          s["in_the_band_beyond"]["response"]["p99"]])
+
+    print_table(["image", "lacunae", "width px min", "median", "p90", "max", "median um",
+                 "width before the prune", "sectors the prune opened",
+                 "hole px", "core px", "mask fraction core/band"],
+                [[o["image_label"], o["lacunae"],
+                  f"{min(r['empty_width_px'] for r in o['rows'] if r['empty_width_px']):.1f}",
+                  f"{np.median([r['empty_width_px'] for r in o['rows'] if r['empty_width_px']]):.1f}",
+                  f"{np.percentile([r['empty_width_px'] for r in o['rows'] if r['empty_width_px']], 90):.1f}",
+                  f"{max(r['empty_width_px'] for r in o['rows'] if r['empty_width_px']):.1f}",
+                  f"{config.um(float(np.median([r['empty_width_px'] for r in o['rows'] if r['empty_width_px']]))):.2f}",
+                  f"{np.median([r['empty_width_before_the_prune_px'] for r in o['rows'] if r['empty_width_before_the_prune_px']]):.1f}",
+                  sum(r["sectors_opened_by_the_prune"] for r in o["rows"]),
+                  o["zone_total_px"], o["core_total_px"],
+                  o["image_stages"]["mask_fraction_core_over_band"]] for o in out],
+                title="The hole around each lacuna, per image")
+    print_table(["image", "p99 response: core", "band", "p99 flattened: core", "band",
+                 "mask fraction: core", "band", "raw p50: core", "band"],
+                [[o["image_label"],
+                  f"{o['image_stages']['in_the_core']['response']['p99']:.6f}",
+                  f"{o['image_stages']['in_the_band_beyond']['response']['p99']:.6f}",
+                  f"{o['image_stages']['in_the_core']['flattened']['p99']:.5f}",
+                  f"{o['image_stages']['in_the_band_beyond']['flattened']['p99']:.5f}",
+                  f"{o['image_stages']['in_the_core']['mask_fraction']:.3f}",
+                  f"{o['image_stages']['in_the_band_beyond']['mask_fraction']:.3f}",
+                  f"{o['image_stages']['in_the_core']['raw']['p50']:.4f}",
+                  f"{o['image_stages']['in_the_band_beyond']['raw']['p50']:.4f}"]
+                 for o in out],
+                title="\nIs there thread contrast in the hole, and what shape is it? "
+                      "The hole against the band beyond it")
+    print_table(["image", "visible px"] + [n.replace("_", " ") for n in stage_names]
+                + ["kept in the mask", "dim pass"],
+                [[o["image_label"], o["image_stages"]["visible_px"]]
+                 + [o["image_stages"]["lost_at"][k] for k in stage_names]
+                 + [o["image_stages"]["kept_in_the_mask"],
+                    o["image_stages"]["rescued_by_the_dim_pass"]] for o in out],
+                title="\nWhere a visible pixel in the hole is lost, by the first stage that drops it")
+    print_table(["image", "skeleton in the hole: before the prune", "after", "removed",
+                 "mask with no centre line, core: before the prune", "after"],
+                [[o["image_label"],
+                  o["image_stages"]["skeleton_px_in_the_hole_before_the_prune"],
+                  o["image_stages"]["skeleton_px_in_the_hole"],
+                  o["image_stages"]["skeleton_px_cut_by_the_50um_prune"],
+                  f"{o['image_stages']['mask_fraction_in_the_core_before_the_prune']:.4f}",
+                  f"{o['image_stages']['mask_fraction_in_the_core']:.4f}"] for o in out],
+                title="\nWhat the 50 um prune does inside the hole")
+    w = report["empty_width_px"]
+    print(f"\nEmpty width over {w['lacunae']} lacunae: min {w['min']} px, median {w['median']} px, "
+          f"p90 {w['p90']} px, max {w['max']} px ({report['empty_width_um']['min']} to "
+          f"{report['empty_width_um']['max']} um, median {report['empty_width_um']['median']} um).")
+    total = sum(totals.values()) + totals_kept
+    for k in stage_names:
+        print(f"  {k.replace('_', ' '):28s} {totals[k]:8d} px  "
+              f"{100.0 * totals[k] / max(1, total):5.1f}% of visible")
+    print(f"  {'kept in the mask':28s} {totals_kept:8d} px  "
+          f"{100.0 * totals_kept / max(1, total):5.1f}% of visible")
+    print(f"\nreport -> {args.out / 'empty_zone.json'}")
+    for p in pictures:
+        print(f"picture -> {p}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -3940,6 +4500,16 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_ridge_background)
+
+    p = sub.add_parser("empty-zone",
+                       help="What makes the hole in the skeleton around a lacuna? (measurement only)")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_empty_zone)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

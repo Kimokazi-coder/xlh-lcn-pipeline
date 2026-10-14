@@ -928,6 +928,9 @@ With all off, `results/` is reproduced exactly
   global cut would make it do, rather than thread presence. The background map beside the image's own
   ownership picture, the tile density against it, and the correlation per image. Measurement only; its
   answer is section 17.
+- `empty-zone`: what makes the hole in the skeleton around a lacuna. How wide it is, by angular sector;
+  what the hole holds against the band immediately beyond it; and which stage of the pipeline drops each
+  visible pixel inside it. Measurement only; its answer is section 18.
 
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
@@ -1107,3 +1110,143 @@ against 12 to 16% everywhere else in the image. The threads in the lower left of
 not a threshold one, and it is the same question the lacuna at (198, 635) raises:
 the threads nearest it lie 7.0 px or further from its body, past the contact
 reach, across paths the signal test refuses.
+
+## 18. The hole in the skeleton around a lacuna
+
+The skeleton stops short of the bodies. This is the measurement of why, before
+anything was changed:
+
+```
+python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone
+```
+
+**How the hole is measured.** The frame around each lacuna is cut into 180
+angular sectors, and a sector's **empty width** is the smallest distance from
+the body edge to a skeleton pixel lying in it; the lacuna's empty width is the
+median over the sectors that answered. It is measured on the skeleton's own
+pixels, because a ray marched outward runs along the corridor between two
+threads and reports a hole where a thread sits 3 px to the side, which
+overstated the width by up to a third when it was tried. A sector with no
+skeleton within 150 px, or with another lacuna body nearer than its skeleton, is
+censored.
+
+The **hole** is the filled star between each body and its own sector widths. The
+threads that bound it carry their own mask inward from their centre lines, so a
+rim of mask lies inside the hole that belongs to them; the **core** is the hole
+with that rim removed, every pixel more than 4 px from any skeleton (one thread
+half width plus one). Everything below is measured on the core. The **control
+band** is the 40 px of each sector immediately beyond the hole: the same tissue,
+the same directions, the same depth of field, differing only in being past it.
+
+### How wide the hole is
+
+| image | lacunae | empty width px: min, median, p90, max | median um | p90 um |
+|---|---|---|---|---|
+| 542_z06 | 19 | 9.0, 20.1, 29.6, 55.2 | 2.61 | 3.85 |
+| 542_z18 | 13 | 17.0, 27.3, 36.2, 51.6 | 3.55 | 4.71 |
+| 543-2 | 12 | 17.0, 28.2, 42.8, 55.4 | 3.67 | 5.56 |
+| 543_3 | 13 | 18.4, 31.5, 43.9, 59.1 | 4.10 | 5.71 |
+| 543_z13 | 11 | 20.9, 26.1, 30.3, 31.9 | 3.39 | 3.94 |
+| 682_z08 | 11 | 10.4, 20.0, 36.3, 38.9 | 2.60 | 4.72 |
+| 682_z23 | 14 | 15.1, 30.1, 33.8, 52.7 | 3.91 | 4.39 |
+| 682_z29 | 15 | 18.0, 29.1, 40.5, 54.1 | 3.79 | 5.27 |
+
+Over all 108 lacunae: **min 9.0 px, median 27.4 px (3.56 um), p90 43.3 px, max
+59.2 px (7.69 um)**. Every lacuna in the set has one. The 40 to 70 px holes are
+real and are the upper end of the distribution.
+
+### What is in the hole, against the band beyond it
+
+| image | p99 response: core / band | p99 flattened: core / band | mask fraction: core / band | **flattened p50: core / band** |
+|---|---|---|---|---|
+| 542_z06 | 0.0659 / 0.2136 (31%) | 0.150 / 0.593 | 0.057 / 0.427 | **0.00000** / 0.00948 |
+| 542_z18 | 0.0794 / 0.1939 (41%) | 0.203 / 0.544 | 0.058 / 0.427 | **0.00000** / 0.01143 |
+| 543-2 | 0.1182 / 0.1662 (71%) | 0.332 / 0.467 | 0.119 / 0.453 | **0.00000** / 0.02464 |
+| 543_3 | 0.0981 / 0.1624 (60%) | 0.278 / 0.455 | 0.096 / 0.459 | **0.00000** / 0.02566 |
+| 543_z13 | 0.0746 / 0.1322 (56%) | 0.206 / 0.370 | 0.076 / 0.435 | **0.00000** / 0.01965 |
+| 682_z08 | 0.0589 / 0.1762 (33%) | 0.132 / 0.486 | 0.042 / 0.396 | **0.00000** / 0.01452 |
+| 682_z23 | 0.0651 / 0.1596 (41%) | 0.179 / 0.440 | 0.059 / 0.396 | **0.00000** / 0.01193 |
+| 682_z29 | 0.0554 / 0.1349 (41%) | 0.141 / 0.372 | 0.047 / 0.408 | **0.00000** / 0.01117 |
+
+Four things follow, and two of them rule out explanations.
+
+- **The glow is not what raises the floor: the flattening removes it
+  completely.** The median flattened value in the core is **exactly 0.00000 on
+  every one of the 8 images**, lower than in the band beyond (0.0095 to 0.0257).
+  A white top-hat returns zero wherever the image is locally flat at its 5 px
+  scale, which a smooth glow is. The raw channel in the core is not brighter
+  than in the band either (p50 0.153 to 0.302 against 0.176 to 0.306: equal or
+  slightly lower). So the hole is not a bright background that swamps a thread.
+- **Nothing is saturated.** 1 pixel in 1,048,576 over the whole set. The ceiling
+  of the sensor plays no part.
+- **Thread contrast there is real but weak.** The p99 of the flattened channel,
+  which is where a thread shows up, is **25% to 71%** of the band's, and the
+  ridge response follows it at **31% to 71%**. The mask covers 4.2 to 11.9% of
+  the core against 39.6 to 45.9% of the band, about a quarter.
+- So there IS something to recover, at roughly a third to two thirds of the
+  amplitude the same tissue shows 40 px further out.
+
+### Which stage removes it
+
+Every pixel in a core with a ridge response of at least half the low cut, which
+is the brief's definition of visible, attributed to the FIRST stage that drops
+it:
+
+| image | visible px in the core | below the low cut | hysteresis not connected | vascular no-growth | body buffer | despeckled | already in the mask |
+|---|---|---|---|---|---|---|---|
+| 542_z06 | 19886 | 12758 | 66 | 200 | 724 | 40 | 6098 |
+| 542_z18 | 18027 | 11357 | 157 | 207 | 316 | 41 | 5949 |
+| 543-2 | 23324 | 11155 | 223 | 0 | 154 | 13 | 11779 |
+| 543_3 | 24070 | 13072 | 147 | 0 | 114 | 6 | 10731 |
+| 543_z13 | 14578 | 8383 | 51 | 0 | 94 | 5 | 6045 |
+| 682_z08 | 11962 | 8537 | 151 | 157 | 434 | 34 | 2649 |
+| 682_z23 | 17325 | 11122 | 90 | 312 | 246 | 8 | 5547 |
+| 682_z29 | 16435 | 10807 | 178 | 377 | 290 | 19 | 4764 |
+| **all 8** | **145,607** | **87,191 (59.9%)** | 1,063 (0.7%) | 1,253 (0.9%) | 2,372 (1.6%) | 166 (0.1%) | 53,562 (36.8%) |
+
+**The stage is the hysteresis low cut on the ridge response.** It takes 59.9% of
+everything visible in the holes, which is **27 times** the other four stages put
+together (4,854 px). The body buffer, the despeckle step and the vascular mask
+are not the cause, at 1.6%, 0.1% and 0.9%.
+
+### The 50 um prune, second and smaller
+
+| image | skeleton in the hole before the prune | after | removed | share |
+|---|---|---|---|---|
+| 542_z06 | 3473 | 3222 | 251 | 7% |
+| 542_z18 | 2375 | 2016 | 359 | 15% |
+| 543-2 | 3427 | 2015 | 1412 | 41% |
+| 543_3 | 3281 | 2054 | 1227 | 37% |
+| 543_z13 | 2702 | 1959 | 743 | 27% |
+| 682_z08 | 1875 | 1723 | 152 | 8% |
+| 682_z23 | 2787 | 2236 | 551 | 20% |
+| 682_z29 | 2885 | 2439 | 446 | 15% |
+
+The 50 um prune removes 7 to 41% of the skeleton that does reach into a hole,
+and that is why mask with no centre line within 4 px rises from 2.6 to 4.6% of
+the core before the prune to 4.2 to 11.9% after. It widens the hole it finds; it
+does not open it. Measured directly: the empty width taken against the skeleton
+**before** the prune is the same to within a pixel on 7 of 8 images (543_3 is
+the exception, 29.1 against 31.5 px), and only 683 of the 19,440 sectors in the
+set are widened by it.
+
+### What this rules out for the fix
+
+Subtracting each lacuna's own radial glow profile before the ridge filter
+**cannot work**, and the measurement says why: the top-hat already removes the
+glow to a median of exactly zero. Subtracting a smooth profile from a channel
+whose smooth part is already gone does not raise a thread's amplitude by
+anything. What is low in the hole is the thread's own local contrast, not the
+background it sits on.
+
+What is left is the brief's second option, and it is the one the numbers
+support: **inside each lacuna's own zone, accept a lower cut, seeded from the
+skeleton that already exists.** 59.9% of the visible signal in the holes sits
+between half the low cut and the low cut, which is exactly the tier the second
+dim pass was built for (section 8); that pass cannot reach it only because it
+may run 5 px past owned skeleton and the holes are 27 px wide.
+
+Profiles for the five widest holes in the set, which is a rule and not a list of
+coordinates, are in `results/empty_zone/`: the neighbourhood with the hole, its
+core and the control band outlined, beside the radial profiles of raw, flattened
+and response with the cuts drawn on them.
