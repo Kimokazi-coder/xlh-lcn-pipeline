@@ -1305,3 +1305,81 @@ filter ever runs and there is nothing left to subtract. What is low there is the
 thread's own contrast, which no background subtraction can raise.
 
 **Not validated.** No hand count chose the fraction, the cut or the cap.
+
+### What the glow zone does to all 8 images
+
+Each image run twice in one process, once with `canaliculi.GLOW_ZONE_MAX_PX = 0`,
+which is the pipeline as it was, and once as configured
+(`python src/diagnostics.py glow-check -d data/WT -o results/glow_zone`). Before
+on the left of each arrow.
+
+| image | glow extent px: min, median, max | zone px | mask added | skeleton inside the zones | empty width px | roots per lacuna | under 3 roots |
+|---|---|---|---|---|---|---|---|
+| 542_z06 | 3.9, 12.0, 18.8 | 105,463 | 5,528 | 2694 -> 3117 (+15.7%) | 20.1 -> 18.4 | 12.16 -> 12.63 | 1 -> 1 |
+| 542_z18 | 10.9, 16.5, 26.0 | 117,124 | 6,031 | 2178 -> 2640 (+21.2%) | 27.3 -> 23.3 | 7.31 -> 9.00 | 1 -> 1 |
+| 543-2 | 13.6, 18.4, 26.9 | 80,643 | 5,945 | 1577 -> 2122 (+34.6%) | 28.2 -> 24.6 | 5.92 -> 7.67 | 2 -> 1 |
+| 543_3 | 13.0, 16.4, 26.7 | 77,068 | 4,829 | 1181 -> 1596 (+35.1%) | 31.5 -> 30.1 | 4.00 -> 5.62 | 6 -> 4 |
+| 543_z13 | 11.9, 18.0, 33.2 | 75,847 | 6,150 | 1864 -> 2227 (+19.5%) | 26.1 -> 24.2 | 6.36 -> 7.46 | 0 -> 0 |
+| 682_z08 | 8.1, 10.9, 19.2 | 69,687 | 2,908 | 1601 -> 1879 (+17.4%) | 20.0 -> 18.0 | 10.00 -> 11.55 | 0 -> 0 |
+| 682_z23 | 10.6, 16.9, 19.5 | 78,778 | 3,956 | 1742 -> 2071 (+18.9%) | 30.1 -> 27.1 | 7.00 -> 7.86 | 1 -> 1 |
+| 682_z29 | 4.7, 17.3, 21.9 | 80,986 | 4,898 | 1670 -> 2074 (+24.2%) | 29.1 -> 28.2 | 6.33 -> 7.07 | 2 -> 2 |
+
+**The three checks.**
+
+1. **The mask outside the zones is unchanged: PASS, bit for bit on all 8
+   images.** The growth is a propagation whose mask is the old candidate plus
+   pixels inside a zone, so every pixel it can add lies inside one.
+   The **skeleton** outside the zones does move, by +238 to +2,835 px, and
+   almost all of that is one thing: the 50 um prune now keeps thread it used to
+   cut, because the zone connects that thread to a body. Per image, of the
+   skeleton gained outside the zones, the prune accounts for 99 of 238, 961 of
+   1102, 2045 of 2129, 1813 of 1985, 1083 of 1435, 1183 of 1256, 1858 of 1976
+   and 2540 of 2835: **85 to 96%**. Nothing new was traced out there; thread that
+   was already drawn stopped being thrown away.
+2. **The empty zones shrink on every image: PASS.** Median empty width per
+   image falls on all 8, and over the 108 lacunae from 27.4 to 24.2 px (3.56 to
+   3.14 um). 84 of 108 lacunae have a smaller hole; the 11 whose hole grows are
+   listed in `results/glow_zone/glow_check.json` and move by under a pixel
+   except 542_z06 lacuna 14 (26.7 to 34.4 px) and 682_z29 lacuna 1 (24.2 to
+   27.3 px), where a newly traced thread nearer the body in one sector pushes
+   the first skeleton pixel of another sector further out.
+3. **Roots per lacuna do not fall: PASS on every image**, +0.47 to +1.69 roots
+   per lacuna. Per lacuna, 60 of 108 rise and 17 fall, every one of those by
+   one or two roots where a new thread lands within the 8 px root merge distance
+   of an existing root and the two count once, as section 3 defines them.
+
+**Length guards, reported and not acted on** (the brief): the skeleton grows
+1.7 to 9.6%, 5.5% over the set, which is inside the 25% guard the dim pass is
+held to. Owned skeleton grows 6.0 to 21.7%, 12.8% over the set, and unowned
+falls on every image. The unattached dim tier is unchanged to the pixel on all 8
+images, as it must be, since it is computed from what no lacuna owns and the
+zones are defined by lacunae.
+
+| image | skeleton px | owned px | unowned px | 50 um prune px | unattached px |
+|---|---|---|---|---|---|
+| 542_z06 | 39229 -> 39890 (+1.7%) | 28803 -> 31159 (+8.2%) | 10426 -> 8731 | 787 -> 688 | 375 -> 375 |
+| 542_z18 | 36688 -> 38252 (+4.3%) | 24971 -> 27573 (+10.4%) | 11717 -> 10679 | 1884 -> 923 | 372 -> 372 |
+| 543-2 | 37700 -> 40374 (+7.1%) | 29417 -> 33719 (+14.6%) | 8283 -> 6655 | 8781 -> 6736 | 465 -> 465 |
+| 543_3 | 35656 -> 38056 (+6.7%) | 25106 -> 30552 (+21.7%) | 10550 -> 7504 | 11572 -> 9759 | 224 -> 224 |
+| 543_z13 | 41377 -> 43175 (+4.3%) | 28463 -> 31589 (+11.0%) | 12914 -> 11586 | 3848 -> 2765 | 256 -> 256 |
+| 682_z08 | 35082 -> 36616 (+4.4%) | 26034 -> 27601 (+6.0%) | 9048 -> 9015 | 3566 -> 2383 | 1011 -> 1011 |
+| 682_z23 | 36058 -> 38363 (+6.4%) | 24363 -> 27668 (+13.6%) | 11695 -> 10695 | 7402 -> 5544 | 560 -> 560 |
+| 682_z29 | 33616 -> 36855 (+9.6%) | 23543 -> 27863 (+18.3%) | 10073 -> 8992 | 7753 -> 5213 | 513 -> 513 |
+
+The 50 um prune falls on every image, by 11 to 51%: 44,593 px pruned over the
+set before, 34,011 after. That is the clearest single sign of what the rule
+does. A thread that could not reach a body within 50 um along the network was
+being deleted; now the zone joins it to the body it belongs to and the limit
+stops applying to it.
+
+Before and after, skeleton and verification pictures, for the two images the
+work was raised on: `results/before_after/543-2_glow_before.png` and
+`_glow_after.png`, the same for 543_3, and `_glow_before_skeleton.png` and
+`_glow_after_skeleton.png` beside them. The lacuna at (198, 635) on 543_3, which
+owned an 11 px stub through three rounds of ownership work, owns a network in
+the after picture.
+
+**Not validated.** None of this is a hand count. The rule recovers thread the
+method was throwing away, and whether that thread is real is a question for the
+manual tracing in `manual_trace/`, under the protocol fixed in advance in
+`docs/NETWORK_TUNING_PROTOCOL.md`.
