@@ -2593,7 +2593,14 @@ def contact_detection(image_path: Path, contact_reach_px: int | None = None) -> 
     high = float(net["t_lo"])
     low = high * canaliculi.HYSTERESIS_LOW_FRACTION
     dist, nearest_id, nearest_index = canaliculi.nearest_lacuna_map(net["lacuna_id_map"])
+    # The hysteresis mask before the bodies and the specks were taken out of it,
+    # with this image's own cut, so "not in the mask" can be split into reasons;
+    # and the buffered bodies, which are what was taken out.
+    signal, _cut = canaliculi.hysteresis_mask(net["ridge_response"], net["flagged"], high)
     return {
+        "hysteresis_signal": signal,
+        "buffered_lacunae": morphology.dilation(
+            net["lacuna_mask"], morphology.disk(canaliculi.LACUNA_DILATION_PX)),
         "label": lacunae.image_label(image_path),
         "image_path": image_path,
         "contact_reach_px": reach_used,
@@ -2655,6 +2662,7 @@ def contact_census_rows(d: dict, near_px: int) -> list:
         if other.any():
             ids, counts = np.unique(owner_map[other], return_counts=True)
             detail = {int(i): int(c) for i, c in zip(ids, counts)}
+        traced = contact_never_traced(d, near, near_px)
         rows.append({
             "image_label": d["label"],
             "lacuna_id": lacuna_id,
@@ -2669,6 +2677,19 @@ def contact_census_rows(d: dict, near_px: int) -> list:
             "near_owned_by_another_px": int(other.sum()),
             "near_owned_by_another_detail": detail,
             "near_pruned_by_50um_px": int((near & pruned).sum()),
+            # Step 4: what the method never traced beside this body. Faint signal
+            # is below every cut the method has, so no threshold can reach it;
+            # signal above the low cut that is not in the mask is a tracing
+            # failure of a different kind and is counted apart.
+            "near_faint_px": traced["faint_half_low_to_low_cut"],
+            "near_above_low_cut_not_in_mask_px":
+                traced["above_low_cut_but_not_in_the_mask"]["total"],
+            "near_untraced_in_a_flagged_canal_px":
+                traced["above_low_cut_but_not_in_the_mask"]["inside_a_flagged_vascular_structure"],
+            "near_untraced_despeckled_px":
+                traced["above_low_cut_but_not_in_the_mask"]["in_the_mask_but_despeckled"],
+            "near_signal_px": traced["at_or_above_high_cut"]
+                + traced["between_low_and_high_cut"],
         })
     return rows
 
@@ -2703,6 +2724,15 @@ def contact_image_summary(d: dict, rows: list, near_px: int) -> dict:
         "near_unowned_px_total": int(sum(r["near_unowned_px"] for r in rows)),
         "near_owned_by_another_px_total": int(sum(r["near_owned_by_another_px"] for r in rows)),
         "near_owned_by_it_px_total": int(sum(r["near_owned_by_it_px"] for r in rows)),
+        "near_faint_px_total": int(sum(r["near_faint_px"] for r in rows)),
+        "near_above_low_cut_not_in_mask_px_total":
+            int(sum(r["near_above_low_cut_not_in_mask_px"] for r in rows)),
+        "near_untraced_in_a_flagged_canal_px_total":
+            int(sum(r["near_untraced_in_a_flagged_canal_px"] for r in rows)),
+        "near_untraced_despeckled_px_total":
+            int(sum(r["near_untraced_despeckled_px"] for r in rows)),
+        "lacunae_with_untraced_signal_above_the_low_cut":
+            sum(1 for r in rows if r["near_above_low_cut_not_in_mask_px"] > 0),
     }
 
 
@@ -2712,13 +2742,8 @@ def contact_never_traced(d: dict, near: np.ndarray, near_px: int) -> dict:
     which are cut out of the mask, so the region is where a thread could be
     traced at all."""
     response, low, high = d["response"], d["low_cut"], d["high_cut"]
-    buffered = morphology.dilation(d["lacuna_mask"],
-                                   morphology.disk(canaliculi.LACUNA_DILATION_PX))
-    region = near & ~buffered
-    # The hysteresis mask before the bodies and the specks were taken out of it,
-    # recomputed with this image's own cut, so "not in the mask" can be split
-    # into the reasons.
-    signal, _cut = canaliculi.hysteresis_mask(response, d["flagged"], high)
+    region = near & ~d["buffered_lacunae"]
+    signal = d["hysteresis_signal"]
     above_low = region & (response >= low)
     return {
         "region": f"within {near_px} px of the body and outside the buffered lacuna bodies",
@@ -2732,8 +2757,12 @@ def contact_never_traced(d: dict, near: np.ndarray, near_px: int) -> dict:
         "above_low_cut_but_not_in_the_mask": {
             "total": int((above_low & ~d["candidate"]).sum()),
             "hysteresis_never_reached_it": int((above_low & ~signal).sum()),
-            "in_the_mask_but_despeckled_or_buffered": int((above_low & signal
-                                                           & ~d["candidate"]).sum()),
+            # Inside a vascular canal hysteresis may add nothing, so a pixel
+            # between the cuts there is withheld by that rule and by no other.
+            "inside_a_flagged_vascular_structure": int((above_low & ~signal
+                                                        & d["flagged"]).sum()),
+            "in_the_mask_but_despeckled": int((above_low & signal
+                                               & ~d["candidate"]).sum()),
         },
         "what_it_means": ("a pixel between 0.5 and 1.0 of the low cut carries ridge signal no "
                           "threshold of this method can reach, so it is NEVER TRACED; one above "
@@ -3055,6 +3084,15 @@ def cmd_contact(args) -> int:
         "near_owned_by_it_px_total": sum(r["near_owned_by_it_px"] for r in rows),
         "near_unowned_px_total": sum(r["near_unowned_px"] for r in rows),
         "near_owned_by_another_px_total": sum(r["near_owned_by_another_px"] for r in rows),
+        "near_faint_px_total": sum(r["near_faint_px"] for r in rows),
+        "near_above_low_cut_not_in_mask_px_total":
+            sum(r["near_above_low_cut_not_in_mask_px"] for r in rows),
+        "near_untraced_in_a_flagged_canal_px_total":
+            sum(r["near_untraced_in_a_flagged_canal_px"] for r in rows),
+        "near_untraced_despeckled_px_total":
+            sum(r["near_untraced_despeckled_px"] for r in rows),
+        "lacunae_with_untraced_signal_above_the_low_cut":
+            sum(1 for r in rows if r["near_above_low_cut_not_in_mask_px"] > 0),
     }
     total["fraction_of_touching_skeleton_not_owned_by_the_body_it_touches"] = round(
         (total["near_unowned_px_total"] + total["near_owned_by_another_px_total"])
@@ -3083,7 +3121,9 @@ def cmd_contact(args) -> int:
         json.dump(report, f, indent=2, default=float)
     csv_cols = ["image_label", "lacuna_id", "centroid_xy", "on_frame_edge", "body_px",
                 "roots_count", "owned_px", "near_skeleton_px", "near_owned_by_it_px",
-                "near_unowned_px", "near_owned_by_another_px", "near_pruned_by_50um_px"]
+                "near_unowned_px", "near_owned_by_another_px", "near_pruned_by_50um_px",
+                "near_signal_px", "near_faint_px", "near_above_low_cut_not_in_mask_px",
+                "near_untraced_in_a_flagged_canal_px", "near_untraced_despeckled_px"]
     csv_path = args.out / f"contact_{args.tag}_per_lacuna.csv"
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
@@ -3165,6 +3205,13 @@ def cmd_contact(args) -> int:
           f"{total['lacunae_touched_by_skeleton_they_do_not_own']} of {total['lacunae']} "
           f"({total['lacunae_touched_by_unowned_skeleton']} touched by unowned skeleton, "
           f"{total['lacunae_touched_by_another_lacunas_skeleton']} by another lacuna's).")
+    print(f"Never traced in those bands: "
+          f"{total['near_above_low_cut_not_in_mask_px_total']} px carry response above the low cut "
+          f"and are not in the mask, over {total['lacunae_with_untraced_signal_above_the_low_cut']} "
+          f"lacunae ({total['near_untraced_in_a_flagged_canal_px_total']} inside a vascular canal, "
+          f"{total['near_untraced_despeckled_px_total']} removed as specks); "
+          f"{total['near_faint_px_total']} px are faint (between half the low cut and the "
+          f"low cut), which no threshold of this method can reach.")
     print(f"Skeleton px in those bands: {total['near_owned_by_it_px_total']} owned by the body "
           f"they touch, {total['near_unowned_px_total']} unowned, "
           f"{total['near_owned_by_another_px_total']} owned by another lacuna "

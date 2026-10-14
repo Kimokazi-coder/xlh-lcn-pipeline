@@ -667,6 +667,55 @@ network and not in straight lines, and the two disagree on 819 of 7536 px.
 numbers is evidence that the new ownership is right, only that it is the rule
 doing what the rule says.
 
+### What contact cannot reach: signal beside a body that was never traced
+
+An ownership rule can only hand out skeleton that exists. The census therefore
+counts, in the same 8 px band and outside the buffered bodies, what carries
+ridge response there and is not in the network mask at all. **Reported, and
+deliberately not fixed here**: every number below is produced by a rule that
+already exists and was chosen for its own reasons.
+
+Two tiers, and they are not the same thing.
+
+- **Faint**, between half the low cut and the low cut: **17,398 px** over the
+  8 images, present beside almost every body. No threshold of this method can
+  reach it, by construction, because hysteresis can only grow into what reaches
+  the low cut somewhere. This is the tier the second, dimmer pass exists for,
+  and the contact rule feeds that pass: the pass is seeded from owned skeleton,
+  so a lacuna that now owns its contact thread can continue it into the faint
+  tier, which is where the +0.021% of skeleton came from.
+- **Above the low cut and still not in the mask**: **848 px over 51 of the 108
+  lacunae**, which is 1.6% of the signal in those bands. Of those, 581 px lie
+  inside a flagged vascular canal, where hysteresis is not allowed to add
+  anything and only already-bright pixels survive; 226 px were removed as specks
+  under 8 px2; the remaining 41 px reached the low cut with no bright pixel
+  connected to them.
+
+| image | lacunae with untraced signal | untraced px above the low cut | in a vascular canal | despeckled | faint px |
+|---|---|---|---|---|---|
+| 542_z06 | 12 of 19 | 179 | 113 | 62 | 3961 |
+| 542_z18 | 5 of 13 | 219 | 171 | 48 | 2404 |
+| 543-2 | 4 of 12 | 13 | 0 | 13 | 1894 |
+| 543_3 | 6 of 13 | 26 | 0 | 6 | 1631 |
+| 543_z13 | 4 of 11 | 10 | 0 | 5 | 1553 |
+| 682_z08 | 6 of 11 | 182 | 125 | 46 | 2288 |
+| 682_z23 | 8 of 14 | 160 | 139 | 20 | 1796 |
+| 682_z29 | 6 of 15 | 59 | 33 | 26 | 1871 |
+| **all 8** | **51 of 108** | **848** | **581** | **226** | **17,398** |
+
+The lacunae it concentrates on, worst first: 542_z18 id 2 (639, 130) 190 px,
+682_z08 id 1 (428, 32) 139 px, 542_z06 id 9 (573, 482) 82 px, 682_z23 id 3
+(472, 61) 72 px, 682_z23 id 2 (363, 7) 52 px, 682_z29 id 1 (99, 14) 33 px. Every
+one of them sits against a vascular canal, which is what the vascular rule is
+for: it stops a vessel wall being traced as a canaliculus, and the price is that
+a real thread crossing a canal is not traced either. 543-2, 543_3 and 543_z13,
+which have no large canal beside a lacuna, lose 10 to 26 px between them, all of
+it specks.
+
+**None of this touches the four lacunae the work started from.** In their 8 px
+bands, every pixel above the low cut is in the mask: 0 px untraced for all four.
+What was wrong there was ownership, and ownership is what was changed.
+
 ## 9. Lacunae the filters used to miss
 
 Two rules, both general, both applying to every image, neither raising
