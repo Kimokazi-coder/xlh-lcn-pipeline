@@ -596,6 +596,77 @@ Pictures, before and after, in `results/contact_census/pictures/`
   would mean setting the contact reach from this one lacuna, which is the kind
   of per-image tuning this pipeline does not do.
 
+### What the contact rule does to all 8 images
+
+The rule is one rule for every lacuna, so it is read on every lacuna. Before is
+`--contact-reach 0`, after is the configured 6 px; **bold is after**.
+
+| image | lacunae | roots per lacuna | under 3 roots | owned px | unowned px | skeleton px | first-pass skeleton px |
+|---|---|---|---|---|---|---|---|
+| 542_z06 | 19 | 9.84 **12.16** | 1 **1** | 28514 **28803** +1.01% | 10710 **10426** | 39224 **39229** +0.01% | 38842 = 38842 |
+| 542_z18 | 13 | 5.38 **7.31** | 4 **1** | 22862 **24971** +9.22% | 13810 **11717** | 36672 **36688** +0.04% | 37584 = 37584 |
+| 543-2 | 12 | 3.58 **5.92** | 7 **2** | 29152 **29417** +0.91% | 8635 **8283** | 37787 **37700** -0.23% | 45028 = 45028 |
+| 543_3 | 13 | 2.31 **4.00** | 9 **6** | 21261 **25106** +18.08% | 14339 **10550** | 35600 **35656** +0.16% | 45929 = 45929 |
+| 543_z13 | 11 | 4.36 **6.36** | 2 **0** | 28210 **28463** +0.90% | 13154 **12914** | 41364 **41377** +0.03% | 44036 = 44036 |
+| 682_z08 | 11 | 8.00 **10.00** | 0 **0** | 25932 **26034** +0.39% | 9149 **9048** | 35081 **35082** +0.00% | 37393 = 37393 |
+| 682_z23 | 14 | 5.57 **7.00** | 1 **1** | 24002 **24363** +1.50% | 12042 **11695** | 36044 **36058** +0.04% | 42338 = 42338 |
+| 682_z29 | 15 | 5.53 **6.33** | 2 **2** | 23274 **23543** +1.16% | 10299 **10073** | 33573 **33616** +0.13% | 40336 = 40336 |
+
+Over the 8 images: roots per lacuna 5.81 to **7.61**, lacunae under 3 roots 26 to
+**13**, lacunae with no roots 7 to **5**, owned skeleton 203,207 to **210,700 px**
+(+3.69%), unowned 92,138 to **84,706 px** (-8.07%), unattached dim threads
+unchanged at 3,776 px. In the 8 px band the census was opened on: lacunae
+touched by skeleton they do not own 92 to **75**, by another lacuna's skeleton
+21 to **6**, band skeleton owned by another lacuna 136 px to **8 px**, and the
+share of touching skeleton that the touched body does not own 12.2% to **5.2%**.
+
+**The four required checks.**
+
+1. **The skeleton is unchanged.** The first-pass skeleton, which is what the
+   ridge threshold traces and the only thing detection produces, is **identical
+   pixel for pixel on all 8 images** (331,486 px before and after). The final
+   skeleton moves by -0.23% to +0.16% (295,345 to 295,406 px, +0.021% in total),
+   and that movement is not the contact rule touching detection: the second,
+   dimmer pass is seeded from **owned** skeleton by design (section 8), so
+   giving a lacuna the thread that touches it gives the dim pass a seed it did
+   not have, the mask grows there, and the centre line of the regrown mask can
+   shift by a pixel. 543-2 ends 87 px shorter because a wider mask skeletonizes
+   to one line where it had two. Both directions are inside the 25% skeleton
+   guard that governs the dim pass, by two orders of magnitude. **Pass, read on
+   detection; the final skeleton moves because an existing rule follows
+   ownership.**
+2. **Total owned px does not fall.** It rises on every image, +0.39% to
+   +18.08%. **Pass.**
+3. **Roots per lacuna rise on every image.** 8 of 8, from +0.80 to +2.31 roots
+   per lacuna. Per lacuna, 80 of 108 rise, 27 are unchanged and **one falls**,
+   682_z08 id 6, from 8 to 7. It did not lose an attachment: it gained two, 14
+   nodes to 16, and the new node at (457, 533) lies within the 8 px root merge
+   distance of two existing roots and joins them into one. That is the roots
+   measure working as defined, one thick thread counted once, not a loss.
+   **Pass.**
+4. **No lacuna loses more than 25% of its owned px unless it was holding
+   skeleton that another lacuna touches closer.** Measured pixel by pixel
+   (`python src/diagnostics.py contact-handover -d data/WT -o results/contact_census`):
+   41 lacunae gained, 46 are unchanged, 21 lost. **One** passes the 25% guard,
+   543-2 id 9 at -35.1%, and all 1388 px it lost went to lacunae 11 and 12,
+   **both of which touch those threads** by the rule's own test, a contact
+   attachment on that same connected component; 1309 of the 1388 px also lie
+   nearer their new owner's body in a straight line. Its own roots rose 4 to 6.
+   Over all 108 lacunae, of 7603 px that changed hands **7536 went to a lacuna
+   that touches that thread**, 0 went to no one, and 67 left the skeleton with
+   the dim pass. No lacuna lost skeleton to a body that does not touch it.
+   **Pass, under the exception, and the exception is measured and not assumed.**
+
+The handover is counted two ways on purpose. "Touches that thread" is the rule's
+own word and is the test that matters: the taker holds that skeleton through a
+contact attachment on the same component. "Nearer in a straight line" is a
+second, weaker reading, reported beside it because ownership runs along the
+network and not in straight lines, and the two disagree on 819 of 7536 px.
+
+**Not validated.** No hand count chose the contact reach, and none of these
+numbers is evidence that the new ownership is right, only that it is the rule
+doing what the rule says.
+
 ## 9. Lacunae the filters used to miss
 
 Two rules, both general, both applying to every image, neither raising
@@ -798,7 +869,11 @@ With all off, `results/` is reproduced exactly
   in advance in `docs/NETWORK_TUNING_PROTOCOL.md`.
 - `contact`: does each lacuna own the threads that touch it. Per named lacuna, the one rule that holds
   every touching thread away from it; per image and over the set, roots, owned px, and the skeleton
-  within 8 px of a body that the body does not own. Measurement only.
+  within 8 px of a body that the body does not own. Measurement only. `--contact-reach 0` runs it with
+  the contact rule off, which is how the before and after tables of section 8 are made.
+- `contact-handover`: each image run twice, contact on and off, and every owned pixel followed to where
+  it went: what each lacuna gained, what it lost, and whether what it lost went to a lacuna that
+  touches that thread. This is where the per-lacuna 25% guard is read.
 
 Every json output carries a `provenance` block (git commit, dirty flag, library
 versions, config hash), and `requirements.txt` pins the versions.
