@@ -4697,6 +4697,12 @@ def _ai_dry_run_one(job: tuple) -> dict:
             "lacuna_id": case["lacuna_id"],
             "case_id": case["case_id"],
             "segments": len(drawn["segments_drawn"]),
+            # A segment can lie in the zone and outside the 256 px crop, and
+            # then it cannot be drawn and is never asked about. Counted here
+            # because a question not asked is a blind spot, not a neutral
+            # outcome: those segments stay unjudged and keep the deterministic
+            # decision.
+            "segments_not_drawn": case["segments_offered"] - len(drawn["segments_drawn"]),
             "bodies_in_the_crop": len(drawn["colours"]),
             "bodies_with_no_colour": len(drawn["bodies_with_no_colour"]),
             "picture_px": drawn["panel_px"],
@@ -4779,6 +4785,8 @@ def cmd_ai_dry_run(args) -> int:
             "within_max_cost_usd": bool(retries <= config.MAX_COST_USD),
             "cases_with_a_body_that_has_no_colour": int(sum(1 for r in rows
                                                             if r["bodies_with_no_colour"])),
+            "segments_not_drawn_because_they_fall_outside_the_crop":
+                int(sum(r["segments_not_drawn"] for r in rows)),
         },
         "per_image": per_image,
         "per_case": rows,
@@ -4797,6 +4805,9 @@ def cmd_ai_dry_run(args) -> int:
           f"estimated ${a['estimated_cost_usd']}")
     print(f"worst case with every call retried once: ${retries}, "
           f"ceiling ${config.MAX_COST_USD}: {'within it' if a['within_max_cost_usd'] else 'ABOVE IT'}")
+    outside = a["segments_not_drawn_because_they_fall_outside_the_crop"]
+    print(f"segments in a zone but outside the {config.AI_CROP_PX} px crop, so never asked "
+          f"about: {outside} of {a['segments'] + outside}")
     if a["cases_with_a_body_that_has_no_colour"]:
         print(f"cases with a body the judge cannot name: "
               f"{a['cases_with_a_body_that_has_no_colour']}")
@@ -4979,7 +4990,9 @@ def cmd_ai_judge(args) -> int:
               f"{totals['segments_artifact']} artifact "
               f"({100.0 * totals['segments_artifact'] / offered:.1f}%), "
               f"{totals['segments_unjudged']} unjudged")
-        print(f"json failures: {totals['invalid_attempts']} of {totals['attempts']} attempts, "
+        print(f"json failures: {totals['invalid_attempts']} of {totals['attempts']} attempts "
+              f"({totals['call_errors']} of them a failed call, "
+              f"{totals['refusals']} a refusal), "
               f"{totals['cases_unjudged']} of {totals['cases']} cases left unjudged")
         print(f"cost: ${totals['cost_usd']} for {totals['calls']} calls "
               f"({totals['input_tokens']} input, {totals['output_tokens']} output tokens)")
@@ -4988,6 +5001,9 @@ def cmd_ai_judge(args) -> int:
                   f"${config.MAX_COST_USD}. The rest of the image was not judged.")
             rc = 3
         if mode == "replay":
+            print(f"replay against the log: "
+                  f"{totals['replay_request_mismatches']} requests and "
+                  f"{totals['replay_picture_mismatches']} pictures differ from what was sent")
             live_path = ai_judge.decisions_path(label)
             if live_path.exists():
                 same = _ai_same_decisions(json.loads(live_path.read_text(encoding="utf-8")),

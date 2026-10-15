@@ -142,6 +142,42 @@ a silent pass, because a summary table must never mix judged and unjudged images
 `AI_JUDGE_ENABLED` is deliberately **not** in `diagnostics.SWITCHES_ON`: switch-check regenerates
 all 8 images and the judge has run on 543-2 only.
 
+## Step 4: the dry run, which always comes first
+
+`python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures 543-2,543_3`,
+run on 2026-10-15. Nothing was sent: the pictures and the requests are built, and the tokens are
+estimated from them. Report: `results/ai_dry_run/ai_dry_run.json`.
+
+| image | lacunae | calls | segments | input tokens | output tokens | cost USD |
+| --- | --- | --- | --- | --- | --- | --- |
+| 542_z06 | 19 | 19 | 131 | 34,754 | 4,965 | 0.1192 |
+| 542_z18 | 13 | 13 | 126 | 23,799 | 4,670 | 0.0943 |
+| 543-2 | 12 | 12 | 122 | 21,982 | 4,510 | 0.0891 |
+| 543_3 | 13 | 13 | 190 | 23,866 | 6,910 | 0.1168 |
+| 543_z13 | 11 | 11 | 100 | 20,136 | 3,720 | 0.0775 |
+| 682_z08 | 11 | 11 | 110 | 20,149 | 4,070 | 0.0810 |
+| 682_z23 | 14 | 14 | 153 | 25,660 | 5,635 | 0.1077 |
+| 682_z29 | 15 | 15 | 167 | 27,513 | 6,145 | 0.1165 |
+| **all 8** | **108** | **108** | **1,099** | **197,859** | **40,625** | **0.80** |
+
+One call per lacuna, so 108 calls for the set and 12 for 543-2 alone. **Estimated $0.80 for all 8
+images, $1.60 if every single call had to be retried, against the $5 ceiling.** 543-2 alone is
+estimated at $0.089.
+
+These are estimates and are labelled as such everywhere they are printed: text at 0.25 tokens per
+character and each picture at width times height over 750 px per token, which is the rule Anthropic
+documents for image input, and the answer at 35 tokens per segment plus 20. A real run logs the
+token counts the API reports, and `--count-tokens` will measure the input exactly with the API's
+free counter once a connection is allowed.
+
+**A blind spot the dry run found and names: 16 of the 1,115 candidate segments (1.4%) lie in a zone
+but outside their 256 px crop, so they cannot be drawn and are never asked about.** They stay
+unjudged and keep the deterministic decision. The crop is the size the brief fixed, so the count is
+reported rather than the crop quietly grown.
+
+The pictures of every case for 543-2 and 543_3, exactly as the judge would see them, are in
+`results/ai_dry_run/pictures/` (25 of them, one per lacuna).
+
 ## The self-test
 
 `python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --self-test` rehearses the whole

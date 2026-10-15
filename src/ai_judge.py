@@ -125,6 +125,15 @@ def sha256_text(text: str) -> str:
     return sha256_bytes(text.encode("utf-8"))
 
 
+def scrub(text: str) -> str:
+    """Never let a key reach a file. The SDK does not put the key in its error
+    messages, and this makes that a guarantee rather than a belief."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if key and len(key) > 8:
+        text = text.replace(key, "(redacted)")
+    return text
+
+
 def canonical_json(obj) -> str:
     """One spelling for anything that gets hashed."""
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
@@ -757,17 +766,17 @@ def call_anthropic(payload: dict) -> dict:
 
     The SDK is imported here and nowhere else, so the pipeline, the dry run and
     the replay all work without it installed."""
-    import anthropic  # noqa: PLC0415 (deliberate: see the docstring)
-
+    anthropic = _sdk()
     client = anthropic.Anthropic()
     sent = dict(payload)
     thinking_fallback = False
     try:
         message = client.messages.create(**sent)
-    except anthropic.BadRequestError as error:
-        # The one negotiation this code does: if the pinned model refuses the
-        # thinking setting, it is dropped once and the log records that the
-        # request went out at the model's default instead.
+    except (anthropic.BadRequestError, TypeError) as error:
+        # The one negotiation this code does: if the model refuses the thinking
+        # setting, or the installed SDK is too old to know it, it is dropped
+        # once and the log records that the request went out at the model's
+        # default instead.
         if "thinking" not in sent or "thinking" not in str(error).lower():
             raise
         sent.pop("thinking")
@@ -786,13 +795,25 @@ def call_anthropic(payload: dict) -> dict:
     }
 
 
+def _sdk():
+    """The official Anthropic SDK, imported on use with an error a person can
+    act on. It is not in the pinned requirements because no pipeline number
+    depends on it (docs/EXPERIMENT_AI.md)."""
+    try:
+        import anthropic  # noqa: PLC0415 (deliberate: only a real call needs it)
+    except ImportError as error:
+        raise RuntimeError(
+            "a real call needs the Anthropic SDK, which is not installed here: "
+            "pip install anthropic (on this venv's Python 3.9 that resolves to the "
+            "last 0.x release, which is what this code is written against)") from error
+    return anthropic
+
+
 def count_tokens(payload: dict) -> int:
     """The exact input token count of a request, from the API's own counter.
     Free, but still a network call, so it runs only when external calls are
     allowed and only when a dry run is asked for it."""
-    import anthropic  # noqa: PLC0415
-
-    client = anthropic.Anthropic()
+    client = _sdk().Anthropic()
     fields = {"model": payload["model"], "system": payload["system"],
               "messages": payload["messages"]}
     return int(client.messages.count_tokens(**fields).input_tokens)
@@ -974,7 +995,9 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
 
     totals = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0,
               "cases": 0, "cases_valid": 0, "cases_unjudged": 0, "attempts": 0,
-              "invalid_attempts": 0, "segments": 0, "segments_real": 0,
+              "invalid_attempts": 0, "call_errors": 0, "refusals": 0,
+              "replay_request_mismatches": 0, "replay_picture_mismatches": 0,
+              "segments": 0, "segments_real": 0,
               "segments_artifact": 0, "segments_unjudged": 0, "stopped_on_cost": False}
     out_cases = []
     for case in candidates["cases"]:
@@ -1045,12 +1068,17 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
                 if logged is None:
                     record_case["invalid_reasons"].append(f"attempt {attempt}: no log record")
                     break
-                record["replay_of"] = {
+                check = {
+                    "attempt": attempt,
                     "written_at": logged.get("written_at"),
                     "request_sha256": logged.get("request_sha256"),
                     "request_matches": logged.get("request_sha256") == request_sha,
                     "picture_matches": logged.get("picture_sha256") == sha256_bytes(png),
                 }
+                record["replay_of"] = check
+                record_case.setdefault("replay_checks", []).append(check)
+                totals["replay_request_mismatches"] += int(not check["request_matches"])
+                totals["replay_picture_mismatches"] += int(not check["picture_matches"])
                 response = logged.get("response") or {}
                 record["response"] = response
                 record["cost_usd"] = float(logged.get("cost_usd", 0.0))
@@ -1059,8 +1087,24 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
                     allowed, why = external_calls_allowed()
                     if not allowed:
                         raise RuntimeError(f"a real call was asked for but {why}")
-                response = (answerer or call_anthropic)(payload)
+                try:
+                    response = (answerer or call_anthropic)(payload)
+                except Exception as error:  # noqa: BLE001
+                    # A call that fails is one bad attempt and not the end of
+                    # the image: it is logged, retried once like any other bad
+                    # answer, and the case is left unjudged if it fails again.
+                    reason = scrub(f"the call failed, {type(error).__name__}: {error}")
+                    record.update({"response": None, "valid": False, "parsed": None,
+                                   "invalid_reason": reason, "cost_usd": 0.0})
+                    write_log(label, record)
+                    totals["attempts"] += 1
+                    totals["invalid_attempts"] += 1
+                    totals["call_errors"] += 1
+                    record_case["attempts"] = attempt
+                    record_case["invalid_reasons"].append(f"attempt {attempt}: {reason}")
+                    continue
                 record["response"] = response
+                totals["refusals"] += int(response.get("stop_reason") == "refusal")
                 record["cost_usd"] = round(cost_usd(response["usage"]["input_tokens"],
                                                     response["usage"]["output_tokens"]), 6)
                 totals["calls"] += 1

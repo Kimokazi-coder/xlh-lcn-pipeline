@@ -1,0 +1,2831 @@
+{
+  "status": "EXPERIMENT, estimate only: nothing was sent",
+  "question": "what a real run of the AI judge would cost",
+  "model": "claude-sonnet-5-5",
+  "provider": "anthropic",
+  "prices_usd_per_mtok": {
+    "input": 2.0,
+    "output": 10.0
+  },
+  "max_cost_usd": 5.0,
+  "how_the_estimate_is_made": "input text at 0.25 tokens per character and the image at width x height / 750.0 px per token, which is the rule Anthropic documents; the answer at 35 tokens per segment plus 20. Estimates, not measurements: a real run logs what the API reports.",
+  "input_tokens_counted_by_the_api": false,
+  "prompt_sha256": "d535ffbfbcdfdc94ee4f3cb8200f8d8bb57addb8ab175e52ee7eca5d58ef59f1",
+  "examples_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "examples_present": false,
+  "all_images": {
+    "images": 8,
+    "calls": 108,
+    "segments": 1099,
+    "estimated_input_tokens": 197859,
+    "estimated_output_tokens": 40625,
+    "estimated_cost_usd": 0.802,
+    "estimated_cost_usd_if_every_call_is_retried_once": 1.604,
+    "within_max_cost_usd": true,
+    "cases_with_a_body_that_has_no_colour": 0,
+    "segments_not_drawn_because_they_fall_outside_the_crop": 16
+  },
+  "per_image": [
+    {
+      "image_label": "542_z06",
+      "lacunae": 19,
+      "calls": 19,
+      "segments": 131,
+      "estimated_input_tokens": 34754,
+      "estimated_output_tokens": 4965,
+      "estimated_cost_usd": 0.1192
+    },
+    {
+      "image_label": "542_z18",
+      "lacunae": 13,
+      "calls": 13,
+      "segments": 126,
+      "estimated_input_tokens": 23799,
+      "estimated_output_tokens": 4670,
+      "estimated_cost_usd": 0.0943
+    },
+    {
+      "image_label": "543-2",
+      "lacunae": 12,
+      "calls": 12,
+      "segments": 122,
+      "estimated_input_tokens": 21982,
+      "estimated_output_tokens": 4510,
+      "estimated_cost_usd": 0.0891
+    },
+    {
+      "image_label": "543_3",
+      "lacunae": 13,
+      "calls": 13,
+      "segments": 190,
+      "estimated_input_tokens": 23866,
+      "estimated_output_tokens": 6910,
+      "estimated_cost_usd": 0.1168
+    },
+    {
+      "image_label": "543_z13",
+      "lacunae": 11,
+      "calls": 11,
+      "segments": 100,
+      "estimated_input_tokens": 20136,
+      "estimated_output_tokens": 3720,
+      "estimated_cost_usd": 0.0775
+    },
+    {
+      "image_label": "682_z08",
+      "lacunae": 11,
+      "calls": 11,
+      "segments": 110,
+      "estimated_input_tokens": 20149,
+      "estimated_output_tokens": 4070,
+      "estimated_cost_usd": 0.081
+    },
+    {
+      "image_label": "682_z23",
+      "lacunae": 14,
+      "calls": 14,
+      "segments": 153,
+      "estimated_input_tokens": 25660,
+      "estimated_output_tokens": 5635,
+      "estimated_cost_usd": 0.1077
+    },
+    {
+      "image_label": "682_z29",
+      "lacunae": 15,
+      "calls": 15,
+      "segments": 167,
+      "estimated_input_tokens": 27513,
+      "estimated_output_tokens": 6145,
+      "estimated_cost_usd": 0.1165
+    }
+  ],
+  "per_case": [
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 1,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83090,
+      "estimate": {
+        "input_tokens": 1825,
+        "text_tokens": 1120,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 55,
+        "cost_usd": 0.0042
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 3,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83213,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 125,
+        "cost_usd": 0.004906
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 2,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 79369,
+      "estimate": {
+        "input_tokens": 1825,
+        "text_tokens": 1120,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 90,
+        "cost_usd": 0.00455
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 2,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83003,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 90,
+        "cost_usd": 0.004554
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 17,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 88612,
+      "estimate": {
+        "input_tokens": 1837,
+        "text_tokens": 1132,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 615,
+        "cost_usd": 0.009824
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84915,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005954
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 9,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 4,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84825,
+      "estimate": {
+        "input_tokens": 1835,
+        "text_tokens": 1130,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 335,
+        "cost_usd": 0.00702
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 10,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83403,
+      "estimate": {
+        "input_tokens": 1832,
+        "text_tokens": 1127,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 370,
+        "cost_usd": 0.007364
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 5,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83932,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 195,
+        "cost_usd": 0.005604
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82922,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005954
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 4,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85817,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 160,
+        "cost_usd": 0.005254
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 12,
+      "case_id": "case_0012",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82846,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005956
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 13,
+      "case_id": "case_0013",
+      "segments": 16,
+      "segments_not_drawn": 3,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85809,
+      "estimate": {
+        "input_tokens": 1837,
+        "text_tokens": 1132,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 580,
+        "cost_usd": 0.009474
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 14,
+      "case_id": "case_0014",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83123,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.006656
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 15,
+      "case_id": "case_0015",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81832,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006304
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 16,
+      "case_id": "case_0016",
+      "segments": 13,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 86364,
+      "estimate": {
+        "input_tokens": 1833,
+        "text_tokens": 1128,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 475,
+        "cost_usd": 0.008416
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 17,
+      "case_id": "case_0017",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83699,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005954
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 18,
+      "case_id": "case_0018",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81090,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006308
+      }
+    },
+    {
+      "image_label": "542_z06",
+      "lacuna_id": 19,
+      "case_id": "case_0019",
+      "segments": 3,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83391,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 125,
+        "cost_usd": 0.004906
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 4,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83572,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 160,
+        "cost_usd": 0.005254
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 5,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85474,
+      "estimate": {
+        "input_tokens": 1826,
+        "text_tokens": 1121,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 195,
+        "cost_usd": 0.005602
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 11,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82910,
+      "estimate": {
+        "input_tokens": 1831,
+        "text_tokens": 1126,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.007712
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84463,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006304
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81868,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006304
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 5,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81560,
+      "estimate": {
+        "input_tokens": 1826,
+        "text_tokens": 1121,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 195,
+        "cost_usd": 0.005602
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 76331,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006308
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 12,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84013,
+      "estimate": {
+        "input_tokens": 1834,
+        "text_tokens": 1129,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 440,
+        "cost_usd": 0.008068
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 20,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85617,
+      "estimate": {
+        "input_tokens": 1840,
+        "text_tokens": 1135,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 720,
+        "cost_usd": 0.01088
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 79369,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.006656
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 23,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84815,
+      "estimate": {
+        "input_tokens": 1843,
+        "text_tokens": 1138,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 825,
+        "cost_usd": 0.011936
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 12,
+      "case_id": "case_0012",
+      "segments": 10,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83779,
+      "estimate": {
+        "input_tokens": 1832,
+        "text_tokens": 1127,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 370,
+        "cost_usd": 0.007364
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacuna_id": 13,
+      "case_id": "case_0013",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82197,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006308
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 2,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81379,
+      "estimate": {
+        "input_tokens": 1825,
+        "text_tokens": 1120,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 90,
+        "cost_usd": 0.00455
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 5,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 73183,
+      "estimate": {
+        "input_tokens": 1826,
+        "text_tokens": 1121,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 195,
+        "cost_usd": 0.005602
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 4,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82190,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 160,
+        "cost_usd": 0.005258
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82959,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.006656
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81556,
+      "estimate": {
+        "input_tokens": 1835,
+        "text_tokens": 1130,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.00772
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 73516,
+      "estimate": {
+        "input_tokens": 1833,
+        "text_tokens": 1128,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.007716
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 18,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 86212,
+      "estimate": {
+        "input_tokens": 1840,
+        "text_tokens": 1135,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 650,
+        "cost_usd": 0.01018
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 15,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 86524,
+      "estimate": {
+        "input_tokens": 1837,
+        "text_tokens": 1132,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 545,
+        "cost_usd": 0.009124
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84336,
+      "estimate": {
+        "input_tokens": 1831,
+        "text_tokens": 1126,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.007712
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 15,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84963,
+      "estimate": {
+        "input_tokens": 1835,
+        "text_tokens": 1130,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 545,
+        "cost_usd": 0.00912
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81487,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005954
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacuna_id": 12,
+      "case_id": "case_0012",
+      "segments": 16,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 86456,
+      "estimate": {
+        "input_tokens": 1836,
+        "text_tokens": 1131,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 580,
+        "cost_usd": 0.009472
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 17,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85053,
+      "estimate": {
+        "input_tokens": 1839,
+        "text_tokens": 1134,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 615,
+        "cost_usd": 0.009828
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81386,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.006656
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81809,
+      "estimate": {
+        "input_tokens": 1830,
+        "text_tokens": 1125,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.00666
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83904,
+      "estimate": {
+        "input_tokens": 1831,
+        "text_tokens": 1126,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.007712
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82778,
+      "estimate": {
+        "input_tokens": 1835,
+        "text_tokens": 1130,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.00772
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 10,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82746,
+      "estimate": {
+        "input_tokens": 1832,
+        "text_tokens": 1127,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 370,
+        "cost_usd": 0.007364
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 13,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85415,
+      "estimate": {
+        "input_tokens": 1835,
+        "text_tokens": 1130,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 475,
+        "cost_usd": 0.00842
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 34,
+      "segments_not_drawn": 2,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 93878,
+      "estimate": {
+        "input_tokens": 1854,
+        "text_tokens": 1149,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 1210,
+        "cost_usd": 0.015808
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 12,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83239,
+      "estimate": {
+        "input_tokens": 1832,
+        "text_tokens": 1127,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 440,
+        "cost_usd": 0.008064
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81819,
+      "estimate": {
+        "input_tokens": 1831,
+        "text_tokens": 1126,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.007712
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 14,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 86133,
+      "estimate": {
+        "input_tokens": 1836,
+        "text_tokens": 1131,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 510,
+        "cost_usd": 0.008772
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 12,
+      "case_id": "case_0012",
+      "segments": 22,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84333,
+      "estimate": {
+        "input_tokens": 1844,
+        "text_tokens": 1139,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 790,
+        "cost_usd": 0.011588
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacuna_id": 13,
+      "case_id": "case_0013",
+      "segments": 19,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85544,
+      "estimate": {
+        "input_tokens": 1839,
+        "text_tokens": 1134,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 685,
+        "cost_usd": 0.010528
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83952,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006308
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 14,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84345,
+      "estimate": {
+        "input_tokens": 1836,
+        "text_tokens": 1131,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 510,
+        "cost_usd": 0.008772
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 3,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83731,
+      "estimate": {
+        "input_tokens": 1826,
+        "text_tokens": 1121,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 125,
+        "cost_usd": 0.004902
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84421,
+      "estimate": {
+        "input_tokens": 1830,
+        "text_tokens": 1125,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.00666
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 9,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83590,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 335,
+        "cost_usd": 0.007008
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 1,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 78642,
+      "estimate": {
+        "input_tokens": 1825,
+        "text_tokens": 1120,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 55,
+        "cost_usd": 0.0042
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 9,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 81880,
+      "estimate": {
+        "input_tokens": 1831,
+        "text_tokens": 1126,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 335,
+        "cost_usd": 0.007012
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 21,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 88662,
+      "estimate": {
+        "input_tokens": 1841,
+        "text_tokens": 1136,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 755,
+        "cost_usd": 0.011232
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 6,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82507,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005954
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 13,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 85062,
+      "estimate": {
+        "input_tokens": 1833,
+        "text_tokens": 1128,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 475,
+        "cost_usd": 0.008416
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 9,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84120,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 335,
+        "cost_usd": 0.007008
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 0,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 76474,
+      "estimate": {
+        "input_tokens": 1824,
+        "text_tokens": 1119,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 20,
+        "cost_usd": 0.003848
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80319,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006308
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 7,
+      "segments_not_drawn": 3,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80927,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006308
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 2,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 74663,
+      "estimate": {
+        "input_tokens": 1825,
+        "text_tokens": 1120,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 90,
+        "cost_usd": 0.00455
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 18,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84914,
+      "estimate": {
+        "input_tokens": 1842,
+        "text_tokens": 1137,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 650,
+        "cost_usd": 0.010184
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 5,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80041,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 195,
+        "cost_usd": 0.005604
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80019,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005956
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 14,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84266,
+      "estimate": {
+        "input_tokens": 1834,
+        "text_tokens": 1129,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 510,
+        "cost_usd": 0.008768
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 19,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84160,
+      "estimate": {
+        "input_tokens": 1839,
+        "text_tokens": 1134,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 685,
+        "cost_usd": 0.010528
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 21,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83460,
+      "estimate": {
+        "input_tokens": 1841,
+        "text_tokens": 1136,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 755,
+        "cost_usd": 0.011232
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 77773,
+      "estimate": {
+        "input_tokens": 1831,
+        "text_tokens": 1126,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.007712
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 1,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80658,
+      "estimate": {
+        "input_tokens": 1823,
+        "text_tokens": 1118,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 55,
+        "cost_usd": 0.004196
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 2,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 79940,
+      "estimate": {
+        "input_tokens": 1825,
+        "text_tokens": 1120,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 90,
+        "cost_usd": 0.00455
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 4,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80030,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 160,
+        "cost_usd": 0.005254
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83026,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.006656
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 22,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84762,
+      "estimate": {
+        "input_tokens": 1844,
+        "text_tokens": 1139,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 790,
+        "cost_usd": 0.011588
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 14,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 84467,
+      "estimate": {
+        "input_tokens": 1834,
+        "text_tokens": 1129,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 510,
+        "cost_usd": 0.008768
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 11,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 78130,
+      "estimate": {
+        "input_tokens": 1833,
+        "text_tokens": 1128,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 405,
+        "cost_usd": 0.007716
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 78542,
+      "estimate": {
+        "input_tokens": 1832,
+        "text_tokens": 1127,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.006664
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 7,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 77134,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 265,
+        "cost_usd": 0.006308
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 21,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 82724,
+      "estimate": {
+        "input_tokens": 1845,
+        "text_tokens": 1140,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 755,
+        "cost_usd": 0.01124
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 14,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 79320,
+      "estimate": {
+        "input_tokens": 1834,
+        "text_tokens": 1129,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 510,
+        "cost_usd": 0.008768
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 12,
+      "case_id": "case_0012",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 75577,
+      "estimate": {
+        "input_tokens": 1831,
+        "text_tokens": 1126,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005962
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 13,
+      "case_id": "case_0013",
+      "segments": 22,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80169,
+      "estimate": {
+        "input_tokens": 1842,
+        "text_tokens": 1137,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 790,
+        "cost_usd": 0.011584
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacuna_id": 14,
+      "case_id": "case_0014",
+      "segments": 13,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 78054,
+      "estimate": {
+        "input_tokens": 1833,
+        "text_tokens": 1128,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 475,
+        "cost_usd": 0.008416
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 1,
+      "case_id": "case_0001",
+      "segments": 2,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80487,
+      "estimate": {
+        "input_tokens": 1824,
+        "text_tokens": 1119,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 90,
+        "cost_usd": 0.004548
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 2,
+      "case_id": "case_0002",
+      "segments": 8,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83129,
+      "estimate": {
+        "input_tokens": 1828,
+        "text_tokens": 1123,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 300,
+        "cost_usd": 0.006656
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 3,
+      "case_id": "case_0003",
+      "segments": 6,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 79378,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 230,
+        "cost_usd": 0.005954
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 4,
+      "case_id": "case_0004",
+      "segments": 12,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80972,
+      "estimate": {
+        "input_tokens": 1836,
+        "text_tokens": 1131,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 440,
+        "cost_usd": 0.008072
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 5,
+      "case_id": "case_0005",
+      "segments": 17,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 79730,
+      "estimate": {
+        "input_tokens": 1839,
+        "text_tokens": 1134,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 615,
+        "cost_usd": 0.009828
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 6,
+      "case_id": "case_0006",
+      "segments": 17,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80032,
+      "estimate": {
+        "input_tokens": 1841,
+        "text_tokens": 1136,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 615,
+        "cost_usd": 0.009832
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 7,
+      "case_id": "case_0007",
+      "segments": 5,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 74889,
+      "estimate": {
+        "input_tokens": 1830,
+        "text_tokens": 1125,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 195,
+        "cost_usd": 0.00561
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 8,
+      "case_id": "case_0008",
+      "segments": 13,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 4,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 76986,
+      "estimate": {
+        "input_tokens": 1839,
+        "text_tokens": 1134,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 475,
+        "cost_usd": 0.008428
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 9,
+      "case_id": "case_0009",
+      "segments": 26,
+      "segments_not_drawn": 1,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 83214,
+      "estimate": {
+        "input_tokens": 1847,
+        "text_tokens": 1142,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 930,
+        "cost_usd": 0.012994
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 10,
+      "case_id": "case_0010",
+      "segments": 4,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 74888,
+      "estimate": {
+        "input_tokens": 1829,
+        "text_tokens": 1124,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 160,
+        "cost_usd": 0.005258
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 11,
+      "case_id": "case_0011",
+      "segments": 2,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 3,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 73364,
+      "estimate": {
+        "input_tokens": 1827,
+        "text_tokens": 1122,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 90,
+        "cost_usd": 0.004554
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 12,
+      "case_id": "case_0012",
+      "segments": 27,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 1,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 80820,
+      "estimate": {
+        "input_tokens": 1847,
+        "text_tokens": 1142,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 965,
+        "cost_usd": 0.013344
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 13,
+      "case_id": "case_0013",
+      "segments": 15,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 76468,
+      "estimate": {
+        "input_tokens": 1837,
+        "text_tokens": 1132,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 545,
+        "cost_usd": 0.009124
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 14,
+      "case_id": "case_0014",
+      "segments": 3,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 2,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 73110,
+      "estimate": {
+        "input_tokens": 1826,
+        "text_tokens": 1121,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 125,
+        "cost_usd": 0.004902
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacuna_id": 15,
+      "case_id": "case_0015",
+      "segments": 10,
+      "segments_not_drawn": 0,
+      "bodies_in_the_crop": 4,
+      "bodies_with_no_colour": 0,
+      "picture_px": [
+        1032,
+        512
+      ],
+      "picture_bytes": 78972,
+      "estimate": {
+        "input_tokens": 1836,
+        "text_tokens": 1131,
+        "image_tokens": 705,
+        "image_px": [
+          1032,
+          512
+        ],
+        "output_tokens": 370,
+        "cost_usd": 0.007372
+      }
+    }
+  ],
+  "pictures": [
+    "results/ai_dry_run/pictures/543-2_case_0001.png",
+    "results/ai_dry_run/pictures/543-2_case_0002.png",
+    "results/ai_dry_run/pictures/543-2_case_0003.png",
+    "results/ai_dry_run/pictures/543-2_case_0004.png",
+    "results/ai_dry_run/pictures/543-2_case_0005.png",
+    "results/ai_dry_run/pictures/543-2_case_0006.png",
+    "results/ai_dry_run/pictures/543-2_case_0007.png",
+    "results/ai_dry_run/pictures/543-2_case_0008.png",
+    "results/ai_dry_run/pictures/543-2_case_0009.png",
+    "results/ai_dry_run/pictures/543-2_case_0010.png",
+    "results/ai_dry_run/pictures/543-2_case_0011.png",
+    "results/ai_dry_run/pictures/543-2_case_0012.png",
+    "results/ai_dry_run/pictures/543_3_case_0001.png",
+    "results/ai_dry_run/pictures/543_3_case_0002.png",
+    "results/ai_dry_run/pictures/543_3_case_0003.png",
+    "results/ai_dry_run/pictures/543_3_case_0004.png",
+    "results/ai_dry_run/pictures/543_3_case_0005.png",
+    "results/ai_dry_run/pictures/543_3_case_0006.png",
+    "results/ai_dry_run/pictures/543_3_case_0007.png",
+    "results/ai_dry_run/pictures/543_3_case_0008.png",
+    "results/ai_dry_run/pictures/543_3_case_0009.png",
+    "results/ai_dry_run/pictures/543_3_case_0010.png",
+    "results/ai_dry_run/pictures/543_3_case_0011.png",
+    "results/ai_dry_run/pictures/543_3_case_0012.png",
+    "results/ai_dry_run/pictures/543_3_case_0013.png"
+  ]
+}
