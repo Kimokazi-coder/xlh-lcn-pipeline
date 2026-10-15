@@ -5001,9 +5001,13 @@ def cmd_ai_judge(args) -> int:
                   f"${config.MAX_COST_USD}. The rest of the image was not judged.")
             rc = 3
         if mode == "replay":
-            print(f"replay against the log: "
-                  f"{totals['replay_request_mismatches']} requests and "
-                  f"{totals['replay_picture_mismatches']} pictures differ from what was sent")
+            if not totals["attempts"]:
+                print("replay against the log: the log holds no answers for this image yet, "
+                      "so every segment is unjudged and keeps the deterministic decision")
+            else:
+                print(f"replay against the log: {totals['attempts']} attempts replayed, "
+                      f"{totals['replay_request_mismatches']} requests and "
+                      f"{totals['replay_picture_mismatches']} pictures differ from what was sent")
             live_path = ai_judge.decisions_path(label)
             if live_path.exists():
                 same = _ai_same_decisions(json.loads(live_path.read_text(encoding="utf-8")),

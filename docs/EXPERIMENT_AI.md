@@ -194,6 +194,12 @@ logged with its hash, no key and no image bytes are in the log, the switch chang
 judge edits nothing outside the zones, the pipeline runs to the end with the switch on, and an image
 with no decision file is refused rather than passed over.
 
+Quantification was then run on 543-2 with the switch on and those stub verdicts, into `.cache/`: it
+writes its json as usual, and the record carries the `ai_judge` block (verdicts applied, pixels
+added and removed, the geometry hash, the model and when the decisions were written), so no result
+file can be mistaken for one the pipeline made alone. **The numbers it gives are meaningless**, for
+the same reason the stub's verdicts are, and they are not reported here as anything else.
+
 ## Reproducibility
 
 - **The model is pinned** in `config.AI_JUDGE_MODEL` (`claude-sonnet-5-5`), and no server side
@@ -248,23 +254,63 @@ The brief left these open. Each was decided, and here is the reason.
 | Server side refusal fallback | not enabled | it would break the pinned model |
 | Where the fixed prompt lives | `src/judge_prompt.md` | the code loads it and hashes it; it is part of the method, like `config.py` |
 
+## Steps 5 and 6: the real run is waiting
+
+**No real call has been made. `results/ai_log/` holds no answers.** On 2026-10-15 neither
+`ALLOW_EXTERNAL_API` nor `ANTHROPIC_API_KEY` was set, in this session, in the Windows user
+environment or in the machine environment, and there is no `.env`. The judge therefore refuses to
+call out, which is the design:
+
+```
+> python src/diagnostics.py ai-judge --image "data/WT/543-2.tif"
+Refused: a real run needs a connection and ALLOW_EXTERNAL_API is not set to 1.
+Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.
+```
+
+Everything that does not need the network has been built and run: the candidates on all 8 images,
+the pictures, the dry run with its cost, the whole chain end to end against a stub judge, and the
+switch through the pipeline to quantification.
+
+**To make the real run on 543-2 happen** (PowerShell, in this repository, the key in the session
+only and never in a file):
+
+```powershell
+$env:ALLOW_EXTERNAL_API = "1"
+$env:ANTHROPIC_API_KEY  = "sk-ant-..."
+pip install anthropic
+python src/diagnostics.py ai-dry-run --image "data/WT/543-2.tif"   # always first
+python src/diagnostics.py ai-judge   --image "data/WT/543-2.tif"
+```
+
+Use `$env:` and not `setx`: `setx` writes the key into the Windows registry, where it outlives the
+session. In Git Bash the same two lines are `export ALLOW_EXTERNAL_API=1` and
+`export ANTHROPIC_API_KEY=sk-ant-...`.
+
+That run will cost about $0.09 for 12 calls, refuse to start if its own estimate is above
+`config.MAX_COST_USD`, and stop if the running total passes it. It writes the log, the pictures and
+the decision file under `results/ai_log/543-2/`. **The other 7 images are not run**: the brief says
+543-2 first and then a review.
+
 ## How to run it
 
 ```
-# Deterministic, no network, no judge:
+# Deterministic, no network, no judge: what the judge would be asked about.
 python src/diagnostics.py ai-candidates --dir data/WT -o results/ai_dry_run
 
-# What a real run would cost, with the pictures for two images:
+# What a real run would cost, with the pictures for two images.
 python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures 543-2,543_3
 
-# A real run on one image (needs both environment variables):
-ALLOW_EXTERNAL_API=1 ANTHROPIC_API_KEY=... python src/diagnostics.py ai-judge --image data/WT/543-2.tif
+# The whole chain with a stub judge, no network and no key.
+python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --self-test
 
-# The same run again, offline, from the log:
-python src/diagnostics.py ai-judge --image data/WT/543-2.tif --replay
+# A real run on one image (needs both environment variables, see above).
+python src/diagnostics.py ai-judge --image "data/WT/543-2.tif"
 
-# The pipeline with the judge applied, which needs a decision file for the image:
-# set config.AI_JUDGE_ENABLED = True, then run the pipeline as usual.
+# The same run again, offline, from the log.
+python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --replay
+
+# The pipeline with the judge applied: set config.AI_JUDGE_ENABLED = True and run
+# the pipeline as usual. It needs a decision file for every image it is given.
 ```
 
 The SDK is needed only for a real call: `pip install anthropic`. On this venv's Python 3.9 pip
