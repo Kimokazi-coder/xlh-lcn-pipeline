@@ -592,6 +592,318 @@ def grow_in_glow_zone(candidate: np.ndarray, response: np.ndarray, t_hi: float,
     return ndi.binary_propagation(candidate, mask=candidate | extra)
 
 
+
+# The hole around a lacuna, the zone that follows it, and the gain inside it
+# METHODS section 19. The glow zone of section 18 left the holes in place
+# because its zone (the glow extent, 3.9 to 33.2 px) is often narrower than the
+# hole (9.0 to 59.2 px) and because it could only extend mask that the global
+# cut had already made. The zone is therefore measured on the hole itself, and
+# the cut inside it is the SAME global cut applied to a response put back on the
+# footing of the tissue just beyond the hole.
+
+# The frame around a body is cut into this many angular sectors, 2 degrees each,
+# and a sector's empty width is the smallest distance to the body over the
+# skeleton pixels in it. The measurement of METHODS section 18, unchanged: a ray
+# marched outward instead runs along the corridor between two threads and
+# reports a hole where a thread sits 3 px to the side.
+HOLE_SECTORS = 180
+# How far out a sector looks for skeleton before it is censored.
+HOLE_MAX_SEARCH_PX = 150
+HOLE_ZONE_MARGIN_PX = config.px(config.HOLE_ZONE_MARGIN_UM)
+HOLE_GAIN_BAND_PX = config.px(config.HOLE_GAIN_BAND_UM)
+HOLE_GAIN_STEP_PX = max(1.0, config.px(config.HOLE_GAIN_STEP_UM))
+HOLE_NEW_MIN_LENGTH_PX = config.px_int(config.HOLE_NEW_MIN_LENGTH_UM)
+
+
+def _body_window(body: np.ndarray, shape: tuple, reach: float) -> tuple:
+    """The bounding box of one body grown by `reach`, so the work around a
+    lacuna is done on its own neighbourhood and not on the whole frame."""
+    rows, cols = np.nonzero(body)
+    reach = int(np.ceil(reach)) + 1
+    return (max(0, int(rows.min()) - reach), min(shape[0], int(rows.max()) + reach + 1),
+            max(0, int(cols.min()) - reach), min(shape[1], int(cols.max()) + reach + 1))
+
+
+def empty_width_px(lacuna_id_map: np.ndarray, skeleton: np.ndarray, n_lacunae: int) -> np.ndarray:
+    """How wide the hole in the skeleton is around each lacuna, in px, indexed
+    by lacuna id (index 0 unused), nan where no sector answered.
+
+    The measurement of METHODS section 18, in the pipeline because the zone is
+    now built on it. The frame around a body is cut into HOLE_SECTORS angular
+    sectors, and a sector's empty width is the smallest distance from the body
+    to a SKELETON PIXEL lying in it; the lacuna's empty width is the median over
+    the sectors that answered. A sector with no skeleton within
+    HOLE_MAX_SEARCH_PX, or with another lacuna body nearer than its skeleton, is
+    censored.
+
+    It is measured on the skeleton's own pixels, never by marching a ray: a ray
+    runs along the corridor between two threads and reports a hole where a
+    thread sits 3 px to the side, which overstated the width by up to a third
+    when it was tried.
+
+    The caller passes the skeleton of the GLOBAL CUT, before any zone pass, so
+    that the zone is never defined by its own output."""
+    widths = np.full(n_lacunae + 1, np.nan, dtype=np.float64)
+    shape = lacuna_id_map.shape
+    all_bodies = lacuna_id_map > 0
+    for lacuna_id in range(1, n_lacunae + 1):
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        rows, cols = np.nonzero(body)
+        r0, c0 = float(rows.mean()), float(cols.mean())
+        r_lo, r_hi, c_lo, c_hi = _body_window(body, shape, HOLE_MAX_SEARCH_PX)
+        sub_body = body[r_lo:r_hi, c_lo:c_hi]
+        sub_gap = ndi.distance_transform_edt(~sub_body)
+        sub_skel = skeleton[r_lo:r_hi, c_lo:c_hi]
+        sub_other = (all_bodies & ~body)[r_lo:r_hi, c_lo:c_hi]
+        rr, cc = np.indices(sub_gap.shape)
+        ang = np.arctan2(rr + r_lo - r0, cc + c_lo - c0) % (2.0 * np.pi)
+        sector = (np.round(ang / (2.0 * np.pi) * HOLE_SECTORS).astype(np.int64)) % HOLE_SECTORS
+        near = (sub_gap > 0) & (sub_gap <= HOLE_MAX_SEARCH_PX)
+
+        blocked = np.full(HOLE_SECTORS, np.inf)
+        sel = near & sub_other
+        np.minimum.at(blocked, sector[sel], sub_gap[sel])
+        found = np.full(HOLE_SECTORS, np.inf)
+        sel = near & sub_skel
+        np.minimum.at(found, sector[sel], sub_gap[sel])
+        answered = np.isfinite(found) & (blocked > found)
+        if answered.any():
+            widths[lacuna_id] = float(np.median(found[answered]))
+    return widths
+
+
+def hole_zone_extents_px(widths: np.ndarray) -> np.ndarray:
+    """How far each lacuna's zone reaches beyond its body: its own empty width
+    plus one thread half width, capped at config.GLOW_ZONE_MAX_UM.
+
+    The margin is what makes the zone reach the first thread that bounds the
+    hole instead of stopping just short of it. The cap is the one of section 18,
+    so a lacuna whose hole fills the frame cannot claim the image. A lacuna
+    whose sectors all went unanswered has no skeleton anywhere within
+    HOLE_MAX_SEARCH_PX, so its hole is at least that wide and the cap is the
+    only bound there is: it takes the cap. That does not happen on the 8 WT
+    images, where every lacuna answers."""
+    extents = np.where(np.isnan(widths), float(GLOW_ZONE_MAX_PX),
+                       np.nan_to_num(widths) + HOLE_ZONE_MARGIN_PX)
+    extents = np.minimum(extents, float(GLOW_ZONE_MAX_PX))
+    extents[0] = 0.0
+    return extents
+
+
+def hole_zone_owner(lacuna_id_map: np.ndarray, extents: np.ndarray) -> np.ndarray:
+    """0 outside every zone, else the id of the lacuna whose zone it is.
+
+    Zones overlap where two bodies are close. A pixel claimed by several goes to
+    the NEAREST of the bodies that claim it, which is the partition ownership
+    already uses, so every pixel has exactly one gain and no pixel is boosted
+    twice. A pixel inside any body, or in no zone, is 0."""
+    shape = lacuna_id_map.shape
+    owner = np.zeros(shape, dtype=np.int32)
+    best = np.full(shape, np.inf, dtype=np.float64)
+    for lacuna_id in range(1, extents.size):
+        extent = float(extents[lacuna_id])
+        if extent <= 0:
+            continue
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        r_lo, r_hi, c_lo, c_hi = _body_window(body, shape, extent)
+        sub_gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
+        sub_best = best[r_lo:r_hi, c_lo:c_hi]
+        sel = (sub_gap > 0) & (sub_gap <= extent) & (sub_gap < sub_best)
+        sub_best[sel] = sub_gap[sel]
+        owner[r_lo:r_hi, c_lo:c_hi][sel] = lacuna_id
+    owner[lacuna_id_map > 0] = 0
+    return owner
+
+
+def hole_zone_gains(response: np.ndarray, lacuna_id_map: np.ndarray, zone_owner: np.ndarray,
+                    extents: np.ndarray) -> dict:
+    """Each lacuna's own contrast gain, as a RADIAL PROFILE: by distance from
+    its body edge, the config.HOLE_GAIN_PERCENTILE of the ridge response in the
+    band just beyond its zone over the same percentile at that distance inside
+    it, clipped to config.HOLE_GAIN_MIN and config.HOLE_GAIN_MAX.
+
+    Returns {lacuna id: gains by annulus}, each annulus HOLE_GAIN_STEP_PX wide
+    from the body edge outward, smoothed over config.HOLE_GAIN_SMOOTH annuli.
+
+    This is METHODS section 18's measurement per lacuna and per distance. The
+    loss in a hole is not flat: measured on 543-2 the response p90 runs at 0.87
+    of the low cut at the body edge, 2.07 ten px out and 3.7 from 40 px out,
+    because the top-hat digs a trough around a bright body. A single gain for
+    the whole zone therefore over-corrects where the skeleton already is and
+    under-corrects where the empty width is decided, which is what the first
+    version did and why it moved no hole.
+
+    The same percentile is taken on both sides so the ratio compares like with
+    like, and the band is the same control band section 18 reads the hole
+    against. Lacuna bodies are left out of both. An annulus whose response is 0
+    at that percentile takes the cap, which changes nothing: a gain times zero
+    is still zero and the global cut still has to be passed."""
+    profiles = {}
+    shape = lacuna_id_map.shape
+    all_bodies = lacuna_id_map > 0
+    percentile = float(config.HOLE_GAIN_PERCENTILE)
+    smooth = max(1, int(config.HOLE_GAIN_SMOOTH))
+    for lacuna_id in range(1, extents.size):
+        extent = float(extents[lacuna_id])
+        if extent <= 0 or not (zone_owner == lacuna_id).any():
+            continue
+        body = lacuna_id_map == lacuna_id
+        r_lo, r_hi, c_lo, c_hi = _body_window(body, shape, extent + HOLE_GAIN_BAND_PX)
+        sub_gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
+        sub_resp = response[r_lo:r_hi, c_lo:c_hi]
+        outside = ~all_bodies[r_lo:r_hi, c_lo:c_hi]
+        band = (sub_gap > extent) & (sub_gap <= extent + HOLE_GAIN_BAND_PX) & outside
+        beyond = float(np.percentile(sub_resp[band], percentile)) if band.any() else 0.0
+        n_bins = max(1, int(np.ceil(extent / HOLE_GAIN_STEP_PX)))
+        levels = np.full(n_bins, np.nan)
+        for b in range(n_bins):
+            lo, hi = b * HOLE_GAIN_STEP_PX, (b + 1) * HOLE_GAIN_STEP_PX
+            ring = (sub_gap > lo) & (sub_gap <= hi) & outside
+            if ring.any():
+                levels[b] = float(np.percentile(sub_resp[ring], percentile))
+        levels = _fill_and_smooth(levels, smooth)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            gains = np.where(levels > 0, beyond / levels, float(config.HOLE_GAIN_MAX))
+        gains = np.clip(np.nan_to_num(gains, nan=float(config.HOLE_GAIN_MIN)),
+                        float(config.HOLE_GAIN_MIN), float(config.HOLE_GAIN_MAX))
+        profiles[lacuna_id] = gains
+    return profiles
+
+
+def _fill_and_smooth(values: np.ndarray, window: int) -> np.ndarray:
+    """An annulus with no pixel of its own takes its neighbours' level, and the
+    profile is then averaged over `window` annuli, so one noisy ring cannot set
+    a gain by itself."""
+    out = np.array(values, dtype=np.float64)
+    if np.isnan(out).all():
+        return out
+    index = np.arange(out.size)
+    good = ~np.isnan(out)
+    out = np.interp(index, index[good], out[good])
+    if window > 1 and out.size > 1:
+        kernel = np.ones(window) / window
+        out = np.convolve(np.pad(out, window // 2, mode="edge"), kernel, mode="valid")[:out.size]
+    return out
+
+
+def boost_in_zones(response: np.ndarray, lacuna_id_map: np.ndarray, zone_owner: np.ndarray,
+                   extents: np.ndarray, profiles: dict) -> np.ndarray:
+    """The ridge response with each zone pixel multiplied by the gain of the
+    annulus it lies in. Outside the zones the response is untouched."""
+    boosted = response.copy()
+    shape = lacuna_id_map.shape
+    for lacuna_id, gains in profiles.items():
+        body = lacuna_id_map == lacuna_id
+        extent = float(extents[lacuna_id])
+        r_lo, r_hi, c_lo, c_hi = _body_window(body, shape, extent)
+        sub_gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
+        sel = zone_owner[r_lo:r_hi, c_lo:c_hi] == lacuna_id
+        if not sel.any():
+            continue
+        bins = np.clip((sub_gap[sel] / HOLE_GAIN_STEP_PX).astype(np.int64), 0, gains.size - 1)
+        window = boosted[r_lo:r_hi, c_lo:c_hi]
+        window[sel] = response[r_lo:r_hi, c_lo:c_hi][sel] * gains[bins]
+    return boosted
+
+
+def gain_summary(profiles: dict, extents: np.ndarray) -> dict:
+    """What the profiles did, small enough for the detection record: the gain at
+    the body edge and at the outer end of the zone, per lacuna."""
+    at_body, at_edge, highest = [], [], []
+    for lacuna_id in sorted(profiles):
+        gains = profiles[lacuna_id]
+        at_body.append(round(float(gains[0]), 4))
+        at_edge.append(round(float(gains[-1]), 4))
+        highest.append(round(float(gains.max()), 4))
+    if not at_body:
+        return {"lacunae": 0}
+    return {
+        "lacunae": len(at_body),
+        "at_the_body_edge": {"min": min(at_body), "median": round(float(np.median(at_body)), 4),
+                             "max": max(at_body)},
+        "at_the_outer_end": {"min": min(at_edge), "median": round(float(np.median(at_edge)), 4),
+                             "max": max(at_edge)},
+        "at_the_cap": int(sum(1 for g in highest if g >= config.HOLE_GAIN_MAX)),
+    }
+
+
+def guard_new_components(merged: np.ndarray, before: np.ndarray) -> tuple:
+    """(mask, what the guard removed). A component of `merged` that holds no
+    pixel of `before` is mask that did not exist at all, which inside a zone is
+    what the glow's own grain looks like once the gain lifts it over the cut. It
+    is kept only if it looks like a thread: at least HOLE_NEW_MIN_LENGTH_PX long
+    once skeletonized and at least config.HOLE_NEW_MIN_ASPECT times longer than
+    it is wide.
+
+    The two tests the unattached dim tier already applies (section 8), for the
+    same reason: nothing vouches for this mask, so it is accepted on its own
+    shape alone. A component that continues mask that was already there is not
+    new and is not tested."""
+    labels = morphology.label(merged, connectivity=2)
+    if labels.max() == 0:
+        return merged, {"new_components": 0, "kept": 0, "dropped_short": 0,
+                        "dropped_round": 0, "dropped_px": 0, "kept_px": 0}
+    old = set(np.unique(labels[before & (labels > 0)]))
+    dropped = np.zeros_like(merged)
+    report = {"new_components": 0, "kept": 0, "dropped_short": 0, "dropped_round": 0,
+              "dropped_px": 0, "kept_px": 0}
+    for region in measure.regionprops(labels):
+        if region.label in old:
+            continue
+        report["new_components"] += 1
+        piece = labels[region.slice] == region.label
+        minor, major = region.axis_minor_length, region.axis_major_length
+        aspect = (major / minor) if minor > 0 else float("inf")
+        length = int(morphology.skeletonize(piece).sum())
+        if length < HOLE_NEW_MIN_LENGTH_PX:
+            report["dropped_short"] += 1
+        elif aspect < config.HOLE_NEW_MIN_ASPECT:
+            report["dropped_round"] += 1
+        else:
+            report["kept"] += 1
+            report["kept_px"] += int(region.area)
+            continue
+        dropped[region.slice] |= piece
+        report["dropped_px"] += int(region.area)
+    return merged & ~dropped, report
+
+
+def grow_in_hole_zone(candidate: np.ndarray, boosted: np.ndarray, t_hi: float,
+                      zone_owner: np.ndarray, lacuna_mask: np.ndarray,
+                      flagged: np.ndarray) -> tuple:
+    """(mask, what it did). Inside each lacuna's own zone, and nowhere else, the
+    ridge response is multiplied by that lacuna's contrast gain and the SAME
+    global cuts are applied to it.
+
+    The cut is not lowered: the response is put back on the footing of the
+    tissue just beyond the hole, and then the pipeline's own hysteresis, its own
+    body buffer, its own vascular rule and its own despeckle step decide, as
+    everywhere else. There is NO requirement to connect to mask the global cut
+    already made, which is what separates this from the glow zone rule of
+    section 18: a thread whose whole run inside the hole is under the cut has no
+    seed to grow from, and that is the thread the holes are made of. The noise
+    guard is what stands in the place of that requirement.
+
+    Outside the zones the mask is the one that came in, pixel for pixel."""
+    report = {"zone_px": int((zone_owner > 0).sum()), "added_px": 0, "guard": None}
+    inside = zone_owner > 0
+    if not inside.any():
+        return candidate, report
+    signal, _cut = hysteresis_mask(boosted, flagged, t_hi)
+    buffered = morphology.dilation(lacuna_mask, morphology.disk(LACUNA_DILATION_PX))
+    grown = morphology.remove_small_objects(signal & ~buffered, min_size=MIN_THREAD_OBJECT_PX2)
+    merged = (candidate & ~inside) | (grown & inside)
+    report["added_before_the_guard_px"] = int((merged & ~candidate).sum())
+    merged, guard = guard_new_components(merged, candidate)
+    report["guard"] = guard
+    report["added_px"] = int((merged & ~candidate).sum())
+    return merged, report
+
+
 def build_lacuna_maps(labels: np.ndarray, kept: list[tuple]) -> tuple[np.ndarray, np.ndarray]:
     """(lacuna_mask, lacuna_id_map). lacuna_id_map is 0 outside any kept
     lacuna, else its 1..N id, the numbering src/lacunae.py uses."""
@@ -774,9 +1086,40 @@ def clean_network_graph(G: nx.Graph, dist_to_lacuna: np.ndarray) -> nx.Graph:
     return G
 
 
+def touching_bodies(G: nx.Graph, lacuna_id_map: np.ndarray, cell_ids: list[int]) -> dict:
+    """{node: [every lacuna whose body it lies within CONTACT_REACH_PX of]}.
+
+    The contact rule of METHODS section 8 offers each node to its NEAREST lacuna
+    only. A thread that touches two bodies, or that touches one body while
+    another body's surface is a pixel nearer, was therefore handed to the
+    neighbour, which is the ownership failure the census found beside the holes.
+    This asks the question the rule is named for: which bodies does this node
+    touch."""
+    nodes = [n for n in G.nodes() if not _is_cell_node(n)]
+    touching: dict = {}
+    if not nodes:
+        return touching
+    rows = np.array([n[0] for n in nodes])
+    cols = np.array([n[1] for n in nodes])
+    shape = lacuna_id_map.shape
+    for lacuna_id in cell_ids:
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        r_lo, r_hi, c_lo, c_hi = _body_window(body, shape, CONTACT_REACH_PX)
+        inside = ((rows >= r_lo) & (rows < r_hi) & (cols >= c_lo) & (cols < c_hi))
+        if not inside.any():
+            continue
+        gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
+        near = gap[rows[inside] - r_lo, cols[inside] - c_lo] <= CONTACT_REACH_PX
+        for node_index in np.flatnonzero(inside)[near]:
+            touching.setdefault(nodes[node_index], []).append(lacuna_id)
+    return touching
+
+
 def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
                    nearest_index: np.ndarray, cell_ids: list[int], response: np.ndarray,
-                   min_signal: float) -> nx.Graph:
+                   min_signal: float, lacuna_id_map: np.ndarray | None = None) -> nx.Graph:
     """Add a virtual ("cell", id) node per lacuna, linked to the skeleton nodes
     near its body. Every node is offered to its NEAREST lacuna only, and that
     lacuna takes it under one of two rules:
@@ -793,6 +1136,13 @@ def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarr
     visibly touch the cell (92 of 108 lacunae had skeleton within 8 px of the
     body that they did not own: python src/diagnostics.py contact).
 
+    With config.CONTACT_EVERY_TOUCHING_BODY, contact is offered by EVERY body
+    the node touches and not only by the nearest one (touching_bodies above),
+    which is what the rule has always said in words: a lacuna owns the thread
+    that touches it. Two bodies that both touch a node both reach it at distance
+    0, and the tie goes to the lower cell id, as every other tie in this file
+    does. Beyond the contact reach nothing changes.
+
     SIGNAL, from there out to LACUNA_ATTACH_REACH_PX, at weight = the gap, so
     the path starts at the cell boundary. Distance alone would hand a lacuna any
     network that happened to pass nearby, across empty space; the survey found
@@ -800,7 +1150,16 @@ def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarr
     the nearest point of the lacuna surface to the node is sampled on the ridge
     response, and its dimmest point must reach `min_signal`, or the node does not
     attach to that lacuna."""
+    touching = (touching_bodies(G, lacuna_id_map, cell_ids)
+                if (config.CONTACT_EVERY_TOUCHING_BODY and lacuna_id_map is not None) else {})
     for node in list(G.nodes()):
+        if _is_cell_node(node):
+            continue
+        contacts = touching.get(node)
+        if contacts:
+            for lacuna_id in contacts:
+                G.add_edge(("cell", lacuna_id), node, weight=0.0)
+            continue
         r, c = node
         gap = float(dist_to_lacuna[r, c])
         if gap > LACUNA_ATTACH_REACH_PX:
@@ -808,7 +1167,7 @@ def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarr
         lacuna_id = int(nearest_id[r, c])
         if lacuna_id not in cell_ids:
             continue
-        if gap <= CONTACT_REACH_PX:
+        if not touching and gap <= CONTACT_REACH_PX:
             G.add_edge(("cell", lacuna_id), node, weight=0.0)
             continue
         sr, sc = int(nearest_index[0, r, c]), int(nearest_index[1, r, c])
@@ -1010,7 +1369,7 @@ def thread_end_mask(skeleton: np.ndarray) -> np.ndarray:
 def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_mask: np.ndarray,
                               dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
                               nearest_index: np.ndarray, response: np.ndarray, min_signal: float,
-                              limit_px: float) -> tuple:
+                              limit_px: float, lacuna_id_map: np.ndarray | None = None) -> tuple:
     """(skeleton, ownership, how it went). Every skeleton pixel further than
     `limit_px` along the network from a lacuna surface is removed, and ownership
     is built on what is left.
@@ -1036,7 +1395,7 @@ def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_ma
     else:
         raise AssertionError(f"the length prune did not settle in {PRUNE_LENGTH_MAX_ITER} rounds")
     own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id, nearest_index, response,
-                          min_signal)
+                          min_signal, lacuna_id_map)
     return skeleton, own, {"removed_px": removed_total, "rounds": rounds,
                            "limit_px": float(limit_px),
                            "limit_um": config.MAX_CANALICULUS_LENGTH_UM}
@@ -1046,14 +1405,15 @@ def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_ma
 
 def build_ownership(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
                     nearest_id: np.ndarray, nearest_index: np.ndarray, response: np.ndarray,
-                    min_signal: float) -> dict:
+                    min_signal: float, lacuna_id_map: np.ndarray | None = None) -> dict:
     """The graph, its cleanup, the lacuna attachment and the ownership, with the
     pixel map the verification picture draws. Detection: no measure is taken
     here. src/quantification.py measures from what this returns."""
     cell_ids = list(range(1, len(kept) + 1))
     G, skel_obj = build_network_graph(skeleton)
     clean_network_graph(G, dist_to_lacuna)
-    attach_lacunae(G, dist_to_lacuna, nearest_id, nearest_index, cell_ids, response, min_signal)
+    attach_lacunae(G, dist_to_lacuna, nearest_id, nearest_index, cell_ids, response, min_signal,
+                   lacuna_id_map)
     owner, node_dist = assign_by_connectivity(G, cell_ids)
     edge_owner = assign_edges(G, owner, node_dist)
     return {
@@ -1089,9 +1449,36 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     # extent is measured on the RAW channel, never on the flattened one, which
     # is what removes the glow.
     glow_extents = glow_extent_px(channel, lacuna_id_map, len(kept))
-    glow_zone = glow_zone_mask(lacuna_id_map, glow_extents)
     candidate_before_glow_zone = candidate
-    candidate = grow_in_glow_zone(candidate, response, t_lo, glow_zone, lacuna_mask, flagged)
+    if config.HOLE_ZONE_RULE:
+        # METHODS section 19. The zone is the HOLE itself, measured on the
+        # skeleton the global cut produced, before any zone pass, so it is never
+        # defined by its own output; and inside it the response is put back on
+        # the footing of the tissue just beyond the hole and the SAME global
+        # cuts are applied. The glow extent above is still measured, because it
+        # is what section 18 documents and what the checks read the zone
+        # against, but it no longer decides where the cut applies.
+        skeleton_global_cut = morphology.skeletonize(candidate)
+        hole_widths = empty_width_px(lacuna_id_map, skeleton_global_cut, len(kept))
+        zone_extents = hole_zone_extents_px(hole_widths)
+        zone_owner = hole_zone_owner(lacuna_id_map, zone_extents)
+        gains = hole_zone_gains(response, lacuna_id_map, zone_owner, zone_extents)
+        boosted = boost_in_zones(response, lacuna_id_map, zone_owner, zone_extents, gains)
+        glow_zone = zone_owner > 0
+        candidate, hole_report = grow_in_hole_zone(candidate, boosted, t_lo, zone_owner,
+                                                   lacuna_mask, flagged)
+        hole_report["gains"] = gain_summary(gains, zone_extents)
+    else:
+        # The glow zone version of section 18, kept so that a before run can be
+        # made with it (python src/diagnostics.py hole-check).
+        skeleton_global_cut = morphology.skeletonize(candidate)
+        hole_widths = np.full(len(kept) + 1, np.nan)
+        zone_extents = glow_extents
+        zone_owner = np.zeros(lacuna_id_map.shape, dtype=np.int32)
+        gains = {}
+        glow_zone = glow_zone_mask(lacuna_id_map, glow_extents)
+        candidate = grow_in_glow_zone(candidate, response, t_lo, glow_zone, lacuna_mask, flagged)
+        hole_report = None
     skeleton = morphology.skeletonize(candidate)
     # What the ridge threshold alone traced. Nothing about ownership enters it,
     # so it is the skeleton an ownership rule must leave pixel for pixel alone;
@@ -1113,7 +1500,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     skeleton_before = skeleton
     skeleton, own, prune = prune_beyond_length_limit(
         kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
-        attach_min_signal, MAX_CANALICULUS_LENGTH_PX)
+        attach_min_signal, MAX_CANALICULUS_LENGTH_PX, lacuna_id_map)
 
     # The second, dimmer pass: continue the threads a lacuna already owns into
     # signal the first cut could not reach. Everything after it is redone on the
@@ -1127,7 +1514,7 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         skeleton_before = skeleton
         skeleton, own, prune = prune_beyond_length_limit(
             kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
-            attach_min_signal, MAX_CANALICULUS_LENGTH_PX)
+            attach_min_signal, MAX_CANALICULUS_LENGTH_PX, lacuna_id_map)
     # Dim thread-shaped structure that touches no lacuna: a class of its own,
     # never owned, counted only in the field measures.
     unattached = find_unattached_threads(response, t_lo, skeleton & (own["owner_map"] > 0),
@@ -1148,6 +1535,12 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "candidate_before_glow_zone": candidate_before_glow_zone,
         "glow_zone": glow_zone,
         "glow_extents_px": glow_extents,
+        "skeleton_global_cut": skeleton_global_cut,
+        "hole_width_px": hole_widths,
+        "zone_extents_px": zone_extents,
+        "zone_owner": zone_owner,
+        "zone_gains": gains,
+        "hole_zone": hole_report,
         "glow_zone_added_px": int((candidate_before_glow_zone ^ candidate_first_pass).sum()),
         "skeleton_before_length_prune": skeleton_before,
         "length_prune": prune,
@@ -1241,6 +1634,27 @@ def parameters(result: dict) -> dict:
         "glow_zone_cut_fraction": config.GLOW_ZONE_CUT_FRACTION,
         "glow_zone_max_um": config.GLOW_ZONE_MAX_UM,
         "glow_zone_max_px": GLOW_ZONE_MAX_PX,
+        # The zone from the hole (METHODS section 19), which is the rule that
+        # decides where the gain applies; the glow extent above is measurement.
+        "hole_zone_rule": config.HOLE_ZONE_RULE,
+        "hole_zone_margin_um": config.HOLE_ZONE_MARGIN_UM,
+        "hole_zone_margin_px": HOLE_ZONE_MARGIN_PX,
+        "hole_zone_sectors": HOLE_SECTORS,
+        "hole_gain_band_um": config.HOLE_GAIN_BAND_UM,
+        "hole_gain_percentile": config.HOLE_GAIN_PERCENTILE,
+        "hole_gain_clip": [config.HOLE_GAIN_MIN, config.HOLE_GAIN_MAX],
+        "hole_new_min_length_um": config.HOLE_NEW_MIN_LENGTH_UM,
+        "hole_new_min_length_px": HOLE_NEW_MIN_LENGTH_PX,
+        "hole_new_min_aspect": config.HOLE_NEW_MIN_ASPECT,
+        "hole_zone_px": int(result["glow_zone"].sum()),
+        "hole_zone_added_px": (result["hole_zone"]["added_px"]
+                               if result["hole_zone"] else 0),
+        "hole_gain_step_um": config.HOLE_GAIN_STEP_UM,
+        "hole_gain_smooth_annuli": config.HOLE_GAIN_SMOOTH,
+        "hole_zone_gains": (result["hole_zone"]["gains"] if result["hole_zone"] else None),
+        "hole_zone_guard_dropped_px": (result["hole_zone"]["guard"]["dropped_px"]
+                                       if result["hole_zone"] else 0),
+        "contact_every_touching_body": config.CONTACT_EVERY_TOUCHING_BODY,
         "lacuna_attach_rule": ("a node attaches only if the dimmest ridge response on the straight "
                                "path from the lacuna surface to it reaches that fraction of the "
                                "response's own low cut"),
