@@ -14,3 +14,9 @@ code_key*
 *_key.csv
 # Claude Code settings for this machine, not part of the pipeline.
 .claude/
+
+# The AI judge experiment (branch exp-ai-layer, docs/EXPERIMENT_AI.md). The API
+# key is read from the environment and is never written to a file; a .env is
+# ignored here as a second guard, as the blinding keys are above.
+.env
+.env.*

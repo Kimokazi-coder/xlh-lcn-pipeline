@@ -437,3 +437,132 @@ BAND_FILTER_MIN_OPENING_SHARE = None
 # and at t_hi scaled 0.8 to 1.2 (python src/diagnostics.py fast-check), and
 # regression passes with it on. Off by default; it changes speed, not output.
 FAST_LACUNA_STAGE = False
+
+# The AI judge experiment (branch exp-ai-layer only)
+# An AI judge decides, for every candidate thread near an osteocyte, whether it
+# is a real thread and which lacuna it belongs to. Deterministic code stays the
+# only code that touches pixels: src/ai_judge.py makes the candidates, the judge
+# labels them, and the pipeline assembles the result and runs the existing 50 um
+# cap and quantification. The whole experiment, with every decision taken while
+# building it, is written up in docs/EXPERIMENT_AI.md.
+#
+# Nothing below changes any pipeline number while AI_JUDGE_ENABLED is False,
+# which is how it ships: with it off the outputs equal results/ exactly
+# (python src/diagnostics.py regression).
+
+# The switch. When True, src/canaliculi.py reads the judge's decision file for
+# the image it is analysing (results/ai_log/<label>/<label>_ai_segments.json),
+# joins the segments judged real to the skeleton, drops the segments judged
+# artifact, and then runs the existing ownership, 50 um cap and quantification
+# unchanged. An image with no decision file is an error and not a silent pass,
+# because a summary table must never mix judged and unjudged images.
+#
+# NOT in diagnostics.SWITCHES_ON: switch-check regenerates all 8 images, and
+# the judge has run on 543-2 only.
+AI_JUDGE_ENABLED = False
+
+# The provider. Only "anthropic" is implemented; the setting exists so that
+# adding a second one is a change in one place and not a change everywhere.
+AI_JUDGE_PROVIDER = "anthropic"
+
+# The pinned model, and the two prices it is billed at, in dollars per million
+# tokens (Anthropic list price for claude-sonnet-5-5 on 2026-10-15). The prices
+# live here because the cost estimate is a number this repository computes and
+# every number it computes has its source written down.
+AI_JUDGE_MODEL = "claude-sonnet-5-5"
+AI_PRICE_INPUT_USD_PER_MTOK = 2.00
+AI_PRICE_OUTPUT_USD_PER_MTOK = 10.00
+
+# Sampling. 0 is the asked-for setting and the one recorded in every log record.
+# It is SENT only to a model that accepts it: the pinned model rejects any
+# non-default temperature with HTTP 400, so for claude-sonnet-5-5 the request
+# carries no temperature at all and the log says so. What makes a run
+# reproducible is therefore not the sampling setting but the log and the replay
+# mode (docs/EXPERIMENT_AI.md, "Reproducibility").
+AI_JUDGE_TEMPERATURE = 0.0
+AI_MODELS_ACCEPTING_TEMPERATURE = ()
+
+# Thinking off, for the same reason: a judge that reasons at length before
+# answering spends output tokens and adds a source of variation. The pinned
+# model takes "off" as thinking type "between_tools"; if the API refuses that,
+# the call is repeated once at the model's default and the log records which of
+# the two was used, so the log never claims a setting that was not sent.
+AI_JUDGE_THINKING_OFF = True
+
+# The answer is a small json object, one line per segment. 8000 leaves room for
+# the largest case (AI_MAX_SEGMENTS_PER_CASE segments) and for the model's own
+# reasoning if the thinking setting above had to fall back.
+AI_JUDGE_MAX_TOKENS = 8000
+
+# The cost ceiling for one run, in dollars. Every run estimates its cost before
+# the first call and refuses to start if the estimate is above this; while it
+# runs it adds up what the answers actually cost and stops if the total passes
+# it.
+MAX_COST_USD = 5.0
+
+# Where the requests, the answers, the pictures that were sent and the decision
+# files are written, inside RESULTS_DIR. One folder per image.
+AI_LOG_DIR = "ai_log"
+# Where the dry run writes its report and its pictures, inside RESULTS_DIR.
+AI_DRY_RUN_DIR = "ai_dry_run"
+
+# Candidates (step 1 of the experiment). Inside each lacuna's measured empty
+# width, and only there, the ridge response is accepted down to
+# AI_CANDIDATE_CUT_FRACTION of the low cut after being scaled by that lacuna's
+# own contrast ratio, which is capped at AI_CONTRAST_RATIO_MAX.
+#
+# 0.5 is the floor the second dim pass and the glow zone rule already use
+# (DIM_THREAD_CUT_FRACTION, GLOW_ZONE_CUT_FRACTION), so the pipeline keeps one
+# definition of "dim" and not three. The contrast ratio is this lacuna's own
+# measurement of what the glow costs a thread: the p90 of the ridge response in
+# the band just beyond the empty zone over the p90 inside it, which is METHODS
+# section 18's "31 to 71% of what the same tissue shows 40 px further out"
+# measured per lacuna instead of per set. It is floored at 1, so the cut can
+# never be stricter than the pipeline's own, and capped at 3 because beyond
+# that the ratio is measuring an empty hole and not a thread in a hole.
+AI_CANDIDATE_CUT_FRACTION = 0.5
+AI_CONTRAST_RATIO_MAX = 3.0
+# The band just beyond the empty zone, in px, the contrast ratio is measured
+# against: the same 40 px control band the empty-zone diagnostic uses.
+AI_REFERENCE_BAND_PX = 40
+# Angular sectors the frame around a body is cut into for the empty width, 2
+# degrees each, and how far a sector looks for skeleton before it is censored.
+# Both as in the empty-zone diagnostic.
+AI_SECTORS = 180
+AI_MAX_SEARCH_PX = 150
+# A candidate segment must run at least this far to be offered to the judge.
+# UNATTACHED_MIN_LENGTH_UM (1.3 um, 10 px) is the floor the pipeline already
+# applies to a thread no lacuna owns, so again one definition and not two.
+AI_MIN_SEGMENT_LENGTH_UM = UNATTACHED_MIN_LENGTH_UM
+# At most this many segments are offered in one case. A zone with more offers
+# its longest ones and the rest keep the deterministic decision, counted and
+# reported as not offered. The cap is what keeps the picture readable and the
+# answer small, and it is a property of the picture and not of the biology.
+AI_MAX_SEGMENTS_PER_CASE = 40
+
+# The picture the judge sees (step 2). A crop of AI_CROP_PX of image data around
+# the lacuna, drawn twice side by side, each panel enlarged by whole pixels to
+# AI_CROP_RENDER_PX so that a one pixel wide thread and a two digit number are
+# both legible. The enlargement repeats pixels and interpolates nothing, so the
+# judge sees the pixels the pipeline measured.
+AI_CROP_PX = 256
+AI_CROP_RENDER_PX = 512
+# The brightness window of the crop: these percentiles of the raw channel in the
+# crop, over the pixels that are NOT inside a lacuna body. Taken with the bodies
+# in, a bright osteocyte takes the top of the window and the faint threads the
+# judge is asked about go black. A display stretch only; it changes nothing
+# measured.
+AI_CROP_WINDOW_PERCENTILES = (1.0, 99.0)
+
+# Token and cost estimate for a dry run, which must work with no network. Text
+# is estimated at AI_TOKENS_PER_CHAR tokens per character and an image at
+# width x height / AI_IMAGE_PIXELS_PER_TOKEN tokens, which is the rule
+# Anthropic documents for image input. The answer is estimated at
+# AI_OUTPUT_TOKENS_PER_SEGMENT per segment plus AI_OUTPUT_TOKENS_FIXED. All four
+# are estimates and are labelled as estimates wherever they are printed; a real
+# run logs the token counts the API reports and the dry run can be told to
+# measure the input exactly (diagnostics ai-dry-run --count-tokens).
+AI_TOKENS_PER_CHAR = 0.25
+AI_IMAGE_PIXELS_PER_TOKEN = 750.0
+AI_OUTPUT_TOKENS_PER_SEGMENT = 35
+AI_OUTPUT_TOKENS_FIXED = 20
