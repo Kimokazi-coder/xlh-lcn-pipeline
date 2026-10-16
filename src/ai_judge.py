@@ -74,8 +74,15 @@ OWNER_COLOURS = (
 # were and the run report adds them up, because a case with one is a case whose
 # answer could not name the right cell.
 UNNAMEABLE_COLOUR = (160, 160, 160)
-# The candidate segments, and their numbers.
-SEGMENT_COLOUR = (255, 60, 60)
+# How a segment is drawn (step 2). A segment the pipeline traced and a lacuna
+# owns is drawn in that lacuna's colour, so the judge sees what the tracing
+# already says; one that nobody owns is WHITE; one the permissive cut found and
+# the pipeline does not have is RED. Only the segments that need a decision
+# carry a number.
+SEGMENT_NEW_COLOUR = (255, 60, 60)
+SEGMENT_UNOWNED_COLOUR = (255, 255, 255)
+# A number is not placed on top of any of these.
+LABEL_AVOIDS = (SEGMENT_NEW_COLOUR, SEGMENT_UNOWNED_COLOUR)
 NUMBER_COLOUR = (255, 255, 255)
 NUMBER_HALO = (0, 0, 0)
 # The gap between the two panels, in rendered px, and its colour.
@@ -145,299 +152,338 @@ def strip_comments(text: str) -> str:
     return re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL).strip()
 
 
-# The empty zone of one lacuna, and what the glow costs a thread in it
 
-def _window(body: np.ndarray, shape: tuple) -> tuple:
-    """The bounding box of the body grown by config.AI_MAX_SEARCH_PX."""
-    rows, cols = np.nonzero(body)
-    reach = config.AI_MAX_SEARCH_PX
-    return (max(0, int(rows.min()) - reach), min(shape[0], int(rows.max()) + reach + 1),
-            max(0, int(cols.min()) - reach), min(shape[1], int(cols.max()) + reach + 1))
-
-
-def zone_and_contrast(lacuna_id_map: np.ndarray, skeleton_global: np.ndarray,
-                      response: np.ndarray, lacuna_id: int) -> dict:
-    """One lacuna's EMPTY ZONE, the band just beyond it, and its CONTRAST RATIO.
-
-    The empty width is measured exactly as the empty-zone diagnostic measures it
-    (src/diagnostics.py empty-zone, METHODS section 19): the frame around the
-    body is cut into config.AI_SECTORS angular sectors, and a sector's empty
-    width is the smallest distance to the body over the skeleton pixels lying in
-    it. A sector with no skeleton within config.AI_MAX_SEARCH_PX, or with
-    another body nearer than its skeleton, is censored. The zone is the pixels
-    out to each sector's own width, so it follows the real shape of the hole and
-    is not a circle.
-
-    Measured here on the GLOBAL CUT SKELETON, the skeleton the ridge threshold
-    and the glow zone rule produced before the dim pass and before the 50 um
-    prune. That is the skeleton that exists at the point in the pipeline where
-    the candidates are made, and it depends on no ownership and on no later
-    stage, so the zone is a property of the image and the lacuna alone. The
-    diagnostic measures the same thing on the final skeleton, which is why the
-    two numbers differ slightly and neither is wrong.
-
-    The CONTRAST RATIO is this lacuna's own measurement of what its glow costs a
-    thread: the p90 of the ridge response in the reference band just beyond the
-    hole, over the p90 inside the hole. METHODS section 18 measured that as 31 to
-    71% for the set, which is a ratio of 1.4 to 3.2; this is the same
-    measurement per lacuna. Floored at 1 so the candidate cut can never be
-    stricter than the pipeline's own, and capped at config.AI_CONTRAST_RATIO_MAX
-    because past that the ratio is measuring an empty hole and not a thread in
-    one.
-
-    This function is deliberately NOT imported from src/diagnostics.py: the
-    pipeline must never depend on a diagnostic. It is the same rule written for
-    this use.
-    """
-    shape = lacuna_id_map.shape
-    body = lacuna_id_map == lacuna_id
-    all_bodies = lacuna_id_map > 0
-    sectors = int(config.AI_SECTORS)
-    rows, cols = np.nonzero(body)
-    r0, c0 = float(rows.mean()), float(cols.mean())
-    gap = ndi.distance_transform_edt(~body)
-    r_lo, r_hi, c_lo, c_hi = _window(body, shape)
-
-    sub_gap = gap[r_lo:r_hi, c_lo:c_hi]
-    sub_skel = skeleton_global[r_lo:r_hi, c_lo:c_hi]
-    sub_other = (all_bodies & ~body)[r_lo:r_hi, c_lo:c_hi]
-    rr, cc = np.indices(sub_gap.shape)
-    ang = np.arctan2(rr + r_lo - r0, cc + c_lo - c0) % (2.0 * np.pi)
-    sector = (np.round(ang / (2.0 * np.pi) * sectors).astype(np.int64)) % sectors
-    near = (sub_gap > 0) & (sub_gap <= config.AI_MAX_SEARCH_PX)
-
-    blocked = np.full(sectors, np.inf)
-    sel = near & sub_other
-    np.minimum.at(blocked, sector[sel], sub_gap[sel])
-    widths = np.full(sectors, np.inf)
-    sel = near & sub_skel
-    np.minimum.at(widths, sector[sel], sub_gap[sel])
-    widths = np.where(np.isfinite(widths) & (blocked > widths), widths, np.nan)
-
-    w = np.where(np.isfinite(widths), widths, -1.0)[sector]
-    zone = np.zeros(shape, dtype=bool)
-    zone[r_lo:r_hi, c_lo:c_hi] = (sub_gap > 0) & (sub_gap <= w)
-    band = np.zeros(shape, dtype=bool)
-    band[r_lo:r_hi, c_lo:c_hi] = ((sub_gap > w) & (sub_gap <= w + config.AI_REFERENCE_BAND_PX)
-                                  & (w >= 0))
-    zone &= ~all_bodies
-    band &= ~all_bodies
-
-    p90_zone = float(np.percentile(response[zone], 90)) if zone.any() else 0.0
-    p90_band = float(np.percentile(response[band], 90)) if band.any() else 0.0
-    if p90_zone > 0.0 and p90_band > 0.0:
-        ratio = min(max(p90_band / p90_zone, 1.0), float(config.AI_CONTRAST_RATIO_MAX))
-    else:
-        # No hole, or nothing to compare it with: the pipeline's own cut stands.
-        ratio = 1.0
-    good = np.isfinite(widths)
-    return {
-        "lacuna_id": int(lacuna_id),
-        "centroid_xy": [round(c0, 1), round(r0, 1)],
-        "body_px": int(body.sum()),
-        "empty_width_px": round(float(np.median(widths[good])), 3) if good.any() else None,
-        "empty_width_um": (round(config.um(float(np.median(widths[good]))), 4)
-                           if good.any() else None),
-        "sectors_answered": int(good.sum()),
-        "sectors_total": sectors,
-        "zone_px": int(zone.sum()),
-        "band_px": int(band.sum()),
-        "response_p90_in_the_zone": round(p90_zone, 8),
-        "response_p90_in_the_band_beyond": round(p90_band, 8),
-        "contrast_ratio": round(ratio, 4),
-        "zone": zone,
-    }
-
-
-# The candidates (step 1)
+# What the judge is shown (step 1)
+#
+# Every segment in a lacuna's crop, and the new ones the zone of the hole
+# proposes. A segment is a BRANCH of a skeleton, the piece between two
+# junctions, which is the same split the candidates used from the start.
+#
+# Four kinds, and the first two are context:
+#   owned    traced by the pipeline and owned by the lacuna this case is about
+#   other    traced and owned by another lacuna
+#   unowned  traced and owned by nobody
+#   new      not traced at all: what the permissive cut inside the zone of the
+#            hole finds beyond the mask the pipeline kept
+#
+# A segment is NUMBERED, which is what asks the judge for a decision, only where
+# a decision could change its owner or its existence: it is new, or it is
+# unowned, or it touches a body that does not own it. A segment that is owned by
+# the lacuna it touches and by nobody else needs no decision and is drawn as
+# context, in its owner's colour.
 
 def _junctions(skel: np.ndarray) -> np.ndarray:
     """Skeleton pixels with three or more skeleton neighbours. Removing them
-    splits the skeleton into its branches, which is what a segment is."""
+    splits a skeleton into its branches, which is what a segment is."""
     neighbours = ndi.convolve(skel.astype(np.uint8), np.ones((3, 3), dtype=np.uint8),
                               mode="constant", cval=0) - skel
     return skel & (neighbours >= 3)
 
 
-def image_candidates(state: dict) -> dict:
-    """Every candidate segment of one image, numbered, with the zone each came
-    from. The deterministic half of the experiment: no network, no judge.
+def _branch_labels(skeleton: np.ndarray) -> np.ndarray:
+    """Every branch of a skeleton with its own label: the junction pixels are
+    taken out, and what is left is labelled. The junctions themselves are 0 and
+    act as the glue between branches, exactly as in the first version."""
+    pieces = skeleton & ~_junctions(skeleton)
+    return ndi.label(pieces, structure=np.ones((3, 3), dtype=np.uint8))[0]
 
-    Within each lacuna's own empty zone, and only there, the ridge response is
-    accepted down to config.AI_CANDIDATE_CUT_FRACTION of the low cut after being
-    scaled by that lacuna's contrast ratio. The pipeline's own exclusions still
-    hold inside the zone: the lacuna bodies with their buffer are cut out, and
-    inside a flagged vascular structure only already-bright pixels survive, both
-    as in canaliculi.hysteresis_mask. The mask the global cut already produced is
-    unioned in, so the permissive mask is a superset of the pipeline's inside the
-    zone and a candidate is never a pixel the pipeline would have refused on a
-    rule other than the cut.
 
-    The permissive mask is skeletonized ONCE, over the whole frame, not zone by
-    zone: the medial axis of a region clipped at a zone boundary runs along that
-    boundary, which would invent threads that follow the shape of the hole. The
-    skeleton is then split at its junctions, and each piece that lies in a zone,
-    clipped to that zone, is one candidate segment.
+def _majority(values: np.ndarray) -> int:
+    if values.size == 0:
+        return 0
+    counts = np.bincount(values[values >= 0])
+    return int(np.argmax(counts)) if counts.size else 0
 
-    A zone belongs to ONE lacuna: zones overlap where two bodies are close, so a
-    pixel is given to the nearer body, the same nearest-lacuna partition the
-    pipeline's attachment uses. No segment is therefore ever judged twice.
 
-    Segments shorter than MIN_SEGMENT_PX are dropped, and at most
-    config.AI_MAX_SEGMENTS_PER_CASE are offered per case, the longest first; the
-    rest are counted as not offered and keep the deterministic decision.
-    Numbering is in reading order, by the top left pixel of each segment, so the
-    numbers in the picture run roughly top to bottom.
-    """
-    shape = state["shape"]
-    lacuna_id_map = state["lacuna_id_map"]
-    response = state["response"]
-    high_cut = state["high_cut"]
-    low_cut = high_cut * canaliculi.HYSTERESIS_LOW_FRACTION
-    floor = low_cut * config.AI_CANDIDATE_CUT_FRACTION
-    n_lacunae = state["n_lacunae"]
+def permissive_mask(state: dict) -> tuple:
+    """(mask, what was used). The pipeline's own mask plus everything inside a
+    zone of the hole that the response reaches once it is put on the footing of
+    the tissue beyond the hole and the cut is lowered to
+    config.AI_CANDIDATE_CUT_FRACTION of the low cut.
 
+    The ZONE and the GAIN are the pipeline's own (METHODS section 19,
+    canaliculi.hole_zone_owner and canaliculi.hole_zone_gains), not a second
+    copy of them: the experiment lowers the cut inside that zone and changes
+    nothing else. The pipeline's exclusions still hold, so no candidate can sit
+    inside a body, in its buffer, or in a flagged vascular structure under the
+    high cut."""
+    response, high = state["response"], state["high_cut"]
+    low = high * canaliculi.HYSTERESIS_LOW_FRACTION
+    floor = low * config.AI_CANDIDATE_CUT_FRACTION
+    zone_owner = state["zone_owner"]
+    boosted = canaliculi.boost_in_zones(response, state["lacuna_id_map"], zone_owner,
+                                        state["zone_extents_px"], state["zone_gains"])
     buffered = morphology.dilation(state["lacuna_mask"],
                                    morphology.disk(canaliculi.LACUNA_DILATION_PX))
-    allowed = ~buffered & ~(lacuna_id_map > 0)
+    allowed = ~buffered & (state["lacuna_id_map"] == 0)
     if state["flagged"].any():
-        allowed &= ~(state["flagged"] & (response < high_cut))
-
-    # The nearest-lacuna partition, computed here from the body map alone so the
-    # two phases of the experiment cannot disagree about it.
-    _dist, nearest_id, _index = canaliculi.nearest_lacuna_map(lacuna_id_map)
-
-    zones = {}
-    zone_owner = np.zeros(shape, dtype=np.int32)
-    permissive = np.zeros(shape, dtype=bool)
-    for lacuna_id in range(1, n_lacunae + 1):
-        z = zone_and_contrast(lacuna_id_map, state["skeleton_global"], response, lacuna_id)
-        own = z["zone"] & (nearest_id == lacuna_id) & allowed
-        zone_owner[own] = lacuna_id
-        permissive |= own & ((response * z["contrast_ratio"] >= floor)
-                             | state["candidate_global"])
-        z["own_zone_px"] = int(own.sum())
-        z.pop("zone")
-        zones[lacuna_id] = z
-    permissive |= state["candidate_global"]
-
-    skeleton = morphology.skeletonize(permissive)
-    junctions = _junctions(skeleton)
-    structure = np.ones((3, 3), dtype=np.uint8)
-
-    # Every candidate piece gets its own label; every other skeleton pixel goes
-    # into one bucket, so that a mask pixel nearer a piece the judge was not
-    # asked about stays with it and is never moved by a verdict.
-    piece_label = np.zeros(shape, dtype=np.int32)
-    cases = []
-    next_label = 1
-    for lacuna_id in range(1, n_lacunae + 1):
-        in_zone = skeleton & ~junctions & (zone_owner == lacuna_id)
-        labelled, count = ndi.label(in_zone, structure=structure)
-        found = []
-        if count:
-            sizes = ndi.sum(np.ones_like(labelled, dtype=np.int64), labelled,
-                            index=np.arange(1, count + 1)).astype(np.int64)
-            for piece in range(1, count + 1):
-                if sizes[piece - 1] < MIN_SEGMENT_PX:
-                    continue
-                rows, cols = np.nonzero(labelled == piece)
-                found.append({"rows": rows, "cols": cols, "px": int(rows.size)})
-        found.sort(key=lambda s: (-s["px"], int(s["rows"].min()), int(s["cols"].min())))
-        offered = found[:int(config.AI_MAX_SEGMENTS_PER_CASE)]
-        not_offered = found[int(config.AI_MAX_SEGMENTS_PER_CASE):]
-        offered.sort(key=lambda s: (int(s["rows"].min()), int(s["cols"].min())))
-
-        segments = []
-        for number, piece in enumerate(offered, start=1):
-            piece_label[piece["rows"], piece["cols"]] = next_label
-            segments.append({
-                "n": number,
-                "label": next_label,
-                "rows": piece["rows"],
-                "cols": piece["cols"],
-                "px": piece["px"],
-                "length_um": round(config.um(piece["px"]), 4),
-            })
-            next_label += 1
-        cases.append({
-            "lacuna_id": lacuna_id,
-            "case_id": f"case_{lacuna_id:04d}",
-            "zone": zones[lacuna_id],
-            "segments": segments,
-            "segments_offered": len(segments),
-            "segments_not_offered": len(not_offered),
-            "px_not_offered": int(sum(s["px"] for s in not_offered)),
-        })
-    other = skeleton & (piece_label == 0)
-    piece_label[other] = next_label  # the one bucket for everything not asked about
-
-    # Which mask pixel belongs to which centre line: the nearest labelled
-    # skeleton pixel. This is what a verdict acts on, so that dropping a segment
-    # drops the mask it is the centre line of and nothing else.
-    index = ndi.distance_transform_edt(piece_label == 0, return_distances=False,
-                                       return_indices=True)
-    territory = np.where(permissive & (zone_owner > 0), piece_label[index[0], index[1]], 0)
-
-    # Report only: was the judge shown new tracing, or tracing the pipeline had?
-    near_global = ndi.distance_transform_edt(~state["skeleton_global"]) <= 1.0
-    for case in cases:
-        for seg in case["segments"]:
-            share = float(near_global[seg["rows"], seg["cols"]].mean())
-            seg["already_traced_share"] = round(share, 4)
-            seg["already_traced"] = bool(share >= TRACED_SHARE)
-            seg["territory_px"] = int((territory == seg["label"]).sum())
-
-    return {
-        "shape": shape,
-        "cases": cases,
-        "zone_owner": zone_owner,
-        "permissive": permissive,
-        "permissive_skeleton": skeleton,
-        "territory": territory,
-        "cut": {"high": round(float(high_cut), 8), "low": round(float(low_cut), 8),
-                "candidate_floor_before_scaling": round(float(floor), 8),
-                "cut_fraction": config.AI_CANDIDATE_CUT_FRACTION,
-                "contrast_ratio_cap": config.AI_CONTRAST_RATIO_MAX,
-                "min_segment_px": MIN_SEGMENT_PX,
-                "max_segments_per_case": config.AI_MAX_SEGMENTS_PER_CASE},
-        "geometry_sha256": geometry_hash(cases),
+        allowed &= ~(state["flagged"] & (response < high))
+    extra = (zone_owner > 0) & (boosted >= floor) & allowed
+    return state["candidate_final"] | extra, {
+        "low_cut": round(float(low), 8),
+        "candidate_floor": round(float(floor), 8),
+        "cut_fraction": config.AI_CANDIDATE_CUT_FRACTION,
+        "zone_px": int((zone_owner > 0).sum()),
+        "added_px": int((extra & ~state["candidate_final"]).sum()),
     }
 
 
-def geometry_hash(cases: list) -> str:
-    """A hash of the candidates themselves: every segment's pixels, in order.
-    The decision file carries it, and the pipeline refuses to apply a decision
-    file whose candidates are not the ones it just computed, so a verdict can
-    never land on a segment it was not given for."""
+def image_candidates(state: dict) -> dict:
+    """Every segment the judge is shown for every lacuna, and the cases that
+    hold them. Deterministic: no network and no judge.
+
+    One pass over the image builds the segments, then each lacuna's crop picks
+    up the ones it holds. A segment that needs a decision is numbered in the
+    case whose crop holds it and whose lacuna it concerns; a segment that
+    touches two bodies is numbered in both of their cases, and if the two
+    answers disagree the assembly leaves it alone and says so."""
+    shape = state["shape"]
+    skeleton = state["skeleton_final"]
+    owner_map = state["owner_map"]
+    zone_owner = state["zone_owner"]
+    lacuna_id_map = state["lacuna_id_map"]
+    n_lacunae = state["n_lacunae"]
+    structure = np.ones((3, 3), dtype=np.uint8)
+
+    permissive, cut = permissive_mask(state)
+    new_skeleton = morphology.skeletonize(permissive)
+    # New LINE, not new mask: a pixel of the permissive skeleton that the
+    # pipeline's own skeleton does not already run along, inside a zone.
+    near_traced = ndi.distance_transform_edt(~skeleton) <= 1.0
+    new_lines = new_skeleton & ~near_traced & (zone_owner > 0)
+
+    traced_labels = _branch_labels(skeleton)
+    new_labels, _n_new = ndi.label(new_lines, structure=structure)
+    _dist, nearest_id, _index = canaliculi.nearest_lacuna_map(lacuna_id_map)
+
+    # Which bodies each segment touches, by the pipeline's own contact reach.
+    touch_maps = {}
+    for lacuna_id in range(1, n_lacunae + 1):
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        r_lo, r_hi, c_lo, c_hi = canaliculi._body_window(body, shape,
+                                                         canaliculi.CONTACT_REACH_PX)
+        gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
+        touch = np.zeros(shape, dtype=bool)
+        touch[r_lo:r_hi, c_lo:c_hi] = gap <= canaliculi.CONTACT_REACH_PX
+        touch_maps[lacuna_id] = touch
+
+    segments = []
+    for kind, labels in (("traced", traced_labels), ("new", new_labels)):
+        count = int(labels.max())
+        if not count:
+            continue
+        objects = ndi.find_objects(labels)
+        for index in range(1, count + 1):
+            box = objects[index - 1]
+            if box is None:
+                continue
+            piece = labels[box] == index
+            rows, cols = np.nonzero(piece)
+            rows = rows + box[0].start
+            cols = cols + box[1].start
+            if rows.size < MIN_SEGMENT_PX:
+                continue
+            owner = _majority(owner_map[rows, cols]) if kind == "traced" else 0
+            touches = sorted(i for i, touch in touch_maps.items() if touch[rows, cols].any())
+            # The zone this segment lies in, which is the lacuna whose hole it
+            # is part of, and which is NOT the same question as who owns it.
+            # That difference is what the brief asks to be counted.
+            zone_lacuna = _majority(zone_owner[rows, cols])
+            home = zone_lacuna or owner or _majority(nearest_id[rows, cols])
+            segments.append({
+                "segment_id": f"{kind[0]}{index:05d}",
+                "kind": kind if kind == "new" else ("owned" if owner else "unowned"),
+                "rows": rows,
+                "cols": cols,
+                "px": int(rows.size),
+                "length_um": round(config.um(int(rows.size)), 4),
+                "owner_lacuna_id": int(owner),
+                "touches": [int(i) for i in touches],
+                "zone_lacuna_id": int(zone_lacuna),
+                "home_lacuna_id": int(home),
+                "label": len(segments) + 1,
+            })
+
+    # The territory of every segment: which mask pixel belongs to which centre
+    # line, so that a verdict acts on the mask its segment is the centre line of
+    # and on nothing else.
+    territory_seed = np.zeros(shape, dtype=np.int32)
+    for seg in segments:
+        territory_seed[seg["rows"], seg["cols"]] = seg["label"]
+    other_lines = (skeleton | new_lines) & (territory_seed == 0)
+    territory_seed[other_lines] = len(segments) + 1
+    index = ndi.distance_transform_edt(territory_seed == 0, return_distances=False,
+                                       return_indices=True)
+    territory = np.where(permissive, territory_seed[index[0], index[1]], 0)
+
+    cases = []
+    for lacuna_id in range(1, n_lacunae + 1):
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        rows, cols = np.nonzero(body)
+        centroid = [round(float(cols.mean()), 1), round(float(rows.mean()), 1)]
+        window = crop_window(shape, centroid, int(config.AI_CROP_PX))
+        cases.append(build_case(state, segments, lacuna_id, centroid, window, "lacuna"))
+    cases += crop_blind_spot_cases(state, segments, cases)
+    number_cases(cases)
+
+    return {
+        "shape": shape,
+        "segments": segments,
+        "cases": cases,
+        "territory": territory,
+        "permissive": permissive,
+        "new_lines": new_lines,
+        "cut": dict(cut, min_segment_px=MIN_SEGMENT_PX,
+                    max_segments_per_case=config.AI_MAX_SEGMENTS_PER_CASE),
+        "counts": segment_counts(segments),
+        "geometry_sha256": geometry_hash(cases, segments),
+    }
+
+
+def segment_counts(segments: list) -> dict:
+    """What the judge is shown, by kind, over the whole image.
+
+    `traced_in_a_zone_its_lacuna_does_not_own` is the number the brief asks for:
+    segments the pipeline traced that lie in a lacuna's zone of the hole and
+    that the lacuna does not own, whether another lacuna owns them or nobody
+    does. `touching_two_bodies` counts the segments that come within the
+    pipeline's contact reach of more than one body, which is the case where two
+    cells can both claim one thread."""
+    counts = {"owned": 0, "unowned": 0, "new": 0, "touching_two_bodies": 0,
+              "traced_in_a_zone": 0, "traced_in_a_zone_its_lacuna_does_not_own": 0,
+              "traced_owned_by_another_than_the_body_it_touches": 0}
+    for seg in segments:
+        counts[seg["kind"]] += 1
+        if len(seg["touches"]) > 1:
+            counts["touching_two_bodies"] += 1
+        if seg["kind"] == "new":
+            continue
+        if seg["zone_lacuna_id"]:
+            counts["traced_in_a_zone"] += 1
+            if seg["owner_lacuna_id"] != seg["zone_lacuna_id"]:
+                counts["traced_in_a_zone_its_lacuna_does_not_own"] += 1
+        if any(i != seg["owner_lacuna_id"] for i in seg["touches"]):
+            counts["traced_owned_by_another_than_the_body_it_touches"] += 1
+    return counts
+
+
+def build_case(state: dict, segments: list, lacuna_id: int, centroid: list, window: tuple,
+               kind: str) -> dict:
+    """One picture's worth: every segment with a pixel in this window, split
+    into the ones that need a decision and the ones that are context.
+
+    A segment needs a decision in this case when a decision could change its
+    owner or its existence: it is new and this is the zone it lies in, it is
+    unowned and this lacuna is the nearest body to it, or it touches this body
+    and this body does not own it."""
+    r_lo, r_hi, c_lo, c_hi = window
+    decide, context = [], []
+    for seg in segments:
+        inside = ((seg["rows"] >= r_lo) & (seg["rows"] < r_hi)
+                  & (seg["cols"] >= c_lo) & (seg["cols"] < c_hi))
+        if not inside.any():
+            continue
+        px_in_crop = int(inside.sum())
+        asked = (
+            (seg["kind"] == "new" and seg["home_lacuna_id"] == lacuna_id)
+            or (seg["kind"] == "unowned" and seg["home_lacuna_id"] == lacuna_id)
+            or (lacuna_id in seg["touches"] and seg["owner_lacuna_id"] != lacuna_id)
+        )
+        entry = {"segment_id": seg["segment_id"], "label": seg["label"], "kind": seg["kind"],
+                 "owner_lacuna_id": seg["owner_lacuna_id"], "touches": seg["touches"],
+                 "px": seg["px"], "px_in_crop": px_in_crop, "length_um": seg["length_um"]}
+        (decide if asked else context).append(entry)
+    decide.sort(key=lambda s: -s["px_in_crop"])
+    over = decide[int(config.AI_MAX_SEGMENTS_PER_CASE):]
+    decide = decide[:int(config.AI_MAX_SEGMENTS_PER_CASE)]
+    context += over
+    return {
+        "lacuna_id": lacuna_id,
+        "kind": kind,
+        "centroid_xy": centroid,
+        "window": [int(r_lo), int(r_hi), int(c_lo), int(c_hi)],
+        "decide": decide,
+        "context": context,
+        "segments_not_offered": len(over),
+    }
+
+
+def crop_blind_spot_cases(state: dict, segments: list, cases: list) -> list:
+    """Step 3: the segments that no lacuna crop holds.
+
+    A zone can reach further than half a crop, so a segment that needs a
+    decision can lie outside the 256 px crop of the lacuna it belongs to. Those
+    segments were counted and left unjudged in the first version, which is a
+    blind spot and not a neutral outcome. Each one now gets a crop of its own,
+    centred on it, and any other left-over segment that falls inside that crop
+    is drawn and numbered in the same call, so one extra call can clear several.
+    """
+    asked = {entry["segment_id"] for case in cases for entry in case["decide"]}
+    # In scope: a segment that lies in some lacuna's ZONE of the hole and needs
+    # a decision. A segment that lies in no zone and in no crop is not part of
+    # any lacuna's case and is not asked about at all; the judge is organised
+    # around the lacunae, and the unowned tracing far from every body is a
+    # separate question this experiment does not put to it.
+    left = [seg for seg in segments
+            if seg["segment_id"] not in asked and seg["zone_lacuna_id"]
+            and (seg["kind"] in ("new", "unowned") or len(seg["touches"]) > 1)]
+    extra = []
+    covered: set = set()
+    for seg in sorted(left, key=lambda s: (-s["px"], s["segment_id"])):
+        if seg["segment_id"] in covered:
+            continue
+        centroid = [round(float(seg["cols"].mean()), 1), round(float(seg["rows"].mean()), 1)]
+        window = crop_window(state["shape"], centroid, int(config.AI_CROP_PX))
+        case = build_case(state, segments, seg["home_lacuna_id"], centroid, window, "left over")
+        # Only the left-over segments are asked about here: everything else in
+        # this crop has been asked about in its own lacuna's case already.
+        keep = [e for e in case["decide"] if e["segment_id"] not in asked]
+        case["context"] += [e for e in case["decide"] if e["segment_id"] in asked]
+        case["decide"] = keep
+        covered |= {e["segment_id"] for e in keep}
+        extra.append(case)
+    return extra
+
+
+def number_cases(cases: list) -> None:
+    """Number the segments that need a decision, in reading order, so the
+    numbers in a picture run roughly top to bottom. Each case numbers from 1."""
+    for index, case in enumerate(cases, start=1):
+        case["case_id"] = f"case_{index:04d}"
+        for number, entry in enumerate(
+                sorted(case["decide"], key=lambda e: (e["label"],)), start=1):
+            entry["n"] = number
+
+
+def geometry_hash(cases: list, segments: list) -> str:
+    """A hash of what the judge is asked about: every case, every numbered
+    segment and its pixels. The decision file carries it and the pipeline
+    refuses to apply a decision file whose candidates are not the ones it has
+    just computed, so a verdict can never land on a segment it was not given
+    for."""
+    by_label = {seg["label"]: seg for seg in segments}
     parts = []
     for case in cases:
-        parts.append([case["lacuna_id"], case["zone"]["empty_width_px"],
-                      case["zone"]["contrast_ratio"],
-                      [[seg["n"], (seg["rows"].astype(np.int64) * 100000
-                                   + seg["cols"].astype(np.int64)).tolist()]
-                       for seg in case["segments"]]])
+        rows = []
+        for entry in sorted(case["decide"], key=lambda e: e["n"]):
+            seg = by_label[entry["label"]]
+            rows.append([entry["n"], entry["kind"], entry["owner_lacuna_id"],
+                         (seg["rows"].astype(np.int64) * 100000
+                          + seg["cols"].astype(np.int64)).tolist()])
+        parts.append([case["case_id"], case["lacuna_id"], case["window"], rows])
     return sha256_text(canonical_json(parts))
 
 
 # The state the candidates are made from
 
-def pipeline_state(image_path: Path) -> dict:
-    """Run one image through the pipeline and keep what the candidates need.
-
-    The switch is forced OFF while this runs: the candidates are made against
-    the pipeline as it is, never against a pipeline the judge has already
-    changed, which would be circular. The module-override idiom is the one the
-    sweep diagnostics use.
-    """
-    saved = config.AI_JUDGE_ENABLED
-    config.AI_JUDGE_ENABLED = False
-    try:
-        lac = lacunae.analyse_image(image_path)
-        display, channel = lacunae.load_channel(image_path)
-        net = canaliculi.analyse_network(image_path, lac, channel)
-    finally:
-        config.AI_JUDGE_ENABLED = saved
+def state_from_base(net: dict, lac: dict, image_path: Path, channel, display=None) -> dict:
+    """Everything the candidates need, from a network result produced with the
+    judge switch OFF. That result is the pipeline as it stands, so the judge is
+    never asked about a tracing it has already changed."""
     return {
         "image_path": image_path,
         "label": lacunae.image_label(image_path),
@@ -450,32 +496,32 @@ def pipeline_state(image_path: Path) -> dict:
         "response": net["ridge_response"],
         "high_cut": float(net["t_lo"]),
         "flagged": net["flagged"],
-        # The global cut: the mask and the skeleton the ridge threshold and the
-        # glow zone rule produced, before the dim pass and before the 50 um
-        # prune. Step 1 of the experiment measures and traces against these.
-        "candidate_global": net["candidate_first_pass"],
-        "skeleton_global": net["skeleton_first_pass"],
+        # The pipeline's own zone of the hole and its radial gain (METHODS
+        # section 19). The judge lowers the cut inside that zone and defines
+        # nothing of its own.
+        "zone_owner": net["zone_owner"],
+        "zone_extents_px": net["zone_extents_px"],
+        "zone_gains": net["zone_gains"],
+        "hole_width_px": net["hole_width_px"],
+        # What the pipeline traced and who owns it.
+        "candidate_final": net["candidate"],
         "skeleton_final": net["skeleton"],
         "owner_map": net["owner_map"],
     }
 
 
-def state_from_pipeline(net: dict, lacuna_id_map: np.ndarray, lacuna_mask: np.ndarray,
-                        n_lacunae: int) -> dict:
-    """The same state, assembled inside canaliculi.analyse_network, where the
-    arrays are already in hand. Used by the switch so that the pipeline never
-    runs the pipeline again."""
-    return {
-        "shape": tuple(lacuna_id_map.shape),
-        "lacuna_id_map": lacuna_id_map,
-        "lacuna_mask": lacuna_mask,
-        "n_lacunae": n_lacunae,
-        "response": net["response"],
-        "high_cut": float(net["high_cut"]),
-        "flagged": net["flagged"],
-        "candidate_global": net["candidate_global"],
-        "skeleton_global": net["skeleton_global"],
-    }
+def pipeline_state(image_path: Path) -> dict:
+    """Run one image through the pipeline with the switch forced OFF, and keep
+    what the candidates need."""
+    saved = config.AI_JUDGE_ENABLED
+    config.AI_JUDGE_ENABLED = False
+    try:
+        lac = lacunae.analyse_image(image_path)
+        display, channel = lacunae.load_channel(image_path)
+        net = canaliculi.analyse_network(image_path, lac, channel)
+    finally:
+        config.AI_JUDGE_ENABLED = saved
+    return state_from_base(net, lac, image_path, channel, display)
 
 
 # The picture the judge sees (step 2)
@@ -586,8 +632,10 @@ def _place_label(canvas: np.ndarray, taken: list, text: str, row: int, col: int,
                     or box[3] < other[1] or box[1] > other[3]) for other in taken):
             continue
         patch = canvas[box[0]:box[2], box[1]:box[3]]
-        if patch.size and bool((patch == np.array(SEGMENT_COLOUR, dtype=np.uint8))
-                               .all(axis=-1).any()):
+        # Never put a number on top of a segment of any kind: it would hide the
+        # very thing it names.
+        if patch.size and bool(any((patch == np.array(colour, dtype=np.uint8)).all(axis=-1).any()
+                                   for colour in LABEL_AVOIDS)):
             continue
         best = box
         break
@@ -595,15 +643,14 @@ def _place_label(canvas: np.ndarray, taken: list, text: str, row: int, col: int,
     return best[0], best[1]
 
 
-def case_colours(state: dict, case: dict, window: tuple) -> dict:
+def case_colours(state: dict, case: dict) -> dict:
     """Which cell body is outlined in which colour: the body the case is about
     is yellow, the other bodies with pixels in the crop take the remaining
     colours by increasing lacuna id. Returns {colour name: lacuna id} plus the
     ids that got no name."""
-    r_lo, r_hi, c_lo, c_hi = window
+    r_lo, r_hi, c_lo, c_hi = case["window"]
     ids = np.unique(state["lacuna_id_map"][r_lo:r_hi, c_lo:c_hi])
-    others = [int(i) for i in ids if i > 0 and int(i) != case["lacuna_id"]]
-    others.sort()
+    others = sorted(int(i) for i in ids if i > 0 and int(i) != case["lacuna_id"])
     colours = {OWNER_COLOURS[0][0]: case["lacuna_id"]}
     spare = [name for name, _rgb in OWNER_COLOURS[1:]]
     for name, lacuna_id in zip(spare, others):
@@ -614,12 +661,18 @@ def case_colours(state: dict, case: dict, window: tuple) -> dict:
 def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
     """The two panels, as png bytes, and what was drawn on them.
 
-    Left: the raw crop, stretched and enlarged, nothing drawn. Right: the same,
-    with every body outlined in its colour and every candidate segment drawn in
-    red with its number beside it."""
+    Left: the raw crop, stretched and enlarged, nothing drawn. Right: the same
+    with every body outlined in its colour and every segment drawn:
+
+      a segment the pipeline traced and a lacuna owns   that lacuna's colour
+      a segment the pipeline traced that nobody owns    white
+      a segment the permissive cut found and the
+        pipeline does not have                          red
+
+    Only the segments that need a decision carry a number. The rest are there so
+    that the judge can see what the tracing already says around them."""
     size = int(config.AI_CROP_PX)
-    window = crop_window(state["shape"], case["zone"]["centroid_xy"], size)
-    r_lo, r_hi, c_lo, c_hi = window
+    r_lo, r_hi, c_lo, c_hi = case["window"]
     factor = max(1, int(round(config.AI_CROP_RENDER_PX / max(1, (r_hi - r_lo)))))
 
     id_crop = state["lacuna_id_map"][r_lo:r_hi, c_lo:c_hi]
@@ -627,8 +680,35 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
     panel = _enlarge(np.stack([gray] * 3, axis=-1), factor)
     right = panel.copy()
 
-    named = case_colours(state, case, window)
+    named = case_colours(state, case)
     rgb_of = dict(OWNER_COLOURS)
+    by_label = {seg["label"]: seg for seg in candidates["segments"]}
+    id_of_colour = {lacuna_id: name for name, lacuna_id in named["colours"].items()}
+
+    def draw(entry, colour):
+        seg = by_label[entry["label"]]
+        inside = ((seg["rows"] >= r_lo) & (seg["rows"] < r_hi)
+                  & (seg["cols"] >= c_lo) & (seg["cols"] < c_hi))
+        if not inside.any():
+            return None
+        rows = (seg["rows"][inside] - r_lo) * factor
+        cols = (seg["cols"][inside] - c_lo) * factor
+        for d_row in range(factor):
+            for d_col in range(factor):
+                right[rows + d_row, cols + d_col] = colour
+        return {"row": int(rows.min()), "col": int(cols[np.argmin(rows)])}
+
+    def colour_of(entry):
+        if entry["kind"] == "new":
+            return SEGMENT_NEW_COLOUR
+        if entry["kind"] == "unowned":
+            return SEGMENT_UNOWNED_COLOUR
+        name = id_of_colour.get(entry["owner_lacuna_id"])
+        return rgb_of[name] if name else UNNAMEABLE_COLOUR
+
+    # Context first, so a numbered segment is never hidden under one.
+    for entry in case["context"]:
+        draw(entry, colour_of(entry))
     for name, lacuna_id in named["colours"].items():
         outline = segmentation.find_boundaries(id_crop == lacuna_id, mode="outer")
         right[_enlarge(outline, factor)] = rgb_of[name]
@@ -637,18 +717,12 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
         right[_enlarge(outline, factor)] = UNNAMEABLE_COLOUR
 
     drawn = []
-    for seg in case["segments"]:
-        inside = ((seg["rows"] >= r_lo) & (seg["rows"] < r_hi)
-                  & (seg["cols"] >= c_lo) & (seg["cols"] < c_hi))
-        if not inside.any():
+    for entry in sorted(case["decide"], key=lambda e: e["n"]):
+        at = draw(entry, colour_of(entry))
+        if at is None:
             continue
-        rows = (seg["rows"][inside] - r_lo) * factor
-        cols = (seg["cols"][inside] - c_lo) * factor
-        for dr in range(factor):
-            for dc in range(factor):
-                right[rows + dr, cols + dc] = SEGMENT_COLOUR
-        drawn.append({"n": seg["n"], "px_in_crop": int(inside.sum()),
-                      "row": int(rows.min()), "col": int(cols[np.argmin(rows)])})
+        drawn.append({"n": entry["n"], "segment_id": entry["segment_id"],
+                      "kind": entry["kind"], "row": at["row"], "col": at["col"]})
     taken: list = []
     for item in drawn:
         row, col = _place_label(right, taken, str(item["n"]), item["row"], item["col"], factor)
@@ -658,8 +732,7 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
     canvas = np.concatenate([panel, gap, right], axis=1)
     buffer = io.BytesIO()
     Image.fromarray(canvas).save(buffer, format="PNG")
-    png = buffer.getvalue()
-    return png, {
+    return buffer.getvalue(), {
         "window_rows": [int(r_lo), int(r_hi)],
         "window_cols": [int(c_lo), int(c_hi)],
         "enlargement": int(factor),
@@ -667,7 +740,32 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
         "colours": named["colours"],
         "bodies_with_no_colour": named["unnameable"],
         "segments_drawn": [item["n"] for item in drawn],
+        "kinds_drawn": {k: sum(1 for item in drawn if item["kind"] == k)
+                        for k in ("new", "unowned", "owned", "other")},
+        "context_drawn": len(case["context"]),
+        "numbers_not_drawn": [e["n"] for e in case["decide"]
+                              if e["n"] not in {item["n"] for item in drawn}],
     }
+
+
+def case_user_text(case: dict, drawn: dict) -> str:
+    """The only text that changes from case to case. It carries no file name, no
+    path and no group: the numbers in the picture, what kind each is, and the
+    colours that are in it."""
+    names = [name for name, _rgb in OWNER_COLOURS if name in drawn["colours"]]
+    numbers = drawn["segments_drawn"]
+    listed = ", ".join(str(n) for n in numbers) if numbers else "none"
+    kinds = drawn["kinds_drawn"]
+    extra = ""
+    if drawn["bodies_with_no_colour"]:
+        extra = (" One or more further bodies are outlined in grey; a segment that belongs to"
+                 " a grey body has no colour to name, so answer owner \"none\" for it.")
+    return (f"This case has {len(numbers)} numbered segment(s): {listed}. "
+            f"Of them {kinds['new']} are red (new), {kinds['unowned']} are white (traced, "
+            f"owned by nobody) and {kinds['owned'] + kinds['other']} are drawn in a cell's "
+            f"colour (traced and owned, and numbered because they touch a cell that does not "
+            f"own them). The bodies outlined are: {', '.join(names)}, with yellow in the "
+            f"middle.{extra} Answer for every number, in one json object.")
 
 
 # The prompt, the request and its hash
@@ -688,22 +786,6 @@ def load_prompt() -> dict:
         "examples_sha256": sha256_text(examples),
         "examples_present": bool(examples),
     }
-
-
-def case_user_text(case: dict, drawn: dict) -> str:
-    """The only text that changes from case to case. It carries no file name, no
-    path and no group: the numbers in the picture and the colours that are in
-    it, and nothing else."""
-    names = [name for name, _rgb in OWNER_COLOURS if name in drawn["colours"]]
-    numbers = drawn["segments_drawn"]
-    listed = ", ".join(str(n) for n in numbers) if numbers else "none"
-    extra = ""
-    if drawn["bodies_with_no_colour"]:
-        extra = (" One or more further bodies are outlined in grey; a segment that belongs to"
-                 " a grey body has no colour to name, so answer owner \"none\" for it.")
-    return (f"This case has {len(numbers)} candidate segment(s), numbered: {listed}. "
-            f"The bodies outlined are: {', '.join(names)}, with yellow in the middle."
-            f"{extra} Answer for every number, in one json object.")
 
 
 def build_request(system: str, user_text: str, png: bytes) -> tuple:
@@ -837,8 +919,8 @@ def stub_answerer():
 
     def answer(payload: dict) -> dict:
         text = payload["messages"][0]["content"][1]["text"]
-        numbers = [int(n) for n in re.findall(r"\d+", text.split("numbered:")[1].split(".")[0])] \
-            if "numbered:" in text else []
+        head = text.split("segment(s):")[1].split(".")[0] if "segment(s):" in text else ""
+        numbers = [int(n) for n in re.findall(r"\d+", head)]
         colours = [name for name, _rgb in OWNER_COLOURS if name in text]
         key = text[:80]
         index = seen.setdefault(key, len(seen) + 1)
@@ -1011,29 +1093,32 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
         record_case = {
             "lacuna_id": case["lacuna_id"],
             "case_id": case["case_id"],
-            "empty_width_px": case["zone"]["empty_width_px"],
-            "contrast_ratio": case["zone"]["contrast_ratio"],
-            "zone_px": case["zone"]["own_zone_px"],
-            "segments_offered": case["segments_offered"],
+            "case_kind": case["kind"],
+            "centroid_xy": case["centroid_xy"],
+            "window": case["window"],
+            "segments_offered": len(case["decide"]),
             "segments_not_offered": case["segments_not_offered"],
+            "context_segments": len(case["context"]),
             "picture": picture.relative_to(config.PROJECT_ROOT).as_posix(),
             "colours": drawn["colours"],
             "bodies_with_no_colour": drawn["bodies_with_no_colour"],
+            "kinds_drawn": drawn["kinds_drawn"],
             "answer_valid": False,
             "attempts": 0,
             "invalid_reasons": [],
             "usage": {"input_tokens": 0, "output_tokens": 0},
             "cost_usd": 0.0,
-            "segments": [{"n": seg["n"], "px": seg["px"], "length_um": seg["length_um"],
-                          "already_traced": seg["already_traced"],
+            "segments": [{"n": seg["n"], "segment_id": seg["segment_id"], "kind": seg["kind"],
+                          "px": seg["px"], "length_um": seg["length_um"],
+                          "owner_lacuna_id_before": seg["owner_lacuna_id"],
+                          "touches": seg["touches"],
                           "verdict": "unjudged", "owner": "none", "owner_lacuna_id": None,
-                          "why": ""} for seg in case["segments"]],
+                          "why": ""}
+                         for seg in sorted(case["decide"], key=lambda e: e["n"])],
         }
-        # A segment whose pixels all fall outside the crop cannot be drawn, so
-        # it is never asked about and stays unjudged. It is counted here and in
-        # the dry run, because a question not asked is a blind spot and not a
-        # neutral outcome.
-        record_case["segments_not_drawn"] = len(case["segments"]) - len(numbers)
+        # Every numbered segment is drawn, because a case is built from the
+        # segments its own crop holds; this stays as a guard and is reported.
+        record_case["segments_not_drawn"] = len(drawn["numbers_not_drawn"])
         if not numbers:
             for seg in record_case["segments"]:
                 totals["segments"] += 1
@@ -1185,18 +1270,25 @@ def read_decisions(label: str) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def apply_to_candidate(image_path: Path, candidate: np.ndarray, net: dict,
-                       lacuna_id_map: np.ndarray, lacuna_mask: np.ndarray,
-                       n_lacunae: int) -> dict:
+def apply_to_base(image_path: Path, candidate: np.ndarray, base: dict, lac: dict,
+                  channel: np.ndarray) -> dict:
     """The switch. Returns the edited candidate mask, the pixels the judge took
     away, and where it says ownership belongs.
 
+    `base` is the network result of a run with the switch OFF, which is the
+    pipeline as it stands and what the judge was shown. The candidates are
+    rebuilt from it and must hash to what the decision file was written for.
+
     The edit is the smallest one that can express the verdicts:
-      a segment judged REAL adds the mask its centre line is the centre line
-      of, inside its zone;
-      a segment judged ARTIFACT takes that mask away;
-      everything else, including a segment with no valid answer and a segment
-      that was never offered, is left exactly as the pipeline had it.
+      a segment judged REAL that the pipeline does not have adds the mask its
+      centre line is the centre line of;
+      a segment judged ARTIFACT takes that mask away, whether the pipeline
+      traced it or not;
+      a segment judged REAL that the pipeline already has is left where it is,
+      and only its owner can change;
+      everything else, including a segment with no valid answer, one that was
+      never offered, and one whose two answers disagree, is left exactly as the
+      pipeline had it.
     So with no verdicts at all the mask comes back unchanged, and the switch
     changes a number only where the judge actually answered.
 
@@ -1206,7 +1298,7 @@ def apply_to_candidate(image_path: Path, candidate: np.ndarray, net: dict,
     then decides everything else (canaliculi.attach_judged_segments)."""
     label = lacunae.image_label(image_path)
     decisions = read_decisions(label)
-    state = state_from_pipeline(net, lacuna_id_map, lacuna_mask, n_lacunae)
+    state = state_from_base(base, lac, image_path, channel)
     candidates = image_candidates(state)
     if decisions["geometry_sha256"] != candidates["geometry_sha256"]:
         raise ValueError(
@@ -1214,52 +1306,75 @@ def apply_to_candidate(image_path: Path, candidate: np.ndarray, net: dict,
             f"(geometry {decisions['geometry_sha256'][:12]}, now "
             f"{candidates['geometry_sha256'][:12]}). Rerun the judge for this image.")
 
-    by_case = {case["lacuna_id"]: case for case in decisions["cases"]}
+    # One verdict per SEGMENT, not per case: a segment that touches two bodies
+    # is numbered in both of their cases, and two answers that disagree are no
+    # answer at all.
+    verdicts: dict = {}
+    conflicts = set()
+    for case in decisions["cases"]:
+        for item in case["segments"]:
+            if item["verdict"] == "unjudged":
+                continue
+            key = item["segment_id"]
+            seen = verdicts.get(key)
+            if seen is None:
+                verdicts[key] = item
+            elif (seen["verdict"], seen["owner_lacuna_id"]) != (item["verdict"],
+                                                                item["owner_lacuna_id"]):
+                conflicts.add(key)
+    for key in conflicts:
+        verdicts.pop(key, None)
+
     territory = candidates["territory"]
     add = np.zeros(candidate.shape, dtype=bool)
     remove = np.zeros(candidate.shape, dtype=bool)
+    judged = np.zeros(candidate.shape, dtype=bool)
     attach: dict = {}
-    counts = {"real": 0, "artifact": 0, "unjudged": 0, "added_px": 0, "removed_px": 0,
-              "attached_segments": 0}
-    for case in candidates["cases"]:
-        judged = by_case.get(case["lacuna_id"])
-        if judged is None:
-            counts["unjudged"] += len(case["segments"])
+    counts = {"real": 0, "artifact": 0, "unjudged": 0, "conflicting": len(conflicts),
+              "added_px": 0, "removed_px": 0, "attached_segments": 0,
+              "real_new": 0, "real_traced": 0, "artifact_new": 0, "artifact_traced": 0}
+    for seg in candidates["segments"]:
+        item = verdicts.get(seg["segment_id"])
+        if item is None:
+            counts["unjudged"] += 1
             continue
-        verdicts = {item["n"]: item for item in judged["segments"]}
-        for seg in case["segments"]:
-            item = verdicts.get(seg["n"])
-            verdict = (item or {}).get("verdict", "unjudged")
-            counts[verdict] = counts.get(verdict, 0) + 1
-            if verdict == "real":
+        verdict = item["verdict"]
+        counts[verdict] += 1
+        counts[f"{verdict}_{'new' if seg['kind'] == 'new' else 'traced'}"] += 1
+        judged |= territory == seg["label"]
+        if verdict == "real":
+            if seg["kind"] == "new":
                 add |= territory == seg["label"]
-                owner = item.get("owner_lacuna_id")
-                if owner:
-                    attach.setdefault(int(owner), []).append(
-                        np.stack([seg["rows"], seg["cols"]], axis=1))
-                    counts["attached_segments"] += 1
-            elif verdict == "artifact":
-                remove |= territory == seg["label"]
+            owner = item.get("owner_lacuna_id")
+            if owner:
+                attach.setdefault(int(owner), []).append(
+                    np.stack([seg["rows"], seg["cols"]], axis=1))
+                counts["attached_segments"] += 1
+        elif verdict == "artifact":
+            remove |= territory == seg["label"]
     counts["added_px"] = int((add & ~candidate).sum())
     counts["removed_px"] = int((remove & candidate).sum())
-    # The invariant of step 1, measured where it is made: the judge's own edit
-    # touches no pixel outside the empty zones. What the dim pass does outside
-    # them afterwards is the pipeline reacting to the ownership it was given,
-    # and is reported as the dim pass, not as the judge.
-    counts["edited_px_outside_the_zones"] = int(((add | remove)
-                                                 & (candidates["zone_owner"] == 0)).sum())
+    # Where the judge's own edit lies: inside a zone of the hole, or on a
+    # segment the pipeline traced outside one. Both are reported, because the
+    # second is new in this version and the first was the only one before it.
+    zone = state["zone_owner"] > 0
+    counts["edited_px_outside_the_zones"] = int(((add | remove) & ~zone).sum())
+    # The invariant of the whole design: the judge's edit lands on the segments
+    # it was given and nowhere else. 0 by construction, measured so that a
+    # mistake in the territory map cannot pass unseen.
+    counts["edited_px_outside_the_judged_segments"] = int(((add | remove) & ~judged).sum())
     edited = (candidate | add) & ~remove
     return {
         "candidate": edited,
         "add": add,
         "remove": remove,
-        "zone_owner": candidates["zone_owner"],
+        "zone_owner": state["zone_owner"],
         "attach": attach,
         "counts": counts,
         "geometry_sha256": candidates["geometry_sha256"],
         "decisions_written_at": decisions["written_at"],
         "model": decisions["model"],
-        "zone_px": int((candidates["zone_owner"] > 0).sum()),
+        "zone_px": int(zone.sum()),
     }
 
 

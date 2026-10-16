@@ -1510,6 +1510,21 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     analyse_image after the lacuna stage), so a diagnostic can rerun the
     network stage without the lacuna stage (network-sweep)."""
     kept = lac["kept"]
+    # The AI judge experiment (branch exp-ai-layer, docs/EXPERIMENT_AI.md), off
+    # by default. The judge is shown the FINISHED tracing and its ownership, so
+    # that run has to exist before the verdicts can be placed on it: with the
+    # switch on, the whole network stage runs once with it off, which is what
+    # main produces and what the judge was shown, and the verdicts are then
+    # applied to the mask and everything after it is redone. With the switch
+    # off this costs nothing at all, not even an import.
+    base = None
+    if config.AI_JUDGE_ENABLED:
+        saved = config.AI_JUDGE_ENABLED
+        config.AI_JUDGE_ENABLED = False
+        try:
+            base = analyse_network(image_path, lac, channel, t_lo)
+        finally:
+            config.AI_JUDGE_ENABLED = saved
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(lac["labels"], kept)
     flagged = flagged_structures(channel)
@@ -1558,25 +1573,18 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     skeleton_first_pass = skeleton
     candidate_first_pass = candidate
 
-    # The AI judge experiment (branch exp-ai-layer, docs/EXPERIMENT_AI.md), off
-    # by default. src/ai_judge.py is imported only when the switch is on, so
-    # with it off this costs nothing at all, not even an import, and every
-    # output is what it was. With it on, the judge's verdicts for THIS image are
-    # read from its decision file and the mask is edited inside the empty zones
-    # and nowhere else: a segment judged real adds the mask its centre line is
-    # the centre line of, a segment judged artifact takes that mask away, and
+    # The judge's verdicts for THIS image, read from its decision file and
+    # placed on the mask: a segment judged real that the pipeline does not have
+    # adds the mask its centre line is the centre line of, a segment judged
+    # artifact takes that mask away whether the pipeline traced it or not, and
     # anything unjudged is left exactly as it is. Everything after this point,
     # the dim pass, the 50 um cap, the ownership and the quantification, runs
-    # unchanged on the edited mask.
+    # unchanged on the edited mask, and the owner the judge named enters it as
+    # a zero weight attachment and in no other way.
     ai = None
-    if config.AI_JUDGE_ENABLED:
+    if base is not None:
         import ai_judge  # noqa: PLC0415 (deliberate: see above)
-        ai = ai_judge.apply_to_candidate(
-            image_path, candidate,
-            {"response": response, "high_cut": t_lo, "flagged": flagged,
-             "candidate_global": candidate_first_pass,
-             "skeleton_global": skeleton_first_pass},
-            lacuna_id_map, lacuna_mask, len(kept))
+        ai = ai_judge.apply_to_base(image_path, candidate, base, lac, channel)
         candidate = ai["candidate"]
         skeleton = morphology.skeletonize(candidate)
 

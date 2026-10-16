@@ -5023,31 +5023,30 @@ def _ai_candidates_one(path_str: str) -> dict:
     candidates = ai_judge.image_candidates(state)
     rows = []
     for case in candidates["cases"]:
-        zone = case["zone"]
-        segments = case["segments"]
+        kinds = {"new": 0, "unowned": 0, "owned": 0}
+        for entry in case["decide"]:
+            kinds[entry["kind"]] = kinds.get(entry["kind"], 0) + 1
         rows.append({
             "image_label": state["label"],
-            "lacuna_id": case["lacuna_id"],
             "case_id": case["case_id"],
-            "empty_width_px": zone["empty_width_px"],
-            "empty_width_um": zone["empty_width_um"],
-            "sectors_answered": zone["sectors_answered"],
-            "response_p90_in_the_zone": zone["response_p90_in_the_zone"],
-            "response_p90_in_the_band_beyond": zone["response_p90_in_the_band_beyond"],
-            "contrast_ratio": zone["contrast_ratio"],
-            "zone_px": zone["own_zone_px"],
-            "segments_offered": case["segments_offered"],
+            "case_kind": case["kind"],
+            "lacuna_id": case["lacuna_id"],
+            "centroid_xy": case["centroid_xy"],
+            "numbered": len(case["decide"]),
+            "numbered_new": kinds["new"],
+            "numbered_unowned": kinds["unowned"],
+            "numbered_traced_owned": kinds["owned"],
+            "context_segments": len(case["context"]),
             "segments_not_offered": case["segments_not_offered"],
-            "segment_px_median": (int(np.median([s["px"] for s in segments]))
-                                  if segments else None),
-            "segments_already_traced": int(sum(s["already_traced"] for s in segments)),
-            "territory_px": int(sum(s["territory_px"] for s in segments)),
         })
     return {
         "image_label": state["label"],
         "lacunae": state["n_lacunae"],
+        "cases": len(candidates["cases"]),
+        "left_over_cases": sum(1 for c in candidates["cases"] if c["kind"] == "left over"),
+        "segments": len(candidates["segments"]),
+        "counts": candidates["counts"],
         "cut": candidates["cut"],
-        "zone_total_px": int((candidates["zone_owner"] > 0).sum()),
         "geometry_sha256": candidates["geometry_sha256"],
         "rows": rows,
     }
@@ -5064,43 +5063,56 @@ def cmd_ai_candidates(args) -> int:
         out = list(ex.map(_ai_candidates_one, jobs))
 
     rows = [r for o in out for r in o["rows"]]
-    ratios = np.array([r["contrast_ratio"] for r in rows], dtype=float)
-    offered = np.array([r["segments_offered"] for r in rows], dtype=float)
+    totals = {k: sum(o["counts"][k] for o in out) for k in out[0]["counts"]} if out else {}
     report = {
         "status": "EXPERIMENT, measurement only: no pipeline output and no judge",
-        "question": "what the AI judge would be asked about, per lacuna",
+        "question": "what the AI judge is shown, and what of it needs a decision",
+        "what_a_segment_is": ("a branch of a skeleton, the piece between two junctions, at "
+                             f"least {out[0]['cut']['min_segment_px'] if out else 0} px long"),
+        "kinds": {
+            "owned": "traced by the pipeline and owned by a lacuna",
+            "unowned": "traced by the pipeline and owned by nobody",
+            "new": "not traced: what the permissive cut finds inside a zone of the hole",
+        },
+        "numbered": ("a segment is numbered, which is what asks the judge for a decision, "
+                     "when it is new, or unowned, or it touches a body that does not own it"),
         "cut": out[0]["cut"] if out else {},
         "all_images": {
-            "lacunae": len(rows),
-            "segments_offered": int(offered.sum()),
-            "segments_not_offered": int(sum(r["segments_not_offered"] for r in rows)),
-            "cases_at_the_segment_cap": int(sum(1 for r in rows if r["segments_not_offered"])),
-            "segments_already_traced": int(sum(r["segments_already_traced"] for r in rows)),
-            "contrast_ratio": {"min": round(float(ratios.min()), 4),
-                               "median": round(float(np.median(ratios)), 4),
-                               "max": round(float(ratios.max()), 4),
-                               "at_the_cap": int((ratios >= config.AI_CONTRAST_RATIO_MAX).sum())},
-            "segments_per_case": {"min": int(offered.min()), "median": float(np.median(offered)),
-                                  "max": int(offered.max())},
+            "images": len(out),
+            "cases": sum(o["cases"] for o in out),
+            "left_over_cases": sum(o["left_over_cases"] for o in out),
+            "segments": sum(o["segments"] for o in out),
+            "numbered": sum(r["numbered"] for r in rows),
+            "numbered_new": sum(r["numbered_new"] for r in rows),
+            "numbered_unowned": sum(r["numbered_unowned"] for r in rows),
+            "numbered_traced_owned": sum(r["numbered_traced_owned"] for r in rows),
+            **totals,
         },
-        "per_image": [{k: o[k] for k in ("image_label", "lacunae", "zone_total_px",
-                                         "geometry_sha256")} for o in out],
-        "per_lacuna": rows,
+        "per_image": [{k: o[k] for k in ("image_label", "lacunae", "cases", "left_over_cases",
+                                         "segments", "counts", "geometry_sha256")} for o in out],
+        "per_case": rows,
     }
     (args.out / "ai_candidates.json").write_text(json.dumps(report, indent=2) + "\n",
                                                  encoding="utf-8")
-    print_table(["image", "lacuna", "empty width px", "ratio", "zone px", "offered", "not offered"],
-                [[r["image_label"], r["lacuna_id"], r["empty_width_px"], r["contrast_ratio"],
-                  r["zone_px"], r["segments_offered"], r["segments_not_offered"]] for r in rows],
-                title="Candidates per lacuna")
+    print_table(["image", "lacunae", "cases", "segments", "owned", "unowned", "new",
+                 "in a zone, not its own", "numbered"],
+                [[o["image_label"], o["lacunae"], o["cases"], o["segments"],
+                  o["counts"]["owned"], o["counts"]["unowned"], o["counts"]["new"],
+                  o["counts"]["traced_in_a_zone_its_lacuna_does_not_own"],
+                  sum(r["numbered"] for r in o["rows"])] for o in out],
+                title="What the judge is shown, per image")
     a = report["all_images"]
-    print(f"\nsegments offered: {a['segments_offered']} over {a['lacunae']} lacunae, "
-          f"{a['segments_already_traced']} of them already traced by the pipeline")
-    print(f"not offered (past the cap of {config.AI_MAX_SEGMENTS_PER_CASE}): "
-          f"{a['segments_not_offered']} in {a['cases_at_the_segment_cap']} cases")
-    print(f"contrast ratio: min {a['contrast_ratio']['min']}, median "
-          f"{a['contrast_ratio']['median']}, max {a['contrast_ratio']['max']}, "
-          f"{a['contrast_ratio']['at_the_cap']} at the cap of {config.AI_CONTRAST_RATIO_MAX}")
+    print(f"\nsegments: {a['segments']} over {a['images']} images, "
+          f"{a['owned']} owned, {a['unowned']} owned by nobody, {a['new']} new")
+    print(f"traced in a lacuna's zone: {a['traced_in_a_zone']}, of which "
+          f"{a['traced_in_a_zone_its_lacuna_does_not_own']} are not owned by that lacuna")
+    print(f"touching two bodies: {a['touching_two_bodies']}; traced and owned by another than "
+          f"the body it touches: {a['traced_owned_by_another_than_the_body_it_touches']}")
+    print(f"numbered for a decision: {a['numbered']} "
+          f"({a['numbered_new']} new, {a['numbered_unowned']} unowned, "
+          f"{a['numbered_traced_owned']} traced and owned)")
+    print(f"calls: {a['cases']}, of them {a['left_over_cases']} for segments that fall "
+          f"outside their lacuna's crop")
     print(f"\nreport -> {args.out / 'ai_candidates.json'}")
     return 0
 
@@ -5127,6 +5139,7 @@ def _ai_dry_run_one(job: tuple) -> dict:
         user_text = ai_judge.case_user_text(case, drawn)
         estimate = ai_judge.estimate_case(prompt["system"], user_text, png,
                                           len(drawn["segments_drawn"]))
+        kinds = drawn["kinds_drawn"]
         if count_tokens:
             payload, _canonical, _sha = ai_judge.build_request(prompt["system"], user_text, png)
             estimate["input_tokens_counted"] = ai_judge.count_tokens(payload)
@@ -5141,13 +5154,15 @@ def _ai_dry_run_one(job: tuple) -> dict:
             "image_label": state["label"],
             "lacuna_id": case["lacuna_id"],
             "case_id": case["case_id"],
+            "case_kind": case["kind"],
             "segments": len(drawn["segments_drawn"]),
-            # A segment can lie in the zone and outside the 256 px crop, and
-            # then it cannot be drawn and is never asked about. Counted here
-            # because a question not asked is a blind spot, not a neutral
-            # outcome: those segments stay unjudged and keep the deterministic
-            # decision.
-            "segments_not_drawn": case["segments_offered"] - len(drawn["segments_drawn"]),
+            "segments_new": kinds["new"],
+            "segments_unowned": kinds["unowned"],
+            "segments_traced_owned": kinds["owned"] + kinds["other"],
+            "context_segments": drawn["context_drawn"],
+            # A segment that lies outside its lacuna's crop now gets a call
+            # of its own, so this should always be 0; it is kept as a guard.
+            "segments_not_drawn": len(drawn["numbers_not_drawn"]),
             "bodies_in_the_crop": len(drawn["colours"]),
             "bodies_with_no_colour": len(drawn["bodies_with_no_colour"]),
             "picture_px": drawn["panel_px"],
@@ -5158,6 +5173,8 @@ def _ai_dry_run_one(job: tuple) -> dict:
         "image_label": state["label"],
         "lacunae": state["n_lacunae"],
         "calls": len(rows),
+        "calls_for_a_lacuna": sum(1 for r in rows if r["case_kind"] == "lacuna"),
+        "calls_for_left_over_segments": sum(1 for r in rows if r["case_kind"] == "left over"),
         "segments": int(sum(r["segments"] for r in rows)),
         "geometry_sha256": candidates["geometry_sha256"],
         "rows": rows,
@@ -5191,6 +5208,8 @@ def cmd_ai_dry_run(args) -> int:
         tokens_out = sum(r["estimate"]["output_tokens"] for r in o["rows"])
         per_image.append({
             "image_label": o["image_label"], "lacunae": o["lacunae"], "calls": o["calls"],
+            "calls_for_a_lacuna": o["calls_for_a_lacuna"],
+            "calls_for_left_over_segments": o["calls_for_left_over_segments"],
             "segments": o["segments"],
             "estimated_input_tokens": int(tokens_in),
             "estimated_output_tokens": int(tokens_out),
@@ -5230,7 +5249,9 @@ def cmd_ai_dry_run(args) -> int:
             "within_max_cost_usd": bool(retries <= config.MAX_COST_USD),
             "cases_with_a_body_that_has_no_colour": int(sum(1 for r in rows
                                                             if r["bodies_with_no_colour"])),
-            "segments_not_drawn_because_they_fall_outside_the_crop":
+            "calls_for_left_over_segments":
+                int(sum(p["calls_for_left_over_segments"] for p in per_image)),
+            "segments_numbered_but_not_drawn":
                 int(sum(r["segments_not_drawn"] for r in rows)),
         },
         "per_image": per_image,
@@ -5239,8 +5260,10 @@ def cmd_ai_dry_run(args) -> int:
     }
     (args.out / "ai_dry_run.json").write_text(json.dumps(report, indent=2) + "\n",
                                               encoding="utf-8")
-    print_table(["image", "lacunae", "calls", "segments", "in tokens", "out tokens", "cost USD"],
-                [[p["image_label"], p["lacunae"], p["calls"], p["segments"],
+    print_table(["image", "lacunae", "calls", "left over", "segments", "in tokens",
+                 "out tokens", "cost USD"],
+                [[p["image_label"], p["lacunae"], p["calls"],
+                  p["calls_for_left_over_segments"], p["segments"],
                   p["estimated_input_tokens"], p["estimated_output_tokens"],
                   p["estimated_cost_usd"]] for p in per_image],
                 title=f"Estimate for {config.AI_JUDGE_MODEL} (one call per lacuna)")
@@ -5250,9 +5273,9 @@ def cmd_ai_dry_run(args) -> int:
           f"estimated ${a['estimated_cost_usd']}")
     print(f"worst case with every call retried once: ${retries}, "
           f"ceiling ${config.MAX_COST_USD}: {'within it' if a['within_max_cost_usd'] else 'ABOVE IT'}")
-    outside = a["segments_not_drawn_because_they_fall_outside_the_crop"]
-    print(f"segments in a zone but outside the {config.AI_CROP_PX} px crop, so never asked "
-          f"about: {outside} of {a['segments'] + outside}")
+    print(f"calls for segments outside their lacuna's crop: "
+          f"{a['calls_for_left_over_segments']}; numbered but not drawn: "
+          f"{a['segments_numbered_but_not_drawn']} (must be 0)")
     if a["cases_with_a_body_that_has_no_colour"]:
         print(f"cases with a body the judge cannot name: "
               f"{a['cases_with_a_body_that_has_no_colour']}")
@@ -5294,8 +5317,10 @@ def _ai_self_test(images: list) -> int:
         print(f"AI judge self-test on {label} (stub judge, nothing is sent)")
         state = ai_judge.pipeline_state(image_path)
         candidates = ai_judge.image_candidates(state)
-        print(f"  {len(candidates['cases'])} cases, "
-              f"{sum(c['segments_offered'] for c in candidates['cases'])} segments, "
+        print(f"  {len(candidates['cases'])} cases "
+              f"({sum(1 for c in candidates['cases'] if c['kind'] == 'left over')} for segments "
+              f"outside a crop), {len(candidates['segments'])} segments of which "
+              f"{sum(len(c['decide']) for c in candidates['cases'])} are numbered, "
               f"geometry {candidates['geometry_sha256'][:12]}")
 
         run = ai_judge.judge_image(state, candidates, "self-test",
@@ -5338,9 +5363,11 @@ def _ai_self_test(images: list) -> int:
                            for i in range(len(before["lacunae"]["kept"])))
         roots_after = sum(quantification.cell_root_count(after["graph"], i + 1)
                           for i in range(len(after["lacunae"]["kept"])))
-        print(f"  the switch: {counts['real']} real and {counts['artifact']} artifact verdicts "
-              f"applied, mask {counts['added_px']:+d} px and {-counts['removed_px']:+d} px "
-              f"inside {zone} px of zone")
+        print(f"  the switch: {counts['real']} real and {counts['artifact']} artifact "
+              f"verdicts applied ({counts['real_new']} new kept, {counts['artifact_new']} new "
+              f"refused, {counts['artifact_traced']} traced dropped), mask "
+              f"{counts['added_px']:+d} px and {-counts['removed_px']:+d} px, "
+              f"{counts['edited_px_outside_the_zones']} px of it outside a zone of the hole")
         print(f"  skeleton {int(before['skeleton'].sum())} -> {int(after['skeleton'].sum())} px, "
               f"roots {roots_before} -> {roots_after}, "
               f"owned {int((before['owner_map'] > 0).sum())} -> "
@@ -5349,8 +5376,8 @@ def _ai_self_test(images: list) -> int:
               f"({before['dim_pass_px']} -> {after['dim_pass_px']} px) growing from the "
               f"ownership it was given, not the judge writing there")
         checks.append(("the switch changes the mask", counts["added_px"] + counts["removed_px"] > 0))
-        checks.append(("the judge edits nothing outside the zones",
-                       counts["edited_px_outside_the_zones"] == 0 and first_pass_same))
+        checks.append(("the judge edits only the segments it was given",
+                       counts["edited_px_outside_the_judged_segments"] == 0 and first_pass_same))
         checks.append(("the pipeline runs to the end with the switch on",
                        after["graph"] is not None and after["owner_map"].any()))
         try:
