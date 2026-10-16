@@ -612,6 +612,16 @@ HOLE_MAX_SEARCH_PX = 150
 HOLE_ZONE_MARGIN_PX = config.px(config.HOLE_ZONE_MARGIN_UM)
 HOLE_GAIN_BAND_PX = config.px(config.HOLE_GAIN_BAND_UM)
 HOLE_GAIN_STEP_PX = max(1.0, config.px(config.HOLE_GAIN_STEP_UM))
+# The gain profile is not measured inside this ring around a body, and the first
+# gain measured outside it is carried inward instead. Two reasons, both already
+# in the pipeline, so this is not a new number: no mask can exist within
+# LACUNA_DILATION_PX of a body, because the buffer is cut out of it; and the
+# top-hat leaves the body's own edge as a ridge, which the Sato filter answers
+# at its own scale, out to about the largest of RIDGE_SIGMAS_PX. That answer is
+# the body, not a thread, and measured on 542_z06 it runs at 0.0445 against
+# 0.0077 in the band beyond, which pins the gain at 1 exactly where the hole is
+# deepest. Skipping the ring is what makes the profile a thread measurement.
+HOLE_GAIN_SKIP_PX = LACUNA_DILATION_PX + max(RIDGE_SIGMAS_PX)
 HOLE_NEW_MIN_LENGTH_PX = config.px_int(config.HOLE_NEW_MIN_LENGTH_UM)
 
 
@@ -741,7 +751,13 @@ def hole_zone_gains(response: np.ndarray, lacuna_id_map: np.ndarray, zone_owner:
     like, and the band is the same control band section 18 reads the hole
     against. Lacuna bodies are left out of both. An annulus whose response is 0
     at that percentile takes the cap, which changes nothing: a gain times zero
-    is still zero and the global cut still has to be passed."""
+    is still zero and the global cut still has to be passed.
+
+    The innermost HOLE_GAIN_SKIP_PX are not measured at all: there is no mask
+    there to lift, and what the response holds there is the body's own edge seen
+    by the ridge filter. The first gain measured outside that ring is carried
+    inward, so the deepest part of the hole is corrected by the nearest
+    measurement of a thread and never by a measurement of the body."""
     profiles = {}
     shape = lacuna_id_map.shape
     all_bodies = lacuna_id_map > 0
@@ -762,6 +778,8 @@ def hole_zone_gains(response: np.ndarray, lacuna_id_map: np.ndarray, zone_owner:
         levels = np.full(n_bins, np.nan)
         for b in range(n_bins):
             lo, hi = b * HOLE_GAIN_STEP_PX, (b + 1) * HOLE_GAIN_STEP_PX
+            if hi <= HOLE_GAIN_SKIP_PX:
+                continue  # the body's own edge, not a thread: left unmeasured
             ring = (sub_gap > lo) & (sub_gap <= hi) & outside
             if ring.any():
                 levels[b] = float(np.percentile(sub_resp[ring], percentile))
