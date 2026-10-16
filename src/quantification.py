@@ -285,6 +285,29 @@ NETWORK_V2_METRICS = [
 ]
 
 
+# LOOPS. REPORT ONLY, and nothing in the pipeline deletes one: a loop in a
+# canalicular network is either a real anastomosis or two threads traced as one
+# ring, and which it is cannot be decided by this method, so it is counted and
+# left alone.
+#
+#   loop_count        the number of INDEPENDENT loops in the subgraph: edges
+#                     minus nodes plus connected components, the cyclomatic
+#                     number. 0 means a tree.
+#   loop_edge_share   the share of that subgraph's edges that lie ON a loop. An
+#                     edge lies on a loop when it is not a bridge: removing a
+#                     bridge disconnects the graph, removing any other edge does
+#                     not. It says how much of the network the loops carry,
+#                     which a count alone does not: one loop around a body and
+#                     one small triangle both count 1.
+#
+# Per cell the subgraph is the edges that cell owns; per field it is the whole
+# real graph, lacuna nodes left out of both.
+LOOP_METRICS = [
+    ("loop_count", "count", 0, "loops per cell"),
+    ("loop_edge_share", "share", 0, "share of a cell's edges on a loop"),
+]
+
+
 # Sholl crossings. Radii (px) from the lacuna masks: 30 px is the ring of the
 # headline measure; 10 px is the attach gap of the roots, so a crossing there is
 # a thread at root distance; 20 px is midway. Half width of the band: the
@@ -521,6 +544,41 @@ def sholl_crossings(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id
     return out
 
 
+def loop_numbers(graph: nx.Graph, edges: list) -> dict:
+    """(loop_count, loop_edge_share) of the subgraph on `edges`. REPORT ONLY."""
+    present = [e for e in edges if graph.has_edge(*e)]
+    if not present:
+        return {"loop_count": 0, "loop_edge_share": 0.0}
+    sub = graph.edge_subgraph(present)
+    n_edges = sub.number_of_edges()
+    loops = n_edges - sub.number_of_nodes() + nx.number_connected_components(sub)
+    bridges = len(list(nx.bridges(sub)))
+    return {"loop_count": int(loops),
+            "loop_edge_share": (n_edges - bridges) / n_edges if n_edges else 0.0}
+
+
+def add_loop_measures(rows: list[dict], detection: dict, precision: int) -> None:
+    """Append LOOP_METRICS to each per-lacuna row, in place. REPORT ONLY."""
+    graph = canaliculi.real_subgraph(detection["graph"])
+    edge_owner = detection["edge_owner"]
+    owned: dict = {}
+    for edge, owner_id in edge_owner.items():
+        owned.setdefault(owner_id, []).append(tuple(edge))
+    for row in rows:
+        numbers = loop_numbers(graph, owned.get(row["lacuna_id"], []))
+        row["loop_count"] = numbers["loop_count"]
+        row["loop_edge_share"] = round(float(numbers["loop_edge_share"]), precision)
+
+
+def loop_field_measures(detection: dict, precision: int) -> dict:
+    """The same two numbers for the whole image. REPORT ONLY."""
+    graph = canaliculi.real_subgraph(detection["graph"])
+    numbers = loop_numbers(graph, list(graph.edges()))
+    return {"loop_count": numbers["loop_count"],
+            "loop_edge_share": round(float(numbers["loop_edge_share"]), precision),
+            "edge_count": int(graph.number_of_edges())}
+
+
 def add_network_v2_measures(rows: list[dict], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
                             nearest_id: np.ndarray, precision: int) -> None:
     """Append the NETWORK_V2_METRICS to each per-lacuna row, in place."""
@@ -555,6 +613,7 @@ def summarize_network(rows: list[dict], precision: int) -> dict:
             sd = round(float(values.std(ddof=1)), precision) if values.size >= 2 else None
         stats[field] = {"mean": mean, "median": median, "sd": sd}
     for field, _unit, extra in (NORMALISED_METRICS + [m[:3] for m in NETWORK_V2_METRICS]
+                                + [m[:3] for m in LOOP_METRICS]
                                 + [m[:3] for m in WIDTH_CELL_METRICS]):
         if not interior or field not in interior[0]:
             continue
@@ -759,6 +818,10 @@ FIELD_UNITS = {
     "unattached_component_count": "count",
     "canalicular_length_density_attached_per_px": "px^-1",
     "field_length_density_with_unattached_per_px": "px^-1",
+    # Loops, report only (LOOP_METRICS).
+    "loop_count": "count",
+    "loop_edge_share": "share",
+    "edge_count": "count",
 }
 
 
@@ -786,6 +849,10 @@ SUMMARY_COLUMNS = [
     # field values.
     *[m[3] for m in NETWORK_V2_METRICS],
     *[c for _k, _u, c in FIELD_V2],
+    # Loops, report only, appended last so no existing column moves.
+    *[m[3] for m in LOOP_METRICS],
+    "loops per field",
+    "share of field edges on a loop",
     # Appended with the results layout: the image's label (lacunae.image_label).
     "image_label",
     # Appended with the detection and quantification split: the width.
@@ -1100,6 +1167,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
     net_rows = network_rows(kept, detection, dist_to_lacuna, nearest_id, precision)
     add_normalised_measures(net_rows, lacuna_id_map, dist_to_lacuna, nearest_id, precision)
     add_network_v2_measures(net_rows, skeleton, dist_to_lacuna, nearest_id, precision)
+    add_loop_measures(net_rows, detection, precision)
 
     # The canalicular width, the new measure.
     sample = width_sample_mask(detection)
@@ -1130,7 +1198,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
         "areas": [row["area_px2"] for row in rows],
         "lacuna_summary": summarize_lacuna_shape(shape_rows, precision),
         "summary": summarize_network(net_rows, precision),
-        "field": field,
+        "field": dict(field, **loop_field_measures(detection, precision)),
         "width": width_image_measures(width, sample, precision),
         "width_values": width[sample],
         "biological_limits": limits,
@@ -1168,13 +1236,18 @@ def v2_columns() -> list[str]:
     return [m[0] for m in NETWORK_V2_METRICS]
 
 
+def loop_columns() -> list[str]:
+    return [m[0] for m in LOOP_METRICS]
+
+
 def width_columns() -> list[str]:
     return [f for f, _u, _x, _c in WIDTH_CELL_METRICS]
 
 
 def lacuna_columns(rows: list[dict]) -> list[str]:
     """Every per-lacuna column, in output order, that the rows actually hold."""
-    order = shape_columns() + network_columns() + normalised_columns() + v2_columns() + width_columns()
+    order = (shape_columns() + network_columns() + normalised_columns() + v2_columns()
+             + width_columns() + loop_columns())
     seen, out = set(), []
     for name in order:
         if name not in seen and (not rows or name in rows[0]):
@@ -1298,6 +1371,11 @@ def save_xlsx(result: dict, out_path: Path) -> None:
         if field in result["summary"]:
             s = result["summary"][field]
             sheet.append([field, "network v2", s["mean"], s["median"], s["sd"], unit, n_interior])
+    for field, unit, _extra, _col in LOOP_METRICS:
+        if field in result["summary"]:
+            s = result["summary"][field]
+            sheet.append([field, "loops, report only", s["mean"], s["median"], s["sd"], unit,
+                          n_interior])
     for field, unit, _extra, _col in WIDTH_CELL_METRICS:
         s = result["summary"][field]
         sheet.append([field, "width", s["mean"], s["median"], s["sd"], unit, n_interior])
@@ -1475,6 +1553,10 @@ def per_image_lines(result: dict) -> list:
         if field in result["summary"]:
             s = result["summary"][field]
             stats_rows.append([field, "network v2", s["mean"], s["median"], s["sd"], unit])
+    for field, unit, _extra, _col in LOOP_METRICS:
+        if field in result["summary"]:
+            s = result["summary"][field]
+            stats_rows.append([field, "loops, report only", s["mean"], s["median"], s["sd"], unit])
     for field, unit, _extra, _col in WIDTH_CELL_METRICS:
         s = result["summary"][field]
         stats_rows.append([field, "width", s["mean"], s["median"], s["sd"], unit])
@@ -1555,6 +1637,8 @@ def summary_row(result: dict) -> list:
         + [summary.get(f, {}).get("mean") for f, _u, _x in NORMALISED_METRICS]
         + [summary.get(m[0], {}).get("mean") for m in NETWORK_V2_METRICS]
         + [field.get(k) for k in FIELD_V2_KEYS]
+        + [summary.get(m[0], {}).get("mean") for m in LOOP_METRICS]
+        + [field.get("loop_count"), field.get("loop_edge_share")]
         + [result["label"]]
         + [result["width"][f] for f, _u, _x, _c in WIDTH_IMAGE_METRICS]
         + [summary.get(f, {}).get("mean") for f, _u, _x, _c in WIDTH_CELL_METRICS])

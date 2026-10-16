@@ -1142,10 +1142,16 @@ def touching_bodies(G: nx.Graph, lacuna_id_map: np.ndarray, cell_ids: list[int])
         if not inside.any():
             continue
         gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
-        near = gap[rows[inside] - r_lo, cols[inside] - c_lo] <= CONTACT_REACH_PX
-        for node_index in np.flatnonzero(inside)[near]:
-            touching.setdefault(nodes[node_index], []).append(lacuna_id)
-    return touching
+        gaps = gap[rows[inside] - r_lo, cols[inside] - c_lo]
+        near = gaps <= CONTACT_REACH_PX
+        for node_index, node_gap in zip(np.flatnonzero(inside)[near], gaps[near]):
+            touching.setdefault(nodes[node_index], []).append((float(node_gap), lacuna_id))
+    # A node that touches two bodies goes to the NEARER surface. The first
+    # version gave it to both at weight 0 and let the tie fall to the lower cell
+    # id, which is arbitrary where a thread runs between two cells; the distance
+    # to the surface is not.
+    return {node: [lacuna_id for _gap, lacuna_id in sorted(found)[:1]]
+            for node, found in touching.items()}
 
 
 def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
@@ -1167,12 +1173,14 @@ def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarr
     visibly touch the cell (92 of 108 lacunae had skeleton within 8 px of the
     body that they did not own: python src/diagnostics.py contact).
 
-    With config.CONTACT_EVERY_TOUCHING_BODY, contact is offered by EVERY body
-    the node touches and not only by the nearest one (touching_bodies above),
-    which is what the rule has always said in words: a lacuna owns the thread
-    that touches it. Two bodies that both touch a node both reach it at distance
-    0, and the tie goes to the lower cell id, as every other tie in this file
-    does. Beyond the contact reach nothing changes.
+    With config.CONTACT_EVERY_TOUCHING_BODY, contact is decided by which bodies
+    the node TOUCHES and not by which body is nearest overall (touching_bodies
+    above), which is what the rule has always said in words: a lacuna owns the
+    thread that touches it. A node 5 px from one body and 7 px from another used
+    to be offered only to the second, because it was nearest, and then refused
+    by the signal test; it now attaches to the body it touches. A node that
+    touches two bodies goes to the nearer surface. Beyond the contact reach
+    nothing changes.
 
     SIGNAL, from there out to LACUNA_ATTACH_REACH_PX, at weight = the gap, so
     the path starts at the cell boundary. Distance alone would hand a lacuna any
