@@ -992,8 +992,18 @@ def _node_absorbed(G: nx.Graph, node) -> list:
 
 
 def prune_spurs(G: nx.Graph) -> bool:
-    """Remove terminal branches shorter than PRUNE_SPUR_LEN_PX, repeating
-    until nothing more qualifies. True if anything changed."""
+    """Remove terminal branches shorter than PRUNE_SPUR_LEN_PX from the GRAPH,
+    repeating until nothing more qualifies. True if anything changed.
+
+    The spur's pixels are NOT removed from the skeleton: only the graph drops
+    them. They are therefore folded into the node they hang off, exactly as a
+    collapse or a chain merge folds what it absorbs, so that the cell owning
+    that node owns them too. Without this they stayed in the skeleton with no
+    owner at all, and a short stub beside a body, which is the commonest thing
+    a new thread in a hole leaves behind, read as skeleton that no lacuna owns.
+    It changes no graph measure: the spur is still out of the graph, so no edge
+    length, degree or root count moves. What it changes is the owner map, and
+    only from nobody to the cell the stub hangs off."""
     any_change = False
     changed = True
     while changed:
@@ -1002,6 +1012,9 @@ def prune_spurs(G: nx.Graph) -> bool:
             if G.degree(node) == 1:
                 neighbor = next(iter(G.neighbors(node)))
                 if G[node][neighbor]["weight"] < PRUNE_SPUR_LEN_PX:
+                    absorbed = _node_absorbed(G, neighbor)
+                    absorbed.extend(G[node][neighbor].get("branches", ()))
+                    absorbed.extend(_node_absorbed(G, node))
                     G.remove_node(node)
                     changed = any_change = True
     G.remove_nodes_from([n for n in list(G.nodes()) if G.degree(n) == 0])

@@ -57,6 +57,10 @@ Subcommands:
     glow-check        the glow zone rule on against off: the skeleton inside
                       and outside the zones, the empty width, roots, owned and
                       unowned px, and the three checks that rule has to pass
+    hole-check        the zone from the hole (section 19) against the glow zone
+                      version (section 18): the acceptance tests, the loops, and
+                      the null floor of the empty width measured on synthetic
+                      bodies in tissue with no hole at all
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -82,6 +86,7 @@ Usage (from the repo root):
     python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background
     python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone
     python src/diagnostics.py glow-check -d data/WT -o results/glow_zone --pictures 543-2,543_3
+    python src/diagnostics.py hole-check -d data/WT -o results/hole_zone --pictures 543-2,543_3
 """
 
 from __future__ import annotations
@@ -4551,6 +4556,445 @@ def cmd_glow_check(args) -> int:
     return 0
 
 
+
+# hole-check ---------------------------------------------------------------------
+# The zone from the hole (METHODS section 19) against the glow zone version of
+# section 18, on every image, with the acceptance tests of the brief.
+#
+# Each image is run TWICE in one process: before with
+# config.HOLE_ZONE_RULE = False and config.CONTACT_EVERY_TOUCHING_BODY = False,
+# which is the glow zone version exactly, and after as configured.
+#
+# The empty width is read against its own FLOOR, which this check measures: the
+# same sector rule applied to HOLE_NULL_DISCS synthetic bodies of the image's
+# own median body size, dropped in tissue at least HOLE_NULL_CLEAR_PX from every
+# real lacuna, where there is no body and so no hole at all. A sector near a
+# body is a thin wedge (at 10 px from a 25 px body it is 0.35 px wide), so the
+# measure cannot read 0 however complete the tracing is, and the floor is what
+# says how much of the number left is a hole and how much is the measure.
+
+HOLE_NULL_DISCS = 40
+HOLE_NULL_CLEAR_PX = 120
+# Test C reads the skeleton this close to a body.
+HOLE_BAND_PX = 8
+# A hole this wide is marked in the pictures.
+HOLE_MARK_PX = 20
+
+
+def _hole_run(image_path: Path, new_rule: bool) -> dict:
+    """One run of the pipeline, with the new rule on or off, and everything the
+    check reads from it."""
+    saved = (config.HOLE_ZONE_RULE, config.CONTACT_EVERY_TOUCHING_BODY)
+    config.HOLE_ZONE_RULE = bool(new_rule)
+    config.CONTACT_EVERY_TOUCHING_BODY = bool(new_rule)
+    try:
+        d = contact_detection(image_path)
+    finally:
+        config.HOLE_ZONE_RULE, config.CONTACT_EVERY_TOUCHING_BODY = saved
+    d["widths"] = canaliculi.empty_width_px(d["lacuna_id_map"], d["skeleton"], d["n_lacunae"])
+    return d
+
+
+def hole_null_floor(d: dict, discs: int = HOLE_NULL_DISCS) -> dict:
+    """What the empty width reads around a body that has no hole: the same
+    sector rule applied to synthetic discs of this image's own median body size,
+    dropped in tissue at least HOLE_NULL_CLEAR_PX from every real lacuna.
+
+    This is the floor of the measure, not of the method. A sector is a wedge
+    whose width grows with the radius, so near a body it holds very few pixels
+    and the first skeleton pixel in it sits further out than the nearest
+    skeleton pixel in any direction. Without this number there is no way to say
+    whether an empty width of 20 px is a hole or the measure."""
+    lacuna_id_map, skeleton = d["lacuna_id_map"], d["skeleton"]
+    areas = [int((lacuna_id_map == i).sum()) for i in range(1, d["n_lacunae"] + 1)]
+    if not areas:
+        return {"discs": 0}
+    radius = float(np.median([np.sqrt(a / np.pi) for a in areas]))
+    far = ndi.distance_transform_edt(lacuna_id_map == 0) > HOLE_NULL_CLEAR_PX
+    rows, cols = np.nonzero(far)
+    edge = int(np.ceil(radius)) + canaliculi.HOLE_MAX_SEARCH_PX // 2
+    keep = ((rows > edge) & (rows < lacuna_id_map.shape[0] - edge)
+            & (cols > edge) & (cols < lacuna_id_map.shape[1] - edge))
+    rows, cols = rows[keep], cols[keep]
+    if rows.size == 0:
+        return {"discs": 0}
+    rng = np.random.default_rng(config.RANDOM_SEED)
+    pick = rng.choice(rows.size, size=int(min(discs, rows.size)), replace=False)
+    rr, cc = np.indices(lacuna_id_map.shape)
+    widths = []
+    for k in pick:
+        disc = ((rr - rows[k]) ** 2 + (cc - cols[k]) ** 2) <= radius ** 2
+        w = canaliculi.empty_width_px(disc.astype(np.int32), skeleton & ~disc, 1)
+        if np.isfinite(w[1]):
+            widths.append(float(w[1]))
+    if not widths:
+        return {"discs": 0}
+    widths = np.array(widths)
+    return {
+        "discs": int(widths.size),
+        "disc_radius_px": round(radius, 2),
+        "min": round(float(widths.min()), 2),
+        "p10": round(float(np.percentile(widths, 10)), 2),
+        "median": round(float(np.median(widths)), 2),
+        "p90": round(float(np.percentile(widths, 90)), 2),
+        "max": round(float(widths.max()), 2),
+    }
+
+
+def hole_band_split(d: dict, near_px: int = HOLE_BAND_PX) -> dict:
+    """The skeleton within `near_px` of a body, as its own, nobody's, or another
+    lacuna's, summed over the lacunae of one image. Test C reads this."""
+    skel, owner_map = d["skeleton"], d["owner_map"]
+    mine = unowned = other = 0
+    for lacuna_id in range(1, d["n_lacunae"] + 1):
+        body = d["lacuna_id_map"] == lacuna_id
+        if not body.any():
+            continue
+        r_lo, r_hi, c_lo, c_hi = canaliculi._body_window(body, skel.shape, near_px)
+        gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
+        near = (gap <= near_px) & skel[r_lo:r_hi, c_lo:c_hi]
+        own_here = owner_map[r_lo:r_hi, c_lo:c_hi]
+        mine += int((near & (own_here == lacuna_id)).sum())
+        unowned += int((near & (own_here == 0)).sum())
+        other += int((near & (own_here > 0) & (own_here != lacuna_id)).sum())
+    return {"own_px": mine, "unowned_px": unowned, "another_lacunas_px": other,
+            "wrong_px": unowned + other, "total_px": mine + unowned + other,
+            "wrong_share": round((unowned + other) / max(1, mine + unowned + other), 4)}
+
+
+def hole_loops(d: dict) -> dict:
+    """Loops, report only and never deleted: how many independent cycles the
+    network holds and what share of its edges lie on one.
+
+    The cycle count is the cyclomatic number of the real subgraph, edges minus
+    nodes plus components, which is the number of independent loops in it. An
+    edge lies on a loop when it is not a bridge: removing a bridge disconnects
+    the graph, removing any other edge does not."""
+    graph = canaliculi.real_subgraph(d["graph"])
+    edges = graph.number_of_edges()
+    nodes = graph.number_of_nodes()
+    parts = nx.number_connected_components(graph) if nodes else 0
+    bridges = len(list(nx.bridges(graph))) if edges else 0
+    per_cell = {}
+    for lacuna_id in range(1, d["n_lacunae"] + 1):
+        owned = [tuple(e) for e, owner in d["net"]["edge_owner"].items() if owner == lacuna_id]
+        sub = graph.edge_subgraph([e for e in owned if graph.has_edge(*e)]).copy()
+        sub_edges = sub.number_of_edges()
+        if not sub_edges:
+            per_cell[lacuna_id] = {"loop_count": 0, "loop_edge_share": 0.0}
+            continue
+        sub_bridges = len(list(nx.bridges(sub)))
+        per_cell[lacuna_id] = {
+            "loop_count": int(sub_edges - sub.number_of_nodes()
+                              + nx.number_connected_components(sub)),
+            "loop_edge_share": round((sub_edges - sub_bridges) / sub_edges, 4),
+        }
+    return {
+        "loop_count": int(edges - nodes + parts),
+        "edges": int(edges),
+        "loop_edge_share": round((edges - bridges) / edges, 4) if edges else 0.0,
+        "per_cell": per_cell,
+    }
+
+
+def hole_pictures(before: dict, after: dict, out_dir: Path, mark_px: int = HOLE_MARK_PX) -> list:
+    """Before and after, skeleton and verification, for one image, with every
+    lacuna whose hole is still wider than `mark_px` ringed in the after
+    verification picture."""
+    from skimage.io import imsave
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    for tag, d in (("hole_before", before), ("hole_after", after)):
+        path = out_dir / f"{d['label']}_{tag}_skeleton.png"
+        imsave(path, (d["skeleton"] * 255).astype(np.uint8), check_contrast=False)
+        written.append(path.as_posix())
+        path = out_dir / f"{d['label']}_{tag}.png"
+        canaliculi.save_verification(d["net"], path)
+        written.append(path.as_posix())
+    # The marked picture: the after verification with a ring at each hole that
+    # is still wider than mark_px, so what is left is visible and counted.
+    marked = out_dir / f"{after['label']}_hole_after_marked.png"
+    from skimage.io import imread
+
+    vis = imread(out_dir / f"{after['label']}_hole_after.png")
+    vis = np.array(vis[..., :3], dtype=np.uint8, copy=True)
+    rr, cc = np.indices(vis.shape[:2])
+    still = []
+    for lacuna_id in range(1, after["n_lacunae"] + 1):
+        width = after["widths"][lacuna_id]
+        if not np.isfinite(width) or width <= mark_px:
+            continue
+        body = after["lacuna_id_map"] == lacuna_id
+        rows, cols = np.nonzero(body)
+        r0, c0 = float(rows.mean()), float(cols.mean())
+        radius = float(np.hypot(rows - r0, cols - c0).max()) + float(width)
+        ring = np.abs(np.hypot(rr - r0, cc - c0) - radius) <= 1.0
+        vis[ring] = (255, 255, 255)
+        still.append({"lacuna_id": lacuna_id, "centroid_xy": [round(c0, 1), round(r0, 1)],
+                      "empty_width_px": round(float(width), 2)})
+    imsave(marked, vis, check_contrast=False)
+    written.append(marked.as_posix())
+    return written, still
+
+
+def _hole_one(job: tuple) -> dict:
+    path_str, out_dir, want_pictures = job
+    image_path = Path(path_str)
+    after = _hole_run(image_path, True)
+    before = _hole_run(image_path, False)
+    zone = after["net"]["glow_zone"]
+    zones_either = zone | before["net"]["glow_zone"]
+    n = after["n_lacunae"]
+    extents = after["net"]["zone_extents_px"]
+    glow = after["net"]["glow_extents_px"]
+
+    rows = []
+    for i in range(1, n + 1):
+        wb, wa = before["widths"][i], after["widths"][i]
+        loops_b = hole_loops_cached(before)["per_cell"].get(i, {})
+        loops_a = hole_loops_cached(after)["per_cell"].get(i, {})
+        rows.append({
+            "image_label": after["label"],
+            "lacuna_id": i,
+            "centroid_xy": contact_centroid(after["lacuna_id_map"] == i),
+            "glow_extent_px": round(float(glow[i]), 2),
+            "zone_extent_px": round(float(extents[i]), 2),
+            "hole_width_measured_px": (round(float(after["net"]["hole_width_px"][i]), 2)
+                                       if np.isfinite(after["net"]["hole_width_px"][i]) else None),
+            "empty_width_before_px": None if not np.isfinite(wb) else round(float(wb), 2),
+            "empty_width_after_px": None if not np.isfinite(wa) else round(float(wa), 2),
+            "within_glow_extent_plus_10": (bool(np.isfinite(wa) and wa <= float(glow[i]) + 10.0)),
+            "roots_before": quantification.cell_root_count(before["graph"], i),
+            "roots_after": quantification.cell_root_count(after["graph"], i),
+            "owned_px_before": int((before["owner_map"] == i).sum()),
+            "owned_px_after": int((after["owner_map"] == i).sum()),
+            "loop_count_after": loops_a.get("loop_count", 0),
+            "loop_edge_share_after": loops_a.get("loop_edge_share", 0.0),
+            "loop_count_before": loops_b.get("loop_count", 0),
+        })
+
+    def side(d, mask):
+        skel = d["skeleton"]
+        return {"skeleton_px": int((skel & mask).sum()),
+                "mask_px": int((d["candidate"] & mask).sum()),
+                "first_pass_mask_px": int((d["candidate_first_pass"] & mask).sum()),
+                "owned_px": int((skel & mask & (d["owner_map"] > 0)).sum()),
+                "unowned_px": int((skel & mask & (d["owner_map"] == 0)).sum())}
+
+    owned_after = [int((after["owner_map"] == i).sum()) for i in range(1, n + 1)]
+    owned_before = [int((before["owner_map"] == i).sum()) for i in range(1, n + 1)]
+    skel_after = max(1, int(after["skeleton"].sum()))
+    skel_before = max(1, int(before["skeleton"].sum()))
+    pictures, still = [], []
+    if want_pictures:
+        pictures, still = hole_pictures(before, after, Path(out_dir))
+    return {
+        "image_label": after["label"],
+        "lacunae": n,
+        "zone_px": int(zone.sum()),
+        "zone_extent_px": {"min": round(float(extents[1:].min()), 2),
+                           "median": round(float(np.median(extents[1:])), 2),
+                           "max": round(float(extents[1:].max()), 2),
+                           "at_the_cap": int((extents[1:] >= canaliculi.GLOW_ZONE_MAX_PX
+                                              - 1e-9).sum())},
+        "gains": after["net"]["hole_zone"]["gains"] if after["net"]["hole_zone"] else None,
+        "guard": after["net"]["hole_zone"]["guard"] if after["net"]["hole_zone"] else None,
+        "mask_added_in_the_zone_px": (after["net"]["hole_zone"]["added_px"]
+                                      if after["net"]["hole_zone"] else 0),
+        # Test A. Outside the zones of BOTH versions: the before run grew mask
+        # inside its own glow zone, which is not always inside the new one, so
+        # the only region where neither rule was allowed to write is the
+        # complement of the union. The stricter figure, against the new zone
+        # alone, is reported beside it.
+        "first_pass_mask_outside_the_zones_identical": bool(
+            ((before["candidate_first_pass"] & ~zones_either)
+             == (after["candidate_first_pass"] & ~zones_either)).all()),
+        "first_pass_mask_differs_outside_the_new_zone_px": int(
+            ((before["candidate_first_pass"] & ~zone)
+             != (after["candidate_first_pass"] & ~zone)).sum()),
+        "glow_zone_px_outside_the_new_zone": int((before["net"]["glow_zone"] & ~zone).sum()),
+        "changed_px_against_the_glow_zone_version": int(
+            (before["skeleton"] != after["skeleton"]).sum()),
+        "inside_the_zone": {"before": side(before, zone), "after": side(after, zone)},
+        "outside_the_zone": {"before": side(before, ~zone), "after": side(after, ~zone)},
+        "skeleton_px": {"before": skel_before, "after": skel_after},
+        "owned_px": {"before": int((before["owner_map"] > 0).sum()),
+                     "after": int((after["owner_map"] > 0).sum())},
+        "length_prune_px": {"before": before["length_prune"]["removed_px"],
+                            "after": after["length_prune"]["removed_px"]},
+        "unattached_px": {"before": int(before["unattached"].sum()),
+                          "after": int(after["unattached"].sum())},
+        "empty_width_px": {
+            "before": round(float(np.nanmedian(before["widths"][1:])), 2),
+            "after": round(float(np.nanmedian(after["widths"][1:])), 2),
+            "null_floor": hole_null_floor(after),
+            "shrank": int(np.sum(np.nan_to_num(after["widths"][1:], nan=np.inf)
+                                 < np.nan_to_num(before["widths"][1:], nan=np.inf))),
+        },
+        "roots_per_lacuna": {
+            "before": round(float(np.mean([r["roots_before"] for r in rows])), 2),
+            "after": round(float(np.mean([r["roots_after"] for r in rows])), 2),
+            "under_3_before": int(sum(1 for r in rows if r["roots_before"] < 3)),
+            "under_3_after": int(sum(1 for r in rows if r["roots_after"] < 3)),
+        },
+        "band_8px": {"before": hole_band_split(before), "after": hole_band_split(after)},
+        "biggest_owner_share": {
+            "before": round(max(owned_before) / skel_before, 4) if owned_before else 0.0,
+            "after": round(max(owned_after) / skel_after, 4) if owned_after else 0.0,
+        },
+        "loops": {"before": {k: v for k, v in hole_loops_cached(before).items()
+                             if k != "per_cell"},
+                  "after": {k: v for k, v in hole_loops_cached(after).items()
+                            if k != "per_cell"}},
+        "rows": rows,
+        "pictures": pictures,
+        "holes_still_wider_than_the_mark": still,
+    }
+
+
+_HOLE_LOOPS_CACHE: dict = {}
+
+
+def hole_loops_cached(d: dict) -> dict:
+    key = id(d)
+    if key not in _HOLE_LOOPS_CACHE:
+        _HOLE_LOOPS_CACHE[key] = hole_loops(d)
+    return _HOLE_LOOPS_CACHE[key]
+
+
+def cmd_hole_check(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    wanted = {s.strip() for s in args.pictures.split(",") if s.strip()}
+    args.out.mkdir(parents=True, exist_ok=True)
+    jobs = [(str(p), str(args.before_after), lacunae.image_label(p) in wanted) for p in images]
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(jobs)))) as ex:
+        out = list(ex.map(_hole_one, jobs))
+
+    rows = [r for o in out for r in o["rows"]]
+    widths_after = [r["empty_width_after_px"] for r in rows if r["empty_width_after_px"]]
+    widths_before = [r["empty_width_before_px"] for r in rows if r["empty_width_before_px"]]
+    shrank = sum(1 for r in rows
+                 if r["empty_width_after_px"] and r["empty_width_before_px"]
+                 and r["empty_width_after_px"] < r["empty_width_before_px"])
+    within = sum(1 for r in rows if r["within_glow_extent_plus_10"])
+    wrong_before = sum(o["band_8px"]["before"]["wrong_px"] for o in out)
+    wrong_after = sum(o["band_8px"]["after"]["wrong_px"] for o in out)
+    roots_fell = [o["image_label"] for o in out
+                  if o["roots_per_lacuna"]["after"] < o["roots_per_lacuna"]["before"]]
+    under3 = {"before": sum(o["roots_per_lacuna"]["under_3_before"] for o in out),
+              "after": sum(o["roots_per_lacuna"]["under_3_after"] for o in out)}
+    biggest = [o for o in out if o["biggest_owner_share"]["after"] > 0.25
+               and o["biggest_owner_share"]["after"] > o["biggest_owner_share"]["before"]]
+    floors = [o["empty_width_px"]["null_floor"].get("median") for o in out
+              if o["empty_width_px"]["null_floor"].get("median")]
+    tests = {
+        "A_mask_outside_every_zone_identical": all(
+            o["first_pass_mask_outside_the_zones_identical"] for o in out),
+        "B_empty_width": {
+            "median_after_px": round(float(np.median(widths_after)), 2),
+            "median_before_px": round(float(np.median(widths_before)), 2),
+            "target_px": 15.0,
+            "null_floor_median_px": round(float(np.median(floors)), 2) if floors else None,
+            "within_glow_extent_plus_10": within,
+            "of_lacunae": len(rows),
+            "share_within": round(within / max(1, len(rows)), 4),
+            "shrank": shrank,
+            "above_the_null_floor_px": (round(float(np.median(widths_after))
+                                              - float(np.median(floors)), 2) if floors else None),
+            "images_at_or_under_their_own_floor": [
+                o["image_label"] for o in out
+                if o["empty_width_px"]["null_floor"].get("median")
+                and o["empty_width_px"]["after"] <= o["empty_width_px"]["null_floor"]["median"]],
+            "pass": bool(float(np.median(widths_after)) < 15.0
+                         and within / max(1, len(rows)) >= 0.9),
+        },
+        "C_contact": {
+            "wrong_px_before": wrong_before,
+            "wrong_px_after": wrong_after,
+            "fall": round(1.0 - wrong_after / max(1, wrong_before), 4),
+            "target_fall": 0.8,
+            "pass": bool(wrong_after <= 0.2 * wrong_before),
+        },
+        "D_roots": {
+            "images_where_roots_fell": roots_fell,
+            "under_3_roots": under3,
+            "pass": bool(not roots_fell and under3["after"] <= under3["before"]),
+        },
+        "E_biggest_owner": {
+            "images_over_a_quarter": [
+                {"image_label": o["image_label"],
+                 "before": o["biggest_owner_share"]["before"],
+                 "after": o["biggest_owner_share"]["after"]} for o in biggest],
+            "largest_share_after": max(o["biggest_owner_share"]["after"] for o in out),
+            "pass": bool(not biggest),
+        },
+    }
+    report = {
+        "status": "measurement only: each image run twice, nothing in the pipeline was changed",
+        "what_before_means": ("config.HOLE_ZONE_RULE = False and "
+                              "config.CONTACT_EVERY_TOUCHING_BODY = False, which is the glow "
+                              "zone version of METHODS section 18"),
+        "constants": {
+            "hole_zone_margin_um": config.HOLE_ZONE_MARGIN_UM,
+            "hole_zone_max_um": config.GLOW_ZONE_MAX_UM,
+            "hole_gain_band_um": config.HOLE_GAIN_BAND_UM,
+            "hole_gain_percentile": config.HOLE_GAIN_PERCENTILE,
+            "hole_gain_clip": [config.HOLE_GAIN_MIN, config.HOLE_GAIN_MAX],
+            "hole_gain_step_um": config.HOLE_GAIN_STEP_UM,
+            "hole_gain_smooth": config.HOLE_GAIN_SMOOTH,
+            "hole_new_min_length_um": config.HOLE_NEW_MIN_LENGTH_UM,
+            "hole_new_min_aspect": config.HOLE_NEW_MIN_ASPECT,
+            "contact_reach_px": canaliculi.CONTACT_REACH_PX,
+            "contact_every_touching_body": config.CONTACT_EVERY_TOUCHING_BODY,
+        },
+        "tests": tests,
+        "per_image": [{k: v for k, v in o.items() if k != "rows"} for o in out],
+        "per_lacuna": rows,
+    }
+    (args.out / "hole_check.json").write_text(json.dumps(report, indent=2) + "\n",
+                                              encoding="utf-8")
+    print_table(["image", "zone px", "empty width", "null floor", "roots", "skeleton px",
+                 "8 px wrong", "loops"],
+                [[o["image_label"], o["zone_px"],
+                  f'{o["empty_width_px"]["before"]} -> {o["empty_width_px"]["after"]}',
+                  o["empty_width_px"]["null_floor"].get("median"),
+                  f'{o["roots_per_lacuna"]["before"]} -> {o["roots_per_lacuna"]["after"]}',
+                  f'{o["skeleton_px"]["before"]} -> {o["skeleton_px"]["after"]}',
+                  f'{o["band_8px"]["before"]["wrong_px"]} -> {o["band_8px"]["after"]["wrong_px"]}',
+                  f'{o["loops"]["before"]["loop_count"]} -> {o["loops"]["after"]["loop_count"]}']
+                 for o in out],
+                title="Before (glow zone version) and after (the zone from the hole)")
+    b = tests["B_empty_width"]
+    print(f"\nA mask outside every zone identical: {'PASS' if tests['A_mask_outside_every_zone_identical'] else 'FAIL'}")
+    print(f"B empty width median {b['median_before_px']} -> {b['median_after_px']} px, "
+          f"target under {b['target_px']}, null floor of the measure "
+          f"{b['null_floor_median_px']}: {'PASS' if b['pass'] else 'FAIL'}")
+    print(f"  within the glow extent plus 10 px: {b['within_glow_extent_plus_10']} of "
+          f"{b['of_lacunae']} ({100 * b['share_within']:.1f}%), smaller hole on {b['shrank']}")
+    c = tests["C_contact"]
+    print(f"C skeleton within 8 px of a body that is not its own: {c['wrong_px_before']} -> "
+          f"{c['wrong_px_after']} px, a fall of {100 * c['fall']:.1f}%, target 80: "
+          f"{'PASS' if c['pass'] else 'FAIL'}")
+    d = tests["D_roots"]
+    print(f"D roots per lacuna fell on: {d['images_where_roots_fell'] or 'no image'}; "
+          f"lacunae under 3 roots {d['under_3_roots']['before']} -> "
+          f"{d['under_3_roots']['after']}: {'PASS' if d['pass'] else 'FAIL'}")
+    e = tests["E_biggest_owner"]
+    print(f"E biggest owner share, largest after: {e['largest_share_after']}: "
+          f"{'PASS' if e['pass'] else 'FAIL'}")
+    print(f"\nreport -> {args.out / 'hole_check.json'}")
+    for o in out:
+        for p in o["pictures"]:
+            print(f"picture -> {p}")
+        for s in o["holes_still_wider_than_the_mark"]:
+            print(f"  {o['image_label']} lacuna {s['lacuna_id']} at {s['centroid_xy']}: "
+                  f"hole still {s['empty_width_px']} px")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -4759,6 +5203,23 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each (two runs each).")
     p.set_defaults(func=cmd_glow_check)
+
+    p = sub.add_parser("hole-check",
+                       help="The zone from the hole against the glow zone version, with the "
+                            "acceptance tests and the null floor of the empty width.")
+    p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR,
+                   help="Folder of .tif images.")
+    p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
+    p.add_argument("-o", dest="out", type=Path, default=config.RESULTS_DIR / "hole_zone",
+                   help="Output folder (default: results/hole_zone).")
+    p.add_argument("--pictures", default="",
+                   help="Image labels, comma separated, to write before and after pictures for.")
+    p.add_argument("--before-after", dest="before_after", type=Path,
+                   default=config.RESULTS_DIR / "before_after",
+                   help="Where those pictures go (default: results/before_after).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each (two runs each).")
+    p.set_defaults(func=cmd_hole_check)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
