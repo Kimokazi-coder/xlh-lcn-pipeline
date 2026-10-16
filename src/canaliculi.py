@@ -77,8 +77,8 @@ image name of config.IMAGE_LABELS; see lacunae.image_label and result_path):
 After a --dir run, also results/all_images/summary_all_images.xlsx and .csv
 (one row per image; see write_summary_table).
 
-Regression check: 543-2 must give 146.42 edges per interior cell, 21.99 px
-mean edge length and 7.67 roots per interior cell
+Regression check: 543-2 must give 161.00 edges per interior cell, 21.63 px
+mean edge length and 8.50 roots per interior cell
 (python src/diagnostics.py reference-check).
 
 Usage (from the repo root):

@@ -43,7 +43,7 @@
     "dim_thread_cut_fraction": 0.5,
     "dim_thread_reach_um": 0.65,
     "dim_thread_reach_px": 5,
-    "dim_pass_added_px": 42855,
+    "dim_pass_added_px": 46387,
     "lacuna_attach_reach_um": 2.6,
     "lacuna_attach_reach_px": 20,
     "lacuna_attach_min_signal_fraction": 0.7,
@@ -52,6 +52,39 @@
     "glow_zone_cut_fraction": 0.5,
     "glow_zone_max_um": 8.0,
     "glow_zone_max_px": 62,
+    "hole_zone_rule": true,
+    "hole_zone_margin_um": 0.39,
+    "hole_zone_margin_px": 3.0,
+    "hole_zone_sectors": 180,
+    "hole_gain_band_um": 5.2,
+    "hole_gain_percentile": 50,
+    "hole_gain_clip": [
+      1.0,
+      3.0
+    ],
+    "hole_new_min_length_um": 10.0,
+    "hole_new_min_length_px": 77,
+    "hole_new_min_aspect": 3.0,
+    "hole_zone_px": 119134,
+    "hole_zone_added_px": 9772,
+    "hole_gain_step_um": 0.26,
+    "hole_gain_smooth_annuli": 3,
+    "hole_zone_gains": {
+      "lacunae": 12,
+      "at_the_body_edge": {
+        "min": 1.4609,
+        "median": 3.0,
+        "max": 3.0
+      },
+      "at_the_outer_end": {
+        "min": 1.0,
+        "median": 1.0848,
+        "max": 1.9919
+      },
+      "at_the_cap": 9
+    },
+    "hole_zone_guard_dropped_px": 601,
+    "contact_every_touching_body": true,
     "lacuna_attach_rule": "a node attaches only if the dimmest ridge response on the straight path from the lacuna surface to it reaches that fraction of the response's own low cut",
     "prune_spur_len_px": 4,
     "min_internal_edge_len_px": 6,
@@ -64,7 +97,7 @@
     ],
     "max_canaliculus_length_um": 50.0,
     "max_canaliculus_length_px": 385,
-    "length_prune_removed_px": 6736,
+    "length_prune_removed_px": 3560,
     "length_prune_rounds": 1,
     "canaliculus_length_range_um": [
       25.0,
@@ -72,7 +105,7 @@
     ]
   },
   "provenance": {
-    "git_commit": "baa51eacc14666ebc0e077031a3f984c7d4bd7b1",
+    "git_commit": "80b7fe761159c9578a24a66b961420a63bde0b8c",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -83,7 +116,7 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "7ccdbafa5b619183",
+    "config_hash": "153311eabefcc081",
     "config_hash_covers": [
       "ALL_IMAGES_ARCHIVE_DIR",
       "ALL_IMAGES_DIR",
@@ -95,6 +128,7 @@
       "CANALICULUS_LENGTH_RANGE_UM",
       "CHANNEL",
       "CHANNEL_AXIS",
+      "CONTACT_EVERY_TOUCHING_BODY",
       "CONTACT_REACH_PX",
       "CSV_FLOAT_PRECISION",
       "DIM_LACUNA_MAX_PEAK",
@@ -109,6 +143,16 @@
       "GLOW_TRIM_WIDTH_FRACTION",
       "GLOW_ZONE_CUT_FRACTION",
       "GLOW_ZONE_MAX_UM",
+      "HOLE_GAIN_BAND_UM",
+      "HOLE_GAIN_MAX",
+      "HOLE_GAIN_MIN",
+      "HOLE_GAIN_PERCENTILE",
+      "HOLE_GAIN_SMOOTH",
+      "HOLE_GAIN_STEP_UM",
+      "HOLE_NEW_MIN_ASPECT",
+      "HOLE_NEW_MIN_LENGTH_UM",
+      "HOLE_ZONE_MARGIN_UM",
+      "HOLE_ZONE_RULE",
       "IMAGE_LABELS",
       "INVERT_SIGNAL",
       "LACUNA_ATTACH_MIN_SIGNAL_FRACTION",
