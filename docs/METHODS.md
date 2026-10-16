@@ -245,6 +245,7 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 | 2026-10-13 | The 50 um length limit is adopted, measured along the network, and prunes. Two report-only limits are added beside it. Nothing about any of them is validated. |
 | 2026-10-13 | The repository keeps only what the pipeline, the figures and the checks use. Earlier experiments, reports and analyses live at the tag `archive-2026-10-13`. |
 | 2026-10-14 | The GLOW ZONE is adopted: inside each lacuna's own glow extent, measured on the raw channel, the ridge response is accepted down to half the low cut where it continues mask the global cut already produced. One global cut was emptying a ring around every body, 27.4 px wide at the median, by dropping 59.9% of everything visible there (section 18). Outside the zones the mask is unchanged. 543-2 reference becomes 146.42 / 21.99 / 7.67. Not validated. |
+| 2026-10-16 | The ZONE FROM THE HOLE replaces the glow zone as what decides where the lower cut applies: each lacuna's empty width, measured on the global cut skeleton, plus one thread half width, capped at 8 um; inside it the response is multiplied by that lacuna's contrast gain, read by distance from the body because the loss is a trough, and the SAME global cuts are applied. No requirement to connect to existing mask, and a noise guard on mask that did not exist before. A lacuna is offered every node that touches it, not only the nodes it is nearest to, and a pruned spur now keeps the owner of the node it hangs off (section 19). 543-2 reference becomes 161.00 / 21.63 / 8.50. Not validated. |
 | 2026-10-14 | CONTACT is adopted: a skeleton node within 6 px of a body attaches to its nearest lacuna with no signal test and at weight 0, so a lacuna that is touched owns what touches it and no neighbour can swallow it. The signal test keeps governing from 6 to 20 px and the 50 um prune is untouched. 543-2 reference becomes 128.42 / 19.53 / 5.92. Not validated. |
 
 ## 6. Open questions
@@ -905,7 +906,7 @@ With all off, `results/` is reproduced exactly
 
 ## 13. Checks (`src/diagnostics.py`)
 
-- `reference-check`: 146.42 edges per cell, 21.99 px mean edge length and 7.67 roots per cell on
+- `reference-check`: 161.00 edges per cell, 21.63 px mean edge length and 8.50 roots per cell on
   543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
   being a headline measure that does not depend on ownership.
 - `regression`: regenerate every image into an ignored folder and compare every json and summary number
@@ -1383,4 +1384,241 @@ the after picture.
 **Not validated.** None of this is a hand count. The rule recovers thread the
 method was throwing away, and whether that thread is real is a question for the
 manual tracing in `manual_trace/`, under the protocol fixed in advance in
+`docs/NETWORK_TUNING_PROTOCOL.md`.
+
+## 19. The zone from the hole, the gain inside it, and what the hole measure can read
+
+Section 18 lowered the cut inside each lacuna's **glow extent**. It recovered
+7% of the skeleton on 543-2 and left the holes where they were: over the 108
+lacunae the empty width fell only from 27.4 to 24.2 px. Two measured reasons.
+
+- **The zone was narrower than the hole.** The glow extents run 3.9 to 33.2 px
+  and the holes they are meant to fill run 9.0 to 59.2 px, median 27.4. A zone
+  that stops short of the missing thread cannot recover it.
+- **It could only extend mask that was already there.** `grow_in_glow_zone` is a
+  propagation seeded by the global cut, so a thread whose whole run inside the
+  hole is under that cut has no seed to grow from, and that is the thread the
+  holes are made of.
+
+So the zone is now measured on the hole itself, and the cut inside it is the
+**same global cut** applied to a response that has been put back on the footing
+of the tissue just beyond the hole. The glow extent is still measured
+(`canaliculi.glow_extent_px`), because it is what section 18 documents and what
+the checks read the zone against; it no longer decides where the cut applies.
+
+```
+python src/diagnostics.py hole-check -d data/WT -o results/hole_zone --pictures 543-2,543_3
+```
+
+### The zone
+
+Per lacuna: its **empty width**, by the 180 sector rule of section 18
+(`canaliculi.empty_width_px`), measured on the skeleton the **global cut**
+produced before any zone pass, so the zone is never defined by its own output;
+plus `config.HOLE_ZONE_MARGIN_UM` = 0.39 um = 3 px, one thread half width, so
+the zone reaches the first thread that bounds the hole instead of stopping just
+short of it; capped at `config.GLOW_ZONE_MAX_UM` = 8 um, the cap of section 18.
+
+Zones overlap where two bodies are close. A pixel claimed by several goes to the
+**nearer** of the bodies that claim it, which is the partition ownership already
+uses, so every pixel has exactly one gain and none is boosted twice.
+
+It is never a fixed width, for the reason section 18 gives: a lacuna with a
+wider hole, which is what a periosteocytic lesion makes, gets a wider zone.
+Measured over the 8 images the zone extents run 14 to 59 px, and **no lacuna
+reaches the 8 um cap**.
+
+### The gain, and why it is radial
+
+Inside its own zone and nowhere else, each lacuna's ridge response is multiplied
+by its own **contrast gain** and the same global cuts are then applied to it.
+The gain is the `config.HOLE_GAIN_PERCENTILE` = 50th percentile of the response
+in the band just beyond the zone over the same percentile inside it, which is
+section 18's own measurement (31 to 71%, a gain of 1.4 to 3.2), clipped to
+`config.HOLE_GAIN_MIN` = 1 so the cut inside a zone is never stricter than
+outside it and to `config.HOLE_GAIN_MAX` = 3.
+
+**One gain per lacuna does not work, and the measurement says why.** The p90 of
+the ridge response by distance from the body edge on 543-2, as a multiple of the
+low cut:
+
+| distance from the body | 0 to 5 px | 5 to 10 | 10 to 15 | 15 to 20 | 20 to 25 | 25 to 30 | 30 to 40 | 40 to 50 | 50 to 70 |
+|---|---|---|---|---|---|---|---|---|---|
+| response p90 / low cut | 0.87 | 1.50 | 2.07 | 2.41 | 2.71 | 3.02 | 3.41 | 3.76 | 3.70 |
+
+The loss is not flat across the hole: it is a **trough**, deepest at the body
+and recovering outward to a plateau 40 px out, which is the top-hat digging
+around a bright body (section 8 names the same trough in the attachment rule).
+One gain of about 2 therefore over-corrects the outer half of the zone, where
+the skeleton already is, and under-corrects the inner half, where the empty
+width is decided. Tried first: it added 12,000 px of mask on 543-2 and moved the
+empty width by nothing.
+
+So the gain is a **radial profile**: measured in annuli
+`config.HOLE_GAIN_STEP_UM` = 0.26 um = 2 px wide, smoothed over
+`config.HOLE_GAIN_SMOOTH` = 3 annuli, and each pixel is multiplied by the gain
+of the annulus it lies in.
+
+**The innermost `canaliculi.HOLE_GAIN_SKIP_PX` = 6.2 px are not measured**, and
+the first gain measured outside that ring is carried inward. Two reasons, both
+already in the pipeline, so the number is derived and not tuned: no mask can
+exist within `LACUNA_DILATION_PX` = 2 px of a body because the buffer is cut out
+of it, and the top-hat leaves the body's own edge as a ridge which the Sato
+filter answers at its own scale, `max(RIDGE_SIGMAS_PX)` = 4.2 px. What that ring
+holds is the body, not a thread: on 542_z06 lacuna 3 the level runs 0.0445,
+0.0290, 0.0134 over the first three annuli against 0.0077 in the band beyond, so
+including it pinned the gain at 1 exactly where the hole is deepest. Skipping it
+is what makes the profile a thread measurement, and it is what turned the root
+counts of 542_z06 and 682_z08 from falling to rising.
+
+Over the 8 images the gain at the body edge is 3.0 on 77 of the 108 lacunae and
+1.9 to 3.0 per image at the median.
+
+### The noise guard
+
+The gain is applied with **no requirement to connect to mask the global cut
+already made**, which is the point of it. That also lets the glow's own grain
+cross the cut, so a component of the new mask that holds **no pixel of the mask
+that was there before** is kept only if it looks like a thread: at least
+`config.HOLE_NEW_MIN_LENGTH_UM` = 10 um long once skeletonized and at least
+`config.HOLE_NEW_MIN_ASPECT` = 3 times longer than it is wide. These are the two
+tests the unattached dim tier already applies (section 8), for the same reason:
+nothing vouches for this mask, so it is accepted on its own shape alone.
+
+**What it does, measured: 130 new components over the 8 images, 4,121 px, and
+every one of them fails the length test.** A zone is at most 8 um wide, so a
+piece of mask that lies inside one and touches nothing else can almost never run
+10 um. The practical effect on this data is therefore that **every pixel the
+rule adds is a continuation of mask the global cut already made**, and the
+isolated pieces are all refused. That is a stricter outcome than the rule as
+written, and it is reported here rather than tuned away.
+
+### Ownership: a lacuna owns what touches it
+
+`config.CONTACT_EVERY_TOUCHING_BODY`. The contact rule of section 8 offered each
+node to its **nearest** lacuna only: a node 5 px from one body and 7 px from
+another was offered only to the second, because it was nearest, and then refused
+by the signal test. Contact is now decided by which bodies the node **touches**
+(`canaliculi.touching_bodies`), and a node that touches two bodies goes to the
+**nearer surface**. Beyond the contact reach nothing changes.
+
+One more ownership fix, found by the checks and not by a rule. `prune_spurs`
+removes a short terminal branch from the **graph**, but its pixels stay in the
+skeleton, and they were not folded into the node they hang off, so they read as
+skeleton that no lacuna owns. A stub beside a body is the commonest thing a new
+thread in a hole leaves behind. The spur is now folded into its neighbour,
+exactly as a collapse or a chain merge folds what it absorbs. No graph measure
+moves: the spur is still out of the graph, so no edge length, degree or root
+count changes. Over the 8 images it took the near-body skeleton that no lacuna
+owns from 324 px to 57 px in the before run and from 353 px to 95 px in the
+after run.
+
+### What the hole measure can read: the null floor
+
+The empty width cannot read 0 however complete the tracing is. A sector is a
+**wedge** whose width grows with the radius: at 10 px from a 25 px body it is
+0.35 px wide, so the first skeleton pixel inside that wedge sits further out
+than the nearest skeleton pixel in any direction, and the median over 180 such
+wedges is a number about the geometry as much as about the tissue.
+
+So `hole-check` measures the floor directly: the same sector rule applied to
+**40 synthetic discs** of the image's own median body size, dropped in tissue at
+least 120 px from every real lacuna, where there is no body and so no hole at
+all (`diagnostics.hole_null_floor`). Over the 8 images that floor is **22.0 px**,
+per image 17.6 to 28.2.
+
+The empty width after the fix is **22.4 px**, 0.4 px above that floor, from 24.2
+px before. On three images it is at or below the floor of its own image. **The
+hole, as this measure reads it, is as closed as the measure can read.**
+
+### What it does to all 8 images
+
+Before is `config.HOLE_ZONE_RULE = False` with
+`config.CONTACT_EVERY_TOUCHING_BODY = False`, which is the glow zone version of
+section 18 exactly; after is as configured.
+
+| image | zone px | zone extent px: min, median, max | gain at the body edge, median | mask added px | skeleton in the zones | skeleton px | changed px |
+|---|---|---|---|---|---|---|---|
+| 542_z06 | 150,055 | 16, 25, 59 | 1.90 | 8,439 | 6,354 -> 6,589 | 39,964 -> 40,198 | 3,516 |
+| 542_z18 | 136,149 | 21, 31, 55 | 3.00 | 8,481 | 4,963 -> 5,278 | 38,360 -> 39,183 | 3,699 |
+| 543-2 | 119,134 | 20, 34, 46 | 3.00 | 9,772 | 4,637 -> 5,077 | 40,561 -> 44,105 | 6,766 |
+| 543_3 | 127,224 | 22, 32, 54 | 3.00 | 10,170 | 4,448 -> 4,982 | 38,356 -> 41,269 | 6,941 |
+| 543_z13 | 94,114 | 24, 29, 35 | 3.00 | 7,597 | 3,984 -> 4,276 | 43,352 -> 44,246 | 4,736 |
+| 682_z08 | 90,269 | 14, 25, 49 | 2.03 | 4,550 | 3,734 -> 3,859 | 36,787 -> 36,997 | 1,856 |
+| 682_z23 | 123,144 | 20, 30, 49 | 3.00 | 6,790 | 4,542 -> 5,130 | 38,480 -> 40,046 | 6,998 |
+| 682_z29 | 140,603 | 23, 32, 57 | 3.00 | 8,452 | 5,095 -> 5,444 | 36,957 -> 37,663 | 4,574 |
+
+Over the set the skeleton grows from 312,817 to 323,707 px (+3.5%), and
+**39,086 px change against the glow zone version**.
+
+| image | empty width px | null floor px | roots per lacuna | under 3 roots | owned px | 50 um prune px | unattached px | loops |
+|---|---|---|---|---|---|---|---|---|
+| 542_z06 | 18.36 -> 18.97 | 26.27 | 12.68 -> 13.11 | 1 -> 1 | 31,615 -> 32,887 | 690 -> 686 | 375 -> 355 | 153 -> 159 |
+| 542_z18 | 23.30 -> 22.47 | 20.81 | 9.00 -> 10.23 | 1 -> 1 | 28,019 -> 29,658 | 924 -> 448 | 372 -> 372 | 146 -> 156 |
+| 543-2 | 24.56 -> 23.67 | 19.23 | 7.67 -> 8.50 | 1 -> 0 | 34,260 -> 37,623 | 6,737 -> 3,560 | 465 -> 465 | 244 -> 275 |
+| 543_3 | 30.08 -> 26.66 | 23.24 | 5.62 -> 6.62 | 4 -> 2 | 31,221 -> 36,517 | 9,608 -> 7,304 | 224 -> 224 | 214 -> 244 |
+| 543_z13 | 24.18 -> 23.43 | 25.16 | 7.55 -> 9.27 | 0 -> 0 | 32,225 -> 34,599 | 2,785 -> 2,171 | 256 -> 256 | 210 -> 231 |
+| 682_z08 | 18.00 -> 17.13 | 18.08 | 11.55 -> 11.91 | 0 -> 0 | 28,124 -> 28,414 | 2,389 -> 2,374 | 1,011 -> 1,011 | 174 -> 181 |
+| 682_z23 | 27.14 -> 22.62 | 17.58 | 7.86 -> 8.93 | 1 -> 0 | 28,101 -> 32,023 | 5,542 -> 4,586 | 560 -> 560 | 183 -> 205 |
+| 682_z29 | 28.16 -> 25.93 | 25.41 | 7.07 -> 7.80 | 2 -> 1 | 28,272 -> 29,408 | 5,218 -> 4,781 | 513 -> 513 | 163 -> 165 |
+
+Owned skeleton grows from 241,837 to 261,129 px (+8.0%), roots per lacuna rise
+on **every** image, lacunae under 3 roots fall from 10 to 5, and the 50 um prune
+falls from 33,893 to 25,910 px (-24%): thread that could not reach a body within
+50 um along the network is now joined to the body it belongs to.
+
+The unattached dim tier is unchanged on 7 images and falls by 20 px on 542_z06,
+where one piece of it is now part of a thread a lacuna owns.
+
+### The acceptance tests
+
+| test | result | number |
+|---|---|---|
+| **A** mask outside every zone bit identical | **PASS** | on all 8 images, outside the zones of both versions |
+| **B** empty width median under 15 px, and 90% of lacunae within their glow extent plus 10 px | **FAIL** | 24.19 -> 22.43 px against a floor of 22.02; 74 of 108 (68.5%) within |
+| **C** near-body skeleton that is not the body's own, down 80% | **FAIL** | 57 -> 78 px; the part nobody owns fell 50 -> 42, the part another lacuna owns rose 7 -> 36 |
+| **D** roots per lacuna do not fall, and lacunae under 3 roots drop | **PASS** | roots rise on all 8 images; under 3 roots 10 -> 5 |
+| **E** no lacuna holds more than 25% of an image's skeleton | **PASS** | largest share 18.9% |
+
+**Why B cannot pass.** The target is below the floor of the measure. The median
+empty width is 22.43 px against a null floor of 22.02 px, so what is left is the
+wedge geometry and not a hole. The second half of the test fails for the same
+reason: 30 of the 108 lacunae have a glow extent plus 10 px that is **below the
+floor of their own image**, so no tracing can bring them inside it, and 13 of
+the 34 lacunae that fail are of that kind. What a tracing can be asked for is
+density, and there the hole is nearly closed: the skeleton density in the zones
+is 83 to 90% of the density in the band beyond, against 76% before.
+
+**Why C cannot pass.** The quantity was already near zero before the fix, 57 px
+over 8 images against 8,011 px of near-body skeleton the bodies do own, 0.71%.
+The new rule puts 14% more skeleton beside the bodies, and of the 78 px left,
+**42 px is owned by nobody** (down from 50) and **36 px is owned by another
+lacuna** (up from 7), all of that last on 543_3 and 682_z23 where a thread
+touches two bodies. A thread has one owner in this model, so the body that does
+not get it reads it as another lacuna's; the only way to zero that term is to
+let two cells own the same pixels, which would double-count length in every
+per-cell measure.
+
+### Loops, report only
+
+`loop_count` and `loop_edge_share`, per cell and per field, in every output.
+Nothing deletes a loop: a loop in a canalicular network is either a real
+anastomosis or two threads traced as one ring, and which it is cannot be decided
+by this method. The count is the cyclomatic number, edges minus nodes plus
+components; the share is the fraction of edges that are not bridges. Over the 8
+images the count rises from 1,487 to 1,616 and the share of edges on a loop from
+0.372 to 0.387.
+
+### Pictures
+
+`results/before_after/`: `<label>_hole_before.png` and `_hole_after.png` are the
+verification pictures, `_hole_before_skeleton.png` and `_hole_after_skeleton.png`
+the skeletons, and `_hole_after_marked.png` rings every lacuna whose hole is
+still wider than 20 px, for 543-2 and 543_3. The changed pixel count against the
+glow zone version is 6,766 on 543-2 and 6,941 on 543_3.
+
+**Not validated.** No hand count chose the margin, the percentile, the clip, the
+skip or the guard, and none of these numbers is a validation. Whether the thread
+this rule recovers is real is a question for the manual tracing in
+`manual_trace/`, under the protocol fixed in advance in
 `docs/NETWORK_TUNING_PROTOCOL.md`.

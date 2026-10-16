@@ -456,7 +456,7 @@ def ring_classes(skeleton: np.ndarray, lacuna_id_map: np.ndarray, interior_ids) 
     CLS_REST (white). Also returns the per-lacuna ring pixel counts."""
     if RING_RADIUS_PX not in canaliculi.RING_RADII_PX:
         raise AssertionFailed(f"ring radius {RING_RADIUS_PX} is not a pipeline radius {canaliculi.RING_RADII_PX}")
-    dist, nearest = canaliculi.nearest_lacuna_map(lacuna_id_map)
+    dist, nearest, _surface = canaliculi.nearest_lacuna_map(lacuna_id_map)
     in_ring = skeleton & (dist <= RING_RADIUS_PX) & (nearest > 0)
     ring_interior = in_ring & np.isin(nearest, list(interior_ids))
     classes = np.zeros(skeleton.shape, dtype=np.uint8)
@@ -497,8 +497,10 @@ def image_data(name: str) -> dict:
     areas = np.bincount(idm.ravel(), minlength=len(lac_rows) + 1)
     for lr, cr, mr in zip(lac_rows, cell_rows, d["cell_rows"]):
         i = lr["lacuna_id"]
-        if areas[i] != lr["area_px2"] or lr["on_border"] != cr["on_border"]:
+        if lr["area_px2"] is not None and areas[i] != lr["area_px2"]:
             raise AssertionFailed(f"{name} lacuna {i}: area {areas[i]} drawn, {lr['area_px2']} in results/")
+        if lr["on_border"] != cr["on_border"]:
+            raise AssertionFailed(f"{name} lacuna {i}: on_border differs from results/")
         if (mr["roots_count"], mr["ring_length_r30_px"]) != (cr["roots_count"], cr["ring_length_r30_px"]):
             raise AssertionFailed(f"{name} lacuna {i}: cache differs from results/")
     d["lacuna_rows"], d["cell_rows"] = lac_rows, cell_rows
@@ -1046,8 +1048,11 @@ def gallery_tiles(d: dict, ids: list, fig, x_mm: float, top_mm: float, fig_w: fl
                                   f"vermillion px; results/ {cell['roots_count']}, {cell['ring_length_r30_px']}")
         ax.set_xlim(x0 - 0.5, x0 + GALLERY_TILE_PX - 0.5)
         ax.set_ylim(y0 + GALLERY_TILE_PX - 0.5, y0 - 0.5)
-        ax.set_title(f"L{lacuna_label(d, lid)}  {cell['roots_count']} roots  ring30 {cell['ring_length_r30_px']} px  "
-                     f"{areas[lid]:.0f} px²", pad=2)
+        # An out-of-focus lacuna has no area by design, so results/ holds None
+        # and the tile says so instead of printing a number that is not there.
+        area_text = f"{areas[lid]:.0f} px²" if areas[lid] is not None else "no area (out of focus)"
+        ax.set_title(f"L{lacuna_label(d, lid)}  {cell['roots_count']} roots  "
+                     f"ring30 {cell['ring_length_r30_px']} px  {area_text}", pad=2)
         if k == 0:
             scale_bar_at(ax, 50)
         pts = np.array(d["roots_xy"][str(lid)]).reshape(-1, 2)
@@ -1315,12 +1320,19 @@ def choose_overview_inset(d: dict) -> tuple[int, dict]:
     the roots closest to the interior median, then the area closest to the
     interior median area, then the smallest id."""
     roots = {c["lacuna_id"]: c["roots_count"] for c in d["cell_rows"]}
+    # An out-of-focus lacuna has no area by design (config.OUT_OF_FOCUS_*: what
+    # the edge measures is the blur, not the cell), so results/ holds None for
+    # it. It still has roots, so it can still be the inset; it is left out of
+    # the area median and sorts last on the area tie-break.
     areas = {r["lacuna_id"]: r["area_px2"] for r in d["lacuna_rows"]}
     med_r = float(np.median([roots[i] for i in d["interior_ids"]]))
-    med_a = float(np.median([areas[i] for i in d["interior_ids"]]))
+    with_area = [areas[i] for i in d["interior_ids"] if areas[i] is not None]
+    med_a = float(np.median(with_area)) if with_area else 0.0
     eligible = [i for i in d["interior_ids"] if frame_margin(d, i) >= INSET_FRAME_MARGIN_PX]
     pool = eligible or list(d["interior_ids"])
-    best = min(pool, key=lambda i: (abs(roots[i] - med_r), abs(areas[i] - med_a), i))
+    best = min(pool, key=lambda i: (abs(roots[i] - med_r),
+                                    abs(areas[i] - med_a) if areas[i] is not None else float("inf"),
+                                    i))
     return best, {"rule": f"interior lacunae with the bounding box at least {INSET_FRAME_MARGIN_PX} px from the "
                           "frame; roots closest to the interior median, then area closest to the interior median "
                           "area, then the smallest id"

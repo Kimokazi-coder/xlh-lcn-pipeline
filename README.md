@@ -41,16 +41,23 @@ There is **one** method. A canaliculus is found because it is a thin bright
    Both cuts come from the response's own histogram. Inside vascular-canal
    structures only already-bright pixels are kept.
 4. Remove the lacuna bodies plus a 2 px buffer and small specks.
-5. Inside each lacuna's own **glow zone**, and nowhere else, accept the response
-   down to half the low cut where it continues mask the global cut already gave.
-   One global cut empties a ring around every body, 27.4 px wide at the median,
-   because a thread's contrast there runs at a third to two thirds of normal
-   (METHODS section 18). The zone is that lacuna's own glow extent, measured on
-   the **raw** channel, and never a fixed width. Then skeletonize. **There is no
-   gap bridging**: a gap is left as a gap.
+5. Inside each lacuna's own **zone**, and nowhere else, multiply the response by
+   that lacuna's **contrast gain** and apply the same cuts again. One global cut
+   empties a ring around every body, 27.4 px wide at the median, because a
+   thread's contrast there runs at a third to two thirds of normal (METHODS
+   section 18). The zone is that lacuna's own **hole**, its empty width measured
+   on the global cut skeleton plus one thread half width, capped at 8 um, and
+   never a fixed width; the gain is the response just beyond the zone over the
+   response inside it, by distance from the body, clipped to 1 and 3, because
+   the loss is a trough that is deepest at the body (METHODS section 19). A
+   piece of mask that did not exist before is kept only if it is at least 10 um
+   long and three times longer than wide. Then skeletonize. **There is no gap
+   bridging**: a gap is left as a gap.
 6. Graph, cleanup, and ownership by shortest path through the network. A lacuna
    owns what **touches** it, within 6 px, with no test and before the shortest
-   path assignment; beyond that it attaches to a thread only where there is
+   path assignment, and every body a node touches is offered it, the nearer
+   surface winning (METHODS section 19); beyond that it attaches to a thread
+   only where there is
    **signal all the way to it**, the dimmest point of the straight path from the
    lacuna surface reaching 0.7 of the response's low cut, within 20 px.
 7. A **second, dimmer pass** continues the threads a lacuna owns into response
@@ -158,7 +165,7 @@ folder run, `results/all_images/quantification/quantification_all_images.xlsx`,
 Check it:
 
 ```
-python src/diagnostics.py reference-check    # must PASS: 146.42 / 21.99 / 7.67 on 543-2
+python src/diagnostics.py reference-check    # must PASS: 161.00 / 21.63 / 8.50 on 543-2
 python src/diagnostics.py regression         # every number against results/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
 python src/diagnostics.py --help             # every other diagnostic

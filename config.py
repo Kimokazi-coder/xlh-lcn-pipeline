@@ -291,6 +291,105 @@ GLOW_PROFILE_FRACTION = 0.10
 GLOW_ZONE_CUT_FRACTION = 0.5
 GLOW_ZONE_MAX_UM = 8.0
 
+# (g) The zone from the HOLE, and the contrast gain inside it. This replaces
+# the cut of (f) above: the glow extent is still measured, and is still what
+# (f) documents, but it is no longer what decides where the lower cut applies.
+#
+# Why. The glow zone rule of (f) recovered 7% of the skeleton (543-2: 37,700 to
+# 40,374 px) and left the holes in place: the empty width median over the 108
+# lacunae fell only from 27.4 to 24.2 px. Two reasons, both measured. The glow
+# extent (3.9 to 33.2 px) is often NARROWER than the hole it is meant to fill
+# (9.0 to 59.2 px, median 27.4), so the zone stopped short of the thread that
+# was missing; and the rule could only EXTEND mask the global cut already made,
+# so a thread whose whole run inside the hole was under the cut had no seed to
+# grow from and stayed invisible.
+#
+# So the zone is now measured on the hole itself, and the cut inside it is the
+# same global cut applied to a response that has been put back on the footing
+# of the tissue just beyond the hole.
+#
+# THE ZONE. Per lacuna: its EMPTY WIDTH, measured by the 180 sector rule of
+# METHODS section 18 on the skeleton the GLOBAL CUT produced, before any zone
+# pass, so the zone is never defined by its own output; plus HOLE_ZONE_MARGIN_UM,
+# one thread half width, so the zone reaches the first thread that bounds the
+# hole and not just up to it; capped at GLOW_ZONE_MAX_UM, the same 8 um cap as
+# (f). Never a fixed width: a lacuna with a wider hole, which is what a
+# periosteocytic lesion makes, gets a wider zone, and that is the comparison
+# this pipeline exists to make.
+#
+# 0.39 um is 3 px, the measured thread half width of this data (the p50 mask
+# width is 6 px, METHODS section 18 uses the same 3 px as its rim).
+HOLE_ZONE_MARGIN_UM = 0.39
+
+# THE GAIN, AND WHY IT IS RADIAL. Inside its own zone, and nowhere else, each
+# lacuna's ridge response is multiplied by its own contrast gain, and then the
+# SAME global cuts are applied to it. The gain is this lacuna's own measurement
+# of what the hole costs a thread: the HOLE_GAIN_PERCENTILE of the ridge
+# response in the band just beyond the zone over the same percentile inside it.
+# METHODS section 18 measured that ratio at 31 to 71% for the set, which is a
+# gain of 1.4 to 3.2.
+#
+# ONE gain per lacuna was tried first and does not shrink the hole. Measured on
+# 543-2, the p90 of the ridge response by distance from the body edge, as a
+# multiple of the low cut: 0.87 at 0 to 5 px, 1.50 at 5 to 10, 2.07 at 10 to 15,
+# 2.71 at 20 to 25, 3.41 at 30 to 40, and a plateau of 3.7 from 40 px out. The
+# loss is not flat across the hole: it is a TROUGH that is deepest at the body
+# and recovers outward, which is the top-hat digging around a bright body
+# (METHODS section 8 names the same trough in the attachment rule). A single
+# gain of about 2 therefore over-corrects the outer half of the zone, where the
+# skeleton already is, and under-corrects the inner half, which is where the
+# empty width is decided. With one gain the mask grew by 12,000 px on 543-2 and
+# the empty width did not fall at all.
+#
+# So the gain follows the trough: the profile is measured in annuli
+# HOLE_GAIN_STEP_UM wide from the body edge outward, smoothed over
+# HOLE_GAIN_SMOOTH annuli, and each pixel is multiplied by the gain of the
+# annulus it lies in. Same measurement, same percentile on both sides, read at
+# the distance the pixel actually sits at.
+#
+# The band is HOLE_GAIN_BAND_UM wide, the same 40 px control band section 18
+# reads the hole against: the same tissue, the same directions, the same depth
+# of field, differing only in being past the hole.
+#
+# Clipped to HOLE_GAIN_MIN so the cut inside a zone can never be stricter than
+# the global cut, and to HOLE_GAIN_MAX so a lacuna whose hole holds nothing at
+# all cannot claim an unbounded gain: past that the ratio is measuring an empty
+# hole and not a thread in one.
+HOLE_GAIN_BAND_UM = 5.2
+HOLE_GAIN_PERCENTILE = 50
+HOLE_GAIN_MIN = 1.0
+HOLE_GAIN_MAX = 3.0
+HOLE_GAIN_STEP_UM = 0.26
+HOLE_GAIN_SMOOTH = 3
+
+# THE NOISE GUARD. The gain is applied with no requirement to connect to mask
+# the global cut already made, which is the whole point of it: a thread whose
+# run inside the hole is entirely under the cut has no seed to grow from. That
+# also means the glow's own grain can now cross the cut, so a piece of mask
+# that did not exist at all before, inside a zone, is kept only if it looks like
+# a thread: at least HOLE_NEW_MIN_LENGTH_UM long once skeletonized and at least
+# HOLE_NEW_MIN_ASPECT times longer than it is wide. These are the two tests the
+# unattached dim tier already applies (section 8), for the same reason: nothing
+# vouches for this mask, so it is accepted on its own shape alone. A piece that
+# continues mask that was already there is not new and is not tested.
+HOLE_NEW_MIN_LENGTH_UM = 10.0
+HOLE_NEW_MIN_ASPECT = 3.0
+
+# OWNERSHIP. A lacuna owns the thread that TOUCHES it. The contact rule of
+# METHODS section 8 offers each node to its NEAREST lacuna only, so a thread
+# that touches two bodies, or that touches one body while another body's
+# surface is a pixel nearer, was handed to the neighbour. With this True a node
+# within CONTACT_REACH_PX of a body attaches to THAT body at weight 0, to every
+# body it touches, and the shortest path assignment then decides the rest as
+# before. Set False to reproduce the nearest-lacuna version.
+CONTACT_EVERY_TOUCHING_BODY = True
+
+# The method, and the one way back. True is the rule above. False reproduces
+# the glow zone version of (f), which is what the before runs of
+# python src/diagnostics.py hole-check are made with; it is not a setting to
+# run results with.
+HOLE_ZONE_RULE = True
+
 # (e) Trimming a glow streak off a lacuna body. A bright osteocyte often carries
 # a tail of out-of-plane glow, and the threshold takes body and tail as one
 # object, which makes it far more elongated than the cell is. The aspect filter
