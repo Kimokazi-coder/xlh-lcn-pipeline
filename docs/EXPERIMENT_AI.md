@@ -2,7 +2,9 @@
 
 **Status: EXPERIMENT. Branch `exp-ai-layer` only. Not merged, not validated, not used for any
 result.** `main` is untouched. With `config.AI_JUDGE_ENABLED = False`, which is how this branch
-ships, every pipeline output is byte for byte what `main` produces.
+ships, every pipeline output is byte for byte what `main` produces: checked after merging main at
+commit ac199fa, `reference-check` PASS at 161.00 / 21.63 / 8.50 and `regression` PASS over 6,800
+numbers at tolerance 0.
 
 External API use approved on 2026-10-15, approver: (Karim fills in)
 
@@ -40,140 +42,127 @@ and before the case, on every call for every image. Karim writes the examples; n
 needed to make them take effect. Both files have their sha256 written into every log record, so a
 changed prompt or a changed set of examples is visible in the log for ever after.
 
-## Step 1: the candidates
+## Step 1: what the judge is shown
 
-Per lacuna, in its own **empty zone** and nowhere else:
+A **segment** is a BRANCH of a skeleton, the piece between two junctions, at least 10 px long
+(1.3 um, the floor the pipeline already applies to a thread no lacuna owns). Within each lacuna's
+crop, every segment is shown, and they are of three kinds:
 
-- **The zone** is the hole in the skeleton around the body, measured as the empty-zone diagnostic
-  measures it: 180 angular sectors, and a sector's empty width is the smallest distance to the body
-  over the skeleton pixels in it; a sector with no skeleton within 150 px, or with another body
-  nearer than its skeleton, is censored. The zone runs out to each sector's own width, so it follows
-  the real shape of the hole and is not a circle. It is measured on the **global cut skeleton**, the
-  skeleton the ridge threshold and the glow zone rule produced before the dim pass and before the 50
-  um prune: that is the skeleton that exists at the point in the pipeline where the candidates are
-  made, and it depends on no ownership and on no later stage.
-- **The contrast ratio** is that lacuna's own measurement of what its glow costs a thread: the p90
-  of the ridge response in the 40 px band just beyond the hole over the p90 inside it. This is
-  METHODS section 18's 31 to 71% measured per lacuna instead of per set. Floored at 1 so the
-  candidate cut can never be stricter than the pipeline's own, capped at 3 as the brief asks.
-  Measured on all 8 images it runs from 1.24 to 3.0 with a median of 2.11, and 2 of the 108 lacunae
-  reach the cap, so the cap is a guard on the tail and not a setting that does the work.
-- **The permissive tracing** accepts the ridge response, scaled by that ratio, down to 0.5 of the
-  low cut. 0.5 is the floor the dim pass and the glow zone rule already use, so the pipeline has one
-  definition of "dim" and not three. The pipeline's own exclusions still hold: bodies with their
-  buffer are cut out, and inside a flagged vascular structure only already bright pixels survive.
-  The mask the global cut produced is unioned in, so the permissive mask is a superset of the
-  pipeline's inside the zone.
-- **The segments** are what is left when that mask is skeletonized and split at its junctions. The
-  skeletonization is done **once over the whole frame**, not zone by zone: the medial axis of a
-  region clipped at a zone boundary runs along that boundary, which would invent threads shaped like
-  the hole. Each branch is then clipped to the zone it lies in. Branches shorter than 10 px (1.3 um,
-  the floor the pipeline already applies to a thread no lacuna owns) are dropped.
-- **Zones belong to one lacuna.** Two zones overlap where two bodies are close, so a pixel is given
-  to the nearer body, the same nearest-lacuna partition the pipeline's attachment uses. No segment
-  is ever judged twice.
-- **At most 40 segments** are offered in one case, the longest first, renumbered in reading order.
-  The rest keep the deterministic decision and are counted as not offered. On all 8 images no case
-  comes near the cap, so it has never yet bound.
+- **owned**: the pipeline traced it and a lacuna owns it;
+- **unowned**: the pipeline traced it and nobody owns it;
+- **new**: the pipeline does not have it. It is what a permissive cut finds inside that lacuna's
+  **zone of the hole**: the pipeline's own zone and its own radial gain (METHODS section 19), with
+  the cut lowered to `config.AI_CANDIDATE_CUT_FRACTION` = 0.5 of the low cut. The experiment
+  lowers that cut and defines nothing of its own: `src/ai_judge.py` no longer measures an empty
+  width or a contrast ratio, because the pipeline measures both.
 
-The global skeleton outside the zones is untouched by all of this.
+Measured over the 8 images (`python src/diagnostics.py ai-candidates --dir data/WT -o
+results/ai_dry_run`):
 
-Run it: `python src/diagnostics.py ai-candidates --dir data/WT -o results/ai_dry_run`. It writes
-`results/ai_dry_run/ai_candidates.json` and no pipeline output.
+| image | segments | owned | unowned | new | in a zone, not owned by that lacuna | numbered |
+| --- | --- | --- | --- | --- | --- | --- |
+| 542_z06 | 1,334 | 1,040 | 248 | 46 | 21 | 208 |
+| 542_z18 | 1,356 | 978 | 332 | 46 | 23 | 186 |
+| 543-2 | 1,485 | 1,234 | 201 | 50 | 12 | 130 |
+| 543_3 | 1,427 | 1,178 | 168 | 81 | 36 | 148 |
+| 543_z13 | 1,463 | 1,101 | 314 | 48 | 7 | 153 |
+| 682_z08 | 1,259 | 937 | 283 | 39 | 13 | 170 |
+| 682_z23 | 1,377 | 1,048 | 283 | 46 | 27 | 221 |
+| 682_z29 | 1,307 | 972 | 272 | 63 | 29 | 215 |
+| **all 8** | **11,008** | **8,488** | **2,101** | **419** | **168 of 1,253** | **1,431** |
 
-## Step 2: the judge
+Two numbers are zero on all 8 images and both say the same thing: **no segment touches two bodies**,
+and **no traced segment is owned by another lacuna than the body it touches**. Main's contact rule
+(a lacuna is offered every node that touches it, the nearer surface winning, METHODS section 19)
+leaves nothing there for a judge to correct, so the ownership question the judge is actually asked
+is the 168 traced segments lying in a lacuna's zone without that lacuna owning them, and the 2,101
+that nobody owns at all.
 
-One call per lacuna. The picture is two panels side by side:
+## Step 2: the picture, and what needs a decision
 
-- **left**, the raw crop, 256 px of image data around the body, brightness stretched between the 1st
-  and 99th percentile of the crop **outside the bodies** (with the bodies in, a bright osteocyte
-  takes the top of the window and the faint threads go black), enlarged by whole pixels to 512 px so
-  that a one pixel thread and a two digit number are both legible. Nothing is interpolated.
-- **right**, the same panel with every body outlined in a colour and every candidate segment drawn
-  in red with its number beside it. The body the case is about is always **yellow**; the others are
-  cyan, magenta, orange, green, blue, handed out by increasing lacuna id. A body beyond the six is
-  outlined in grey, which is not in the vocabulary, so it can never be named; the run report counts
-  those cases.
+One call per case. The picture is two panels side by side:
 
-Nothing else is drawn. Tracing the pipeline is already sure about is not marked, so a red segment is
-a question and not a result.
+- **left**, the raw crop, 256 px of image data around the body, brightness stretched between the
+  1st and 99th percentile of the crop **outside the bodies**, enlarged by whole pixels to 512 px.
+  Nothing is interpolated.
+- **right**, the same panel with every body outlined in its colour (the body the case is about is
+  always **yellow**, the others cyan, magenta, orange, green, blue) and **every segment drawn**: in
+  its owner's colour if a lacuna owns it, in **white** if nobody does, in **red** if the pipeline
+  does not have it.
 
-The answer is one json object with, per segment number, `real` or `artifact`, the owner colour or
-`none`, and one line of reasoning. Validation is strict: every number in the picture exactly once,
-no number that is not in it, only the words the prompt allows. A failure is retried once with the
-same request; if the second answer also fails, every segment of that case **keeps the deterministic
-decision and is labelled unjudged**, which for a candidate means the pipeline's own mask stands
-there. Both attempts are logged either way, and the run report gives the failure rate.
+**Only the segments that need a decision carry a number**, which is what asks the judge for one: the
+new ones, the unowned ones, and any segment that touches a body that does not own it. Everything
+else is context, so the judge can see what the tracing already says around the piece it is judging.
+Over the 8 images that is 1,431 numbered segments of 11,008 drawn, about 13 numbers per call.
 
-## Step 3: the assembly
+The answer is unchanged: per number, `real` or `artifact`, the owner colour or `none`, and one line
+of reasoning. Validation is strict, a failure is retried once, and a case that fails twice leaves
+every segment of it **unjudged**, which means the pipeline's own decision stands.
 
-Behind `config.AI_JUDGE_ENABLED`, default off. With it on, `canaliculi.analyse_network` recomputes
-the candidates from the state it already holds, loads the decision file for that image, and edits
-the candidate mask:
+## Step 3: the crop blind spot
 
-- a segment judged **real** adds the mask its centre line is the centre line of, inside its zone;
-- a segment judged **artifact** takes that mask away, and the dim pass may not put it back;
-- everything else, including an unjudged segment and one that was never offered, is left exactly as
-  the pipeline had it.
+A zone can reach further than half a crop, so a segment that needs a decision can lie outside the
+256 px crop of the lacuna it belongs to. Those segments used to be counted and left unjudged, which
+is a blind spot and not a neutral outcome. **Each one now gets a call of its own**, with a crop
+centred on it, and any other left-over segment inside that crop is numbered in the same call, so one
+extra call can clear several.
 
-So with no verdicts at all the mask comes back unchanged, and the switch changes a number only where
-the judge actually answered. Which mask pixel belongs to which centre line is decided by nearest
-centre line within the zone, so dropping a segment drops the mask it is the centre line of and
-nothing else.
+On the 8 images this costs **one extra call**, on 682_z29: 109 calls for 108 lacunae. The mechanism
+is exercised and not merely present: with the crop forced to 96 px, 543-2 produces 21 cases of which
+9 are left-over cases. The dry run reports `numbered but not drawn`, which must be 0, and is.
+
+## Step 4: the assembly
+
+Behind `config.AI_JUDGE_ENABLED`, default off. With it on, `canaliculi.analyse_network` runs the
+whole network stage **once with the judge off**, which is what main produces and what the judge was
+shown, rebuilds the candidates from it, checks the geometry hash against the decision file, and then
+edits the mask:
+
+- a segment judged **real** that the pipeline does not have adds the mask its centre line is the
+  centre line of;
+- a segment judged **artifact** takes that mask away, **whether the pipeline traced it or not**;
+- a segment judged real that the pipeline already has stays where it is, and only its owner can
+  change;
+- everything else, including an unjudged segment, one never offered, and one whose two answers
+  disagree, is left exactly as the pipeline had it.
+
+So with no verdicts at all the mask comes back unchanged. A segment numbered in two cases that gets
+two different answers is **left alone and counted**, because two answers that disagree are no answer.
 
 The owner the judge names is not written into any result by hand. It becomes a **zero weight
 attachment** from that cell to the nearest node of that segment, the same zero weight the contact
 rule uses, and the pipeline's own ownership, 50 um cap and quantification then run unchanged. A
-segment the judge calls real with owner `none` joins the skeleton with no attachment, so the
-existing rules decide whether anything owns it: **the judge can grant ownership and never veto it.**
+segment the judge calls real with owner `none` joins the skeleton with no attachment: **the judge
+can grant ownership and never veto it.**
 
-The judge's own edit touches no pixel outside the empty zones, and the detection record carries that
-as a number (`ai_judge.counts.edited_px_outside_the_zones`, 0). The mask does move outside them
-afterwards, because the **dim pass** grows from the skeleton a lacuna owns and the ownership has
-changed: on 543-2 with the self-test's stub verdicts that is 1,482 px against 6,045 px changed in
-all. That is a pipeline stage reacting to what it was given, not the judge writing there, and the
-self-test reports the two separately.
+The judge's edit lands on the segments it was given and nowhere else, which the detection record
+carries as a number (`ai_judge.counts.edited_px_outside_the_judged_segments`, 0). It is no longer
+confined to the zones, because an unowned segment the judge calls an artifact may lie outside one;
+how much of the edit lies outside a zone is reported beside it.
 
-The decision file carries a sha256 of the candidate geometry, and the pipeline refuses to apply a
-decision file whose candidates are not the ones it has just computed, so a verdict can never land on
-a segment it was not given for. An image with the switch on and no decision file is an error and not
-a silent pass, because a summary table must never mix judged and unjudged images.
+An image with the switch on and no decision file is an error and not a silent pass, because a
+summary table must never mix judged and unjudged images.
 
-`AI_JUDGE_ENABLED` is deliberately **not** in `diagnostics.SWITCHES_ON`: switch-check regenerates
-all 8 images and the judge has run on 543-2 only.
-
-## Step 4: the dry run, which always comes first
+## The dry run, which always comes first
 
 `python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures 543-2,543_3`,
-run on 2026-10-15. Nothing was sent: the pictures and the requests are built, and the tokens are
-estimated from them. Report: `results/ai_dry_run/ai_dry_run.json`.
+rerun on 2026-10-16 with the new candidates. Nothing is sent.
 
-| image | lacunae | calls | segments | input tokens | output tokens | cost USD |
-| --- | --- | --- | --- | --- | --- | --- |
-| 542_z06 | 19 | 19 | 131 | 34,754 | 4,965 | 0.1192 |
-| 542_z18 | 13 | 13 | 126 | 23,799 | 4,670 | 0.0943 |
-| 543-2 | 12 | 12 | 122 | 21,982 | 4,510 | 0.0891 |
-| 543_3 | 13 | 13 | 190 | 23,866 | 6,910 | 0.1168 |
-| 543_z13 | 11 | 11 | 100 | 20,136 | 3,720 | 0.0775 |
-| 682_z08 | 11 | 11 | 110 | 20,149 | 4,070 | 0.0810 |
-| 682_z23 | 14 | 14 | 153 | 25,660 | 5,635 | 0.1077 |
-| 682_z29 | 15 | 15 | 167 | 27,513 | 6,145 | 0.1165 |
-| **all 8** | **108** | **108** | **1,099** | **197,859** | **40,625** | **0.80** |
+| image | lacunae | calls | of those, left over | numbered segments | input tokens | output tokens | cost USD |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 542_z06 | 19 | 19 | 0 | 208 | 37,643 | 7,660 | 0.1519 |
+| 542_z18 | 13 | 13 | 0 | 186 | 25,783 | 6,770 | 0.1193 |
+| 543-2 | 12 | 12 | 0 | 130 | 23,763 | 4,790 | 0.0954 |
+| 543_3 | 13 | 13 | 0 | 148 | 25,750 | 5,440 | 0.1059 |
+| 543_z13 | 11 | 11 | 0 | 153 | 21,816 | 5,575 | 0.0994 |
+| 682_z08 | 11 | 11 | 0 | 170 | 21,833 | 6,170 | 0.1054 |
+| 682_z23 | 14 | 14 | 0 | 221 | 27,799 | 8,015 | 0.1357 |
+| 682_z29 | 15 | 16 | 1 | 215 | 31,750 | 7,845 | 0.1420 |
+| **all 8** | **108** | **109** | **1** | **1,431** | **216,137** | **52,265** | **0.95** |
 
-One call per lacuna, so 108 calls for the set and 12 for 543-2 alone. **Estimated $0.80 for all 8
-images, $1.60 if every single call had to be retried, against the $5 ceiling.** 543-2 alone is
-estimated at $0.089.
-
-These are estimates and are labelled as such everywhere they are printed: text at 0.25 tokens per
-character and each picture at width times height over 750 px per token, which is the rule Anthropic
-documents for image input, and the answer at 35 tokens per segment plus 20. A real run logs the
-token counts the API reports, and `--count-tokens` will measure the input exactly with the API's
-free counter once a connection is allowed.
-
-**A blind spot the dry run found and names: 16 of the 1,115 candidate segments (1.4%) lie in a zone
-but outside their 256 px crop, so they cannot be drawn and are never asked about.** They stay
-unjudged and keep the deterministic decision. The crop is the size the brief fixed, so the count is
-reported rather than the crop quietly grown.
+**Estimated $0.95 for all 8 images, $1.91 if every single call had to be retried**, against the $5
+ceiling of `config.MAX_COST_USD`. 543-2 alone is $0.095 for 12 calls. The previous version of the
+candidates cost $0.80 for 108 calls and 1,099 segments; what grew is the answer, not the picture.
 
 The pictures of every case for 543-2 and 543_3, exactly as the judge would see them, are in
 `results/ai_dry_run/pictures/` (25 of them, one per lacuna).
@@ -188,11 +177,15 @@ biologically (odd numbers real, even numbers artifact, some answers deliberately
 checks the machinery and never the judgement. Everything it writes goes to `.cache/ai_self_test`,
 never to `results/`, so a rehearsal cannot leave verdicts where the pipeline could pick them up.
 
-Ten checks, all passing on 2026-10-15: the answers validate, a bad answer is retried, a case that
+Ten checks, all passing on 2026-10-16: the answers validate, a bad answer is retried, a case that
 never validates stays unjudged rather than guessed, replay gives the same verdicts, every request is
-logged with its hash, no key and no image bytes are in the log, the switch changes the mask, the
-judge edits nothing outside the zones, the pipeline runs to the end with the switch on, and an image
-with no decision file is refused rather than passed over.
+logged with its hash, no key and no image bytes are in the log, the switch changes the mask, **the
+judge edits only the segments it was given**, the pipeline runs to the end with the switch on, and
+an image with no decision file is refused rather than passed over.
+
+On 543-2 the stub's arbitrary verdicts keep 21 new segments, refuse 21, and drop 36 the pipeline had
+traced, which moves 1,407 px of mask in and 9,607 px out and exercises every path including the one
+that removes tracing.
 
 Quantification was then run on 543-2 with the switch on and those stub verdicts, into `.cache/`: it
 writes its json as usual, and the record carries the `ai_judge` block (verdicts applied, pixels
@@ -256,7 +249,8 @@ The brief left these open. Each was decided, and here is the reason.
 
 ## Steps 5 and 6: the real run is waiting
 
-**No real call has been made. `results/ai_log/` holds no answers.** On 2026-10-15 neither
+**No real call has been made. `results/ai_log/` holds no answers.** On 2026-10-15, and again
+on 2026-10-16 when the candidates were rebuilt, neither
 `ALLOW_EXTERNAL_API` nor `ANTHROPIC_API_KEY` was set, in this session, in the Windows user
 environment or in the machine environment, and there is no `.env`. The judge therefore refuses to
 call out, which is the design:
@@ -286,7 +280,7 @@ Use `$env:` and not `setx`: `setx` writes the key into the Windows registry, whe
 session. In Git Bash the same two lines are `export ALLOW_EXTERNAL_API=1` and
 `export ANTHROPIC_API_KEY=sk-ant-...`.
 
-That run will cost about $0.09 for 12 calls, refuse to start if its own estimate is above
+That run will cost about $0.10 for 12 calls, refuse to start if its own estimate is above
 `config.MAX_COST_USD`, and stop if the running total passes it. It writes the log, the pictures and
 the decision file under `results/ai_log/543-2/`. **The other 7 images are not run**: the brief says
 543-2 first and then a review.
