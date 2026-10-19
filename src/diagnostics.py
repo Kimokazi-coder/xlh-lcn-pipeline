@@ -5431,6 +5431,39 @@ def _ai_self_test(images: list) -> int:
                        counts["edited_px_outside_the_judged_segments"] == 0 and first_pass_same))
         checks.append(("the pipeline runs to the end with the switch on",
                        after["graph"] is not None and after["owner_map"].any()))
+        checks.append(("nothing the judge said deleted tracing the pipeline made",
+                       counts["artifact_traced"] == 0))
+
+        # A verdict that moves a network from one cell to the other, which is
+        # what the whole experiment is for. The stub gives every white number to
+        # the LAST candidate it is offered, which for a class d segment is the
+        # cell that does not own it, so the attachment goes in and the shortest
+        # path has to split the network. Both ends of that are checked: that an
+        # attachment went to another cell, and that tracing then changed hands.
+        moved = _ai_ownership_moves(before, after)
+        print(f"  a verdict moves a network: {counts['attached_to_another_cell']} segments "
+              f"attached to a cell that did not own them, {counts['ownership_moved_px']} px of "
+              f"tracing changed hands between {len(moved)} pair(s) of cells")
+        for (was, now), px in sorted(moved.items(), key=lambda kv: -kv[1])[:3]:
+            print(f"    cell {was} -> cell {now}: {px} px")
+        checks.append(("a verdict moves a network between two owners",
+                       counts["attached_to_another_cell"] > 0
+                       and counts["ownership_moved_px"] > 0 and bool(moved)))
+
+        # Two cases that disagree about one segment. No segment on these 8
+        # images is numbered in two cases, so the rule is exercised on a
+        # decision file built for it: one judged segment answered a second time
+        # with a different owner. The answer must be thrown away whole and the
+        # segment left exactly as the pipeline had it.
+        disagreed = _ai_conflict_check(image_path, label, run, after)
+        print(f"  two cases that disagree about {disagreed['segment_id']}: "
+              f"{disagreed['conflicting']} segment counted as conflicting, "
+              f"{disagreed['attached']} segments attached against "
+              f"{disagreed['attached_without_it']} with no disagreement, so that one attaches "
+              f"to neither cell; {disagreed['differs_px']} px of ownership differ")
+        checks.append(("a segment two cases answer differently is left alone and counted",
+                       disagreed["conflicting"] == 1
+                       and disagreed["attached"] == disagreed["attached_without_it"] - 1))
         try:
             ai_judge.LOG_ROOT = AI_SELF_TEST_DIR / "empty"
             config.AI_JUDGE_ENABLED = True
@@ -5576,6 +5609,71 @@ def cmd_ai_judge(args) -> int:
                 if not same:
                     rc = 4
     return rc
+
+
+def _ai_ownership_moves(before: dict, after: dict) -> dict:
+    """{(the cell that owned it, the cell that owns it now): pixels}, over the
+    tracing both runs own. It is what the shortest path did once the judge's
+    attachments were in the graph, not anything the judge wrote."""
+    was, now = before["owner_map"], after["owner_map"]
+    both = (was > 0) & (now > 0) & (was != now)
+    moves: dict = {}
+    for a, b in zip(was[both].tolist(), now[both].tolist()):
+        moves[(int(a), int(b))] = moves.get((int(a), int(b)), 0) + 1
+    return moves
+
+
+def _ai_conflict_check(image_path: Path, label: str, run: dict, after: dict) -> dict:
+    """Two cases that answer one segment differently: the answer is thrown away
+    whole and the segment is left exactly as the pipeline had it.
+
+    No segment on these 8 images is numbered in two cases, so the rule is
+    exercised on a decision file written for it: one segment the stub judged and
+    gave an owner is answered a second time, in a case of its own, with a
+    different owner. Nothing else in the file changes, and the geometry hash
+    still matches, because what the judge was ASKED is the same.
+
+    `after` is the run with the same verdicts and no conflict, so the difference
+    between the two is exactly what dropping that one attachment did."""
+    import ai_judge
+
+    decisions = json.loads(json.dumps(run))  # a copy, so the run's own file stands
+    picked = None
+    for case in decisions["cases"]:
+        for item in case["segments"]:
+            if item["verdict"] == "real" and item["owner_lacuna_id"]:
+                picked = (case, item)
+                break
+        if picked:
+            break
+    if picked is None:
+        return {"conflicting": -1, "attached": -1, "attached_without_it": -1, "differs_px": -1}
+    case, item = picked
+    # The other answer: the same segment, real, given to a different cell. Any
+    # other cell will do, because what is checked is that two answers which
+    # disagree are no answer at all.
+    other = dict(item, owner="cyan",
+                 owner_lacuna_id=1 if item["owner_lacuna_id"] != 1 else 2)
+    decisions["cases"] = decisions["cases"] + [dict(case, case_id="case_conflict",
+                                                    segments=[other])]
+    path = ai_judge.decisions_path(label)
+    kept = path.read_text(encoding="utf-8")
+    path.write_text(json.dumps(decisions, indent=2) + "\n", encoding="utf-8")
+    saved = config.AI_JUDGE_ENABLED
+    try:
+        config.AI_JUDGE_ENABLED = True
+        result = canaliculi.analyse_image(image_path)
+    finally:
+        config.AI_JUDGE_ENABLED = saved
+        path.write_text(kept, encoding="utf-8")
+    counts = result["ai_judge"]["counts"]
+    return {
+        "segment_id": item["segment_id"],
+        "conflicting": counts["conflicting"],
+        "attached": counts["attached_segments"],
+        "attached_without_it": after["ai_judge"]["counts"]["attached_segments"],
+        "differs_px": int((result["owner_map"] != after["owner_map"]).sum()),
+    }
 
 
 def _ai_same_decisions(a: dict, b: dict) -> bool:

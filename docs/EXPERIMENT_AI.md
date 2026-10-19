@@ -268,15 +268,32 @@ biologically (odd numbers real, even numbers artifact, some answers deliberately
 checks the machinery and never the judgement. Everything it writes goes to `.cache/ai_self_test`,
 never to `results/`, so a rehearsal cannot leave verdicts where the pipeline could pick them up.
 
-Ten checks, all passing on 2026-10-16: the answers validate, a bad answer is retried, a case that
-never validates stays unjudged rather than guessed, replay gives the same verdicts, every request is
-logged with its hash, no key and no image bytes are in the log, the switch changes the mask, **the
-judge edits only the segments it was given**, the pipeline runs to the end with the switch on, and
-an image with no decision file is refused rather than passed over.
+**Thirteen checks, all passing on 2026-10-19**: the answers validate, a bad answer is retried, a
+case that never validates stays unjudged rather than guessed, replay gives the same verdicts, every
+request is logged with its hash, no key and no image bytes are in the log, the switch changes the
+mask, the judge edits only the segments it was given, the pipeline runs to the end with the switch
+on, **nothing the judge said deleted tracing the pipeline made**, **a verdict moves a network
+between two owners**, **a segment two cases answer differently is left alone and counted**, and an
+image with no decision file is refused rather than passed over.
 
-On 543-2 the stub's arbitrary verdicts keep 21 new segments, refuse 21, and drop 36 the pipeline had
-traced, which moves 1,407 px of mask in and 9,607 px out and exercises every path including the one
-that removes tracing.
+The last two are the ones this round adds, and they are the two the design turns on.
+
+- **A verdict moves a network.** The stub gives every white number to the LAST candidate it is
+  offered, which for a class d segment is the cell that does not own it, so the attachment goes in
+  and the shortest path has to redo the split. On 543-2: 54 segments attached, **30 of them to a
+  cell that did not own them**, and **1,426 px of tracing changed hands between 14 pairs of cells**,
+  the largest single move being 258 px from cell 7 to cell 5. None of that is written by the judge;
+  it is what the shortest path did once the attachment was in the graph.
+- **Two cases that disagree.** No segment on these 8 images is numbered in two cases, so the rule is
+  exercised on a decision file written for it: one segment the stub judged is answered a second
+  time, in a case of its own, with a different owner. Nothing else in the file changes and the
+  geometry hash still matches, because what the judge was *asked* is the same. The switch then
+  counts 1 conflicting segment and attaches **53 segments instead of 54**: that one attaches to
+  neither cell and keeps the decision the pipeline made.
+
+On 543-2 the stub's arbitrary verdicts keep 21 new segments and refuse 21, which moves 1,428 px of
+mask in and 985 px out. **No traced segment is dropped, and none can be**: only a class b number is
+asked whether it is real.
 
 Quantification was then run on 543-2 with the switch on and those stub verdicts, into `.cache/`: it
 writes its json as usual, and the record carries the `ai_judge` block (verdicts applied, pixels
