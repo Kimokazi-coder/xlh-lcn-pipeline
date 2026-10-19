@@ -1222,10 +1222,15 @@ def attach_judged_segments(G: nx.Graph, extra_attach: dict | None) -> nx.Graph:
     docs/EXPERIMENT_AI.md).
 
     For each segment the judge called real and gave an owner, one edge of weight
-    0 from that cell to the graph node nearest the segment: the same zero weight
-    the contact rule uses, for the same reason. Nothing else is written. The
-    ownership below then decides everything, so the judge grants ownership and
-    never vetoes it, and no ownership rule moves into the model.
+    0 from that cell to the graph node nearest the point the caller gives, which
+    is the END of that segment nearest that cell (ai_judge.nearest_end): the
+    same zero weight the contact rule uses, for the same reason. The path then
+    enters the thread where the thread starts, and the multi source shortest
+    path below splits the network where the two cells' paths meet.
+
+    Nothing else is written. The ownership below decides everything, so the
+    judge grants ownership and never vetoes it, the old owner keeps whatever the
+    shortest path still gives it, and no ownership rule moves into the model.
 
     A node both the judge and the contact rule reach at weight 0 goes to the
     lower cell id, which is how every other tie in this file is broken."""
@@ -1626,6 +1631,17 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     # never owned, counted only in the field measures.
     unattached = find_unattached_threads(response, t_lo, skeleton & (own["owner_map"] > 0),
                                          skeleton, lacuna_mask, flagged)
+    if ai is not None:
+        # What the verdicts actually moved: the pixels of tracing that both runs
+        # own and that changed hands, measured against the run with the switch
+        # off that the judge was shown. It is the one number that says whether a
+        # verdict split a network, and it is NOT the judge writing anywhere: it
+        # is what the shortest path did once the attachment was there.
+        before, after = base["owner_map"], own["owner_map"]
+        both = (before > 0) & (after > 0)
+        ai["counts"]["ownership_moved_px"] = int((both & (before != after)).sum())
+        ai["counts"]["newly_owned_px"] = int(((before == 0) & (after > 0)).sum())
+        ai["counts"]["no_longer_owned_px"] = int(((before > 0) & (after == 0)).sum())
     return {
         "image_path": image_path,
         "lacunae": lac,

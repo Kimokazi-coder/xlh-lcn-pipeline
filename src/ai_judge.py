@@ -198,6 +198,31 @@ def _junctions(skel: np.ndarray) -> np.ndarray:
     return skel & (neighbours >= 3)
 
 
+def segment_ends(rows: np.ndarray, cols: np.ndarray) -> np.ndarray:
+    """The END pixels of one segment: the pixels of it with at most one
+    neighbour of its own, which for a branch of a skeleton is its two tips.
+
+    A verdict attaches a cell to the END of the segment NEAREST that cell
+    (step 3), not to whatever pixel of it happens to be nearest, so that the
+    shortest path enters the thread where the thread starts and the network is
+    split where the two paths meet.
+
+    Measured on the segment alone, so a junction the pipeline removed cannot
+    make a tip look like an interior pixel. A segment that closes on itself has
+    no tip; it gets all of its pixels back, which is the old behaviour and no
+    worse than it was."""
+    r_lo, c_lo = int(rows.min()), int(cols.min())
+    piece = np.zeros((int(rows.max()) - r_lo + 3, int(cols.max()) - c_lo + 3), dtype=np.uint8)
+    piece[rows - r_lo + 1, cols - c_lo + 1] = 1
+    neighbours = ndi.convolve(piece, np.ones((3, 3), dtype=np.uint8),
+                              mode="constant", cval=0) - piece
+    tips = (piece > 0) & (neighbours <= 1)
+    if not tips.any():
+        return np.stack([rows, cols], axis=1)
+    tip_rows, tip_cols = np.nonzero(tips)
+    return np.stack([tip_rows + r_lo - 1, tip_cols + c_lo - 1], axis=1)
+
+
 def _branch_labels(skeleton: np.ndarray) -> np.ndarray:
     """Every branch of a skeleton with its own label: the junction pixels are
     taken out, and what is left is labelled. The junctions themselves are 0 and
@@ -373,6 +398,7 @@ def image_candidates(state: dict) -> dict:
                 "nearest_gap_px": round(float(dist_to_lacuna[rows, cols].min()), 3),
                 "gap_px": {int(i): round(float(gaps[i]), 3) for i in pool},
                 "candidate_pool": [int(i) for i in pool],
+                "ends": segment_ends(rows, cols),
                 "label": len(segments) + 1,
             }
             seg["classes"] = segment_classes(seg)
@@ -1598,6 +1624,31 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
 
 # The assembly (step 3): what the pipeline does with the verdicts
 
+def nearest_end(seg: dict, lacuna_id: int, gap_maps: dict) -> np.ndarray:
+    """The END of a segment nearest one cell, as a 1 x 2 array of (row, col).
+
+    Step 3: a verdict attaches that cell to the end of the segment nearest it,
+    so the shortest path enters the thread where the thread starts. Attaching to
+    whatever pixel of the segment happened to be nearest would let the path
+    enter halfway along and measure the thread from its middle.
+
+    A cell whose window does not reach the segment at all, which the reach test
+    makes very unlikely, falls back to straight distance from the body's own
+    pixels, so there is always an end to attach to."""
+    ends = seg["ends"]
+    found = gap_maps.get(lacuna_id)
+    if found is None:
+        return ends[:1]
+    (r_lo, r_hi, c_lo, c_hi), gap = found
+    inside = ((ends[:, 0] >= r_lo) & (ends[:, 0] < r_hi)
+              & (ends[:, 1] >= c_lo) & (ends[:, 1] < c_hi))
+    if not inside.any():
+        return ends[:1]
+    usable = ends[inside]
+    gaps = gap[usable[:, 0] - r_lo, usable[:, 1] - c_lo]
+    return usable[int(np.argmin(gaps)):int(np.argmin(gaps)) + 1]
+
+
 def read_decisions(label: str) -> dict:
     path = decisions_path(label)
     if not path.exists():
@@ -1664,12 +1715,14 @@ def apply_to_base(image_path: Path, candidate: np.ndarray, base: dict, lac: dict
         verdicts.pop(key, None)
 
     territory = candidates["territory"]
+    gap_maps = body_gap_maps(state)
     add = np.zeros(candidate.shape, dtype=bool)
     remove = np.zeros(candidate.shape, dtype=bool)
     judged = np.zeros(candidate.shape, dtype=bool)
     attach: dict = {}
     counts = {"real": 0, "artifact": 0, "unjudged": 0, "conflicting": len(conflicts),
               "added_px": 0, "removed_px": 0, "attached_segments": 0,
+              "attached_to_the_owner_it_already_had": 0, "attached_to_another_cell": 0,
               "real_new": 0, "real_traced": 0, "artifact_new": 0, "artifact_traced": 0}
     for seg in candidates["segments"]:
         item = verdicts.get(seg["segment_id"])
@@ -1686,8 +1739,11 @@ def apply_to_base(image_path: Path, candidate: np.ndarray, base: dict, lac: dict
             owner = item.get("owner_lacuna_id")
             if owner:
                 attach.setdefault(int(owner), []).append(
-                    np.stack([seg["rows"], seg["cols"]], axis=1))
+                    nearest_end(seg, int(owner), gap_maps))
                 counts["attached_segments"] += 1
+                counts["attached_to_the_owner_it_already_had"
+                       if int(owner) == seg["owner_lacuna_id"]
+                       else "attached_to_another_cell"] += 1
         elif verdict == "artifact":
             remove |= territory == seg["label"]
     counts["added_px"] = int((add & ~candidate).sum())

@@ -195,7 +195,9 @@ edits the mask:
 
 - a segment judged **real** that the pipeline does not have adds the mask its centre line is the
   centre line of;
-- a segment judged **artifact** takes that mask away, **whether the pipeline traced it or not**;
+- a segment judged **artifact** takes that mask away. Only a class b segment can be judged artifact,
+  because only a class b number is asked the question, so **nothing the judge says can delete
+  tracing the pipeline made**;
 - a segment judged real that the pipeline already has stays where it is, and only its owner can
   change;
 - everything else, including an unjudged segment, one never offered, and one whose two answers
@@ -204,11 +206,25 @@ edits the mask:
 So with no verdicts at all the mask comes back unchanged. A segment numbered in two cases that gets
 two different answers is **left alone and counted**, because two answers that disagree are no answer.
 
-The owner the judge names is not written into any result by hand. It becomes a **zero weight
-attachment** from that cell to the nearest node of that segment, the same zero weight the contact
-rule uses, and the pipeline's own ownership, 50 um cap and quantification then run unchanged. A
-segment the judge calls real with owner `none` joins the skeleton with no attachment: **the judge
+**How a verdict is used.** The owner the judge names is not written into any result by hand, and
+nothing is reassigned. It becomes a **zero weight attachment from that cell to the END of the
+segment nearest that cell**, the same zero weight the contact rule uses, and then the pipeline's own
+multi source shortest path assignment, the 50 um cap and the quantification run unchanged.
+
+The end, not the nearest pixel, is the point: the path has to enter the thread where the thread
+starts, or it enters halfway along and measures the thread from its middle. With the attachment
+there, the two cells' paths meet somewhere along the network and **the shortest path splits it
+between them**, which is the whole aim. The network stays connected, nothing is cut, and the old
+owner keeps whatever the shortest path still gives it.
+
+A segment the judge calls real with owner `none` joins the skeleton with no attachment: **the judge
 can grant ownership and never veto it.**
+
+The detection record carries what the verdicts moved, measured against the run with the switch off
+that the judge was shown: `attached_segments`, how many of those went
+`attached_to_another_cell`, and then `ownership_moved_px`, `newly_owned_px` and
+`no_longer_owned_px`. Those last three are not the judge writing anywhere; they are what the
+shortest path did once the attachment was in the graph.
 
 The judge's edit lands on the segments it was given and nowhere else, which the detection record
 carries as a number (`ai_judge.counts.edited_px_outside_the_judged_segments`, 0). It is no longer

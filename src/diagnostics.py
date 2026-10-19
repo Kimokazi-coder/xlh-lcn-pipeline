@@ -5418,6 +5418,11 @@ def _ai_self_test(images: list) -> int:
               f"roots {roots_before} -> {roots_after}, "
               f"owned {int((before['owner_map'] > 0).sum())} -> "
               f"{int((after['owner_map'] > 0).sum())} px")
+        print(f"  ownership: {counts['attached_segments']} segments attached "
+              f"({counts['attached_to_another_cell']} to a cell that did not own them), "
+              f"{counts['ownership_moved_px']} px changed hands, "
+              f"{counts['newly_owned_px']} px newly owned, "
+              f"{counts['no_longer_owned_px']} px no longer owned")
         print(f"  outside the zones the mask then moves by {outside} px, which is the dim pass "
               f"({before['dim_pass_px']} -> {after['dim_pass_px']} px) growing from the "
               f"ownership it was given, not the judge writing there")
