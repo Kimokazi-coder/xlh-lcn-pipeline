@@ -599,6 +599,14 @@ AI_JUDGE_MAX_TOKENS = 8000
 # it.
 MAX_COST_USD = 5.0
 
+# The quality gate of a run over several images. Once this many calls have been
+# made over the whole run, if more than AI_MAX_UNJUDGED_SHARE of the cases are
+# still without a valid answer after their one retry, the run stops where it is
+# and nothing after it is attempted: a prompt the model cannot answer should
+# cost twenty calls and not a hundred and forty five.
+AI_MIN_CALLS_BEFORE_QUALITY_GATE = 20
+AI_MAX_UNJUDGED_SHARE = 0.20
+
 # Where the requests, the answers, the pictures that were sent and the decision
 # files are written, inside RESULTS_DIR. One folder per image.
 AI_LOG_DIR = "ai_log"

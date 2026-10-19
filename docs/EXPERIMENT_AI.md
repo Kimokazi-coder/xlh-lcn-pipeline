@@ -317,6 +317,19 @@ the same reason the stub's verdicts are, and they are not reported here as anyth
 - `config.MAX_COST_USD = 5`. Every run estimates its cost before the first call and refuses to start
   if the estimate is above it; while it runs it adds up what the answers actually cost and stops if
   the total passes it.
+- **A billing, credit or authentication error stops the whole run at once.** A bad answer is
+  retried once and a case that never validates is left unjudged, which is right for a bad answer and
+  wrong for this: a run that carried on past a spent balance would mark every remaining segment
+  unjudged and write a decision file that looked like a considered result, when nothing was ever
+  asked. So that error is logged, raised, and the run ends: no decision file for that image, no
+  further image, and nothing recorded as unjudged. It is recognised by the SDK's own error classes
+  (`AuthenticationError`, `PermissionDeniedError`) and by what the server says in a plain bad
+  request, which is how a spent balance arrives, and the key is scrubbed out of the message first.
+- **A run of several images watches the share of answers it cannot read.** After
+  `config.AI_MIN_CALLS_BEFORE_QUALITY_GATE` = 20 calls, if more than
+  `config.AI_MAX_UNJUDGED_SHARE` = 20% of the cases still have no valid answer after their one
+  retry, the run stops and nothing after it is attempted. A prompt the model cannot answer should
+  cost twenty calls and not a hundred and forty five.
 
 ## Decisions taken while building this
 

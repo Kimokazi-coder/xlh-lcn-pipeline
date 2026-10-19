@@ -5467,6 +5467,26 @@ def cmd_ai_judge(args) -> int:
         print(f"Refused: a real run needs a connection and {why}.")
         print("Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.")
         return 2
+
+    # The quality gate, over the whole run and not one image: once
+    # AI_MIN_CALLS_BEFORE_QUALITY_GATE calls have been made, if more than
+    # config.AI_MAX_UNJUDGED_SHARE of the cases are still without a valid answer
+    # after their one retry, the run stops where it is and the rest is not
+    # attempted. A prompt the model cannot answer should cost 20 calls, not 145.
+    seen = {"cases": 0, "unjudged": 0}
+
+    def quality_gate(record_case, totals):
+        seen["cases"] += 1
+        seen["unjudged"] += int(not record_case["answer_valid"])
+        if totals["calls"] < config.AI_MIN_CALLS_BEFORE_QUALITY_GATE:
+            return ""
+        share = seen["unjudged"] / max(1, seen["cases"])
+        if share <= config.AI_MAX_UNJUDGED_SHARE:
+            return ""
+        return (f"{seen['unjudged']} of {seen['cases']} cases had no valid answer after the "
+                f"one retry ({100.0 * share:.0f}%), which is above the "
+                f"{100.0 * config.AI_MAX_UNJUDGED_SHARE:.0f}% this run allows")
+
     rc = 0
     for image_path in images:
         label = lacunae.image_label(image_path)
@@ -5505,7 +5525,16 @@ def cmd_ai_judge(args) -> int:
             # to: left alone it writes to .cache/, so a real run's record of
             # what it cost is never replaced by a replay's zeros.
             out_root = (AI_REPLAY_DIR / label) if mode == "replay" else None
-        decisions = ai_judge.judge_image(state, candidates, mode, out_root, progress=show)
+        try:
+            decisions = ai_judge.judge_image(state, candidates, mode, out_root, progress=show,
+                                             stop_check=quality_gate if mode == "live" else None)
+        except ai_judge.FatalApiError as error:
+            # A billing, credit or authentication error: stop the whole run
+            # here, report it, and run nothing else. Nothing is marked unjudged
+            # and no decision file is written, because nothing was asked.
+            print(f"\nSTOPPED: {error}")
+            print("No decision file was written for this image and no further image was run.")
+            return 5
         totals = decisions["totals"]
         offered = max(1, totals["segments"])
         print(f"segments: {totals['segments']} offered, "
@@ -5513,12 +5542,19 @@ def cmd_ai_judge(args) -> int:
               f"{totals['segments_artifact']} artifact "
               f"({100.0 * totals['segments_artifact'] / offered:.1f}%), "
               f"{totals['segments_unjudged']} unjudged")
+        print(f"owners: {totals['segments_given_an_owner']} segments given one, of which "
+              f"{totals['owner_moved_by_a_verdict']} to a cell that did not own them; "
+              f"{totals['segments_given_no_owner']} given none")
         print(f"json failures: {totals['invalid_attempts']} of {totals['attempts']} attempts "
               f"({totals['call_errors']} of them a failed call, "
               f"{totals['refusals']} a refusal), "
               f"{totals['cases_unjudged']} of {totals['cases']} cases left unjudged")
         print(f"cost: ${totals['cost_usd']} for {totals['calls']} calls "
               f"({totals['input_tokens']} input, {totals['output_tokens']} output tokens)")
+        if totals["stopped_early"]:
+            print(f"\nSTOPPED: {totals['stopped_early']}.")
+            print("The rest of this image and every image after it were not run.")
+            return 6
         if totals["stopped_on_cost"]:
             print(f"STOPPED: the running total passed config.MAX_COST_USD "
                   f"${config.MAX_COST_USD}. The rest of the image was not judged.")

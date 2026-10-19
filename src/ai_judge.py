@@ -1148,6 +1148,39 @@ def external_calls_allowed() -> tuple:
     return True, ""
 
 
+class FatalApiError(RuntimeError):
+    """An error that must stop the whole run where it is, not cost one case its
+    answer: no credit, no money, or no permission to call at all.
+
+    A bad answer is retried once and a case that never validates is left
+    unjudged, which is right for a bad answer and wrong for this. A run that
+    carried on past a billing or authentication error would mark every
+    remaining segment unjudged and write a decision file that looked like a
+    considered result, when nothing was ever asked. So this is raised, never
+    retried, and never turned into an unjudged segment."""
+
+
+# What the API says when it is one of those. Matched on the exception's class
+# where the SDK has one, and on its text where the server reports it as a plain
+# bad request, which is what a spent balance comes back as.
+FATAL_API_CLASSES = ("AuthenticationError", "PermissionDeniedError")
+FATAL_API_PHRASES = ("credit balance", "billing", "insufficient", "quota",
+                     "payment", "authentication_error", "invalid x-api-key",
+                     "invalid api key", "api key")
+
+
+def fatal_api_reason(error: BaseException) -> str:
+    """Why this error must stop the run, or "" if it is just a bad call."""
+    name = type(error).__name__
+    if name in FATAL_API_CLASSES:
+        return f"{name}: the API refused the key or the account"
+    text = scrub(str(error)).lower()
+    for phrase in FATAL_API_PHRASES:
+        if phrase in text:
+            return f"{name}: the API reported {phrase!r}"
+    return ""
+
+
 def call_anthropic(payload: dict) -> dict:
     """One request to the Messages API through the official SDK. Returns the
     answer text, the token counts and what was actually sent.
@@ -1395,7 +1428,8 @@ def read_log(label: str, case_id: str, attempt: int) -> dict | None:
 # One image, judged (step 2) or replayed
 
 def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None = None,
-                budget_usd: float | None = None, progress=None, answerer=None) -> dict:
+                budget_usd: float | None = None, progress=None, answerer=None,
+                stop_check=None) -> dict:
     """Judge every case of one image, or replay every case from the log.
 
     mode "live"   one call per case, retried once if the answer does not
@@ -1409,8 +1443,15 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
     rehearses the whole chain with no network and no key. The real call is the
     default and nothing else ever passes this.
 
+    `stop_check` is consulted after every case and may stop the run by
+    returning a reason: it is how a run of several images watches the share of
+    answers that never validate and gives up rather than spending the budget on
+    a prompt the model cannot answer.
+
     The cost ceiling is checked before the first call and again after every
-    answer; passing it stops the run where it is and says so.
+    answer; passing it stops the run where it is and says so. A billing, credit
+    or authentication error stops it at once and raises, because nothing was
+    asked and nothing may be recorded as unjudged.
     """
     label = state["label"]
     prompt = load_prompt()
@@ -1427,7 +1468,8 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
               "segments_given_an_owner": 0, "segments_given_no_owner": 0,
               "segments_asked_an_owner_only": 0, "segments_asked_real_and_owner": 0,
               "owner_moved_by_a_verdict": 0, "owner_left_where_it_was": 0,
-              "verdicts_sent_where_none_was_asked": 0, "stopped_on_cost": False}
+              "verdicts_sent_where_none_was_asked": 0, "stopped_on_cost": False,
+              "stopped_early": None}
     out_cases = []
     for case in candidates["cases"]:
         totals["cases"] += 1
@@ -1526,9 +1568,25 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
                 try:
                     response = (answerer or call_anthropic)(payload)
                 except Exception as error:  # noqa: BLE001
-                    # A call that fails is one bad attempt and not the end of
-                    # the image: it is logged, retried once like any other bad
-                    # answer, and the case is left unjudged if it fails again.
+                    # A billing, credit or authentication error is the end of
+                    # the whole run, not one bad attempt: it is logged, and then
+                    # raised. Nothing is marked unjudged and no decision file is
+                    # written, because nothing was ever asked.
+                    fatal = fatal_api_reason(error)
+                    if fatal:
+                        record.update({"response": None, "valid": False, "parsed": None,
+                                       "invalid_reason": scrub(str(error))[:500],
+                                       "fatal": fatal, "cost_usd": 0.0})
+                        write_log(label, record)
+                        raise FatalApiError(
+                            f"{fatal}. Stopped at {case['case_id']} of {label} after "
+                            f"{totals['calls']} calls and ${totals['cost_usd']}. Nothing was "
+                            f"marked unjudged and no decision file was written."
+                        ) from error
+                    # Any other failed call is one bad attempt and not the end
+                    # of the image: it is logged, retried once like any other
+                    # bad answer, and the case is left unjudged if it fails
+                    # again.
                     reason = scrub(f"the call failed, {type(error).__name__}: {error}")
                     record.update({"response": None, "valid": False, "parsed": None,
                                    "invalid_reason": reason, "cost_usd": 0.0})
@@ -1597,6 +1655,11 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
         out_cases.append(record_case)
         if progress is not None:
             progress(record_case, totals)
+        if stop_check is not None:
+            why = stop_check(record_case, totals)
+            if why:
+                totals["stopped_early"] = why
+                break
         if totals["stopped_on_cost"]:
             break
 
