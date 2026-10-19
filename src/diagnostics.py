@@ -5201,7 +5201,14 @@ def _ai_dry_run_one(job: tuple) -> dict:
             "lacuna_id": case["lacuna_id"],
             "case_id": case["case_id"],
             "case_kind": case["kind"],
+            "crop_px": drawn["crop_px"],
+            "enlargement": drawn["enlargement"],
             "segments": len(drawn["segments_drawn"]),
+            "segments_by_class": {name: sum(1 for q in drawn["questions"].values()
+                                            if name in q["classes"])
+                                  for name in ai_judge.CLASSES},
+            "segments_asked_an_owner_only": sum(1 for q in drawn["questions"].values()
+                                                if q["question"] == "owner"),
             "segments_new": kinds["new"],
             "segments_unowned": kinds["unowned"],
             "segments_traced_owned": kinds["owned"] + kinds["other"],
@@ -5236,11 +5243,13 @@ def cmd_ai_dry_run(args) -> int:
     images = images_from(args)
     args.out.mkdir(parents=True, exist_ok=True)
     wanted = {s.strip() for s in args.pictures.split(",") if s.strip()}
+    every = "all" in wanted
     allowed, why = ai_judge.external_calls_allowed()
     if args.count_tokens and not allowed:
         print(f"--count-tokens needs a real connection and {why}; estimating offline instead.")
         args.count_tokens = False
-    jobs = [(str(p), str(args.out / "pictures") if lacunae.image_label(p) in wanted else "",
+    jobs = [(str(p),
+             str(args.out / "pictures") if every or lacunae.image_label(p) in wanted else "",
              bool(args.count_tokens)) for p in images]
     workers = max(1, min(args.workers, len(jobs)))
     with ProcessPoolExecutor(max_workers=workers) as ex:
@@ -5257,6 +5266,10 @@ def cmd_ai_dry_run(args) -> int:
             "calls_for_a_lacuna": o["calls_for_a_lacuna"],
             "calls_for_left_over_segments": o["calls_for_left_over_segments"],
             "segments": o["segments"],
+            "segments_by_class": {name: sum(r["segments_by_class"][name] for r in o["rows"])
+                                  for name in ai_judge.CLASSES},
+            "segments_asked_an_owner_only": sum(r["segments_asked_an_owner_only"]
+                                                for r in o["rows"]),
             "estimated_input_tokens": int(tokens_in),
             "estimated_output_tokens": int(tokens_out),
             "estimated_cost_usd": round(ai_judge.cost_usd(tokens_in, tokens_out), 4),
@@ -5285,9 +5298,19 @@ def cmd_ai_dry_run(args) -> int:
         "prompt_sha256": prompt["prompt_sha256"],
         "examples_sha256": prompt["examples_sha256"],
         "examples_present": prompt["examples_present"],
+        "classes": ai_judge.CLASSES,
+        "the_question": {"a, c, d": "which osteocyte does this thread start from, the first "
+                                    "candidate, the second candidate, or none",
+                         "b": "is it a real thread or glow texture, and whose"},
         "all_images": {
             "images": len(per_image), "calls": total_calls,
             "segments": int(sum(p["segments"] for p in per_image)),
+            "segments_by_class": {name: sum(p["segments_by_class"][name] for p in per_image)
+                                  for name in ai_judge.CLASSES},
+            "segments_asked_an_owner_only": int(sum(p["segments_asked_an_owner_only"]
+                                                    for p in per_image)),
+            "cases_by_crop_px": {str(size): sum(1 for r in rows if r["crop_px"] == size)
+                                 for size in sorted({r["crop_px"] for r in rows})},
             "estimated_input_tokens": int(total_in),
             "estimated_output_tokens": int(total_out),
             "estimated_cost_usd": total_cost,
@@ -5306,17 +5329,23 @@ def cmd_ai_dry_run(args) -> int:
     }
     (args.out / "ai_dry_run.json").write_text(json.dumps(report, indent=2) + "\n",
                                               encoding="utf-8")
-    print_table(["image", "lacunae", "calls", "left over", "segments", "in tokens",
-                 "out tokens", "cost USD"],
+    print_table(["image", "lacunae", "calls", "left over", "segments",
+                 "a", "b", "c", "d", "in tokens", "out tokens", "cost USD"],
                 [[p["image_label"], p["lacunae"], p["calls"],
                   p["calls_for_left_over_segments"], p["segments"],
+                  *[p["segments_by_class"][name] for name in "abcd"],
                   p["estimated_input_tokens"], p["estimated_output_tokens"],
                   p["estimated_cost_usd"]] for p in per_image],
-                title=f"Estimate for {config.AI_JUDGE_MODEL} (one call per lacuna)")
+                title=f"Estimate for {config.AI_JUDGE_MODEL}, numbered segments by class")
     a = report["all_images"]
     print(f"\ntotal: {a['calls']} calls, {a['segments']} segments, "
           f"{a['estimated_input_tokens']} input and {a['estimated_output_tokens']} output tokens, "
           f"estimated ${a['estimated_cost_usd']}")
+    print("by class: " + ", ".join(f"{name} {a['segments_by_class'][name]}" for name in "abcd")
+          + f"; {a['segments_asked_an_owner_only']} asked an owner only and "
+          f"{a['segments'] - a['segments_asked_an_owner_only']} asked real or artifact as well")
+    print("crops: " + ", ".join(f"{n} cases at {size} px" for size, n
+                                in a["cases_by_crop_px"].items()))
     print(f"worst case with every call retried once: ${retries}, "
           f"ceiling ${config.MAX_COST_USD}: {'within it' if a['within_max_cost_usd'] else 'ABOVE IT'}")
     print(f"calls for segments outside their lacuna's crop: "
@@ -5934,7 +5963,8 @@ def main() -> None:
                    default=config.RESULTS_DIR / config.AI_DRY_RUN_DIR,
                    help="Output folder (default: results/ai_dry_run).")
     p.add_argument("--pictures", default="",
-                   help="Image labels, comma separated, to write every case picture for.")
+                   help="Image labels, comma separated, to write every case picture for, "
+                        "or 'all' for every image.")
     p.add_argument("--count-tokens", dest="count_tokens", action="store_true",
                    help="Count the input tokens with the API instead of estimating them "
                         "(free, but it is a real connection, so it needs ALLOW_EXTERNAL_API=1).")

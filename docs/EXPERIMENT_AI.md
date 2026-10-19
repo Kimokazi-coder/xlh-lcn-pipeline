@@ -236,27 +236,31 @@ summary table must never mix judged and unjudged images.
 
 ## The dry run, which always comes first
 
-`python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures 543-2,543_3`,
-rerun on 2026-10-16 with the new candidates. Nothing is sent.
+`python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures all`, rerun on
+2026-10-19 with the four classes. Nothing is sent.
 
-| image | lacunae | calls | of those, left over | numbered segments | input tokens | output tokens | cost USD |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 542_z06 | 19 | 19 | 0 | 208 | 37,643 | 7,660 | 0.1519 |
-| 542_z18 | 13 | 13 | 0 | 186 | 25,783 | 6,770 | 0.1193 |
-| 543-2 | 12 | 12 | 0 | 130 | 23,763 | 4,790 | 0.0954 |
-| 543_3 | 13 | 13 | 0 | 148 | 25,750 | 5,440 | 0.1059 |
-| 543_z13 | 11 | 11 | 0 | 153 | 21,816 | 5,575 | 0.0994 |
-| 682_z08 | 11 | 11 | 0 | 170 | 21,833 | 6,170 | 0.1054 |
-| 682_z23 | 14 | 14 | 0 | 221 | 27,799 | 8,015 | 0.1357 |
-| 682_z29 | 15 | 16 | 1 | 215 | 31,750 | 7,845 | 0.1420 |
-| **all 8** | **108** | **109** | **1** | **1,431** | **216,137** | **52,265** | **0.95** |
+| image | lacunae | calls | of those, left over | segments | a | b | c | d | input tokens | output tokens | cost USD |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 542_z06 | 19 | 24 | 5 | 108 | 43 | 46 | 0 | 19 | 68,968 | 4,260 | 0.1805 |
+| 542_z18 | 13 | 19 | 6 | 118 | 49 | 46 | 0 | 23 | 55,503 | 4,510 | 0.1561 |
+| 543-2 | 12 | 16 | 4 | 88 | 11 | 50 | 0 | 27 | 46,575 | 3,400 | 0.1271 |
+| 543_3 | 13 | 23 | 10 | 163 | 28 | 81 | 0 | 54 | 68,037 | 6,165 | 0.1977 |
+| 543_z13 | 11 | 15 | 4 | 83 | 17 | 48 | 0 | 18 | 43,668 | 3,205 | 0.1194 |
+| 682_z08 | 11 | 12 | 1 | 72 | 26 | 39 | 0 | 7 | 35,067 | 2,760 | 0.0977 |
+| 682_z23 | 14 | 17 | 3 | 120 | 52 | 46 | 0 | 22 | 50,085 | 4,540 | 0.1456 |
+| 682_z29 | 15 | 19 | 4 | 143 | 40 | 63 | 0 | 40 | 56,417 | 5,385 | 0.1667 |
+| **all 8** | **108** | **145** | **37** | **895** | **266** | **419** | **0** | **210** | **424,320** | **34,225** | **1.19** |
 
-**Estimated $0.95 for all 8 images, $1.91 if every single call had to be retried**, against the $5
-ceiling of `config.MAX_COST_USD`. 543-2 alone is $0.095 for 12 calls. The previous version of the
-candidates cost $0.80 for 108 calls and 1,099 segments; what grew is the answer, not the picture.
+**Estimated $1.19 for all 8 images, $2.38 if every single call had to be retried**, against the $5
+ceiling of `config.MAX_COST_USD`. 543-2 alone is $0.13 for 16 calls. 125 of the 145 calls use the
+256 px crop and 20 use the 512 px one; `numbered but not drawn` is 0, as it must be.
 
-The pictures of every case for 543-2 and 543_3, exactly as the judge would see them, are in
-`results/ai_dry_run/pictures/` (25 of them, one per lacuna).
+The previous round cost $0.95 for 109 calls and 1,431 segments. There are now more calls and fewer
+segments, which is the shape of the change: the unowned tracing with no cell within reach is no
+longer asked about, and class d and the crops that can hold two candidate bodies are.
+
+**The pictures of every case of all 8 images, exactly as the judge would see them, are in
+`results/ai_dry_run/pictures/`** (145 of them, 18 MB).
 
 ## The self-test
 
