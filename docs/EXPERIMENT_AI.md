@@ -372,11 +372,10 @@ The brief left these open. Each was decided, and here is the reason.
 | Server side refusal fallback | not enabled | it would break the pinned model |
 | Where the fixed prompt lives | `src/judge_prompt.md` | the code loads it and hashes it; it is part of the method, like `config.py` |
 
-## Steps 5 and 6: the real run is waiting
+## Step 7: the real run is waiting, and both of its guards are rehearsed
 
-**No real call has been made. `results/ai_log/` holds no answers.** On 2026-10-15, and again
-on 2026-10-16 when the candidates were rebuilt, neither
-`ALLOW_EXTERNAL_API` nor `ANTHROPIC_API_KEY` was set, in this session, in the Windows user
+**No real call has been made. `results/ai_log/` holds no answers.** Checked again on 2026-10-19:
+neither `ALLOW_EXTERNAL_API` nor `ANTHROPIC_API_KEY` is set, in the session, in the Windows user
 environment or in the machine environment, and there is no `.env`. The judge therefore refuses to
 call out, which is the design:
 
@@ -386,29 +385,43 @@ Refused: a real run needs a connection and ALLOW_EXTERNAL_API is not set to 1.
 Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.
 ```
 
-Everything that does not need the network has been built and run: the candidates on all 8 images,
-the pictures, the dry run with its cost, the whole chain end to end against a stub judge, and the
-switch through the pipeline to quantification.
+Everything that does not need the network has been built and run: the candidates and the four
+classes on all 8 images, the 145 case pictures, the dry run with its cost, the whole chain end to
+end against a stub judge, and the switch through the pipeline to quantification.
 
-**To make the real run on 543-2 happen** (PowerShell, in this repository, the key in the session
-only and never in a file):
+The two guards a run of 8 images leans on are rehearsed in the self-test, with no network:
+
+- **the quality gate.** With every answer deliberately unreadable, the run stops after 20 calls and
+  10 of 16 cases, reporting that 10 of 10 cases had no valid answer after their one retry, which is
+  above the 20% it allows. Nothing after that point is attempted.
+- **a billing error.** With the first call raising what a spent balance raises, the run stops at
+  `case_0001` after 0 calls, raises, and leaves **no decision file**. Nothing is marked unjudged.
+
+**To make the real run happen** (PowerShell, in this repository, the key in the session only and
+never in a file):
 
 ```powershell
 $env:ALLOW_EXTERNAL_API = "1"
 $env:ANTHROPIC_API_KEY  = "sk-ant-..."
 pip install anthropic
-python src/diagnostics.py ai-dry-run --image "data/WT/543-2.tif"   # always first
-python src/diagnostics.py ai-judge   --image "data/WT/543-2.tif"
+python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run   # always first
+python src/diagnostics.py ai-judge   --dir data/WT                        # all 8 images
+python src/diagnostics.py ai-judge   --dir data/WT --replay               # offline, same verdicts
 ```
 
 Use `$env:` and not `setx`: `setx` writes the key into the Windows registry, where it outlives the
-session. In Git Bash the same two lines are `export ALLOW_EXTERNAL_API=1` and
+session and every process in it. The key is never read back, printed, logged or written to a file by
+anything here, and it is scrubbed out of an error message before that message is logged. To put the
+key in for one session without it appearing in the console history, use
+`$env:ANTHROPIC_API_KEY = (Read-Host "key" -AsSecureString | ConvertFrom-SecureString -AsPlainText)`
+on PowerShell 7, or paste it into the assignment above and then clear the history with
+`Clear-History`. In Git Bash the two lines are `export ALLOW_EXTERNAL_API=1` and
 `export ANTHROPIC_API_KEY=sk-ant-...`.
 
-That run will cost about $0.10 for 12 calls, refuse to start if its own estimate is above
-`config.MAX_COST_USD`, and stop if the running total passes it. It writes the log, the pictures and
-the decision file under `results/ai_log/543-2/`. **The other 7 images are not run**: the brief says
-543-2 first and then a review.
+That run will cost about **$1.19 for 145 calls**, refuse to start if an image's own estimate is above
+`config.MAX_COST_USD`, stop if the running total passes it, stop if too many answers cannot be read,
+and stop at once on a billing or authentication error. It writes the log, the pictures and the
+decision file under `results/ai_log/<label>/`.
 
 ## How to run it
 

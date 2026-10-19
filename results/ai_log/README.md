@@ -5,7 +5,8 @@
 Everything the AI judge was asked and everything it answered, one folder per
 image. This folder is empty of runs because **no real call has been made yet**:
 `ALLOW_EXTERNAL_API=1` and `ANTHROPIC_API_KEY` were not set, so the judge has
-never been allowed to call out.
+never been allowed to call out. Checked again on 2026-10-19, in the session, in
+the Windows user environment and in the machine environment.
 
 What a run writes, under `results/ai_log/<image label>/`:
 
@@ -17,7 +18,13 @@ What a run writes, under `results/ai_log/<image label>/`:
 | `<label>_ai_segments.json` | the decision file: every candidate segment with its verdict, its owner and the one line of reasoning, plus the sha256 of the candidate geometry the verdicts belong to. This is the only file the pipeline reads, and only when `config.AI_JUDGE_ENABLED` is on. |
 
 The log never holds the API key, and never the image bytes inside a json
-record. `NNNN` is the lacuna id, which is the only name a case has.
+record. A billing, credit or authentication error is logged with the key
+scrubbed out of it, and then stops the run: no decision file is written for that
+image and nothing is recorded as unjudged.
+
+`NNNN` numbers the cases of one image in order. Most are one lacuna's case; the
+rest are for segments that one lacuna's crop cannot show with both of their
+candidate cells, and the decision file says which each one is.
 
 To rerun from the log with no network:
 

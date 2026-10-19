@@ -1303,6 +1303,46 @@ def stub_answerer():
     return answer
 
 
+def quality_gate(seen: dict | None = None):
+    """A `stop_check` for `judge_image` that watches the share of answers the
+    parser cannot read, over a whole run and not one image.
+
+    Once `config.AI_MIN_CALLS_BEFORE_QUALITY_GATE` calls have been made, if more
+    than `config.AI_MAX_UNJUDGED_SHARE` of the cases still have no valid answer
+    after their one retry, it returns the reason and the run stops there.
+    A prompt the model cannot answer should cost twenty calls, not a hundred
+    and forty five.
+
+    `seen` is the counter, which the caller keeps so that one gate can watch
+    several images in a row."""
+    seen = {"cases": 0, "unjudged": 0} if seen is None else seen
+
+    def check(record_case: dict, totals: dict) -> str:
+        seen["cases"] += 1
+        seen["unjudged"] += int(not record_case["answer_valid"])
+        if totals["calls"] < config.AI_MIN_CALLS_BEFORE_QUALITY_GATE:
+            return ""
+        share = seen["unjudged"] / max(1, seen["cases"])
+        if share <= config.AI_MAX_UNJUDGED_SHARE:
+            return ""
+        return (f"{seen['unjudged']} of {seen['cases']} cases had no valid answer after the "
+                f"one retry ({100.0 * share:.0f}%), which is above the "
+                f"{100.0 * config.AI_MAX_UNJUDGED_SHARE:.0f}% this run allows")
+
+    return check
+
+
+def unreadable_answerer():
+    """A stand-in judge that never gives a readable answer, for the self-test of
+    the quality gate. It costs nothing and sends nothing."""
+    def answer(payload: dict) -> dict:
+        return {"text": "I am not going to answer in json.", "id": "self-test-unreadable",
+                "model": f"{config.AI_JUDGE_MODEL} (NOT CALLED: self-test stub)",
+                "stop_reason": "end_turn", "thinking_fallback": False,
+                "usage": {"input_tokens": 0, "output_tokens": 0}}
+    return answer
+
+
 def cost_usd(input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * config.AI_PRICE_INPUT_USD_PER_MTOK / 1e6
             + output_tokens * config.AI_PRICE_OUTPUT_USD_PER_MTOK / 1e6)

@@ -107,6 +107,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -5504,6 +5505,32 @@ def _ai_self_test(images: list) -> int:
             config.AI_JUDGE_ENABLED = saved_switch
             ai_judge.LOG_ROOT = AI_SELF_TEST_DIR
         checks.append(("an image with no decision file is refused, not passed over", refused))
+
+        # The two guards a run of 8 images leans on, rehearsed with no network.
+        # A prompt the model cannot answer must cost about 20 calls and not 145.
+        ai_judge.LOG_ROOT = AI_SELF_TEST_DIR / "gate"
+        gate_run = ai_judge.judge_image(state, candidates, "self-test",
+                                        out_root=AI_SELF_TEST_DIR / "gate",
+                                        answerer=ai_judge.unreadable_answerer(),
+                                        stop_check=ai_judge.quality_gate())
+        ai_judge.LOG_ROOT = AI_SELF_TEST_DIR
+        gate_totals = gate_run["totals"]
+        print(f"  the quality gate: every answer unreadable, stopped after "
+              f"{gate_totals['calls']} calls and {gate_totals['cases']} of "
+              f"{len(candidates['cases'])} cases: {gate_totals['stopped_early']}")
+        checks.append(("a run whose answers cannot be read stops itself",
+                       bool(gate_totals["stopped_early"])
+                       and gate_totals["cases"] < len(candidates["cases"])
+                       and gate_totals["calls"]
+                       <= config.AI_MIN_CALLS_BEFORE_QUALITY_GATE + 2))
+
+        # A billing, credit or authentication error stops the run at once and
+        # raises: nothing is marked unjudged and no decision file is written.
+        fatal = _ai_fatal_check(state, candidates)
+        print(f"  a billing error: {fatal['what']}")
+        checks.append(("a billing or authentication error stops the run at once",
+                       fatal["raised"] and fatal["calls"] == 0
+                       and not fatal["decision_file"]))
     finally:
         ai_judge.LOG_ROOT, config.AI_JUDGE_ENABLED = saved_root, saved_switch
 
@@ -5530,25 +5557,9 @@ def cmd_ai_judge(args) -> int:
         print("Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.")
         return 2
 
-    # The quality gate, over the whole run and not one image: once
-    # AI_MIN_CALLS_BEFORE_QUALITY_GATE calls have been made, if more than
-    # config.AI_MAX_UNJUDGED_SHARE of the cases are still without a valid answer
-    # after their one retry, the run stops where it is and the rest is not
-    # attempted. A prompt the model cannot answer should cost 20 calls, not 145.
-    seen = {"cases": 0, "unjudged": 0}
-
-    def quality_gate(record_case, totals):
-        seen["cases"] += 1
-        seen["unjudged"] += int(not record_case["answer_valid"])
-        if totals["calls"] < config.AI_MIN_CALLS_BEFORE_QUALITY_GATE:
-            return ""
-        share = seen["unjudged"] / max(1, seen["cases"])
-        if share <= config.AI_MAX_UNJUDGED_SHARE:
-            return ""
-        return (f"{seen['unjudged']} of {seen['cases']} cases had no valid answer after the "
-                f"one retry ({100.0 * share:.0f}%), which is above the "
-                f"{100.0 * config.AI_MAX_UNJUDGED_SHARE:.0f}% this run allows")
-
+    # The quality gate, over the whole run and not one image: it stops the run
+    # if too many answers cannot be read, and one counter watches every image.
+    gate = ai_judge.quality_gate()
     rc = 0
     for image_path in images:
         label = lacunae.image_label(image_path)
@@ -5589,7 +5600,7 @@ def cmd_ai_judge(args) -> int:
             out_root = (AI_REPLAY_DIR / label) if mode == "replay" else None
         try:
             decisions = ai_judge.judge_image(state, candidates, mode, out_root, progress=show,
-                                             stop_check=quality_gate if mode == "live" else None)
+                                             stop_check=gate if mode == "live" else None)
         except ai_judge.FatalApiError as error:
             # A billing, credit or authentication error: stop the whole run
             # here, report it, and run nothing else. Nothing is marked unjudged
@@ -5638,6 +5649,35 @@ def cmd_ai_judge(args) -> int:
                 if not same:
                     rc = 4
     return rc
+
+
+def _ai_fatal_check(state: dict, candidates: dict) -> dict:
+    """A billing error on the first call must stop the run at once: it is
+    raised, nothing is counted as judged or unjudged, and no decision file is
+    left behind for the pipeline to pick up."""
+    import ai_judge
+
+    class BadRequestError(Exception):
+        pass
+
+    def broke(payload):
+        raise BadRequestError("Your credit balance is too low to access the Anthropic API.")
+
+    out = AI_SELF_TEST_DIR / "fatal"
+    if out.exists():
+        shutil.rmtree(out)
+    saved = ai_judge.LOG_ROOT
+    ai_judge.LOG_ROOT = out
+    try:
+        ai_judge.judge_image(state, candidates, "self-test", out_root=out, answerer=broke)
+        what, raised = "it carried on, which it must not", False
+    except ai_judge.FatalApiError as error:
+        what, raised = str(error), True
+    finally:
+        ai_judge.LOG_ROOT = saved
+    written = sorted(p.name for p in out.rglob("*_ai_segments.json"))
+    return {"raised": raised, "what": what, "decision_file": written,
+            "calls": len(sorted(out.rglob("*_attempt2.json")))}
 
 
 def _ai_ownership_moves(before: dict, after: dict) -> dict:
