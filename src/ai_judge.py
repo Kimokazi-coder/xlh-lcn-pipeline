@@ -871,8 +871,12 @@ def _place_label(canvas: np.ndarray, taken: list, text: str, row: int, col: int,
         box = (r0, c0, r0 + box_h, c0 + box_w)
         if best is None:
             best = box
-        if any(not (box[2] < other[0] or box[0] > other[2]
-                    or box[3] < other[1] or box[1] > other[3]) for other in taken):
+        # Keep a clear gap between two numbers, not merely no overlap: a 2 drawn
+        # hard against a 1 reads as 21, which names a segment that is not there.
+        pad = DIGIT_SCALE * 2
+        if any(not (box[2] + pad < other[0] or box[0] - pad > other[2]
+                    or box[3] + pad < other[1] or box[1] - pad > other[3])
+               for other in taken):
             continue
         patch = canvas[box[0]:box[2], box[1]:box[3]]
         # Never put a number on top of a segment of any kind: it would hide the
@@ -942,10 +946,17 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
                 right[rows + d_row, cols + d_col] = colour
         return {"row": int(rows.min()), "col": int(cols[np.argmin(rows)])}
 
-    def colour_of(entry):
+    def colour_of(entry, numbered=False):
         if entry["kind"] == "new":
+            # Not traced by the pipeline, numbered or not: red says so, and for
+            # a numbered one that is the whole of the real-or-artifact question.
             return SEGMENT_NEW_COLOUR
-        if entry["kind"] == "unowned":
+        if numbered or entry["kind"] == "unowned":
+            # A NUMBERED segment the pipeline traced is drawn in WHITE, whoever
+            # owns it now, because its owner is the question. The owner is not
+            # hidden by that: it is one of the candidate colours the case text
+            # names for that number, and the tracing around it is still drawn in
+            # that owner's colour as context.
             return SEGMENT_UNOWNED_COLOUR
         name = id_of_colour.get(entry["owner_lacuna_id"])
         return rgb_of[name] if name else UNNAMEABLE_COLOUR
@@ -962,11 +973,13 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
 
     drawn = []
     for entry in sorted(case["decide"], key=lambda e: e["n"]):
-        at = draw(entry, colour_of(entry))
+        at = draw(entry, colour_of(entry, numbered=True))
         if at is None:
             continue
         drawn.append({"n": entry["n"], "segment_id": entry["segment_id"],
-                      "kind": entry["kind"], "row": at["row"], "col": at["col"]})
+                      "kind": entry["kind"], "question": entry["question"],
+                      "candidates": entry["candidates"], "classes": entry["classes"],
+                      "row": at["row"], "col": at["col"]})
     taken: list = []
     for item in drawn:
         row, col = _place_label(right, taken, str(item["n"]), item["row"], item["col"], factor)
@@ -979,11 +992,21 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
     return buffer.getvalue(), {
         "window_rows": [int(r_lo), int(r_hi)],
         "window_cols": [int(c_lo), int(c_hi)],
+        "crop_px": int(r_hi - r_lo),
         "enlargement": int(factor),
         "panel_px": [int(canvas.shape[1]), int(canvas.shape[0])],
         "colours": named["colours"],
         "bodies_with_no_colour": named["unnameable"],
         "segments_drawn": [item["n"] for item in drawn],
+        # Per number: what it is asked, and the colours of its candidates. It is
+        # what the case text states and what the answer is validated against, so
+        # the two can never drift apart.
+        "questions": {item["n"]: {
+            "question": item["question"],
+            "classes": item["classes"],
+            "candidate_colours": [id_of_colour[i] for i in item["candidates"]
+                                  if i in id_of_colour],
+        } for item in drawn},
         "kinds_drawn": {k: sum(1 for item in drawn if item["kind"] == k)
                         for k in ("new", "unowned", "owned", "other")},
         "context_drawn": len(case["context"]),
@@ -994,22 +1017,35 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
 
 def case_user_text(case: dict, drawn: dict) -> str:
     """The only text that changes from case to case. It carries no file name, no
-    path and no group: the numbers in the picture, what kind each is, and the
-    colours that are in it."""
+    path and no group: the numbers in the picture, what each one is asked, and
+    the candidate colours each one may be answered with.
+
+    The candidates are named here and nowhere else. They are the two cells the
+    segment could start from, nearer one first, and the only owners its answer
+    may name: "the first candidate, the second candidate, or none"."""
     names = [name for name, _rgb in OWNER_COLOURS if name in drawn["colours"]]
     numbers = drawn["segments_drawn"]
-    listed = ", ".join(str(n) for n in numbers) if numbers else "none"
-    kinds = drawn["kinds_drawn"]
+    lines = []
+    for n in numbers:
+        ask = drawn["questions"][n]
+        pair = " or ".join(f'"{c}"' for c in ask["candidate_colours"]) or "no candidate"
+        if ask["question"] == "real and owner":
+            lines.append(f"  {n}: drawn in red, the pipeline has not traced it. Is it a real "
+                         f"thread or glow texture, and which cell does it start from: "
+                         f"{pair}, or \"none\"?")
+        else:
+            lines.append(f"  {n}: drawn in white, the pipeline has traced it. Which cell does "
+                         f"it start from: {pair}, or \"none\"?")
     extra = ""
     if drawn["bodies_with_no_colour"]:
-        extra = (" One or more further bodies are outlined in grey; a segment that belongs to"
-                 " a grey body has no colour to name, so answer owner \"none\" for it.")
-    return (f"This case has {len(numbers)} numbered segment(s): {listed}. "
-            f"Of them {kinds['new']} are red (new), {kinds['unowned']} are white (traced, "
-            f"owned by nobody) and {kinds['owned'] + kinds['other']} are drawn in a cell's "
-            f"colour (traced and owned, and numbered because they touch a cell that does not "
-            f"own them). The bodies outlined are: {', '.join(names)}, with yellow in the "
-            f"middle.{extra} Answer for every number, in one json object.")
+        extra = (" One or more further bodies are outlined in grey. No number's candidates are"
+                 " ever grey, so a grey body is context only.")
+    return (f"This case has {len(numbers)} numbered segment(s). The square of tissue is "
+            f"{drawn['crop_px']} px across, enlarged {drawn['enlargement']}x. The bodies "
+            f"outlined are: {', '.join(names)}, with yellow in the middle.{extra}\n\n"
+            + "\n".join(lines)
+            + "\n\nAnswer for every number, and for each one name only a colour offered for "
+              "that number or \"none\", in one json object.")
 
 
 # The prompt, the request and its hash
@@ -1148,11 +1184,18 @@ def count_tokens(payload: dict) -> int:
 def stub_answerer():
     """A stand-in judge for the self-test: no network, no key, no cost.
 
-    It answers from the picture's own numbers with a fixed rule, odd numbers
-    real and even numbers artifact, which is meaningless biologically and is
-    meant to be: what the self-test checks is the machinery, that a picture
-    becomes a request, an answer becomes verdicts, a log becomes the same
-    verdicts again on replay, and that the switch then edits the mask. It
+    It reads the case text for the numbers and each number's candidates, and
+    answers by a fixed rule that is meaningless biologically and is meant to be:
+
+      a RED number (real or artifact, and whose): odd is real and goes to its
+      first candidate, even is an artifact;
+      a WHITE number (whose only): the LAST candidate offered, which for a class
+      d segment is the cell that does not own it now, so a verdict MOVES
+      ownership and the shortest path has something to redo.
+
+    What the self-test checks is the machinery: that a picture becomes a
+    request, an answer becomes verdicts, a log becomes the same verdicts again
+    on replay, and that the switch then edits the mask and moves a network. It
     deliberately returns unreadable json on some calls, so that the retry and
     the unjudged path are exercised too: every third case is broken once and
     recovers, every seventh is broken twice and stays unjudged.
@@ -1163,9 +1206,13 @@ def stub_answerer():
 
     def answer(payload: dict) -> dict:
         text = payload["messages"][0]["content"][1]["text"]
-        head = text.split("segment(s):")[1].split(".")[0] if "segment(s):" in text else ""
-        numbers = [int(n) for n in re.findall(r"\d+", head)]
-        colours = [name for name, _rgb in OWNER_COLOURS if name in text]
+        asked = []
+        for line in text.splitlines():
+            match = re.match(r"\s*(\d+): drawn in (red|white)", line)
+            if not match:
+                continue
+            colours = [c for c in re.findall(r'"([a-z]+)"', line) if c != "none"]
+            asked.append((int(match.group(1)), match.group(2), colours))
         key = text[:80]
         index = seen.setdefault(key, len(seen) + 1)
         attempts = seen[("tries", key)] = seen.get(("tries", key), 0) + 1
@@ -1173,11 +1220,18 @@ def stub_answerer():
         if broken:
             body = "I looked at the picture and here is what I think, in prose."
         else:
-            owner = colours[0] if colours else "none"
-            body = json.dumps({"segments": [
-                {"n": n, "verdict": "real" if n % 2 else "artifact",
-                 "owner": owner if n % 2 else "none",
-                 "why": "self-test, no judgement was made"} for n in numbers]})
+            items = []
+            for number, colour, colours in asked:
+                if colour == "red":
+                    real = bool(number % 2)
+                    items.append({"n": number, "verdict": "real" if real else "artifact",
+                                  "owner": (colours[0] if colours else "none") if real
+                                           else "none",
+                                  "why": "self-test, no judgement was made"})
+                else:
+                    items.append({"n": number, "owner": colours[-1] if colours else "none",
+                                  "why": "self-test, no judgement was made"})
+            body = json.dumps({"segments": items})
         return {
             "text": body,
             "id": f"self-test-{index:04d}-{attempts}",
@@ -1200,11 +1254,22 @@ def cost_usd(input_tokens: int, output_tokens: int) -> float:
 VERDICTS = ("real", "artifact")
 
 
-def parse_answer(text: str, numbers: list, colours: dict) -> tuple:
+def parse_answer(text: str, numbers: list, colours: dict, questions: dict) -> tuple:
     """(answer, why it was refused). Strict: the json must name every number in
     the picture exactly once, name no other, and use only the words the prompt
-    allows. Anything else is refused whole, because a half-read answer is a
-    judgement nobody made."""
+    allows FOR THAT NUMBER. Anything else is refused whole, because a half-read
+    answer is a judgement nobody made.
+
+    The owner a number may be given is one of its own two candidates or "none",
+    and nothing else: naming a cell that was never offered for that segment is
+    not a judgement of the question that was asked.
+
+    `verdict` is asked for, and read, only where the question is "real and
+    owner", which is a segment the pipeline has not traced. For a segment the
+    pipeline HAS traced the only question is the owner, so the verdict is "real"
+    by what the pipeline already did and a verdict in the answer is recorded and
+    ignored rather than acted on: nothing the judge says can delete tracing the
+    pipeline made."""
     if not text or not text.strip():
         return None, "the answer was empty"
     body = text.strip()
@@ -1220,7 +1285,6 @@ def parse_answer(text: str, numbers: list, colours: dict) -> tuple:
         return None, f"the json did not parse: {error.msg}"
     if not isinstance(parsed, dict) or not isinstance(parsed.get("segments"), list):
         return None, "no segments list"
-    allowed_owners = set(colours) | {"none"}
     seen = {}
     for item in parsed["segments"]:
         if not isinstance(item, dict):
@@ -1233,17 +1297,26 @@ def parse_answer(text: str, numbers: list, colours: dict) -> tuple:
             return None, f"segment {number} answered twice"
         if number not in numbers:
             return None, f"segment {number} is not in the picture"
-        verdict = str(item.get("verdict", "")).strip().lower()
-        if verdict not in VERDICTS:
-            return None, f"segment {number} has verdict {item.get('verdict')!r}"
+        ask = questions.get(number, {})
+        allowed_owners = set(ask.get("candidate_colours", ())) | {"none"}
         owner = str(item.get("owner", "none")).strip().lower()
         if owner not in allowed_owners:
-            return None, f"segment {number} has owner {item.get('owner')!r}"
-        if verdict == "artifact":
-            owner = "none"
+            return None, (f"segment {number} has owner {item.get('owner')!r}, which is not one "
+                          f"of {sorted(allowed_owners)}")
+        said = str(item.get("verdict", "")).strip().lower()
+        if ask.get("question") == "real and owner":
+            if said not in VERDICTS:
+                return None, f"segment {number} has verdict {item.get('verdict')!r}"
+            verdict = said
+            if verdict == "artifact":
+                owner = "none"
+        else:
+            verdict = "real"
         why = str(item.get("why", "")).strip()
         seen[number] = {"n": number, "verdict": verdict, "owner": owner,
-                        "owner_lacuna_id": colours.get(owner), "why": why[:300]}
+                        "owner_lacuna_id": colours.get(owner), "why": why[:300],
+                        "verdict_asked_for": ask.get("question") == "real and owner",
+                        "verdict_in_the_answer": said or None}
     missing = [n for n in numbers if n not in seen]
     if missing:
         return None, f"no answer for segment(s) {missing}"
@@ -1324,7 +1397,11 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
               "invalid_attempts": 0, "call_errors": 0, "refusals": 0,
               "replay_request_mismatches": 0, "replay_picture_mismatches": 0,
               "segments": 0, "segments_real": 0,
-              "segments_artifact": 0, "segments_unjudged": 0, "stopped_on_cost": False}
+              "segments_artifact": 0, "segments_unjudged": 0,
+              "segments_given_an_owner": 0, "segments_given_no_owner": 0,
+              "segments_asked_an_owner_only": 0, "segments_asked_real_and_owner": 0,
+              "owner_moved_by_a_verdict": 0, "owner_left_where_it_was": 0,
+              "verdicts_sent_where_none_was_asked": 0, "stopped_on_cost": False}
     out_cases = []
     for case in candidates["cases"]:
         totals["cases"] += 1
@@ -1353,6 +1430,10 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
             "usage": {"input_tokens": 0, "output_tokens": 0},
             "cost_usd": 0.0,
             "segments": [{"n": seg["n"], "segment_id": seg["segment_id"], "kind": seg["kind"],
+                          "classes": seg["classes"], "question": seg["question"],
+                          "candidates": seg["candidates"],
+                          "candidate_colours": drawn["questions"].get(
+                              seg["n"], {}).get("candidate_colours", []),
                           "px": seg["px"], "length_um": seg["length_um"],
                           "owner_lacuna_id_before": seg["owner_lacuna_id"],
                           "touches": seg["touches"],
@@ -1446,7 +1527,7 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
             totals["attempts"] += 1
             record_case["attempts"] = attempt
             parsed, why_not = parse_answer(response.get("text", ""), numbers,
-                                           drawn["colours"])
+                                           drawn["colours"], drawn["questions"])
             record["valid"] = parsed is not None
             record["invalid_reason"] = why_not or None
             record["parsed"] = parsed
@@ -1468,12 +1549,25 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
                 if item is None:
                     continue
                 seg.update({"verdict": item["verdict"], "owner": item["owner"],
-                            "owner_lacuna_id": item["owner_lacuna_id"], "why": item["why"]})
+                            "owner_lacuna_id": item["owner_lacuna_id"], "why": item["why"],
+                            "verdict_in_the_answer": item["verdict_in_the_answer"]})
+                if not item["verdict_asked_for"] and item["verdict_in_the_answer"]:
+                    totals["verdicts_sent_where_none_was_asked"] += 1
         else:
             totals["cases_unjudged"] += 1
         for seg in record_case["segments"]:
             totals["segments"] += 1
             totals[f"segments_{seg['verdict']}"] += 1
+            totals["segments_asked_an_owner_only" if seg["question"] == "owner"
+                   else "segments_asked_real_and_owner"] += 1
+            if seg["verdict"] == "unjudged":
+                continue
+            if seg["owner_lacuna_id"]:
+                totals["segments_given_an_owner"] += 1
+                totals["owner_moved_by_a_verdict" if seg["owner_lacuna_id"]
+                       != seg["owner_lacuna_id_before"] else "owner_left_where_it_was"] += 1
+            else:
+                totals["segments_given_no_owner"] += 1
         out_cases.append(record_case)
         if progress is not None:
             progress(record_case, totals)

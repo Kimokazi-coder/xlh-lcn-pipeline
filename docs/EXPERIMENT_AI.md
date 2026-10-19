@@ -29,18 +29,21 @@ Ownership, the 50 um cap and all quantification stay exactly where they were.
 
 ## What the judge is told
 
-The rules, in the words of the brief, are in `src/judge_prompt.md`, which is the one fixed prompt
-used for every image:
+The rules are in `src/judge_prompt.md`, which is the one fixed prompt used for every image:
 
 1. A thread that visibly touches an osteocyte belongs to it.
-2. Threads in the glow around a body are often faint and are still real.
+2. A thread belongs to the osteocyte it starts from, even where it later joins a network another
+   osteocyte also reaches. That a different cell can be reached the long way round through the
+   network is not evidence, because that is the very thing the pipeline gets wrong.
 3. Not every dendrite belongs to an osteocyte, so "none" is a valid owner.
-4. Glow texture and noise are artifacts.
+4. Threads in the glow around a body are often faint and are still real.
+5. Glow texture and noise are artifacts.
 
-`docs/judge_examples.md` starts empty and is loaded into the prompt automatically, after the rules
-and before the case, on every call for every image. Karim writes the examples; nothing else is
-needed to make them take effect. Both files have their sha256 written into every log record, so a
-changed prompt or a changed set of examples is visible in the log for ever after.
+`docs/judge_examples.md` holds rules 1 to 3 again in the words of the brief, and is loaded into the
+prompt automatically, after the rules and before the case, on every call for every image. Karim adds
+worked examples under them; nothing else is needed to make them take effect. Both files have their
+sha256 written into every log record, so a changed prompt or a changed set of examples is visible in
+the log for ever after.
 
 ## Step 1: what the judge is shown, and the four classes
 
@@ -111,26 +114,54 @@ Three things that number says, and each is a measurement and not a choice:
   only answer they could be given is the one the pipeline already has. It is also what keeps the
   cost of the run where it is.
 
-## Step 2: the picture, and what needs a decision
+## Step 2: the question
 
 One call per case. The picture is two panels side by side:
 
-- **left**, the raw crop, 256 px of image data around the body, brightness stretched between the
-  1st and 99th percentile of the crop **outside the bodies**, enlarged by whole pixels to 512 px.
-  Nothing is interpolated.
-- **right**, the same panel with every body outlined in its colour (the body the case is about is
-  always **yellow**, the others cyan, magenta, orange, green, blue) and **every segment drawn**: in
-  its owner's colour if a lacuna owns it, in **white** if nobody does, in **red** if the pipeline
-  does not have it.
+- **left**, the raw crop, 256 px of image data (512 px where a case needs the bigger crop),
+  brightness stretched between the 1st and 99th percentile of the crop **outside the bodies**,
+  enlarged by whole pixels to 512 px. Nothing is interpolated.
+- **right**, the same panel with every body outlined in its colour (the body in the middle is
+  always **yellow**, the others cyan, magenta, orange, green, blue, and a seventh body grey) and
+  **every segment drawn**.
 
-**Only the segments that need a decision carry a number**, which is what asks the judge for one: the
-new ones, the unowned ones, and any segment that touches a body that does not own it. Everything
-else is context, so the judge can see what the tracing already says around the piece it is judging.
-Over the 8 images that is 1,431 numbered segments of 11,008 drawn, about 13 numbers per call.
+How a segment is drawn says what it is:
 
-The answer is unchanged: per number, `real` or `artifact`, the owner colour or `none`, and one line
-of reasoning. Validation is strict, a failure is retried once, and a case that fails twice leaves
-every segment of it **unjudged**, which means the pipeline's own decision stands.
+| | drawn |
+| --- | --- |
+| numbered, and the pipeline traced it (classes a, c, d) | **white** |
+| numbered, and the pipeline does not have it (class b) | **red** |
+| context, traced and owned | **its owner's colour** |
+| context, traced and owned by nobody | white |
+| context, not traced | red |
+
+A numbered traced segment is white **whoever owns it now**, because its owner is exactly what is in
+question. That hides nothing: its current owner is one of the two candidate colours the case text
+names for that number, and the rest of that cell's tracing is still drawn in its colour all around,
+which is the context the judge needs to see where a thread starts.
+
+**The question, per number, is one of two.** The case text lists every number with its
+**candidates**: the one or two cells it could start from, the nearer one first.
+
+- a **white** number: *which cell does this thread start from: the first candidate, the second
+  candidate, or none?* The pipeline traced it, so it is real and the judge is not asked whether it
+  is. **Nothing the judge says can delete tracing the pipeline made.**
+- a **red** number: *is it a real thread or glow texture, and which cell does it start from?*
+
+An answer may name **only a colour offered for that number**, or `none`. A colour that is in the
+picture but not offered for that number is context, not an answer. Validation is strict and
+per number: a failure is retried once, and a case that fails twice leaves every segment of it
+**unjudged**, which means the pipeline's own decision stands.
+
+Over the 8 images that is 895 numbered segments of 11,008 drawn, about 6 numbers per call: 476
+asked an owner only and 419 asked real or artifact as well.
+
+The three rules the brief asks for in words are in `docs/judge_examples.md`, which is loaded into
+the prompt after the rules and before the case, on every call for every image: **(1)** a thread that
+visibly touches an osteocyte belongs to that osteocyte; **(2)** a thread belongs to the osteocyte it
+starts from, even if it later joins a network that another osteocyte also reaches; **(3)** not every
+dendrite belongs to an osteocyte, so "none" is a valid answer. Both files' sha256 go into every log
+record, so a changed prompt or a changed set of rules is visible in the log for ever after.
 
 ## Step 3: the segments one lacuna's crop cannot show
 
