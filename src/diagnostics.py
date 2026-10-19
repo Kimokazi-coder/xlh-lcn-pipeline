@@ -5024,20 +5024,28 @@ def _ai_candidates_one(path_str: str) -> dict:
     rows = []
     for case in candidates["cases"]:
         kinds = {"new": 0, "unowned": 0, "owned": 0}
+        classes = {name: 0 for name in ai_judge.CLASSES}
         for entry in case["decide"]:
             kinds[entry["kind"]] = kinds.get(entry["kind"], 0) + 1
+            for name in entry["classes"]:
+                classes[name] += 1
         rows.append({
             "image_label": state["label"],
             "case_id": case["case_id"],
             "case_kind": case["kind"],
             "lacuna_id": case["lacuna_id"],
             "centroid_xy": case["centroid_xy"],
+            "crop_px": case["crop_px"],
             "numbered": len(case["decide"]),
             "numbered_new": kinds["new"],
             "numbered_unowned": kinds["unowned"],
             "numbered_traced_owned": kinds["owned"],
+            "numbered_by_class": classes,
+            "numbered_asked_an_owner_only": sum(1 for e in case["decide"]
+                                                if e["question"] == "owner"),
             "context_segments": len(case["context"]),
             "segments_not_offered": case["segments_not_offered"],
+            "segments_not_askable_here": len(case["segments_not_askable_here"]),
         })
     return {
         "image_label": state["label"],
@@ -5055,6 +5063,8 @@ def _ai_candidates_one(path_str: str) -> dict:
 def cmd_ai_candidates(args) -> int:
     from concurrent.futures import ProcessPoolExecutor
 
+    import ai_judge
+
     images = images_from(args)
     args.out.mkdir(parents=True, exist_ok=True)
     jobs = [str(p) for p in images]
@@ -5063,7 +5073,11 @@ def cmd_ai_candidates(args) -> int:
         out = list(ex.map(_ai_candidates_one, jobs))
 
     rows = [r for o in out for r in o["rows"]]
-    totals = {k: sum(o["counts"][k] for o in out) for k in out[0]["counts"]} if out else {}
+    scalars = [k for k in (out[0]["counts"] if out else {}) if k != "classes"]
+    totals = {k: sum(o["counts"][k] for o in out) for k in scalars}
+    classes = {name: {field: sum(o["counts"]["classes"][name][field] for o in out)
+                      for field in ("segments", "px", "lacunae")}
+               for name in ai_judge.CLASSES}
     report = {
         "status": "EXPERIMENT, measurement only: no pipeline output and no judge",
         "question": "what the AI judge is shown, and what of it needs a decision",
@@ -5074,18 +5088,29 @@ def cmd_ai_candidates(args) -> int:
             "unowned": "traced by the pipeline and owned by nobody",
             "new": "not traced: what the permissive cut finds inside a zone of the hole",
         },
+        "classes": ai_judge.CLASSES,
+        "within_reach": ("a lacuna is a candidate for a segment when its body lies within that "
+                         "lacuna's own zone of the hole plus the minimum segment length of the "
+                         "segment; it is the pipeline's zone and no new number"),
         "numbered": ("a segment is numbered, which is what asks the judge for a decision, "
-                     "when it is new, or unowned, or it touches a body that does not own it"),
+                     "exactly when it falls in one of the four classes"),
+        "the_question": {"a, c, d": "which osteocyte does this thread start from",
+                         "b": "is it a real thread or glow texture, and whose"},
+        "lacunae_involved": ("per class, how many lacunae are a candidate for at least one "
+                             "segment of it, so how many cells its answers could move"),
         "cut": out[0]["cut"] if out else {},
         "all_images": {
             "images": len(out),
             "cases": sum(o["cases"] for o in out),
             "left_over_cases": sum(o["left_over_cases"] for o in out),
             "segments": sum(o["segments"] for o in out),
-            "numbered": sum(r["numbered"] for r in rows),
+            "numbers_in_all_the_pictures": sum(r["numbered"] for r in rows),
             "numbered_new": sum(r["numbered_new"] for r in rows),
             "numbered_unowned": sum(r["numbered_unowned"] for r in rows),
             "numbered_traced_owned": sum(r["numbered_traced_owned"] for r in rows),
+            "numbered_asked_an_owner_only": sum(r["numbered_asked_an_owner_only"]
+                                                for r in rows),
+            "classes": classes,
             **totals,
         },
         "per_image": [{k: o[k] for k in ("image_label", "lacunae", "cases", "left_over_cases",
@@ -5094,13 +5119,24 @@ def cmd_ai_candidates(args) -> int:
     }
     (args.out / "ai_candidates.json").write_text(json.dumps(report, indent=2) + "\n",
                                                  encoding="utf-8")
-    print_table(["image", "lacunae", "cases", "segments", "owned", "unowned", "new",
-                 "in a zone, not its own", "numbered"],
-                [[o["image_label"], o["lacunae"], o["cases"], o["segments"],
+    print_table(["image", "lacunae", "segments", "owned", "unowned", "new",
+                 "a", "b", "c", "d", "numbered", "calls"],
+                [[o["image_label"], o["lacunae"], o["segments"],
                   o["counts"]["owned"], o["counts"]["unowned"], o["counts"]["new"],
-                  o["counts"]["traced_in_a_zone_its_lacuna_does_not_own"],
-                  sum(r["numbered"] for r in o["rows"])] for o in out],
-                title="What the judge is shown, per image")
+                  *[o["counts"]["classes"][name]["segments"] for name in "abcd"],
+                  o["counts"]["numbered"], o["cases"]] for o in out],
+                title="What the judge is shown, per image: kinds, then the four classes")
+    print_table(["class", "what it is", "segments", "px", "lacunae"],
+                [[name, ai_judge.CLASSES[name], classes[name]["segments"],
+                  classes[name]["px"], classes[name]["lacunae"]] for name in "abcd"],
+                title="The four classes over all the images (a lacuna counts once per image)")
+    print_table(["image", *[f"{name}: segments / px / lacunae" for name in "abcd"]],
+                [[o["image_label"],
+                  *[f"{o['counts']['classes'][name]['segments']} / "
+                    f"{o['counts']['classes'][name]['px']} / "
+                    f"{o['counts']['classes'][name]['lacunae']}" for name in "abcd"]]
+                 for o in out],
+                title="Segments, pixels and lacunae involved per class, per image")
     a = report["all_images"]
     print(f"\nsegments: {a['segments']} over {a['images']} images, "
           f"{a['owned']} owned, {a['unowned']} owned by nobody, {a['new']} new")
@@ -5108,11 +5144,21 @@ def cmd_ai_candidates(args) -> int:
           f"{a['traced_in_a_zone_its_lacuna_does_not_own']} are not owned by that lacuna")
     print(f"touching two bodies: {a['touching_two_bodies']}; traced and owned by another than "
           f"the body it touches: {a['traced_owned_by_another_than_the_body_it_touches']}")
-    print(f"numbered for a decision: {a['numbered']} "
+    print(f"numbered for a decision: {a['numbered']} segments, "
+          f"{a['numbers_in_all_the_pictures']} numbers over all the pictures "
           f"({a['numbered_new']} new, {a['numbered_unowned']} unowned, "
-          f"{a['numbered_traced_owned']} traced and owned)")
-    print(f"calls: {a['cases']}, of them {a['left_over_cases']} for segments that fall "
-          f"outside their lacuna's crop")
+          f"{a['numbered_traced_owned']} traced and owned), of them "
+          f"{a['numbered_asked_an_owner_only']} asked an owner only and "
+          f"{a['numbers_in_all_the_pictures'] - a['numbered_asked_an_owner_only']} "
+          f"asked real or artifact as well")
+    print(f"in two classes, so asked in two cases: {a['in_two_classes']}")
+    print(f"unowned with no lacuna within reach, so not asked at all: "
+          f"{a['unowned_with_no_lacuna_in_reach']} (no body in a picture could be named for "
+          f"them, so the only answer they could be given is the pipeline's own)")
+    print(f"calls: {a['cases']}, of them {a['left_over_cases']} for segments their lacuna's "
+          f"crop cannot show with both candidates")
+    print(f"in a class but no case could ask: "
+          f"{a['needs_a_decision_but_no_case_could_ask']} (must be 0)")
     print(f"\nreport -> {args.out / 'ai_candidates.json'}")
     return 0
 

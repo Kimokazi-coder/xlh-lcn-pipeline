@@ -42,11 +42,11 @@ and before the case, on every call for every image. Karim writes the examples; n
 needed to make them take effect. Both files have their sha256 written into every log record, so a
 changed prompt or a changed set of examples is visible in the log for ever after.
 
-## Step 1: what the judge is shown
+## Step 1: what the judge is shown, and the four classes
 
 A **segment** is a BRANCH of a skeleton, the piece between two junctions, at least 10 px long
 (1.3 um, the floor the pipeline already applies to a thread no lacuna owns). Within each lacuna's
-crop, every segment is shown, and they are of three kinds:
+crop, every segment is shown, and they are of three **kinds**, which is what the pipeline has:
 
 - **owned**: the pipeline traced it and a lacuna owns it;
 - **unowned**: the pipeline traced it and nobody owns it;
@@ -56,27 +56,60 @@ crop, every segment is shown, and they are of three kinds:
   lowers that cut and defines nothing of its own: `src/ai_judge.py` no longer measures an empty
   width or a contrast ratio, because the pipeline measures both.
 
+What the judge is **asked** about is not the kind but the **class**, and there are four:
+
+| class | what it is |
+| --- | --- |
+| **a** | an unowned segment, with at least one lacuna within reach of it |
+| **b** | a new segment from the permissive cut inside the zone of the hole |
+| **c** | a segment that touches a body that does not own it |
+| **d** | a segment owned by a lacuna that is **not** the nearest lacuna to it by straight distance, where that nearest lacuna's body lies within its own zone of the hole plus 10 px |
+
+A segment is numbered, which is what asks the judge for a decision, exactly when it falls in one of
+those four classes. Class **d** is what this round adds, and it is the case the experiment is now
+about: ownership goes by shortest path through the skeleton, so a whole connected network can go to
+one lacuna that reaches it through a single thread while another lacuna sits closer to where those
+threads start and has no skeleton path to them.
+
+**Within reach** is one test, used for class d, for which candidates a numbered segment is offered,
+and for which unowned segments are asked about at all: *a lacuna is a candidate for a segment when
+its body lies within that lacuna's own zone of the hole plus 10 px of the segment.* The zone is the
+pipeline's (METHODS section 19) and the 10 px is the minimum segment length the pipeline already
+applies, so the rule introduces no number of its own.
+
 Measured over the 8 images (`python src/diagnostics.py ai-candidates --dir data/WT -o
-results/ai_dry_run`):
+results/ai_dry_run`). Each class cell is **segments / pixels / lacunae involved**, where a lacuna
+counts as involved when it is a candidate for at least one segment of that class, so it is the
+number of cells whose ownership the class could move:
 
-| image | segments | owned | unowned | new | in a zone, not owned by that lacuna | numbered |
-| --- | --- | --- | --- | --- | --- | --- |
-| 542_z06 | 1,334 | 1,040 | 248 | 46 | 21 | 208 |
-| 542_z18 | 1,356 | 978 | 332 | 46 | 23 | 186 |
-| 543-2 | 1,485 | 1,234 | 201 | 50 | 12 | 130 |
-| 543_3 | 1,427 | 1,178 | 168 | 81 | 36 | 148 |
-| 543_z13 | 1,463 | 1,101 | 314 | 48 | 7 | 153 |
-| 682_z08 | 1,259 | 937 | 283 | 39 | 13 | 170 |
-| 682_z23 | 1,377 | 1,048 | 283 | 46 | 27 | 221 |
-| 682_z29 | 1,307 | 972 | 272 | 63 | 29 | 215 |
-| **all 8** | **11,008** | **8,488** | **2,101** | **419** | **168 of 1,253** | **1,431** |
+| image | segments | owned | unowned | new | a | b | c | d | numbered | calls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 542_z06 | 1,334 | 1,040 | 248 | 46 | 43 / 1,195 / 15 | 46 / 789 / 16 | 0 / 0 / 0 | 19 / 612 / 11 | 108 | 24 |
+| 542_z18 | 1,356 | 978 | 332 | 46 | 49 / 1,257 / 13 | 46 / 657 / 11 | 0 / 0 / 0 | 23 / 620 / 8 | 118 | 19 |
+| 543-2 | 1,485 | 1,234 | 201 | 50 | 11 / 345 / 8 | 50 / 1,000 / 12 | 0 / 0 / 0 | 27 / 742 / 10 | 88 | 16 |
+| 543_3 | 1,427 | 1,178 | 168 | 81 | 28 / 630 / 12 | 81 / 1,903 / 13 | 0 / 0 / 0 | 54 / 1,458 / 12 | 163 | 23 |
+| 543_z13 | 1,463 | 1,101 | 314 | 48 | 17 / 530 / 7 | 48 / 781 / 11 | 0 / 0 / 0 | 18 / 596 / 10 | 83 | 15 |
+| 682_z08 | 1,259 | 937 | 283 | 39 | 26 / 799 / 8 | 39 / 557 / 10 | 0 / 0 / 0 | 7 / 188 / 5 | 72 | 12 |
+| 682_z23 | 1,377 | 1,048 | 283 | 46 | 52 / 1,353 / 12 | 46 / 802 / 11 | 0 / 0 / 0 | 22 / 540 / 9 | 120 | 17 |
+| 682_z29 | 1,307 | 972 | 272 | 63 | 40 / 1,116 / 11 | 63 / 1,112 / 13 | 0 / 0 / 0 | 40 / 933 / 12 | 143 | 19 |
+| **all 8** | **11,008** | **8,488** | **2,101** | **419** | **266 / 7,225 / 86** | **419 / 7,601 / 97** | **0 / 0 / 0** | **210 / 5,689 / 77** | **895** | **145** |
 
-Two numbers are zero on all 8 images and both say the same thing: **no segment touches two bodies**,
-and **no traced segment is owned by another lacuna than the body it touches**. Main's contact rule
-(a lacuna is offered every node that touches it, the nearer surface winning, METHODS section 19)
-leaves nothing there for a judge to correct, so the ownership question the judge is actually asked
-is the 168 traced segments lying in a lacuna's zone without that lacuna owning them, and the 2,101
-that nobody owns at all.
+**895 segments are numbered over the 8 images, in 145 calls.** Of them 476 are asked an owner only
+(classes a and d) and 419 are asked real or artifact as well (class b).
+
+Three things that number says, and each is a measurement and not a choice:
+
+- **Class c is empty on all 8 images**, as is the count of segments touching two bodies. Main's
+  contact rule (a lacuna is offered every node that touches it, the nearer surface winning, METHODS
+  section 19) leaves nothing there for a judge to correct. The machinery stays, because the class is
+  real and an image outside these 8 may hold one, but on these images it asks nothing.
+- **Class d is not empty: 210 segments, 5,689 px, and it involves 77 of the 108 lacunae.** The two
+  candidate bodies lie a median 126 px apart and up to 334 px apart, which is why a case may need a
+  bigger crop than a lacuna's own (below).
+- **1,835 of the 2,101 unowned segments have no lacuna within reach and are not asked about at
+  all.** Nothing is lost by that: no body in their picture could be named as their owner, so the
+  only answer they could be given is the one the pipeline already has. It is also what keeps the
+  cost of the run where it is.
 
 ## Step 2: the picture, and what needs a decision
 
@@ -99,17 +132,28 @@ The answer is unchanged: per number, `real` or `artifact`, the owner colour or `
 of reasoning. Validation is strict, a failure is retried once, and a case that fails twice leaves
 every segment of it **unjudged**, which means the pipeline's own decision stands.
 
-## Step 3: the crop blind spot
+## Step 3: the segments one lacuna's crop cannot show
 
-A zone can reach further than half a crop, so a segment that needs a decision can lie outside the
-256 px crop of the lacuna it belongs to. Those segments used to be counted and left unjudged, which
-is a blind spot and not a neutral outcome. **Each one now gets a call of its own**, with a crop
-centred on it, and any other left-over segment inside that crop is numbered in the same call, so one
-extra call can clear several.
+A numbered segment can only be asked about in a picture that shows it **and both of its
+candidates**: a candidate body with no pixel in the crop has no name the judge could answer with.
+Two things put a segment outside its own lacuna's crop. A zone can reach further than half a crop;
+and the two candidate bodies of a class d segment lie a median 126 px and up to 334 px apart, which
+one 256 px crop often cannot hold. Either way the segment would be counted and left unjudged, which
+is a blind spot and not a neutral outcome.
 
-On the 8 images this costs **one extra call**, on 682_z29: 109 calls for 108 lacunae. The mechanism
-is exercised and not merely present: with the crop forced to 96 px, 543-2 produces 21 cases of which
-9 are left-over cases. The dry run reports `numbered but not drawn`, which must be 0, and is.
+**Each one now gets a call of its own**, with the **smallest crop that holds the segment and both
+candidate bodies**, centred on all three, and any other left-over segment inside that crop is
+numbered in the same call, so one extra call can clear several. The crop sizes are the pipeline's
+own crop doubled until it reaches the rendered width: 256 px enlarged 2x, or 512 px at its own size.
+Every size divides the rendered width exactly, so a picture is still enlarged by a whole number of
+pixels and nothing is ever interpolated, and **a bigger crop costs magnification, not tokens**,
+because the picture that goes out is the same size either way.
+
+On the 8 images this costs **37 extra calls**: 145 for 108 lacunae, of which 125 are 256 px crops
+and 20 are 512 px. The number that says whether anything was left out is
+`needs_a_decision_but_no_case_could_ask`, which must be 0, and is on all 8 images. A segment that
+two left-over crops both hold is numbered in the earlier one only, because a segment asked twice
+would be two answers that can disagree over nothing.
 
 ## Step 4: the assembly
 

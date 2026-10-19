@@ -159,18 +159,36 @@ def strip_comments(text: str) -> str:
 # proposes. A segment is a BRANCH of a skeleton, the piece between two
 # junctions, which is the same split the candidates used from the start.
 #
-# Four kinds, and the first two are context:
-#   owned    traced by the pipeline and owned by the lacuna this case is about
-#   other    traced and owned by another lacuna
+# Three KINDS, by what the pipeline has:
+#   owned    traced by the pipeline and owned by a lacuna
 #   unowned  traced and owned by nobody
 #   new      not traced at all: what the permissive cut inside the zone of the
 #            hole finds beyond the mask the pipeline kept
 #
-# A segment is NUMBERED, which is what asks the judge for a decision, only where
-# a decision could change its owner or its existence: it is new, or it is
-# unowned, or it touches a body that does not own it. A segment that is owned by
-# the lacuna it touches and by nobody else needs no decision and is drawn as
-# context, in its owner's colour.
+# and four CLASSES, which are the cases the judge is actually asked about:
+#   a  an unowned segment
+#   b  a new segment from the permissive cut inside the zone of the hole
+#   c  a segment that touches a body that does not own it
+#   d  a segment owned by a lacuna that is NOT the nearest lacuna to it by
+#      straight distance, where that nearest lacuna is within REACH of it
+#
+# A segment is NUMBERED, which is what asks the judge for a decision, exactly
+# when it falls in one of those four classes. A segment in none of them needs no
+# decision and is drawn as context, in its owner's colour.
+
+def reach_px(extents, lacuna_id: int) -> float:
+    """How far the judge looks for one lacuna: that lacuna's OWN zone of the
+    hole (the pipeline's zone, METHODS section 19) plus the minimum segment
+    length, which is the floor the pipeline already applies to a thread no
+    lacuna owns. Nothing new is defined here.
+
+    A lacuna is a CANDIDATE for a segment when its body lies within this reach
+    of the segment, and that one test decides class d, which candidates a
+    numbered segment is offered, and which unowned segments are asked about at
+    all. An unowned segment with no lacuna within reach is left to the pipeline:
+    no body in the picture could be named as its owner, so the only answer it
+    could be given is the one the pipeline already has."""
+    return float(extents[lacuna_id]) + MIN_SEGMENT_PX
 
 def _junctions(skel: np.ndarray) -> np.ndarray:
     """Skeleton pixels with three or more skeleton neighbours. Removing them
@@ -193,6 +211,49 @@ def _majority(values: np.ndarray) -> int:
         return 0
     counts = np.bincount(values[values >= 0])
     return int(np.argmax(counts)) if counts.size else 0
+
+
+def body_gap_maps(state: dict) -> dict:
+    """{lacuna id: (window, the straight distance from that body inside it)}.
+
+    One distance transform per lacuna, in a window padded by as far as the judge
+    ever looks from that body (`reach_px`, never less than the pipeline's
+    contact reach). A pixel outside the window is further from that body than
+    anything this module asks about, so it needs no number, and the window keeps
+    the measurement cheap on an image of a hundred lacunae."""
+    shape = state["shape"]
+    lacuna_id_map = state["lacuna_id_map"]
+    extents = state["zone_extents_px"]
+    maps = {}
+    for lacuna_id in range(1, state["n_lacunae"] + 1):
+        body = lacuna_id_map == lacuna_id
+        if not body.any():
+            continue
+        pad = max(reach_px(extents, lacuna_id), float(canaliculi.CONTACT_REACH_PX))
+        window = canaliculi._body_window(body, shape, pad)
+        r_lo, r_hi, c_lo, c_hi = window
+        maps[lacuna_id] = (window,
+                           ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi]))
+    return maps
+
+
+def gaps_to_bodies(gap_maps: dict, labels: np.ndarray, count: int) -> list:
+    """For every labelled segment, {lacuna id: the straight gap in px from that
+    segment to that body}, for every body whose window the segment reaches.
+
+    Measured with one `ndi.minimum` per lacuna over the whole label image, so
+    the cost is one pass per lacuna and not one per segment per lacuna."""
+    out = [{} for _ in range(count + 1)]
+    for lacuna_id, (window, gap) in gap_maps.items():
+        r_lo, r_hi, c_lo, c_hi = window
+        sub = labels[r_lo:r_hi, c_lo:c_hi]
+        present = np.unique(sub)
+        present = present[present > 0]
+        if not present.size:
+            continue
+        for label, value in zip(present, ndi.minimum(gap, sub, index=present)):
+            out[int(label)][int(lacuna_id)] = float(value)
+    return out
 
 
 def permissive_mask(state: dict) -> tuple:
@@ -254,20 +315,14 @@ def image_candidates(state: dict) -> dict:
 
     traced_labels = _branch_labels(skeleton)
     new_labels, _n_new = ndi.label(new_lines, structure=structure)
-    _dist, nearest_id, _index = canaliculi.nearest_lacuna_map(lacuna_id_map)
+    dist_to_lacuna, nearest_id, _index = canaliculi.nearest_lacuna_map(lacuna_id_map)
 
-    # Which bodies each segment touches, by the pipeline's own contact reach.
-    touch_maps = {}
-    for lacuna_id in range(1, n_lacunae + 1):
-        body = lacuna_id_map == lacuna_id
-        if not body.any():
-            continue
-        r_lo, r_hi, c_lo, c_hi = canaliculi._body_window(body, shape,
-                                                         canaliculi.CONTACT_REACH_PX)
-        gap = ndi.distance_transform_edt(~body[r_lo:r_hi, c_lo:c_hi])
-        touch = np.zeros(shape, dtype=bool)
-        touch[r_lo:r_hi, c_lo:c_hi] = gap <= canaliculi.CONTACT_REACH_PX
-        touch_maps[lacuna_id] = touch
+    # The straight distance from every body, out to as far as the judge looks.
+    # It answers three questions at once: which bodies a segment TOUCHES (the
+    # pipeline's own contact reach), which lacunae are CANDIDATES for it (within
+    # `reach_px`), and in what order, which is by that distance.
+    gap_maps = body_gap_maps(state)
+    extents = state["zone_extents_px"]
 
     segments = []
     for kind, labels in (("traced", traced_labels), ("new", new_labels)):
@@ -275,6 +330,7 @@ def image_candidates(state: dict) -> dict:
         if not count:
             continue
         objects = ndi.find_objects(labels)
+        gaps_by_label = gaps_to_bodies(gap_maps, labels, count)
         for index in range(1, count + 1):
             box = objects[index - 1]
             if box is None:
@@ -286,13 +342,23 @@ def image_candidates(state: dict) -> dict:
             if rows.size < MIN_SEGMENT_PX:
                 continue
             owner = _majority(owner_map[rows, cols]) if kind == "traced" else 0
-            touches = sorted(i for i, touch in touch_maps.items() if touch[rows, cols].any())
+            gaps = gaps_by_label[index]
+            touches = sorted(i for i, gap in gaps.items()
+                             if gap <= canaliculi.CONTACT_REACH_PX)
+            # Every lacuna whose body lies within its own zone of the hole plus
+            # the minimum segment length of this segment: the candidates the
+            # judge can be offered for it, nearest first.
+            pool = sorted((i for i, gap in gaps.items() if gap <= reach_px(extents, i)),
+                          key=lambda i: (gaps[i], i))
+            # The nearest body by STRAIGHT distance, which is not the same
+            # question as who owns it: class d is exactly where the two differ.
+            nearest_at = int(np.argmin(dist_to_lacuna[rows, cols]))
+            nearest = int(nearest_id[rows[nearest_at], cols[nearest_at]])
             # The zone this segment lies in, which is the lacuna whose hole it
-            # is part of, and which is NOT the same question as who owns it.
-            # That difference is what the brief asks to be counted.
+            # is part of, and which is again not who owns it.
             zone_lacuna = _majority(zone_owner[rows, cols])
-            home = zone_lacuna or owner or _majority(nearest_id[rows, cols])
-            segments.append({
+            home = zone_lacuna or owner or nearest
+            seg = {
                 "segment_id": f"{kind[0]}{index:05d}",
                 "kind": kind if kind == "new" else ("owned" if owner else "unowned"),
                 "rows": rows,
@@ -303,8 +369,14 @@ def image_candidates(state: dict) -> dict:
                 "touches": [int(i) for i in touches],
                 "zone_lacuna_id": int(zone_lacuna),
                 "home_lacuna_id": int(home),
+                "nearest_lacuna_id": nearest,
+                "nearest_gap_px": round(float(dist_to_lacuna[rows, cols].min()), 3),
+                "gap_px": {int(i): round(float(gaps[i]), 3) for i in pool},
+                "candidate_pool": [int(i) for i in pool],
                 "label": len(segments) + 1,
-            })
+            }
+            seg["classes"] = segment_classes(seg)
+            segments.append(seg)
 
     # The territory of every segment: which mask pixel belongs to which centre
     # line, so that a verdict acts on the mask its segment is the centre line of
@@ -327,9 +399,18 @@ def image_candidates(state: dict) -> dict:
         centroid = [round(float(cols.mean()), 1), round(float(rows.mean()), 1)]
         window = crop_window(shape, centroid, int(config.AI_CROP_PX))
         cases.append(build_case(state, segments, lacuna_id, centroid, window, "lacuna"))
-    cases += crop_blind_spot_cases(state, segments, cases)
+    cases += left_over_cases(state, segments, cases)
     number_cases(cases)
 
+    counts = segment_counts(segments)
+    asked = {entry["segment_id"] for case in cases for entry in case["decide"]}
+    counts["numbered"] = len(asked)
+    # The one number that says whether anything was left out: a segment in one
+    # of the four classes that no case could ask about, because its candidates
+    # do not fit one picture. It keeps the pipeline's own decision and is never
+    # guessed at.
+    counts["needs_a_decision_but_no_case_could_ask"] = sum(
+        1 for seg in segments if seg["classes"] and seg["segment_id"] not in asked)
     return {
         "shape": shape,
         "segments": segments,
@@ -338,28 +419,100 @@ def image_candidates(state: dict) -> dict:
         "permissive": permissive,
         "new_lines": new_lines,
         "cut": dict(cut, min_segment_px=MIN_SEGMENT_PX,
-                    max_segments_per_case=config.AI_MAX_SEGMENTS_PER_CASE),
-        "counts": segment_counts(segments),
+                    max_segments_per_case=config.AI_MAX_SEGMENTS_PER_CASE,
+                    crop_sizes_px=crop_sizes()),
+        "counts": counts,
         "geometry_sha256": geometry_hash(cases, segments),
     }
 
 
-def segment_counts(segments: list) -> dict:
-    """What the judge is shown, by kind, over the whole image.
+# The four classes of the brief. A segment can fall in more than one: c sits on
+# top of a or d, and a segment in two classes is asked in two cases, which is
+# the one place two answers can disagree.
+CLASSES = {
+    "a": "an unowned segment, with at least one lacuna within reach of it",
+    "b": "a new segment from the permissive cut inside the zone of the hole",
+    "c": "a segment that touches a body that does not own it",
+    "d": ("a segment owned by a lacuna that is not the nearest lacuna to it by straight "
+          "distance, where that nearest lacuna's body lies within its own zone of the hole "
+          "plus the minimum segment length"),
+}
 
-    `traced_in_a_zone_its_lacuna_does_not_own` is the number the brief asks for:
-    segments the pipeline traced that lie in a lacuna's zone of the hole and
-    that the lacuna does not own, whether another lacuna owns them or nobody
-    does. `touching_two_bodies` counts the segments that come within the
-    pipeline's contact reach of more than one body, which is the case where two
-    cells can both claim one thread."""
+
+def segment_classes(seg: dict) -> list:
+    """Which of the four classes a segment falls in, which is also what decides
+    whether it is numbered at all.
+
+    a and b and d are exclusive of each other by construction: a has no owner, b
+    is not traced, d has an owner. c can sit on top of a or of d."""
+    classes = []
+    if seg["kind"] == "unowned" and seg["candidate_pool"]:
+        classes.append("a")
+    if seg["kind"] == "new":
+        classes.append("b")
+    if seg["kind"] != "new" and any(i != seg["owner_lacuna_id"] for i in seg["touches"]):
+        classes.append("c")
+    if (seg["kind"] == "owned" and seg["nearest_lacuna_id"]
+            and seg["nearest_lacuna_id"] != seg["owner_lacuna_id"]
+            and seg["nearest_lacuna_id"] in seg["candidate_pool"]):
+        classes.append("d")
+    return classes
+
+
+def entry_candidates(seg: dict, lacuna_id: int) -> list:
+    """The candidate lacunae a numbered segment is offered in ONE case, in
+    order, at most two: "the first candidate, the second candidate, or none".
+
+    Two of them can never be dropped, because without them the question has no
+    sensible answer: the lacuna whose case this is, which is the body the
+    segment was numbered against, and the lacuna that owns the segment now, so
+    that the judge can always leave ownership where it is. Anything else comes
+    from the candidate pool, nearest body first, and the two are then ordered by
+    straight distance so that the FIRST candidate is always the nearer one."""
+    gaps = seg["gap_px"]
+    must = [i for i in (lacuna_id, seg["owner_lacuna_id"]) if i]
+    order = sorted(set(must) | set(seg["candidate_pool"]),
+                   key=lambda i: (gaps.get(i, float("inf")), i))
+    keep = [i for i in order if i in must]
+    for i in order:
+        if len(keep) >= 2:
+            break
+        if i not in keep:
+            keep.append(i)
+    keep = keep[:2]
+    return sorted(keep, key=lambda i: (gaps.get(i, float("inf")), i))
+
+
+def segment_counts(segments: list) -> dict:
+    """What the judge is shown, by kind and by class, over the whole image: for
+    every class the segments, the pixels and how many lacunae are involved,
+    which is what step 1 of the brief asks to be reported per image.
+
+    A lacuna counts as involved in a class when it is a candidate for at least
+    one segment of that class, so it is the number of cells whose ownership the
+    class could change."""
     counts = {"owned": 0, "unowned": 0, "new": 0, "touching_two_bodies": 0,
+              "needs_a_decision": 0, "in_two_classes": 0,
+              "unowned_with_no_lacuna_in_reach": 0,
               "traced_in_a_zone": 0, "traced_in_a_zone_its_lacuna_does_not_own": 0,
               "traced_owned_by_another_than_the_body_it_touches": 0}
+    classes = {name: {"segments": 0, "px": 0, "lacunae": set()} for name in CLASSES}
     for seg in segments:
         counts[seg["kind"]] += 1
         if len(seg["touches"]) > 1:
             counts["touching_two_bodies"] += 1
+        if seg["classes"]:
+            counts["needs_a_decision"] += 1
+        if len(seg["classes"]) > 1:
+            counts["in_two_classes"] += 1
+        if seg["kind"] == "unowned" and not seg["candidate_pool"]:
+            counts["unowned_with_no_lacuna_in_reach"] += 1
+        for name in seg["classes"]:
+            classes[name]["segments"] += 1
+            classes[name]["px"] += seg["px"]
+            classes[name]["lacunae"] |= set(seg["candidate_pool"])
+            if seg["owner_lacuna_id"]:
+                classes[name]["lacunae"].add(seg["owner_lacuna_id"])
         if seg["kind"] == "new":
             continue
         if seg["zone_lacuna_id"]:
@@ -368,7 +521,36 @@ def segment_counts(segments: list) -> dict:
                 counts["traced_in_a_zone_its_lacuna_does_not_own"] += 1
         if any(i != seg["owner_lacuna_id"] for i in seg["touches"]):
             counts["traced_owned_by_another_than_the_body_it_touches"] += 1
+    counts["classes"] = {name: {"segments": c["segments"], "px": c["px"],
+                                "lacunae": len(c["lacunae"])}
+                         for name, c in classes.items()}
     return counts
+
+
+def asked_classes(seg: dict, lacuna_id: int) -> list:
+    """Which of a segment's classes are put to the judge in the case of this
+    lacuna. Each class is asked against ONE body, so that a segment is numbered
+    once per body it is in question with and never twice in one picture:
+
+      a  against the lacuna whose crop it belongs to (its zone, else the
+         nearest body)
+      b  the same
+      c  against the body it touches that does not own it
+      d  against the nearest body, the one that does not own it
+
+    The case the brief calls two cases disagreeing is a segment asked in two of
+    these at once, which is class c on top of class a or d."""
+    out = []
+    if "a" in seg["classes"] and seg["home_lacuna_id"] == lacuna_id:
+        out.append("a")
+    if "b" in seg["classes"] and seg["home_lacuna_id"] == lacuna_id:
+        out.append("b")
+    if ("c" in seg["classes"] and lacuna_id in seg["touches"]
+            and seg["owner_lacuna_id"] != lacuna_id):
+        out.append("c")
+    if "d" in seg["classes"] and seg["nearest_lacuna_id"] == lacuna_id:
+        out.append("d")
+    return out
 
 
 def build_case(state: dict, segments: list, lacuna_id: int, centroid: list, window: tuple,
@@ -376,27 +558,42 @@ def build_case(state: dict, segments: list, lacuna_id: int, centroid: list, wind
     """One picture's worth: every segment with a pixel in this window, split
     into the ones that need a decision and the ones that are context.
 
-    A segment needs a decision in this case when a decision could change its
-    owner or its existence: it is new and this is the zone it lies in, it is
-    unowned and this lacuna is the nearest body to it, or it touches this body
-    and this body does not own it."""
+    A segment needs a decision in this case when it falls in one of the four
+    classes against THIS body (`asked_classes`), and it can only be asked here
+    if the picture can name both of its candidates: a candidate body with no
+    pixel in the crop, or beyond the sixth colour, has no name the judge could
+    answer with, so the segment is left to a case of its own instead of being
+    asked a question it cannot answer."""
     r_lo, r_hi, c_lo, c_hi = window
-    decide, context = [], []
+    named = case_colours(state, lacuna_id, window)
+    nameable = set(named["colours"].values())
+    decide, context, unnameable = [], [], []
     for seg in segments:
         inside = ((seg["rows"] >= r_lo) & (seg["rows"] < r_hi)
                   & (seg["cols"] >= c_lo) & (seg["cols"] < c_hi))
         if not inside.any():
             continue
         px_in_crop = int(inside.sum())
-        asked = (
-            (seg["kind"] == "new" and seg["home_lacuna_id"] == lacuna_id)
-            or (seg["kind"] == "unowned" and seg["home_lacuna_id"] == lacuna_id)
-            or (lacuna_id in seg["touches"] and seg["owner_lacuna_id"] != lacuna_id)
-        )
         entry = {"segment_id": seg["segment_id"], "label": seg["label"], "kind": seg["kind"],
                  "owner_lacuna_id": seg["owner_lacuna_id"], "touches": seg["touches"],
                  "px": seg["px"], "px_in_crop": px_in_crop, "length_um": seg["length_um"]}
-        (decide if asked else context).append(entry)
+        classes = asked_classes(seg, lacuna_id)
+        if not classes:
+            context.append(entry)
+            continue
+        candidates = entry_candidates(seg, lacuna_id)
+        whole = bool(inside.all())
+        if not whole or not set(candidates) <= nameable:
+            # Not askable here: either the segment runs out of the picture or a
+            # candidate body is not in it. Counted, drawn as context, and given
+            # a case of its own by `left_over_cases`.
+            unnameable.append(entry)
+            context.append(entry)
+            continue
+        entry["classes"] = classes
+        entry["candidates"] = candidates
+        entry["question"] = "real and owner" if seg["kind"] == "new" else "owner"
+        decide.append(entry)
     decide.sort(key=lambda s: -s["px_in_crop"])
     over = decide[int(config.AI_MAX_SEGMENTS_PER_CASE):]
     decide = decide[:int(config.AI_MAX_SEGMENTS_PER_CASE)]
@@ -406,44 +603,89 @@ def build_case(state: dict, segments: list, lacuna_id: int, centroid: list, wind
         "kind": kind,
         "centroid_xy": centroid,
         "window": [int(r_lo), int(r_hi), int(c_lo), int(c_hi)],
+        "crop_px": int(r_hi - r_lo),
+        "colours": named["colours"],
+        "bodies_with_no_colour": named["unnameable"],
         "decide": decide,
         "context": context,
         "segments_not_offered": len(over),
+        "segments_not_askable_here": [e["segment_id"] for e in unnameable],
     }
 
 
-def crop_blind_spot_cases(state: dict, segments: list, cases: list) -> list:
-    """Step 3: the segments that no lacuna crop holds.
+def crop_sizes() -> list:
+    """The crop sizes a case may use, smallest first: the pipeline's own crop,
+    doubled until it reaches the rendered width. Every size is a whole divisor
+    of the rendered width, so a picture is always enlarged by a whole number of
+    pixels and nothing is ever interpolated. A bigger crop costs magnification,
+    not tokens: the picture is the same size whichever is used."""
+    sizes, size = [], int(config.AI_CROP_PX)
+    while size <= int(config.AI_CROP_RENDER_PX):
+        sizes.append(size)
+        size *= 2
+    return sizes
 
-    A zone can reach further than half a crop, so a segment that needs a
-    decision can lie outside the 256 px crop of the lacuna it belongs to. Those
-    segments were counted and left unjudged in the first version, which is a
-    blind spot and not a neutral outcome. Each one now gets a crop of its own,
-    centred on it, and any other left-over segment that falls inside that crop
-    is drawn and numbered in the same call, so one extra call can clear several.
-    """
+
+def left_over_cases(state: dict, segments: list, cases: list) -> list:
+    """Step 3, now also carrying class d: the segments no lacuna case can ask
+    about, each given a case of its own.
+
+    Two things put a segment here. A zone can reach further than half a crop, so
+    a segment can lie outside the crop of the lacuna it belongs to; and the two
+    candidate bodies of a class d segment can be further apart than one crop, so
+    the lacuna's own crop cannot show them both. Either way the segment was
+    counted and left unjudged, which is a blind spot and not a neutral outcome.
+
+    Each one now gets the SMALLEST crop that holds the segment and the bodies of
+    both its candidates (`crop_sizes`), centred on all three, and any other
+    left-over segment that falls inside that crop is numbered in the same call,
+    so one extra call can clear several."""
     asked = {entry["segment_id"] for case in cases for entry in case["decide"]}
-    # In scope: a segment that lies in some lacuna's ZONE of the hole and needs
-    # a decision. A segment that lies in no zone and in no crop is not part of
-    # any lacuna's case and is not asked about at all; the judge is organised
-    # around the lacunae, and the unowned tracing far from every body is a
-    # separate question this experiment does not put to it.
-    left = [seg for seg in segments
-            if seg["segment_id"] not in asked and seg["zone_lacuna_id"]
-            and (seg["kind"] in ("new", "unowned") or len(seg["touches"]) > 1)]
+    # In scope: every segment that falls in one of the four classes and is not
+    # asked about anywhere yet. A segment in no class is not asked about at all,
+    # here or in a lacuna's case: that includes the unowned tracing with no
+    # lacuna within reach, which no body in a picture could be given.
+    left = [seg for seg in segments if seg["segment_id"] not in asked and seg["classes"]]
+    bodies = {}
+    for lacuna_id in range(1, state["n_lacunae"] + 1):
+        rows, cols = np.nonzero(state["lacuna_id_map"] == lacuna_id)
+        if rows.size:
+            bodies[lacuna_id] = (int(rows.min()), int(rows.max()),
+                                 int(cols.min()), int(cols.max()))
     extra = []
     covered: set = set()
     for seg in sorted(left, key=lambda s: (-s["px"], s["segment_id"])):
         if seg["segment_id"] in covered:
             continue
-        centroid = [round(float(seg["cols"].mean()), 1), round(float(seg["rows"].mean()), 1)]
-        window = crop_window(state["shape"], centroid, int(config.AI_CROP_PX))
-        case = build_case(state, segments, seg["home_lacuna_id"], centroid, window, "left over")
-        # Only the left-over segments are asked about here: everything else in
-        # this crop has been asked about in its own lacuna's case already.
-        keep = [e for e in case["decide"] if e["segment_id"] not in asked]
-        case["context"] += [e for e in case["decide"] if e["segment_id"] in asked]
+        # The case is centred on the segment and both of its candidates, and
+        # takes the first crop size that holds all of them.
+        against = seg["nearest_lacuna_id"] if "d" in seg["classes"] else seg["home_lacuna_id"]
+        wanted = [i for i in entry_candidates(seg, against) if i in bodies]
+        boxes = [(int(seg["rows"].min()), int(seg["rows"].max()),
+                  int(seg["cols"].min()), int(seg["cols"].max()))]
+        boxes += [bodies[i] for i in wanted]
+        r_lo = min(b[0] for b in boxes)
+        r_hi = max(b[1] for b in boxes)
+        c_lo = min(b[2] for b in boxes)
+        c_hi = max(b[3] for b in boxes)
+        centroid = [round((c_lo + c_hi) / 2.0, 1), round((r_lo + r_hi) / 2.0, 1)]
+        sizes = crop_sizes()
+        size = next((s for s in sizes if s > r_hi - r_lo and s > c_hi - c_lo), sizes[-1])
+        window = crop_window(state["shape"], centroid, size)
+        case = build_case(state, segments, against, centroid, window, "left over")
+        # Only the segments still left over are asked about here: everything
+        # else in this crop has been asked about in its own lacuna's case, or in
+        # an earlier left-over case whose crop also held it. Two left-over crops
+        # overlap readily, and a segment asked twice would be two answers that
+        # can disagree over nothing.
+        done = asked | covered
+        keep = [e for e in case["decide"] if e["segment_id"] not in done]
+        case["context"] += [e for e in case["decide"] if e["segment_id"] in done]
         case["decide"] = keep
+        if not keep:
+            # The bodies do not fit even the largest crop, so this segment
+            # cannot be shown with both its candidates. Counted, never guessed.
+            continue
         covered |= {e["segment_id"] for e in keep}
         extra.append(case)
     return extra
@@ -472,6 +714,7 @@ def geometry_hash(cases: list, segments: list) -> str:
         for entry in sorted(case["decide"], key=lambda e: e["n"]):
             seg = by_label[entry["label"]]
             rows.append([entry["n"], entry["kind"], entry["owner_lacuna_id"],
+                         entry["question"], entry["classes"], entry["candidates"],
                          (seg["rows"].astype(np.int64) * 100000
                           + seg["cols"].astype(np.int64)).tolist()])
         parts.append([case["case_id"], case["lacuna_id"], case["window"], rows])
@@ -643,18 +886,18 @@ def _place_label(canvas: np.ndarray, taken: list, text: str, row: int, col: int,
     return best[0], best[1]
 
 
-def case_colours(state: dict, case: dict) -> dict:
+def case_colours(state: dict, lacuna_id: int, window) -> dict:
     """Which cell body is outlined in which colour: the body the case is about
     is yellow, the other bodies with pixels in the crop take the remaining
     colours by increasing lacuna id. Returns {colour name: lacuna id} plus the
     ids that got no name."""
-    r_lo, r_hi, c_lo, c_hi = case["window"]
+    r_lo, r_hi, c_lo, c_hi = window
     ids = np.unique(state["lacuna_id_map"][r_lo:r_hi, c_lo:c_hi])
-    others = sorted(int(i) for i in ids if i > 0 and int(i) != case["lacuna_id"])
-    colours = {OWNER_COLOURS[0][0]: case["lacuna_id"]}
+    others = sorted(int(i) for i in ids if i > 0 and int(i) != lacuna_id)
+    colours = {OWNER_COLOURS[0][0]: int(lacuna_id)}
     spare = [name for name, _rgb in OWNER_COLOURS[1:]]
-    for name, lacuna_id in zip(spare, others):
-        colours[name] = lacuna_id
+    for name, other in zip(spare, others):
+        colours[name] = other
     return {"colours": colours, "unnameable": others[len(spare):]}
 
 
@@ -671,16 +914,17 @@ def case_picture(state: dict, candidates: dict, case: dict) -> tuple:
 
     Only the segments that need a decision carry a number. The rest are there so
     that the judge can see what the tracing already says around them."""
-    size = int(config.AI_CROP_PX)
     r_lo, r_hi, c_lo, c_hi = case["window"]
-    factor = max(1, int(round(config.AI_CROP_RENDER_PX / max(1, (r_hi - r_lo)))))
+    # Whole pixels only, and never below 1: a crop of the rendered width is
+    # drawn at its own size and a smaller one is enlarged to fill it.
+    factor = max(1, int(config.AI_CROP_RENDER_PX // max(1, (r_hi - r_lo))))
 
     id_crop = state["lacuna_id_map"][r_lo:r_hi, c_lo:c_hi]
     gray = stretch_to_gray(state["channel"][r_lo:r_hi, c_lo:c_hi], id_crop > 0)
     panel = _enlarge(np.stack([gray] * 3, axis=-1), factor)
     right = panel.copy()
 
-    named = case_colours(state, case)
+    named = {"colours": case["colours"], "unnameable": case["bodies_with_no_colour"]}
     rgb_of = dict(OWNER_COLOURS)
     by_label = {seg["label"]: seg for seg in candidates["segments"]}
     id_of_colour = {lacuna_id: name for name, lacuna_id in named["colours"].items()}
