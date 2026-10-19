@@ -1,31 +1,41 @@
 # Experiment: an AI judge for the threads around a lacuna
 
 **Status: EXPERIMENT. Branch `exp-ai-layer` only. Not merged, not validated, not used for any
-result.** `main` is untouched. With `config.AI_JUDGE_ENABLED = False`, which is how this branch
-ships, every pipeline output is byte for byte what `main` produces: checked after merging main at
-commit ac199fa, `reference-check` PASS at 161.00 / 21.63 / 8.50 and `regression` PASS over 6,800
-numbers at tolerance 0.
+result. NOTHING IN THIS FILE IS VALIDATED.** No verdict here has been checked against a manual
+trace, no number here has been compared with ground truth, and no result in `results/` was made with
+any of it. What is established is that the machinery does what it says, not that what it says is
+right.
+
+`main` is untouched. With `config.AI_JUDGE_ENABLED = False`, which is how this branch ships, every
+pipeline output is byte for byte what `main` produces: `reference-check` PASS at
+161.00 / 21.63 / 8.50 and `regression` PASS over 6,800 numbers at tolerance 0, rechecked on
+2026-10-19.
 
 External API use approved on 2026-10-15, approver: (Karim fills in)
 
 ## The question
 
-One global cut empties a ring of skeleton around every lacuna. METHODS section 18 measured why: a
-thread's own contrast inside that glow runs at 31 to 71% of what the same tissue shows 40 px further
-out, so one threshold keeps a quarter of the mask there that it keeps elsewhere. The glow zone rule
-(`config.GLOW_ZONE_CUT_FRACTION`) recovers part of it by lowering the cut where the mask already
-reaches. What it cannot do is tell a faint thread from the grain of the glow, because a threshold
-has no way to ask that question.
+Ownership goes by the shortest path through the skeleton. That is the right rule for a thread whose
+own cell traced it, and the wrong one at a join: a whole connected network can go to a cell that
+reaches it through one thread, while another cell lies much closer to where those threads start and
+has no skeleton path to them at all. A threshold cannot see which cell a thread leaves. It has no
+way to ask that question.
 
-This experiment asks it. A permissive tracing proposes every piece of thread-shaped signal in the
-hole, and an AI judge, looking at a picture, says for each piece whether it is a real thread and
-which cell it belongs to.
+This experiment asks it. **An AI judge decides who owns a thread where the answer is a judgement
+call, and a verdict feeds the shortest path step so that the network is split in a sensible place.**
+
+The second question is older and is still here. One global cut empties a ring of skeleton around
+every lacuna; METHODS section 18 measured why, a thread's own contrast inside that glow running at
+31 to 71% of what the same tissue shows 40 px further out. A permissive tracing proposes the pieces
+the cut lost, and the judge says which of them are threads and which are the grain of the glow.
 
 **Deterministic code stays the only code that touches pixels.** `src/ai_judge.py` makes the
-candidates, draws the pictures, reads the answer back and hands the pipeline a set of pixels to add
-and a set to drop. The judge only ever answers "real or artifact, and whose", about a numbered
-segment in a picture. It never sees a file name, a path or a genotype, and it never writes a pixel.
-Ownership, the 50 um cap and all quantification stay exactly where they were.
+candidates, draws the pictures, reads the answer back and hands the pipeline a set of pixels to add,
+a set to drop, and the cell each judged thread was said to start from. The judge only ever answers
+about a numbered segment in a picture: *which cell does this start from*, and for a piece the
+pipeline does not have, *is it a thread at all*. It never sees a file name, a path or a genotype,
+and it never writes a pixel. The attachment it earns is a zero weight edge; ownership, the 50 um cap
+and all quantification then run exactly where they were.
 
 ## What the judge is told
 
@@ -227,9 +237,8 @@ that the judge was shown: `attached_segments`, how many of those went
 shortest path did once the attachment was in the graph.
 
 The judge's edit lands on the segments it was given and nowhere else, which the detection record
-carries as a number (`ai_judge.counts.edited_px_outside_the_judged_segments`, 0). It is no longer
-confined to the zones, because an unowned segment the judge calls an artifact may lie outside one;
-how much of the edit lies outside a zone is reported beside it.
+carries as a number (`ai_judge.counts.edited_px_outside_the_judged_segments`, 0). How much of it
+lies outside a zone of the hole is reported beside it.
 
 An image with the switch on and no decision file is an error and not a silent pass, because a
 summary table must never mix judged and unjudged images.
@@ -361,10 +370,16 @@ The brief left these open. Each was decided, and here is the reason.
 | What "the measured empty width" is measured on | the global cut skeleton, before the dim pass and the 50 um prune | that is the skeleton in hand where the candidates are made, and it depends on no later stage and on no ownership |
 | What the contrast ratio is | p90 of the ridge response in the 40 px band beyond the hole over the p90 in the hole, per lacuna | it is METHODS section 18's own measurement, per lacuna; it lands in 1.24 to 3.0, median 2.11, which is the 1.4 to 3.2 that section measured with a short tail either side |
 | How a segment is defined | a branch of the permissive skeleton, split at junctions, clipped to one zone, at least 10 px | branches are what "split into numbered segments" means for a skeleton; 10 px is the floor the pipeline already uses for an unowned thread |
+| What "within reach" means, which decides class d, the candidates and which unowned segments are asked about | the lacuna's body lies within that lacuna's own zone of the hole plus 10 px of the segment | both numbers are the pipeline's, so one rule serves three questions and the experiment defines nothing of its own |
+| How many candidates a number is offered | at most two, nearest body first, and neither the case's own body nor the current owner can be dropped | the brief asks for the first candidate, the second, or none; keeping the current owner means the judge can always leave ownership where it is |
+| Which case a class d segment is asked in | the case of the NEAREST body, the one that does not own it | that is the body whose vicinity the segment sits in, so its crop almost always holds the segment |
+| Where a verdict's attachment lands | the end of the segment nearest the named cell | the path has to enter the thread where the thread starts; the nearest pixel would let it enter halfway along and measure the thread from its middle |
+| Whether a traced segment can be judged an artifact | no: only a segment the pipeline does not have is asked whether it is real | the brief asks a, c and d for an owner only, and it means nothing the judge says can delete tracing the pipeline made |
+| What an unowned segment with no lacuna within reach does | it is not asked about at all | no body in its picture could be named as its owner, so the only answer it could be given is the one the pipeline already has, and there are 1,835 of them |
 | Where the permissive mask is skeletonized | once over the whole frame | a mask clipped at the zone boundary has a medial axis that runs along that boundary, which would invent threads shaped like the hole |
 | Segments in two zones | given to the nearer body | the pipeline's own nearest-lacuna partition; it makes double judging impossible |
 | How many segments per case | at most 40, longest first | the picture has to stay readable and the answer small; nowhere near binding on these 8 images |
-| What an "artifact" verdict removes | the mask whose nearest centre line is that segment, inside the zone | the smallest edit that expresses the verdict, and it leaves every unjudged segment untouched |
+| What an "artifact" verdict removes | the mask whose nearest centre line is that segment | the smallest edit that expresses the verdict, and it leaves every unjudged segment untouched |
 | What an unjudged segment does | keeps the deterministic decision | the brief says so, and for a candidate that means the pipeline's own mask stands |
 | What owner `none` does | no attachment is added, the existing rules decide | the judge grants ownership and never vetoes it, so no ownership rule moves into the model |
 | Temperature 0 | not sent to this model, recorded as not sent | the pinned model returns HTTP 400 for any non-default temperature |
@@ -426,20 +441,20 @@ decision file under `results/ai_log/<label>/`.
 ## How to run it
 
 ```
-# Deterministic, no network, no judge: what the judge would be asked about.
+# Deterministic, no network, no judge: the four classes and what needs a decision.
 python src/diagnostics.py ai-candidates --dir data/WT -o results/ai_dry_run
 
-# What a real run would cost, with the pictures for two images.
-python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures 543-2,543_3
+# What a real run would cost, with every case picture of every image.
+python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures all
 
-# The whole chain with a stub judge, no network and no key.
+# The whole chain with a stub judge, no network and no key: 15 checks.
 python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --self-test
 
-# A real run on one image (needs both environment variables, see above).
-python src/diagnostics.py ai-judge --image "data/WT/543-2.tif"
+# A real run (needs both environment variables, see above).
+python src/diagnostics.py ai-judge --dir data/WT
 
 # The same run again, offline, from the log.
-python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --replay
+python src/diagnostics.py ai-judge --dir data/WT --replay
 
 # The pipeline with the judge applied: set config.AI_JUDGE_ENABLED = True and run
 # the pipeline as usual. It needs a decision file for every image it is given.
@@ -447,3 +462,27 @@ python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --replay
 
 The SDK is needed only for a real call: `pip install anthropic`. On this venv's Python 3.9 pip
 resolves to the last 0.x release, and the code uses only what 0.x and 1.x share.
+
+## What is established, and what is not
+
+Established, and each one measured rather than asserted:
+
+- the four classes exist and are counted on all 8 images, class d among them with 210 segments and
+  77 of the 108 lacunae;
+- every segment in a class is asked about in some picture, with both of its candidates visible
+  (`needs_a_decision_but_no_case_could_ask` is 0 on all 8);
+- a verdict becomes an attachment and the **shortest path then moves tracing between two cells**,
+  1,426 px of it on 543-2 under the stub's arbitrary answers;
+- nothing the judge says can delete tracing the pipeline made;
+- two answers that disagree are no answer, and the segment is left as the pipeline had it;
+- the whole chain replays offline to the same verdicts, with every request hashed;
+- a billing error stops the run at once, and a run whose answers cannot be read stops itself;
+- with the switch off every number is `main`'s, over 6,800 of them at tolerance 0.
+
+**Not established, and nothing here should be read as if it were.** No verdict has been checked
+against a manual trace. No judgement in this design has been shown to be a better judgement than the
+pipeline's. The 145 pictures say what the judge would be asked; they do not say the answer would be
+right, and the cost of a wrong answer is not symmetric, because a thread given to the wrong cell
+moves that cell's whole measured network. **Nothing here is validated**, nothing here has produced a
+result, and none of it may be used for one until it has been checked against ground truth and that
+check is written down.
