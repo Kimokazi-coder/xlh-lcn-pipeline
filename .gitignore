@@ -1,5 +1,6 @@
-# Only local environment and cache files are excluded. Code, data, results,
-# reports and the archive are all tracked and pushed.
+# Local environment and cache files are excluded, and so are the diagnostic and
+# archive folders listed at the end, which commands rerun into results/ but which
+# are not results. Code, data, both result sets and the reports are tracked.
 venv/
 __pycache__/
 .cache/
@@ -20,3 +21,19 @@ code_key*
 # ignored here as a second guard, as the blinding keys are above.
 .env
 .env.*
+
+# Removed from the repository on 2026-10-20 (cleanup). Each is written again when
+# its command reruns, so it is ignored rather than tracked a second time. The
+# command that makes each one is cited where the docs use it, and the files as
+# they were are at commit bf3b982.
+results/*/4_archive_not_used/
+results/all_images/archive_not_used/
+results/diagnosis_543_3/
+results/ai_dry_run/
+results/ridge_background/
+results/empty_zone/
+results/contact_census/
+results/network_shape/
+results/survey/
+results/glow_zone/
+results/hole_zone/

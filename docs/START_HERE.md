@@ -122,8 +122,8 @@ python src/diagnostics.py regression                     # every number against 
 python src/diagnostics.py switch-check                   # what each switch changes
 python -u figures/make_figures.py all                    # every figure, into results/
 python -u figures/make_figures.py check                  # drawn numbers against results/
-python src/diagnostics.py survey -d data/WT -o results/survey     # what it does to every image
-python src/diagnostics.py shape-picture -d data/WT -o results/network_shape
+python src/diagnostics.py survey -d data/WT -o results/survey     # what it does to every image (not tracked)
+python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
 python src/validate_manual.py                            # score against a hand tracing
 ```
 

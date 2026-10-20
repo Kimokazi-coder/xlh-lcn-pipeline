@@ -459,6 +459,11 @@ python src/diagnostics.py contact -d data/WT -o results/contact_census --tag bef
     --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures
 ```
 
+`results/contact_census/` is not tracked since 2026-10-20: regenerate with the command above. It
+measures the pipeline as configured, so with the contact rule on today it draws the after state; the
+tables and pictures cited in this section, before and after, are at commit `bf3b982`
+(`git checkout bf3b982 -- results/contact_census`).
+
 The question is narrow. Take the band 8 px wide around each lacuna body
 (`diagnostics.CONTACT_CENSUS_NEAR_PX`), which is the 2 px mask buffer plus one
 thread half width, so a thread whose centre line lies in it is drawn against the
@@ -530,7 +535,7 @@ multi-source Dijkstra, then multiplies the damage: a lacuna that attaches
 nothing cannot compete for the thread against a neighbour that did, so the
 neighbour takes the whole connected component.
 
-The pictures are in `results/contact_census/pictures/` (green: owned by this
+The pictures were in `results/contact_census/pictures/` (not tracked: regenerate with `python src/diagnostics.py contact -d data/WT -o results/contact_census --tag after --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures`; as cited, at commit `bf3b982`) (green: owned by this
 lacuna, orange: owned by another, magenta: unowned, gold: cut by the 50 um
 limit, cyan: the body).
 
@@ -578,7 +583,7 @@ then within 20 px, as its own / unowned / another lacuna's.
 | 543_3 id 8 (198, 635) | 1 **2** | 11 **11** | 8/8/0 **8/7/0** | 11/42/0 **11/41/0** | 0 / 17 |
 | 543_3 id 1 (271, 79) | 2 **3** | 158 **811** | 4/9/0 **7/3/0** | 20/60/14 **41/36/14** | 0 / 0 |
 
-Pictures, before and after, in `results/contact_census/pictures/`
+Pictures, before and after, were in `results/contact_census/pictures/` (not tracked: regenerate with `python src/diagnostics.py contact -d data/WT -o results/contact_census --tag after --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures`; as cited, at commit `bf3b982`)
 (`<label>_lacuna<id>_before.png` and `_after.png`, and `_x4` of each).
 
 - **543_3 id 3**, which owned nothing: it now owns 881 px and 3 roots, and the
@@ -652,7 +657,8 @@ share of touching skeleton that the touched body does not own 12.2% to **5.2%**.
    **Pass.**
 4. **No lacuna loses more than 25% of its owned px unless it was holding
    skeleton that another lacuna touches closer.** Measured pixel by pixel
-   (`python src/diagnostics.py contact-handover -d data/WT -o results/contact_census`):
+   (regenerate with `python src/diagnostics.py contact-handover -d data/WT -o results/contact_census`;
+   not tracked, the file cited is at commit `bf3b982`):
    41 lacunae gained, 46 are unchanged, 21 lost. **One** passes the 25% guard,
    543-2 id 9 at -35.1%, and all 1388 px it lost went to lacunae 11 and 12,
    **both of which touch those threads** by the rule's own test, a contact
@@ -760,7 +766,8 @@ rejected.
 
 Before any rule was written, every object the lacuna threshold produced at 100 px²
 or more over all 8 images was tabulated with its features, 173 of them
-(`python src/diagnostics.py lacuna-candidates -d data/WT -o results/survey`).
+(regenerate with `python src/diagnostics.py lacuna-candidates -d data/WT -o results/survey`; not
+tracked, as cited at commit `bf3b982`).
 
 The rule everyone expects is "a missed lacuna is clearly brighter than its
 surroundings". **The data says the opposite.** Measured as the mean inside over
@@ -861,8 +868,8 @@ The first two are restored verbatim from the ablation at tag
 `archive-2026-10-13`, where they were written for exactly this question. The two
 loop measures are new.
 
-`python src/diagnostics.py shape-picture -d data/WT -o results/network_shape`
-draws them: every skeleton pixel one pixel wide over the raw image, axis-aligned
+Regenerate with `python src/diagnostics.py shape-picture -d data/WT -o results/network_shape`,
+which draws them (not tracked): every skeleton pixel one pixel wide over the raw image, axis-aligned
 runs in blue, skeleton lying on a cycle in red, the rest green, lacunae outlined
 cyan.
 
@@ -1042,7 +1049,8 @@ ridge response** and the **local skeleton density**: where the floor is higher,
 more of the image clears one fixed cut.
 
 **The test**, measurement only
-(`python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background`).
+(regenerate with `python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background`;
+not tracked, as cited at commit `bf3b982`).
 The local background is the 25th percentile of the ridge response in 100 px
 windows on a 50 px grid, with every lacuna body and its mask buffer left out,
 smoothed over the grid and resampled to the frame. Skeleton density is counted
@@ -1127,6 +1135,9 @@ anything was changed:
 ```
 python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone
 ```
+
+`results/empty_zone/` is not tracked: regenerate with the command above; the files cited in this
+section are at commit `bf3b982`.
 
 **How the hole is measured.** The frame around each lacuna is cut into 180
 angular sectors, and a sector's **empty width** is the smallest distance from
@@ -1255,7 +1266,8 @@ dim pass was built for (section 8); that pass cannot reach it only because it
 may run 5 px past owned skeleton and the holes are 27 px wide.
 
 Profiles for the five widest holes in the set, which is a rule and not a list of
-coordinates, are in `results/empty_zone/`: the neighbourhood with the hole, its
+coordinates, were in `results/empty_zone/` (not tracked: regenerate with
+`python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone`; as cited, at commit `bf3b982`): the neighbourhood with the hole, its
 core and the control band outlined, beside the radial profiles of raw, flattened
 and response with the cuts drawn on them.
 
@@ -1312,7 +1324,8 @@ thread's own contrast, which no background subtraction can raise.
 
 Each image run twice in one process, once with `canaliculi.GLOW_ZONE_MAX_PX = 0`,
 which is the pipeline as it was, and once as configured
-(`python src/diagnostics.py glow-check -d data/WT -o results/glow_zone`). Before
+(regenerate with `python src/diagnostics.py glow-check -d data/WT -o results/glow_zone`; not tracked,
+as cited at commit `bf3b982`). Before
 on the left of each arrow.
 
 | image | glow extent px: min, median, max | zone px | mask added | skeleton inside the zones | empty width px | roots per lacuna | under 3 roots |
@@ -1341,7 +1354,8 @@ on the left of each arrow.
 2. **The empty zones shrink on every image: PASS.** Median empty width per
    image falls on all 8, and over the 108 lacunae from 27.4 to 24.2 px (3.56 to
    3.14 um). 84 of 108 lacunae have a smaller hole; the 11 whose hole grows are
-   listed in `results/glow_zone/glow_check.json` and move by under a pixel
+   listed in `results/glow_zone/glow_check.json` (not tracked: regenerate with
+   `python src/diagnostics.py glow-check -d data/WT -o results/glow_zone`; as cited, at commit `bf3b982`) and move by under a pixel
    except 542_z06 lacuna 14 (26.7 to 34.4 px) and 682_z29 lacuna 1 (24.2 to
    27.3 px), where a newly traced thread nearer the body in one sector pushes
    the first skeleton pixel of another sector further out.
@@ -1409,6 +1423,9 @@ the checks read the zone against; it no longer decides where the cut applies.
 ```
 python src/diagnostics.py hole-check -d data/WT -o results/hole_zone --pictures 543-2,543_3
 ```
+
+`results/hole_zone/` is not tracked: regenerate with the command above; the file cited in this
+section is at commit `bf3b982`.
 
 ### The zone
 

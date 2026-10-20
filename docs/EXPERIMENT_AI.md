@@ -90,8 +90,8 @@ its body lies within that lacuna's own zone of the hole plus 10 px of the segmen
 pipeline's (METHODS section 19) and the 10 px is the minimum segment length the pipeline already
 applies, so the rule introduces no number of its own.
 
-Measured over the 8 images (`python src/diagnostics.py ai-candidates --dir data/WT -o
-results/ai_dry_run`). Each class cell is **segments / pixels / lacunae involved**, where a lacuna
+Measured over the 8 images (regenerate with `python src/diagnostics.py ai-candidates --dir data/WT -o
+results/ai_dry_run`; not tracked since 2026-10-20, as cited at commit `bf3b982`). Each class cell is **segments / pixels / lacunae involved**, where a lacuna
 counts as involved when it is a candidate for at least one segment of that class, so it is the
 number of cells whose ownership the class could move:
 
@@ -245,7 +245,8 @@ summary table must never mix judged and unjudged images.
 
 ## The dry run, which always comes first
 
-`python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures all`, rerun on
+Regenerate with `python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures all`
+(not tracked since 2026-10-20; as cited, at commit `bf3b982`), rerun on
 2026-10-19 with the four classes. Nothing is sent.
 
 | image | lacunae | calls | of those, left over | segments | a | b | c | d | input tokens | output tokens | cost USD |
@@ -269,7 +270,9 @@ segments, which is the shape of the change: the unowned tracing with no cell wit
 longer asked about, and class d and the crops that can hold two candidate bodies are.
 
 **The pictures of every case of all 8 images, exactly as the judge would see them, are in
-`results/ai_dry_run/pictures/`** (145 of them, 18 MB).
+`results/ai_dry_run/pictures/`** (145 of them, 18 MB; not tracked, regenerate with the command
+above). They are the pictures a run would send; the ones that were actually sent are in
+`results_ai_judge/ai_log/<label>/pictures/`.
 
 ## The self-test
 

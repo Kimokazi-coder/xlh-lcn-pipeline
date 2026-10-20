@@ -1,6 +1,15 @@
 # Results
 
-Everything the pipeline and the figure code produce, per image and for all images together.
+**The deterministic method.** This is one of two labelled result sets: everything the pipeline and the
+figure code produce with `config.AI_JUDGE_ENABLED` off, as `config.py` ships, per image and for all
+images together. It is the reference `python src/diagnostics.py regression` compares with. The second
+set, the same pipeline with the AI judge switch on, is [`../results_ai_judge/`](../results_ai_judge/README.md),
+with the same per-image layout; which method is used is a choice still pending, and neither is validated
+against a manual trace.
+
+Made by, from the repository root: `python src/lacunae.py --dir data/WT`, `python src/canaliculi.py --dir
+data/WT`, `python src/quantification.py --dir data/WT` and `python -u figures/make_figures.py all` (see
+How to regenerate).
 **Pre-validation**: no number here has been checked against manual counts. **Pixel units**: the pixel
 size is 0.13 um/px (acquisition record, all 8 images, rounded to two decimals), but the pipeline reports
 px, px² and px⁻¹ so that a fresh run still equals this folder at tolerance 0.
@@ -13,10 +22,11 @@ draw, and save what they found in `1_lacunae/` and `2_canaliculi/`. `src/quantif
 writes every measured number, in `5_quantification/` and in the one cross-image table. No number is
 computed in two places.
 
-**What is tracked.** Everything above except `3_publication_figures/` and `all_images/figures/`: every
-figure there is redrawn by `python -u figures/make_figures.py all`, so none of them is committed. The
-stage pictures in `1_lacunae/` and `2_canaliculi/` are committed, because the skeleton png is an input to
-`python src/diagnostics.py validate-network`.
+**What is tracked.** Everything in the layout below, the figures included: `python -u
+figures/make_figures.py all` redraws any figure that is missing and skips the ones that exist. The stage
+pictures in `1_lacunae/` and `2_canaliculi/` are committed, because the skeleton png is an input to
+`python src/diagnostics.py validate-network`. The diagnostic and archive folders that commands write
+here are not tracked; see Not tracked at the end.
 
 ## Layout
 
@@ -30,7 +40,6 @@ results/
     figures/main/           Fig01 to Fig04
     figures/supplement/     S01 and S02
     figures/display_window.json
-    archive_not_used/       kept for history, not a result (see Archive)
   <label>/                  one folder per image: 542_z06, 542_z18, 543-2, 543_3, 543_z13, 682_z08, 682_z23, 682_z29
     1_lacunae/              detection: <label>_lacunae_outlines.png, <label>_lacuna_labels.png,
                             <label>_lacunae_detection.json
@@ -40,17 +49,10 @@ results/
     3_publication_figures/  <label>_figure_network, _figure_cell_gallery, _figure_overview (png and pdf),
                             <label>_figure_network_checks.json, _figure_cell_gallery_checks.json,
                             _figure_inset_choice.json
-    4_archive_not_used/     kept for history, not a result (see Archive)
     5_quantification/       every measured number: <label>_quantification.json, .xlsx and .pdf
   validation_tiles/         tiles for counting roots by hand
   before_after/             whole-frame verification pictures of one rule change each; its own README
                             says which pair documents which change
-  contact_census/           does each lacuna own the threads that touch it (diagnostics.py contact and
-                            contact-handover): the tables before and after the contact rule, and
-                            pictures/ with four lacunae close up
-  survey/                   what the pipeline does to every image, measured before a change
-  network_shape/            what the report-only shape measures count, drawn
-  diagnosis_543_3/          why one thread or blob was missing, on one image
 ```
 
 The label is the short image name. The table from the image file name to the label is
@@ -195,16 +197,31 @@ python src/lacunae.py --dir data/WT          # 1_lacunae of every image
 python src/canaliculi.py --dir data/WT       # 2_canaliculi of every image
 python src/quantification.py --dir data/WT   # 5_quantification and the cross-image table
 python -u figures/make_figures.py all        # every figure; existing figures are skipped
-python src/diagnostics.py reference-check    # must PASS: 109.25 / 24.11 / 6.00 on 543-2
+python src/diagnostics.py reference-check    # must PASS: 161.00 / 21.63 / 8.50 on 543-2
 python src/diagnostics.py regression         # every number against results/, tolerance 0
 ```
 
 `results/` is the reference that `regression` compares with, so regenerate it only on purpose.
 The option `-o OTHER_FOLDER` writes the same layout into another folder.
 
-## Archive
+## Not tracked
 
-The folders `<label>/4_archive_not_used/` and `all_images/archive_not_used/` hold images kept only for
-history: the per-image brightness variants of the figures; the low-cut overview layer of 543_3; and the
-coded contact sheet used to test blinding. They are not part of the results, and no figure or table uses
-them.
+These folders were removed from the repository on 2026-10-20. They are diagnostics and history, not
+results; each is written again when its command reruns, and `.gitignore` keeps it out of git when that
+happens. Each command measures the pipeline **as configured today**, so where a folder recorded a state
+before a rule changed, the files exactly as the docs cite them are at commit `bf3b982`
+(`git checkout bf3b982 -- results/<folder>`).
+
+| folder | what it was | regenerate with |
+| --- | --- | --- |
+| `<label>/4_archive_not_used/` | the per-image brightness variants of the figures, and the low-cut overview layer of 543_3 | `python -u figures/make_figures.py all` |
+| `all_images/archive_not_used/` | the coded contact sheet used to test blinding (S03); already absent before this cleanup | `python -u figures/make_figures.py all -b KEY` |
+| `diagnosis_543_3/` | why one thread or blob was missing, on 543_3 | `python src/diagnostics.py diagnose-untraced -i "data/WT/543_3.tif" -o results/diagnosis_543_3 --lacunae 1,7 --blobs "40,290;480,460;285,855;820,155"` |
+| `ai_dry_run/` | what a judge run would cost, and the pictures it would send | `python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures all` and `python src/diagnostics.py ai-candidates --dir data/WT -o results/ai_dry_run` |
+| `ridge_background/` | the local background of the ridge response | `python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background` |
+| `empty_zone/` | the empty ring around each lacuna, measured | `python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone` |
+| `contact_census/` | does each lacuna own the threads that touch it, before and after the contact rule | `python src/diagnostics.py contact -d data/WT -o results/contact_census --tag after --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures` and `python src/diagnostics.py contact-handover -d data/WT -o results/contact_census` |
+| `network_shape/` | what the report-only shape measures count, drawn | `python src/diagnostics.py shape-picture -d data/WT -o results/network_shape` |
+| `survey/` | what the pipeline does to every image, and the lacuna candidates | `python src/diagnostics.py survey -d data/WT -o results/survey` and `python src/diagnostics.py lacuna-candidates -d data/WT -o results/survey` |
+| `glow_zone/` | the glow zone rule, on against off | `python src/diagnostics.py glow-check -d data/WT -o results/glow_zone` |
+| `hole_zone/` | the hole zone rule, checked | `python src/diagnostics.py hole-check -d data/WT -o results/hole_zone --pictures 543-2,543_3` |

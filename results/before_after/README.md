@@ -21,11 +21,15 @@ python src/diagnostics.py contact -i "data/WT/543_3.tif" -o OUT --tag contact_af
     --verification results/before_after
 ```
 
-`results/contact_census/pictures/` has the same comparison close up, around each
-of the four lacunae the rule was opened on.
+`results/contact_census/pictures/` had the same comparison close up, around each
+of the four lacunae the rule was opened on. It is not tracked: regenerate with
+`python src/diagnostics.py contact -d data/WT -o results/contact_census --tag after --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures`,
+which draws the rule as configured today; the before and after pictures are at commit `bf3b982`.
 
 The glow pair is made the same way, from two runs that differ only in the rule:
 
 ```
 python src/diagnostics.py glow-check -d data/WT -o results/glow_zone --pictures 543-2,543_3
 ```
+
+Its own output folder, `results/glow_zone/`, is not tracked; the pair it made is the one kept here.

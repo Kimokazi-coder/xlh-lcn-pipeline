@@ -169,8 +169,8 @@ python src/diagnostics.py reference-check    # must PASS: 161.00 / 21.63 / 8.50 
 python src/diagnostics.py regression         # every number against results/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
 python src/diagnostics.py --help             # every other diagnostic
-python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image
-python src/diagnostics.py shape-picture -d data/WT -o results/network_shape
+python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image (not tracked)
+python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
 python src/validate_manual.py                # score against a hand tracing, when one exists
 ```
 
