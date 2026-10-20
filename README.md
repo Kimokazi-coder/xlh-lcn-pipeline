@@ -9,6 +9,14 @@ and measures it per lacuna and per field.
 (ImageJ) counts yet, and no parameter or limit has been tuned against one. The
 data are 8 wild-type (WT) sections; no Hyp images have been processed.
 
+**You are on the branch `exp-ai-layer`.** It adds one experiment on top of the
+pipeline: an AI judge that decides, for every candidate thread near an
+osteocyte, whether it is a real thread and which lacuna owns it
+(`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). It is **off by default**
+(`config.AI_JUDGE_ENABLED = False`) and with it off every output of this branch
+is what `main` produces, checked by `python src/diagnostics.py regression`.
+Nothing on this branch is validated and nothing from it has been merged.
+
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
 confirmed for all 8 images and rounded to two decimals
 (`config.PIXEL_SIZE_UM_ACQUIRED`). Every biological limit is written in

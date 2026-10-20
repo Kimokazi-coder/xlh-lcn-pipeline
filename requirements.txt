@@ -12,3 +12,11 @@ imageio==2.37.2
 pillow==11.3.0
 matplotlib==3.9.4
 pandas==2.3.3
+
+# The AI judge experiment (branch exp-ai-layer, docs/EXPERIMENT_AI.md) needs the
+# official Anthropic SDK for a REAL call, and for nothing else: the candidates,
+# the pictures, the dry run, the replay and the self-test all work without it.
+# It is deliberately not pinned here, because no pipeline number depends on it
+# and the version this venv's Python 3.9 resolves to is not the version a newer
+# environment would. Install it only to make real calls:
+#   pip install anthropic

@@ -1,0 +1,54 @@
+{
+  "schema": "lcn-ai-judge-log-1",
+  "written_at": "2026-10-19T16:03:26Z",
+  "mode": "live",
+  "image_label": "543-2",
+  "lacuna_id": 10,
+  "case_id": "case_0016",
+  "attempt": 1,
+  "picture": "results/ai_log/543-2/pictures/case_0016.png",
+  "picture_sha256": "ccf6e1a276579d9a80b5b3ebe2028599ca6949409ab6e96282bb203dac61dde0",
+  "prompt_sha256": "3d48d88ec823640a6557709f7cda262e94d2bc547fb0506802a31effee6ccf37",
+  "examples_sha256": "393055e5c350e89be96bcb011582f5bee45c99fb5d6676992ce59765aeb446a0",
+  "request_sha256": "eeb9eb0e956a0c80b04a71164eab189e0a446995bbae3b5dd49eca4de1c1224b",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 8000,
+    "temperature": "not sent: claude-sonnet-5-5 rejects a non-default temperature with HTTP 400",
+    "thinking": {
+      "type": "between_tools"
+    },
+    "system_sha256": "71c163a464e2d5271fdb1311e2f9d2091c88acffecca0acb15e6b23f0599a889",
+    "user_text": "This case has 1 numbered segment(s). The square of tissue is 256 px across, enlarged 2x. The bodies outlined are: yellow, cyan, with yellow in the middle.\n\n  1: drawn in white, the pipeline has traced it. Which cell does it start from: \"yellow\" or \"cyan\", or \"none\"?\n\nAnswer for every number, and for each one name only a colour offered for that number or \"none\", in one json object.",
+    "image": {
+      "media_type": "image/png",
+      "sha256": "ccf6e1a276579d9a80b5b3ebe2028599ca6949409ab6e96282bb203dac61dde0",
+      "bytes": 85918
+    }
+  },
+  "response": {
+    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"Short white piece at the end of a yellow thread near (800,190); it continues the yellow network and links down to the yellow branch, not the cyan one.\"}\n]}",
+    "id": "msg_011CgBsuph5AjwZKJoFcc9hs",
+    "model": "claude-sonnet-5-5",
+    "stop_reason": "end_turn",
+    "thinking_fallback": false,
+    "usage": {
+      "input_tokens": 3523,
+      "output_tokens": 81
+    }
+  },
+  "cost_usd": 0.007856,
+  "valid": true,
+  "invalid_reason": null,
+  "parsed": [
+    {
+      "n": 1,
+      "verdict": "real",
+      "owner": "yellow",
+      "owner_lacuna_id": 10,
+      "why": "Short white piece at the end of a yellow thread near (800,190); it continues the yellow network and links down to the yellow branch, not the cyan one.",
+      "verdict_asked_for": false,
+      "verdict_in_the_answer": null
+    }
+  ]
+}

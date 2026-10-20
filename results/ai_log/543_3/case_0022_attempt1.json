@@ -1,0 +1,54 @@
+{
+  "schema": "lcn-ai-judge-log-1",
+  "written_at": "2026-10-19T16:05:25Z",
+  "mode": "live",
+  "image_label": "543_3",
+  "lacuna_id": 13,
+  "case_id": "case_0022",
+  "attempt": 1,
+  "picture": "results/ai_log/543_3/pictures/case_0022.png",
+  "picture_sha256": "6f9d90b10ed682dd3fbaeebdfab79659d75dbee4776be16015e9689ac42376e1",
+  "prompt_sha256": "3d48d88ec823640a6557709f7cda262e94d2bc547fb0506802a31effee6ccf37",
+  "examples_sha256": "393055e5c350e89be96bcb011582f5bee45c99fb5d6676992ce59765aeb446a0",
+  "request_sha256": "54b22aa1f3954db837b8985e55c3363e0080ba2290732fd055ab24a1dbaa076f",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 8000,
+    "temperature": "not sent: claude-sonnet-5-5 rejects a non-default temperature with HTTP 400",
+    "thinking": {
+      "type": "between_tools"
+    },
+    "system_sha256": "71c163a464e2d5271fdb1311e2f9d2091c88acffecca0acb15e6b23f0599a889",
+    "user_text": "This case has 1 numbered segment(s). The square of tissue is 256 px across, enlarged 2x. The bodies outlined are: yellow, cyan, with yellow in the middle.\n\n  1: drawn in white, the pipeline has traced it. Which cell does it start from: \"yellow\" or \"cyan\", or \"none\"?\n\nAnswer for every number, and for each one name only a colour offered for that number or \"none\", in one json object.",
+    "image": {
+      "media_type": "image/png",
+      "sha256": "6f9d90b10ed682dd3fbaeebdfab79659d75dbee4776be16015e9689ac42376e1",
+      "bytes": 93065
+    }
+  },
+  "response": {
+    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"White piece at lower left runs up toward the yellow body, in line with the yellow threads reaching down-left from it; far from cyan.\"}\n]}",
+    "id": "msg_011CgBt4au6NwGbnUrnhow6B",
+    "model": "claude-sonnet-5-5",
+    "stop_reason": "end_turn",
+    "thinking_fallback": false,
+    "usage": {
+      "input_tokens": 3523,
+      "output_tokens": 76
+    }
+  },
+  "cost_usd": 0.007806,
+  "valid": true,
+  "invalid_reason": null,
+  "parsed": [
+    {
+      "n": 1,
+      "verdict": "real",
+      "owner": "yellow",
+      "owner_lacuna_id": 13,
+      "why": "White piece at lower left runs up toward the yellow body, in line with the yellow threads reaching down-left from it; far from cyan.",
+      "verdict_asked_for": false,
+      "verdict_in_the_answer": null
+    }
+  ]
+}

@@ -1216,6 +1216,38 @@ def attach_lacunae(G: nx.Graph, dist_to_lacuna: np.ndarray, nearest_id: np.ndarr
     return G
 
 
+def attach_judged_segments(G: nx.Graph, extra_attach: dict | None) -> nx.Graph:
+    """The ownership the AI judge named, expressed the way the pipeline already
+    expresses ownership (the experiment of branch exp-ai-layer, off by default;
+    docs/EXPERIMENT_AI.md).
+
+    For each segment the judge called real and gave an owner, one edge of weight
+    0 from that cell to the graph node nearest the point the caller gives, which
+    is the END of that segment nearest that cell (ai_judge.nearest_end): the
+    same zero weight the contact rule uses, for the same reason. The path then
+    enters the thread where the thread starts, and the multi source shortest
+    path below splits the network where the two cells' paths meet.
+
+    Nothing else is written. The ownership below decides everything, so the
+    judge grants ownership and never vetoes it, the old owner keeps whatever the
+    shortest path still gives it, and no ownership rule moves into the model.
+
+    A node both the judge and the contact rule reach at weight 0 goes to the
+    lower cell id, which is how every other tie in this file is broken."""
+    if not extra_attach:
+        return G
+    nodes = [n for n in G.nodes() if not _is_cell_node(n)]
+    if not nodes:
+        return G
+    coords = np.array(nodes, dtype=np.float64)
+    for lacuna_id, segments in sorted(extra_attach.items()):
+        for pixels in segments:
+            pixels = np.asarray(pixels, dtype=np.float64)
+            gaps = ((coords[:, None, :] - pixels[None, :, :]) ** 2).sum(axis=2).min(axis=1)
+            G.add_edge(("cell", int(lacuna_id)), nodes[int(np.argmin(gaps))], weight=0.0)
+    return G
+
+
 def assign_by_connectivity(G: nx.Graph, cell_ids: list[int]) -> tuple[dict, dict]:
     """Multi-source Dijkstra from all cell nodes at once. Every reachable
     skeleton node is owned by the cell whose shortest graph path reaches it.
@@ -1408,7 +1440,8 @@ def thread_end_mask(skeleton: np.ndarray) -> np.ndarray:
 def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_mask: np.ndarray,
                               dist_to_lacuna: np.ndarray, nearest_id: np.ndarray,
                               nearest_index: np.ndarray, response: np.ndarray, min_signal: float,
-                              limit_px: float, lacuna_id_map: np.ndarray | None = None) -> tuple:
+                              limit_px: float, lacuna_id_map: np.ndarray | None = None,
+                              extra_attach: dict | None = None) -> tuple:
     """(skeleton, ownership, how it went). Every skeleton pixel further than
     `limit_px` along the network from a lacuna surface is removed, and ownership
     is built on what is left.
@@ -1434,7 +1467,7 @@ def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_ma
     else:
         raise AssertionError(f"the length prune did not settle in {PRUNE_LENGTH_MAX_ITER} rounds")
     own = build_ownership(kept, skeleton, dist_to_lacuna, nearest_id, nearest_index, response,
-                          min_signal, lacuna_id_map)
+                          min_signal, lacuna_id_map, extra_attach)
     return skeleton, own, {"removed_px": removed_total, "rounds": rounds,
                            "limit_px": float(limit_px),
                            "limit_um": config.MAX_CANALICULUS_LENGTH_UM}
@@ -1444,7 +1477,8 @@ def prune_beyond_length_limit(kept: list[tuple], skeleton: np.ndarray, lacuna_ma
 
 def build_ownership(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.ndarray,
                     nearest_id: np.ndarray, nearest_index: np.ndarray, response: np.ndarray,
-                    min_signal: float, lacuna_id_map: np.ndarray | None = None) -> dict:
+                    min_signal: float, lacuna_id_map: np.ndarray | None = None,
+                    extra_attach: dict | None = None) -> dict:
     """The graph, its cleanup, the lacuna attachment and the ownership, with the
     pixel map the verification picture draws. Detection: no measure is taken
     here. src/quantification.py measures from what this returns."""
@@ -1453,6 +1487,9 @@ def build_ownership(kept: list[tuple], skeleton: np.ndarray, dist_to_lacuna: np.
     clean_network_graph(G, dist_to_lacuna)
     attach_lacunae(G, dist_to_lacuna, nearest_id, nearest_index, cell_ids, response, min_signal,
                    lacuna_id_map)
+    # Nothing unless the AI judge experiment is switched on, and then only the
+    # owner it named, at weight 0 (attach_judged_segments).
+    attach_judged_segments(G, extra_attach)
     owner, node_dist = assign_by_connectivity(G, cell_ids)
     edge_owner = assign_edges(G, owner, node_dist)
     return {
@@ -1478,6 +1515,21 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     analyse_image after the lacuna stage), so a diagnostic can rerun the
     network stage without the lacuna stage (network-sweep)."""
     kept = lac["kept"]
+    # The AI judge experiment (branch exp-ai-layer, docs/EXPERIMENT_AI.md), off
+    # by default. The judge is shown the FINISHED tracing and its ownership, so
+    # that run has to exist before the verdicts can be placed on it: with the
+    # switch on, the whole network stage runs once with it off, which is what
+    # main produces and what the judge was shown, and the verdicts are then
+    # applied to the mask and everything after it is redone. With the switch
+    # off this costs nothing at all, not even an import.
+    base = None
+    if config.AI_JUDGE_ENABLED:
+        saved = config.AI_JUDGE_ENABLED
+        config.AI_JUDGE_ENABLED = False
+        try:
+            base = analyse_network(image_path, lac, channel, t_lo)
+        finally:
+            config.AI_JUDGE_ENABLED = saved
 
     lacuna_mask, lacuna_id_map = build_lacuna_maps(lac["labels"], kept)
     flagged = flagged_structures(channel)
@@ -1526,6 +1578,21 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     skeleton_first_pass = skeleton
     candidate_first_pass = candidate
 
+    # The judge's verdicts for THIS image, read from its decision file and
+    # placed on the mask: a segment judged real that the pipeline does not have
+    # adds the mask its centre line is the centre line of, a segment judged
+    # artifact takes that mask away whether the pipeline traced it or not, and
+    # anything unjudged is left exactly as it is. Everything after this point,
+    # the dim pass, the 50 um cap, the ownership and the quantification, runs
+    # unchanged on the edited mask, and the owner the judge named enters it as
+    # a zero weight attachment and in no other way.
+    ai = None
+    if base is not None:
+        import ai_judge  # noqa: PLC0415 (deliberate: see above)
+        ai = ai_judge.apply_to_base(image_path, candidate, base, lac, channel)
+        candidate = ai["candidate"]
+        skeleton = morphology.skeletonize(candidate)
+
     dist_to_lacuna, nearest_id, nearest_index = nearest_lacuna_map(lacuna_id_map)
     # Attachment is by signal: the dimmest point of the straight path from a
     # lacuna surface to a skeleton node must reach this on the ridge response, or
@@ -1539,7 +1606,8 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     skeleton_before = skeleton
     skeleton, own, prune = prune_beyond_length_limit(
         kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
-        attach_min_signal, MAX_CANALICULUS_LENGTH_PX, lacuna_id_map)
+        attach_min_signal, MAX_CANALICULUS_LENGTH_PX, lacuna_id_map,
+        ai["attach"] if ai else None)
 
     # The second, dimmer pass: continue the threads a lacuna already owns into
     # signal the first cut could not reach. Everything after it is redone on the
@@ -1547,17 +1615,33 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
     # skeleton and not two.
     dim = grow_dim_threads(candidate, response, t_lo, skeleton & (own["owner_map"] > 0),
                            lacuna_mask, flagged)
+    if ai is not None:
+        # A territory the judge called an artifact stays out: the dim pass is
+        # seeded from owned skeleton and would otherwise put part of it back.
+        dim = dim & ~ai["remove"]
     if dim.any():
         candidate = candidate | dim
         skeleton = morphology.skeletonize(candidate)
         skeleton_before = skeleton
         skeleton, own, prune = prune_beyond_length_limit(
             kept, skeleton, lacuna_mask, dist_to_lacuna, nearest_id, nearest_index, response,
-            attach_min_signal, MAX_CANALICULUS_LENGTH_PX, lacuna_id_map)
+            attach_min_signal, MAX_CANALICULUS_LENGTH_PX, lacuna_id_map,
+            ai["attach"] if ai else None)
     # Dim thread-shaped structure that touches no lacuna: a class of its own,
     # never owned, counted only in the field measures.
     unattached = find_unattached_threads(response, t_lo, skeleton & (own["owner_map"] > 0),
                                          skeleton, lacuna_mask, flagged)
+    if ai is not None:
+        # What the verdicts actually moved: the pixels of tracing that both runs
+        # own and that changed hands, measured against the run with the switch
+        # off that the judge was shown. It is the one number that says whether a
+        # verdict split a network, and it is NOT the judge writing anywhere: it
+        # is what the shortest path did once the attachment was there.
+        before, after = base["owner_map"], own["owner_map"]
+        both = (before > 0) & (after > 0)
+        ai["counts"]["ownership_moved_px"] = int((both & (before != after)).sum())
+        ai["counts"]["newly_owned_px"] = int(((before == 0) & (after > 0)).sum())
+        ai["counts"]["no_longer_owned_px"] = int(((before > 0) & (after == 0)).sum())
     return {
         "image_path": image_path,
         "lacunae": lac,
@@ -1581,6 +1665,12 @@ def analyse_network(image_path: Path, lac: dict, channel: np.ndarray, t_lo: floa
         "zone_gains": gains,
         "hole_zone": hole_report,
         "glow_zone_added_px": int((candidate_before_glow_zone ^ candidate_first_pass).sum()),
+        "ai_judge": None if ai is None else {
+            k: ai[k] for k in ("counts", "geometry_sha256", "decisions_written_at",
+                               "model", "zone_px")},
+        # 0 outside every empty zone, else the lacuna whose zone it is. None
+        # with the switch off, so nothing is computed and nothing is stored.
+        "ai_zone_owner": None if ai is None else ai["zone_owner"],
         "skeleton_before_length_prune": skeleton_before,
         "length_prune": prune,
         "flagged": flagged,
@@ -1638,6 +1728,12 @@ def save_verification(result: dict, out_path: Path) -> None:
 
 
 def parameters(result: dict) -> dict:
+    extra = {}
+    if result.get("ai_judge") is not None:
+        # The AI judge experiment is switched on. Recorded here so that no
+        # result file can be mistaken for one the pipeline made alone.
+        extra = {"ai_judge": dict(result["ai_judge"],
+                                  experiment="branch exp-ai-layer, docs/EXPERIMENT_AI.md")}
     return {
         "pixel_size_um": config.PIXEL_SIZE_UM,
         "smooth_sigma_px": SMOOTH_SIGMA_PX,
@@ -1709,6 +1805,7 @@ def parameters(result: dict) -> dict:
         "length_prune_removed_px": result["length_prune"]["removed_px"],
         "length_prune_rounds": result["length_prune"]["rounds"],
         "canaliculus_length_range_um": list(config.CANALICULUS_LENGTH_RANGE_UM),
+        **extra,
     }
 
 

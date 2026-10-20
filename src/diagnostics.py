@@ -61,6 +61,20 @@ Subcommands:
                       version (section 18): the acceptance tests, the loops, and
                       the null floor of the empty width measured on synthetic
                       bodies in tissue with no hole at all
+    ai-candidates     EXPERIMENT (branch exp-ai-layer): what the AI judge would
+                      be asked about, per lacuna: the empty zone, the contrast
+                      ratio in it and the candidate segments found there
+    ai-dry-run        EXPERIMENT: what a real judge run would cost, per image,
+                      and the pictures of the cases exactly as the judge sees
+                      them. Nothing is sent
+    ai-judge          EXPERIMENT: the judge itself, one call per lacuna, every
+                      request and answer logged; --replay reruns from the log
+                      offline and checks the verdicts come back the same
+    ai-run            EXPERIMENT: detection, canaliculi and quantification with
+                      the judge switch on for that run only, into results/ai_run/,
+                      proving every other file under results/ is unchanged
+    ai-compare        EXPERIMENT: judge off against judge on, per image: the
+                      pictures side by side and what the verdicts moved
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -87,6 +101,10 @@ Usage (from the repo root):
     python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone
     python src/diagnostics.py glow-check -d data/WT -o results/glow_zone --pictures 543-2,543_3
     python src/diagnostics.py hole-check -d data/WT -o results/hole_zone --pictures 543-2,543_3
+    python src/diagnostics.py ai-candidates --dir data/WT -o results/ai_dry_run
+    python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures 543-2,543_3
+    python src/diagnostics.py ai-judge --image "data/WT/543-2.tif"
+    python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --replay -o .cache/ai_replay
 """
 
 from __future__ import annotations
@@ -94,6 +112,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -4996,6 +5015,1429 @@ def cmd_hole_check(args) -> int:
     return 0
 
 
+# ai-candidates ------------------------------------------------------------------
+# EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). What the AI judge
+# would be asked about, and nothing more: the empty zone of every lacuna, the
+# contrast ratio measured in it, and the candidate segments the permissive
+# tracing finds there. No network, no judge, no pipeline output is written.
+
+
+def _ai_candidates_one(path_str: str) -> dict:
+    import ai_judge
+
+    state = ai_judge.pipeline_state(Path(path_str))
+    candidates = ai_judge.image_candidates(state)
+    rows = []
+    for case in candidates["cases"]:
+        kinds = {"new": 0, "unowned": 0, "owned": 0}
+        classes = {name: 0 for name in ai_judge.CLASSES}
+        for entry in case["decide"]:
+            kinds[entry["kind"]] = kinds.get(entry["kind"], 0) + 1
+            for name in entry["classes"]:
+                classes[name] += 1
+        rows.append({
+            "image_label": state["label"],
+            "case_id": case["case_id"],
+            "case_kind": case["kind"],
+            "lacuna_id": case["lacuna_id"],
+            "centroid_xy": case["centroid_xy"],
+            "crop_px": case["crop_px"],
+            "numbered": len(case["decide"]),
+            "numbered_new": kinds["new"],
+            "numbered_unowned": kinds["unowned"],
+            "numbered_traced_owned": kinds["owned"],
+            "numbered_by_class": classes,
+            "numbered_asked_an_owner_only": sum(1 for e in case["decide"]
+                                                if e["question"] == "owner"),
+            "context_segments": len(case["context"]),
+            "segments_not_offered": case["segments_not_offered"],
+            "segments_not_askable_here": len(case["segments_not_askable_here"]),
+        })
+    return {
+        "image_label": state["label"],
+        "lacunae": state["n_lacunae"],
+        "cases": len(candidates["cases"]),
+        "left_over_cases": sum(1 for c in candidates["cases"] if c["kind"] == "left over"),
+        "segments": len(candidates["segments"]),
+        "counts": candidates["counts"],
+        "cut": candidates["cut"],
+        "geometry_sha256": candidates["geometry_sha256"],
+        "rows": rows,
+    }
+
+
+def cmd_ai_candidates(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    import ai_judge
+
+    images = images_from(args)
+    args.out.mkdir(parents=True, exist_ok=True)
+    jobs = [str(p) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        out = list(ex.map(_ai_candidates_one, jobs))
+
+    rows = [r for o in out for r in o["rows"]]
+    scalars = [k for k in (out[0]["counts"] if out else {}) if k != "classes"]
+    totals = {k: sum(o["counts"][k] for o in out) for k in scalars}
+    classes = {name: {field: sum(o["counts"]["classes"][name][field] for o in out)
+                      for field in ("segments", "px", "lacunae")}
+               for name in ai_judge.CLASSES}
+    report = {
+        "status": "EXPERIMENT, measurement only: no pipeline output and no judge",
+        "question": "what the AI judge is shown, and what of it needs a decision",
+        "what_a_segment_is": ("a branch of a skeleton, the piece between two junctions, at "
+                             f"least {out[0]['cut']['min_segment_px'] if out else 0} px long"),
+        "kinds": {
+            "owned": "traced by the pipeline and owned by a lacuna",
+            "unowned": "traced by the pipeline and owned by nobody",
+            "new": "not traced: what the permissive cut finds inside a zone of the hole",
+        },
+        "classes": ai_judge.CLASSES,
+        "within_reach": ("a lacuna is a candidate for a segment when its body lies within that "
+                         "lacuna's own zone of the hole plus the minimum segment length of the "
+                         "segment; it is the pipeline's zone and no new number"),
+        "numbered": ("a segment is numbered, which is what asks the judge for a decision, "
+                     "exactly when it falls in one of the four classes"),
+        "the_question": {"a, c, d": "which osteocyte does this thread start from",
+                         "b": "is it a real thread or glow texture, and whose"},
+        "lacunae_involved": ("per class, how many lacunae are a candidate for at least one "
+                             "segment of it, so how many cells its answers could move"),
+        "cut": out[0]["cut"] if out else {},
+        "all_images": {
+            "images": len(out),
+            "cases": sum(o["cases"] for o in out),
+            "left_over_cases": sum(o["left_over_cases"] for o in out),
+            "segments": sum(o["segments"] for o in out),
+            "numbers_in_all_the_pictures": sum(r["numbered"] for r in rows),
+            "numbered_new": sum(r["numbered_new"] for r in rows),
+            "numbered_unowned": sum(r["numbered_unowned"] for r in rows),
+            "numbered_traced_owned": sum(r["numbered_traced_owned"] for r in rows),
+            "numbered_asked_an_owner_only": sum(r["numbered_asked_an_owner_only"]
+                                                for r in rows),
+            "classes": classes,
+            **totals,
+        },
+        "per_image": [{k: o[k] for k in ("image_label", "lacunae", "cases", "left_over_cases",
+                                         "segments", "counts", "geometry_sha256")} for o in out],
+        "per_case": rows,
+    }
+    (args.out / "ai_candidates.json").write_text(json.dumps(report, indent=2) + "\n",
+                                                 encoding="utf-8")
+    print_table(["image", "lacunae", "segments", "owned", "unowned", "new",
+                 "a", "b", "c", "d", "numbered", "calls"],
+                [[o["image_label"], o["lacunae"], o["segments"],
+                  o["counts"]["owned"], o["counts"]["unowned"], o["counts"]["new"],
+                  *[o["counts"]["classes"][name]["segments"] for name in "abcd"],
+                  o["counts"]["numbered"], o["cases"]] for o in out],
+                title="What the judge is shown, per image: kinds, then the four classes")
+    print_table(["class", "what it is", "segments", "px", "lacunae"],
+                [[name, ai_judge.CLASSES[name], classes[name]["segments"],
+                  classes[name]["px"], classes[name]["lacunae"]] for name in "abcd"],
+                title="The four classes over all the images (a lacuna counts once per image)")
+    print_table(["image", *[f"{name}: segments / px / lacunae" for name in "abcd"]],
+                [[o["image_label"],
+                  *[f"{o['counts']['classes'][name]['segments']} / "
+                    f"{o['counts']['classes'][name]['px']} / "
+                    f"{o['counts']['classes'][name]['lacunae']}" for name in "abcd"]]
+                 for o in out],
+                title="Segments, pixels and lacunae involved per class, per image")
+    a = report["all_images"]
+    print(f"\nsegments: {a['segments']} over {a['images']} images, "
+          f"{a['owned']} owned, {a['unowned']} owned by nobody, {a['new']} new")
+    print(f"traced in a lacuna's zone: {a['traced_in_a_zone']}, of which "
+          f"{a['traced_in_a_zone_its_lacuna_does_not_own']} are not owned by that lacuna")
+    print(f"touching two bodies: {a['touching_two_bodies']}; traced and owned by another than "
+          f"the body it touches: {a['traced_owned_by_another_than_the_body_it_touches']}")
+    print(f"numbered for a decision: {a['numbered']} segments, "
+          f"{a['numbers_in_all_the_pictures']} numbers over all the pictures "
+          f"({a['numbered_new']} new, {a['numbered_unowned']} unowned, "
+          f"{a['numbered_traced_owned']} traced and owned), of them "
+          f"{a['numbered_asked_an_owner_only']} asked an owner only and "
+          f"{a['numbers_in_all_the_pictures'] - a['numbered_asked_an_owner_only']} "
+          f"asked real or artifact as well")
+    print(f"in two classes, so asked in two cases: {a['in_two_classes']}")
+    print(f"unowned with no lacuna within reach, so not asked at all: "
+          f"{a['unowned_with_no_lacuna_in_reach']} (no body in a picture could be named for "
+          f"them, so the only answer they could be given is the pipeline's own)")
+    print(f"calls: {a['cases']}, of them {a['left_over_cases']} for segments their lacuna's "
+          f"crop cannot show with both candidates")
+    print(f"in a class but no case could ask: "
+          f"{a['needs_a_decision_but_no_case_could_ask']} (must be 0)")
+    print(f"\nreport -> {args.out / 'ai_candidates.json'}")
+    return 0
+
+
+
+# ai-dry-run ---------------------------------------------------------------------
+# EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). What a real run would
+# cost, before any run: calls per image, estimated tokens and cost for every
+# image, and the pictures of the cases for the images asked for, exactly as the
+# judge would see them. No network unless --count-tokens is given, and then only
+# the API's free token counter.
+
+
+def _ai_dry_run_one(job: tuple) -> dict:
+    import ai_judge
+
+    path_str, picture_dir, count_tokens = job
+    state = ai_judge.pipeline_state(Path(path_str))
+    candidates = ai_judge.image_candidates(state)
+    prompt = ai_judge.load_prompt()
+    rows, pictures = [], []
+    for case in candidates["cases"]:
+        png, drawn = ai_judge.case_picture(state, candidates, case)
+        user_text = ai_judge.case_user_text(case, drawn)
+        estimate = ai_judge.estimate_case(prompt["system"], user_text, png,
+                                          len(drawn["segments_drawn"]))
+        kinds = drawn["kinds_drawn"]
+        if count_tokens:
+            payload, _canonical, _sha = ai_judge.build_request(prompt["system"], user_text, png)
+            estimate["input_tokens_counted"] = ai_judge.count_tokens(payload)
+            estimate["cost_usd"] = round(ai_judge.cost_usd(estimate["input_tokens_counted"],
+                                                           estimate["output_tokens"]), 6)
+        if picture_dir:
+            out = Path(picture_dir) / f"{state['label']}_{case['case_id']}.png"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(png)
+            pictures.append(out.as_posix())
+        rows.append({
+            "image_label": state["label"],
+            "lacuna_id": case["lacuna_id"],
+            "case_id": case["case_id"],
+            "case_kind": case["kind"],
+            "crop_px": drawn["crop_px"],
+            "enlargement": drawn["enlargement"],
+            "segments": len(drawn["segments_drawn"]),
+            "segments_by_class": {name: sum(1 for q in drawn["questions"].values()
+                                            if name in q["classes"])
+                                  for name in ai_judge.CLASSES},
+            "segments_asked_an_owner_only": sum(1 for q in drawn["questions"].values()
+                                                if q["question"] == "owner"),
+            "segments_new": kinds["new"],
+            "segments_unowned": kinds["unowned"],
+            "segments_traced_owned": kinds["owned"] + kinds["other"],
+            "context_segments": drawn["context_drawn"],
+            # A segment that lies outside its lacuna's crop now gets a call
+            # of its own, so this should always be 0; it is kept as a guard.
+            "segments_not_drawn": len(drawn["numbers_not_drawn"]),
+            "bodies_in_the_crop": len(drawn["colours"]),
+            "bodies_with_no_colour": len(drawn["bodies_with_no_colour"]),
+            "picture_px": drawn["panel_px"],
+            "picture_bytes": len(png),
+            "estimate": estimate,
+        })
+    return {
+        "image_label": state["label"],
+        "lacunae": state["n_lacunae"],
+        "calls": len(rows),
+        "calls_for_a_lacuna": sum(1 for r in rows if r["case_kind"] == "lacuna"),
+        "calls_for_left_over_segments": sum(1 for r in rows if r["case_kind"] == "left over"),
+        "segments": int(sum(r["segments"] for r in rows)),
+        "geometry_sha256": candidates["geometry_sha256"],
+        "rows": rows,
+        "pictures": pictures,
+    }
+
+
+def cmd_ai_dry_run(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    import ai_judge
+
+    images = images_from(args)
+    args.out.mkdir(parents=True, exist_ok=True)
+    wanted = {s.strip() for s in args.pictures.split(",") if s.strip()}
+    every = "all" in wanted
+    allowed, why = ai_judge.external_calls_allowed()
+    if args.count_tokens and not allowed:
+        print(f"--count-tokens needs a real connection and {why}; estimating offline instead.")
+        args.count_tokens = False
+    jobs = [(str(p),
+             str(args.out / "pictures") if every or lacunae.image_label(p) in wanted else "",
+             bool(args.count_tokens)) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        out = list(ex.map(_ai_dry_run_one, jobs))
+
+    rows = [r for o in out for r in o["rows"]]
+    per_image = []
+    for o in out:
+        tokens_in = sum(r["estimate"].get("input_tokens_counted", r["estimate"]["input_tokens"])
+                        for r in o["rows"])
+        tokens_out = sum(r["estimate"]["output_tokens"] for r in o["rows"])
+        per_image.append({
+            "image_label": o["image_label"], "lacunae": o["lacunae"], "calls": o["calls"],
+            "calls_for_a_lacuna": o["calls_for_a_lacuna"],
+            "calls_for_left_over_segments": o["calls_for_left_over_segments"],
+            "segments": o["segments"],
+            "segments_by_class": {name: sum(r["segments_by_class"][name] for r in o["rows"])
+                                  for name in ai_judge.CLASSES},
+            "segments_asked_an_owner_only": sum(r["segments_asked_an_owner_only"]
+                                                for r in o["rows"]),
+            "estimated_input_tokens": int(tokens_in),
+            "estimated_output_tokens": int(tokens_out),
+            "estimated_cost_usd": round(ai_judge.cost_usd(tokens_in, tokens_out), 4),
+        })
+    total_calls = sum(p["calls"] for p in per_image)
+    total_in = sum(p["estimated_input_tokens"] for p in per_image)
+    total_out = sum(p["estimated_output_tokens"] for p in per_image)
+    total_cost = round(ai_judge.cost_usd(total_in, total_out), 4)
+    retries = round(total_cost * 2.0, 4)
+    prompt = ai_judge.load_prompt()
+    report = {
+        "status": "EXPERIMENT, estimate only: nothing was sent",
+        "question": "what a real run of the AI judge would cost",
+        "model": config.AI_JUDGE_MODEL,
+        "provider": config.AI_JUDGE_PROVIDER,
+        "prices_usd_per_mtok": {"input": config.AI_PRICE_INPUT_USD_PER_MTOK,
+                                "output": config.AI_PRICE_OUTPUT_USD_PER_MTOK},
+        "max_cost_usd": config.MAX_COST_USD,
+        "how_the_estimate_is_made": (
+            "input text at {t} tokens per character and the image at width x height / {p} px per "
+            "token, which is the rule Anthropic documents; the answer at {o} tokens per segment "
+            "plus {f}. Estimates, not measurements: a real run logs what the API reports."
+        ).format(t=config.AI_TOKENS_PER_CHAR, p=config.AI_IMAGE_PIXELS_PER_TOKEN,
+                 o=config.AI_OUTPUT_TOKENS_PER_SEGMENT, f=config.AI_OUTPUT_TOKENS_FIXED),
+        "input_tokens_counted_by_the_api": bool(args.count_tokens),
+        "prompt_sha256": prompt["prompt_sha256"],
+        "examples_sha256": prompt["examples_sha256"],
+        "examples_present": prompt["examples_present"],
+        "classes": ai_judge.CLASSES,
+        "the_question": {"a, c, d": "which osteocyte does this thread start from, the first "
+                                    "candidate, the second candidate, or none",
+                         "b": "is it a real thread or glow texture, and whose"},
+        "all_images": {
+            "images": len(per_image), "calls": total_calls,
+            "segments": int(sum(p["segments"] for p in per_image)),
+            "segments_by_class": {name: sum(p["segments_by_class"][name] for p in per_image)
+                                  for name in ai_judge.CLASSES},
+            "segments_asked_an_owner_only": int(sum(p["segments_asked_an_owner_only"]
+                                                    for p in per_image)),
+            "cases_by_crop_px": {str(size): sum(1 for r in rows if r["crop_px"] == size)
+                                 for size in sorted({r["crop_px"] for r in rows})},
+            "estimated_input_tokens": int(total_in),
+            "estimated_output_tokens": int(total_out),
+            "estimated_cost_usd": total_cost,
+            "estimated_cost_usd_if_every_call_is_retried_once": retries,
+            "within_max_cost_usd": bool(retries <= config.MAX_COST_USD),
+            "cases_with_a_body_that_has_no_colour": int(sum(1 for r in rows
+                                                            if r["bodies_with_no_colour"])),
+            "calls_for_left_over_segments":
+                int(sum(p["calls_for_left_over_segments"] for p in per_image)),
+            "segments_numbered_but_not_drawn":
+                int(sum(r["segments_not_drawn"] for r in rows)),
+        },
+        "per_image": per_image,
+        "per_case": rows,
+        "pictures": [p for o in out for p in o["pictures"]],
+    }
+    (args.out / "ai_dry_run.json").write_text(json.dumps(report, indent=2) + "\n",
+                                              encoding="utf-8")
+    print_table(["image", "lacunae", "calls", "left over", "segments",
+                 "a", "b", "c", "d", "in tokens", "out tokens", "cost USD"],
+                [[p["image_label"], p["lacunae"], p["calls"],
+                  p["calls_for_left_over_segments"], p["segments"],
+                  *[p["segments_by_class"][name] for name in "abcd"],
+                  p["estimated_input_tokens"], p["estimated_output_tokens"],
+                  p["estimated_cost_usd"]] for p in per_image],
+                title=f"Estimate for {config.AI_JUDGE_MODEL}, numbered segments by class")
+    a = report["all_images"]
+    print(f"\ntotal: {a['calls']} calls, {a['segments']} segments, "
+          f"{a['estimated_input_tokens']} input and {a['estimated_output_tokens']} output tokens, "
+          f"estimated ${a['estimated_cost_usd']}")
+    print("by class: " + ", ".join(f"{name} {a['segments_by_class'][name]}" for name in "abcd")
+          + f"; {a['segments_asked_an_owner_only']} asked an owner only and "
+          f"{a['segments'] - a['segments_asked_an_owner_only']} asked real or artifact as well")
+    print("crops: " + ", ".join(f"{n} cases at {size} px" for size, n
+                                in a["cases_by_crop_px"].items()))
+    print(f"worst case with every call retried once: ${retries}, "
+          f"ceiling ${config.MAX_COST_USD}: {'within it' if a['within_max_cost_usd'] else 'ABOVE IT'}")
+    print(f"calls for segments outside their lacuna's crop: "
+          f"{a['calls_for_left_over_segments']}; numbered but not drawn: "
+          f"{a['segments_numbered_but_not_drawn']} (must be 0)")
+    if a["cases_with_a_body_that_has_no_colour"]:
+        print(f"cases with a body the judge cannot name: "
+              f"{a['cases_with_a_body_that_has_no_colour']}")
+    print(f"\nreport -> {args.out / 'ai_dry_run.json'}")
+    for picture in report["pictures"]:
+        print(f"picture -> {picture}")
+    return 0
+
+
+# ai-judge -----------------------------------------------------------------------
+# EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). The judge itself: one
+# call per lacuna, every request and answer logged, the verdicts written to the
+# image's decision file. With --replay it reruns from the log with no network
+# and checks that it gets the same decisions back.
+
+
+AI_SELF_TEST_DIR = config.PROJECT_ROOT / ".cache" / "ai_self_test"
+AI_REPLAY_DIR = config.PROJECT_ROOT / ".cache" / "ai_replay"
+
+
+def _ai_self_test(images: list) -> int:
+    """The whole chain with no network and no key: a picture becomes a request,
+    a stub answer becomes verdicts, the log replays to the same verdicts, and
+    the switch then edits the mask and runs the rest of the pipeline on it.
+
+    The stub answers by a fixed rule that means nothing biologically
+    (ai_judge.stub_answerer), so this checks the machinery and never the
+    judgement. Everything it writes goes to .cache/, which is git-ignored, and
+    never to results/: a rehearsal must not leave verdicts where the pipeline
+    could pick them up."""
+    import ai_judge
+
+    image_path = images[0]
+    label = lacunae.image_label(image_path)
+    saved_root, saved_switch = ai_judge.LOG_ROOT, config.AI_JUDGE_ENABLED
+    ai_judge.LOG_ROOT = AI_SELF_TEST_DIR
+    checks = []
+    try:
+        print(f"AI judge self-test on {label} (stub judge, nothing is sent)")
+        state = ai_judge.pipeline_state(image_path)
+        candidates = ai_judge.image_candidates(state)
+        print(f"  {len(candidates['cases'])} cases "
+              f"({sum(1 for c in candidates['cases'] if c['kind'] == 'left over')} for segments "
+              f"outside a crop), {len(candidates['segments'])} segments of which "
+              f"{sum(len(c['decide']) for c in candidates['cases'])} are numbered, "
+              f"geometry {candidates['geometry_sha256'][:12]}")
+
+        run = ai_judge.judge_image(state, candidates, "self-test",
+                                   answerer=ai_judge.stub_answerer())
+        totals = run["totals"]
+        print(f"  judged: {totals['segments_real']} real, {totals['segments_artifact']} artifact, "
+              f"{totals['segments_unjudged']} unjudged; "
+              f"{totals['invalid_attempts']} of {totals['attempts']} attempts were bad json")
+        checks.append(("the stub answered and the answers validated", totals["cases_valid"] > 0))
+        checks.append(("a bad answer was retried", totals["attempts"] > totals["cases"]))
+        checks.append(("a case that never validated is unjudged, not guessed",
+                       totals["cases_unjudged"] > 0 and totals["segments_unjudged"] > 0))
+
+        replay = ai_judge.judge_image(state, candidates, "replay",
+                                      out_root=AI_SELF_TEST_DIR / "replay")
+        same = _ai_same_decisions(run, replay)
+        print(f"  replay from the log: {'identical verdicts' if same else 'DIFFERENT'}")
+        checks.append(("replay gives the same verdicts", same))
+        logged = [r for r in (ai_judge.read_log(label, c["case_id"], 1)
+                              for c in run["cases"]) if r]
+        checks.append(("every request is logged with its hash",
+                       len(logged) == sum(1 for c in run["cases"] if c["attempts"]) and
+                       all(r.get("request_sha256") for r in logged)))
+        checks.append(("no key and no image bytes are in the log",
+                       all("ANTHROPIC_API_KEY" not in json.dumps(r) and
+                           "data" not in json.dumps(r.get("request", {}).get("image", {}))
+                           for r in logged)))
+
+        before = canaliculi.analyse_image(image_path)
+        config.AI_JUDGE_ENABLED = True
+        after = canaliculi.analyse_image(image_path)
+        config.AI_JUDGE_ENABLED = saved_switch
+        counts = after["ai_judge"]["counts"]
+        zone = after["ai_judge"]["zone_px"]
+        outside = int(((before["candidate"] != after["candidate"])
+                       & (after["ai_zone_owner"] == 0)).sum())
+        first_pass_same = bool((before["candidate_first_pass"]
+                                == after["candidate_first_pass"]).all())
+        roots_before = sum(quantification.cell_root_count(before["graph"], i + 1)
+                           for i in range(len(before["lacunae"]["kept"])))
+        roots_after = sum(quantification.cell_root_count(after["graph"], i + 1)
+                          for i in range(len(after["lacunae"]["kept"])))
+        print(f"  the switch: {counts['real']} real and {counts['artifact']} artifact "
+              f"verdicts applied ({counts['real_new']} new kept, {counts['artifact_new']} new "
+              f"refused, {counts['artifact_traced']} traced dropped), mask "
+              f"{counts['added_px']:+d} px and {-counts['removed_px']:+d} px, "
+              f"{counts['edited_px_outside_the_zones']} px of it outside a zone of the hole")
+        print(f"  skeleton {int(before['skeleton'].sum())} -> {int(after['skeleton'].sum())} px, "
+              f"roots {roots_before} -> {roots_after}, "
+              f"owned {int((before['owner_map'] > 0).sum())} -> "
+              f"{int((after['owner_map'] > 0).sum())} px")
+        print(f"  ownership: {counts['attached_segments']} segments attached "
+              f"({counts['attached_to_another_cell']} to a cell that did not own them), "
+              f"{counts['ownership_moved_px']} px changed hands, "
+              f"{counts['newly_owned_px']} px newly owned, "
+              f"{counts['no_longer_owned_px']} px no longer owned")
+        print(f"  outside the zones the mask then moves by {outside} px, which is the dim pass "
+              f"({before['dim_pass_px']} -> {after['dim_pass_px']} px) growing from the "
+              f"ownership it was given, not the judge writing there")
+        checks.append(("the switch changes the mask", counts["added_px"] + counts["removed_px"] > 0))
+        checks.append(("the judge edits only the segments it was given",
+                       counts["edited_px_outside_the_judged_segments"] == 0 and first_pass_same))
+        checks.append(("the pipeline runs to the end with the switch on",
+                       after["graph"] is not None and after["owner_map"].any()))
+        checks.append(("nothing the judge said deleted tracing the pipeline made",
+                       counts["artifact_traced"] == 0))
+
+        # A verdict that moves a network from one cell to the other, which is
+        # what the whole experiment is for. The stub gives every white number to
+        # the LAST candidate it is offered, which for a class d segment is the
+        # cell that does not own it, so the attachment goes in and the shortest
+        # path has to split the network. Both ends of that are checked: that an
+        # attachment went to another cell, and that tracing then changed hands.
+        moved = _ai_ownership_moves(before, after)
+        print(f"  a verdict moves a network: {counts['attached_to_another_cell']} segments "
+              f"attached to a cell that did not own them, {counts['ownership_moved_px']} px of "
+              f"tracing changed hands between {len(moved)} pair(s) of cells")
+        for (was, now), px in sorted(moved.items(), key=lambda kv: -kv[1])[:3]:
+            print(f"    cell {was} -> cell {now}: {px} px")
+        checks.append(("a verdict moves a network between two owners",
+                       counts["attached_to_another_cell"] > 0
+                       and counts["ownership_moved_px"] > 0 and bool(moved)))
+
+        # Two cases that disagree about one segment. No segment on these 8
+        # images is numbered in two cases, so the rule is exercised on a
+        # decision file built for it: one judged segment answered a second time
+        # with a different owner. The answer must be thrown away whole and the
+        # segment left exactly as the pipeline had it.
+        disagreed = _ai_conflict_check(image_path, label, run, after)
+        print(f"  two cases that disagree about {disagreed['segment_id']}: "
+              f"{disagreed['conflicting']} segment counted as conflicting, "
+              f"{disagreed['attached']} segments attached against "
+              f"{disagreed['attached_without_it']} with no disagreement, so that one attaches "
+              f"to neither cell; {disagreed['differs_px']} px of ownership differ")
+        checks.append(("a segment two cases answer differently is left alone and counted",
+                       disagreed["conflicting"] == 1
+                       and disagreed["attached"] == disagreed["attached_without_it"] - 1))
+        try:
+            ai_judge.LOG_ROOT = AI_SELF_TEST_DIR / "empty"
+            config.AI_JUDGE_ENABLED = True
+            canaliculi.analyse_image(image_path)
+            refused = False
+        except FileNotFoundError:
+            refused = True
+        finally:
+            config.AI_JUDGE_ENABLED = saved_switch
+            ai_judge.LOG_ROOT = AI_SELF_TEST_DIR
+        checks.append(("an image with no decision file is refused, not passed over", refused))
+
+        # The two guards a run of 8 images leans on, rehearsed with no network.
+        # A prompt the model cannot answer must cost about 20 calls and not 145.
+        ai_judge.LOG_ROOT = AI_SELF_TEST_DIR / "gate"
+        gate_run = ai_judge.judge_image(state, candidates, "self-test",
+                                        out_root=AI_SELF_TEST_DIR / "gate",
+                                        answerer=ai_judge.unreadable_answerer(),
+                                        stop_check=ai_judge.quality_gate())
+        ai_judge.LOG_ROOT = AI_SELF_TEST_DIR
+        gate_totals = gate_run["totals"]
+        print(f"  the quality gate: every answer unreadable, stopped after "
+              f"{gate_totals['calls']} calls and {gate_totals['cases']} of "
+              f"{len(candidates['cases'])} cases: {gate_totals['stopped_early']}")
+        checks.append(("a run whose answers cannot be read stops itself",
+                       bool(gate_totals["stopped_early"])
+                       and gate_totals["cases"] < len(candidates["cases"])
+                       and gate_totals["calls"]
+                       <= config.AI_MIN_CALLS_BEFORE_QUALITY_GATE + 2))
+
+        # A billing, credit or authentication error stops the run at once and
+        # raises: nothing is marked unjudged and no decision file is written.
+        fatal = _ai_fatal_check(state, candidates)
+        print(f"  a billing error: {fatal['what']}")
+        checks.append(("a billing or authentication error stops the run at once",
+                       fatal["raised"] and fatal["calls"] == 0
+                       and not fatal["decision_file"]))
+    finally:
+        ai_judge.LOG_ROOT, config.AI_JUDGE_ENABLED = saved_root, saved_switch
+
+    print()
+    print_table(["check", "result"],
+                [[name, "PASS" if ok else "FAIL"] for name, ok in checks])
+    failed = [name for name, ok in checks if not ok]
+    print(f"\n{len(checks) - len(failed)} of {len(checks)} checks pass"
+          + (f"; FAILED: {failed}" if failed else ""))
+    print(f"everything written went to {AI_SELF_TEST_DIR} and nothing to results/")
+    return 1 if failed else 0
+
+
+def cmd_ai_judge(args) -> int:
+    import ai_judge
+
+    images = images_from(args)
+    if args.self_test:
+        return _ai_self_test(images[:1])
+    mode = "replay" if args.replay else "live"
+    # Only a live run asks whether it may call out. A replay never looks at
+    # either environment variable, the key least of all: it has no use for it.
+    if mode == "live":
+        allowed, why = ai_judge.external_calls_allowed()
+        if not allowed:
+            print(f"Refused: a real run needs a connection and {why}.")
+            print("Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.")
+            return 2
+
+    # The quality gate, over the whole run and not one image: it stops the run
+    # if too many answers cannot be read, and one counter watches every image.
+    gate = ai_judge.quality_gate()
+    rc = 0
+    for image_path in images:
+        label = lacunae.image_label(image_path)
+        print(f"\n== {label} ({mode}) ==")
+        state = ai_judge.pipeline_state(image_path)
+        candidates = ai_judge.image_candidates(state)
+        prompt = ai_judge.load_prompt()
+
+        # The cost gate: estimate the whole image before the first call.
+        estimated = 0.0
+        for case in candidates["cases"]:
+            png, drawn = ai_judge.case_picture(state, candidates, case)
+            estimate = ai_judge.estimate_case(prompt["system"],
+                                              ai_judge.case_user_text(case, drawn), png,
+                                              len(drawn["segments_drawn"]))
+            estimated += estimate["cost_usd"]
+        estimated = round(estimated, 4)
+        print(f"{len(candidates['cases'])} calls, estimated ${estimated}, "
+              f"ceiling ${config.MAX_COST_USD}")
+        if mode == "live" and estimated > config.MAX_COST_USD:
+            print(f"Refused: the estimate ${estimated} is above config.MAX_COST_USD "
+                  f"${config.MAX_COST_USD}.")
+            return 2
+
+        def show(case_record, totals):
+            kept = sum(1 for s in case_record["segments"] if s["verdict"] == "real")
+            print(f"  {case_record['case_id']}: {case_record['segments_offered']} segments, "
+                  f"{kept} real, "
+                  f"{'ok' if case_record['answer_valid'] else 'UNJUDGED'}, "
+                  f"running ${totals['cost_usd']}")
+
+        if args.out:
+            out_root = Path(args.out) / label
+        else:
+            # A replay writes beside the log by default only when it is asked
+            # to: left alone it writes to .cache/, so a real run's record of
+            # what it cost is never replaced by a replay's zeros.
+            out_root = (AI_REPLAY_DIR / label) if mode == "replay" else None
+        try:
+            decisions = ai_judge.judge_image(state, candidates, mode, out_root, progress=show,
+                                             stop_check=gate if mode == "live" else None)
+        except ai_judge.FatalApiError as error:
+            # A billing, credit or authentication error: stop the whole run
+            # here, report it, and run nothing else. Nothing is marked unjudged
+            # and no decision file is written, because nothing was asked.
+            print(f"\nSTOPPED: {error}")
+            print("No decision file was written for this image and no further image was run.")
+            return 5
+        totals = decisions["totals"]
+        offered = max(1, totals["segments"])
+        print(f"segments: {totals['segments']} offered, "
+              f"{totals['segments_real']} real ({100.0 * totals['segments_real'] / offered:.1f}%), "
+              f"{totals['segments_artifact']} artifact "
+              f"({100.0 * totals['segments_artifact'] / offered:.1f}%), "
+              f"{totals['segments_unjudged']} unjudged")
+        given = [s for c in decisions["cases"] for s in c["segments"]
+                 if s["verdict"] != "unjudged" and s["owner_lacuna_id"]]
+        kept_owner = sum(1 for s in given if s["owner_lacuna_id"] == s["owner_lacuna_id_before"])
+        from_none = sum(1 for s in given if not s["owner_lacuna_id_before"])
+        between = len(given) - kept_owner - from_none
+        print(f"owners: {len(given)} segments given one: {kept_owner} the cell that already "
+              f"owned it, {from_none} a segment nobody owned, {between} moved from one cell to "
+              f"another; {totals['segments_given_no_owner']} given none")
+        print(f"json failures: {totals['invalid_attempts']} of {totals['attempts']} attempts "
+              f"({totals['call_errors']} of them a failed call, "
+              f"{totals['refusals']} a refusal), "
+              f"{totals['cases_unjudged']} of {totals['cases']} cases left unjudged")
+        print(f"cost: ${totals['cost_usd']} for {totals['calls']} calls "
+              f"({totals['input_tokens']} input, {totals['output_tokens']} output tokens)")
+        if totals["stopped_early"]:
+            print(f"\nSTOPPED: {totals['stopped_early']}.")
+            print("The rest of this image and every image after it were not run.")
+            return 6
+        if totals["stopped_on_cost"]:
+            print(f"STOPPED: the running total passed config.MAX_COST_USD "
+                  f"${config.MAX_COST_USD}. The rest of the image was not judged.")
+            rc = 3
+        if mode == "replay":
+            if not totals["attempts"]:
+                print("replay against the log: the log holds no answers for this image yet, "
+                      "so every segment is unjudged and keeps the deterministic decision")
+            else:
+                print(f"replay against the log: {totals['attempts']} attempts replayed, "
+                      f"{totals['replay_request_mismatches']} requests and "
+                      f"{totals['replay_picture_mismatches']} pictures differ from what was sent")
+            live_path = ai_judge.decisions_path(label)
+            if live_path.exists():
+                same = _ai_same_decisions(json.loads(live_path.read_text(encoding="utf-8")),
+                                          decisions)
+                print(f"replay against the logged run: "
+                      f"{'IDENTICAL verdicts' if same else 'DIFFERENT, see below'}")
+                if not same:
+                    rc = 4
+    return rc
+
+
+def _ai_fatal_check(state: dict, candidates: dict) -> dict:
+    """A billing error on the first call must stop the run at once: it is
+    raised, nothing is counted as judged or unjudged, and no decision file is
+    left behind for the pipeline to pick up."""
+    import ai_judge
+
+    class BadRequestError(Exception):
+        pass
+
+    def broke(payload):
+        raise BadRequestError("Your credit balance is too low to access the Anthropic API.")
+
+    out = AI_SELF_TEST_DIR / "fatal"
+    if out.exists():
+        shutil.rmtree(out)
+    saved = ai_judge.LOG_ROOT
+    ai_judge.LOG_ROOT = out
+    try:
+        ai_judge.judge_image(state, candidates, "self-test", out_root=out, answerer=broke)
+        what, raised = "it carried on, which it must not", False
+    except ai_judge.FatalApiError as error:
+        what, raised = str(error), True
+    finally:
+        ai_judge.LOG_ROOT = saved
+    written = sorted(p.name for p in out.rglob("*_ai_segments.json"))
+    return {"raised": raised, "what": what, "decision_file": written,
+            "calls": len(sorted(out.rglob("*_attempt2.json")))}
+
+
+def _ai_ownership_moves(before: dict, after: dict) -> dict:
+    """{(the cell that owned it, the cell that owns it now): pixels}, over the
+    tracing both runs own. It is what the shortest path did once the judge's
+    attachments were in the graph, not anything the judge wrote."""
+    was, now = before["owner_map"], after["owner_map"]
+    both = (was > 0) & (now > 0) & (was != now)
+    moves: dict = {}
+    for a, b in zip(was[both].tolist(), now[both].tolist()):
+        moves[(int(a), int(b))] = moves.get((int(a), int(b)), 0) + 1
+    return moves
+
+
+def _ai_conflict_check(image_path: Path, label: str, run: dict, after: dict) -> dict:
+    """Two cases that answer one segment differently: the answer is thrown away
+    whole and the segment is left exactly as the pipeline had it.
+
+    No segment on these 8 images is numbered in two cases, so the rule is
+    exercised on a decision file written for it: one segment the stub judged and
+    gave an owner is answered a second time, in a case of its own, with a
+    different owner. Nothing else in the file changes, and the geometry hash
+    still matches, because what the judge was ASKED is the same.
+
+    `after` is the run with the same verdicts and no conflict, so the difference
+    between the two is exactly what dropping that one attachment did."""
+    import ai_judge
+
+    decisions = json.loads(json.dumps(run))  # a copy, so the run's own file stands
+    picked = None
+    for case in decisions["cases"]:
+        for item in case["segments"]:
+            if item["verdict"] == "real" and item["owner_lacuna_id"]:
+                picked = (case, item)
+                break
+        if picked:
+            break
+    if picked is None:
+        return {"conflicting": -1, "attached": -1, "attached_without_it": -1, "differs_px": -1}
+    case, item = picked
+    # The other answer: the same segment, real, given to a different cell. Any
+    # other cell will do, because what is checked is that two answers which
+    # disagree are no answer at all.
+    other = dict(item, owner="cyan",
+                 owner_lacuna_id=1 if item["owner_lacuna_id"] != 1 else 2)
+    decisions["cases"] = decisions["cases"] + [dict(case, case_id="case_conflict",
+                                                    segments=[other])]
+    path = ai_judge.decisions_path(label)
+    kept = path.read_text(encoding="utf-8")
+    path.write_text(json.dumps(decisions, indent=2) + "\n", encoding="utf-8")
+    saved = config.AI_JUDGE_ENABLED
+    try:
+        config.AI_JUDGE_ENABLED = True
+        result = canaliculi.analyse_image(image_path)
+    finally:
+        config.AI_JUDGE_ENABLED = saved
+        path.write_text(kept, encoding="utf-8")
+    counts = result["ai_judge"]["counts"]
+    return {
+        "segment_id": item["segment_id"],
+        "conflicting": counts["conflicting"],
+        "attached": counts["attached_segments"],
+        "attached_without_it": after["ai_judge"]["counts"]["attached_segments"],
+        "differs_px": int((result["owner_map"] != after["owner_map"]).sum()),
+    }
+
+
+# ai-run -------------------------------------------------------------------------
+# EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). The pipeline itself,
+# detection, canaliculi and quantification, with config.AI_JUDGE_ENABLED on for
+# this one process, into a folder of its own. config.py is not touched: the
+# switch ships off and stays off. It reads only the decision files already in
+# results/ai_log/, makes no call and needs no key. Every file under results/
+# outside its own output folder is hashed before and after, so the run proves it
+# changed nothing it was not asked to write.
+
+
+AI_RUN_DIR = config.RESULTS_DIR / "ai_run"
+
+
+def _tree_manifest(root: Path, exclude: Path) -> dict:
+    """{path relative to root: sha256} for every file under root, leaving out
+    everything under `exclude`. Byte for byte, so a changed timestamp is not a
+    change and a changed byte is."""
+    import hashlib
+
+    exclude = exclude.resolve()
+    out = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        resolved = path.resolve()
+        if resolved == exclude or exclude in resolved.parents:
+            continue
+        out[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return out
+
+
+def _ai_run_detect(job: tuple) -> dict:
+    """Both detection stages for one image with the switch on, written exactly
+    as src/lacunae.py and src/canaliculi.py write them."""
+    path_str, out_str = job
+    config.AI_JUDGE_ENABLED = True
+    image_path, out_root = Path(path_str), Path(out_str)
+    lac = lacunae.analyse_image(image_path)
+    lacunae.write_outputs(lac, out_root)
+    net = canaliculi.analyse_image(image_path)
+    canaliculi.write_outputs(net, out_root)
+    counts = net["ai_judge"]["counts"]
+    return {"image_label": lacunae.image_label(image_path),
+            "skeleton_px": int(net["skeleton"].sum()),
+            "ai_judge": {k: counts[k] for k in sorted(counts)}}
+
+
+def cmd_ai_run(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    import ai_judge
+
+    images = images_from(args)
+    out = Path(args.out)
+    results_root = config.RESULTS_DIR
+    for image_path in images:
+        label = lacunae.image_label(image_path)
+        if not ai_judge.decisions_path(label).is_file():
+            print(f"Refused: no decision file for {label} at {ai_judge.decisions_path(label)}. "
+                  f"Run or replay the judge first.")
+            return 2
+    print(f"The pipeline with the AI judge switch on, for this process only, into {out}")
+    print("Reads results/ai_log/ only. No call is made and no key is read.")
+    before = _tree_manifest(results_root, out)
+    print(f"results/ before: {len(before)} files hashed (leaving out {out.name}/)")
+
+    out.mkdir(parents=True, exist_ok=True)
+    jobs = [(str(p), str(out)) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        detected = list(ex.map(_ai_run_detect, jobs))
+    for row in detected:
+        c = row["ai_judge"]
+        print(f"  {row['image_label']}: detection written, skeleton {row['skeleton_px']} px, "
+              f"{c['real']} real and {c['artifact']} artifact verdicts applied, "
+              f"{c['attached_segments']} attached, {c['conflicting']} conflicting, "
+              f"{c['ownership_moved_px']} px changed hands")
+
+    # Quantification exactly as src/quantification.py runs it: from the files
+    # detection has just written, then the cross-image table.
+    config.AI_JUDGE_ENABLED = True
+    quantified = []
+    for image_path in images:
+        label = lacunae.image_label(image_path)
+        detection = quantification.load_detection(out, label)
+        result = quantification.quantify(detection, image_path, None)
+        quantification.write_outputs(result, out)
+        quantified.append(result)
+        print(f"  {label}: quantified, lacunae={result['lacuna_count']} "
+              f"(interior {result['interior_lacuna_count']}), roots per cell="
+              f"{result['summary']['roots_count']['mean']}")
+    quantification.write_summary_table(quantified, out)
+    config.AI_JUDGE_ENABLED = False
+
+    after = _tree_manifest(results_root, out)
+    changed = sorted(k for k in before if k in after and before[k] != after[k])
+    gone = sorted(k for k in before if k not in after)
+    new = sorted(k for k in after if k not in before)
+    same = not (changed or gone or new)
+    report = {
+        "status": ("EXPERIMENT. The pipeline with config.AI_JUDGE_ENABLED on for this run "
+                   "only, from the decision files in results/ai_log/. Not validated."),
+        "written_at": ai_judge.utc_now(),
+        "images": [lacunae.image_label(p) for p in images],
+        "per_image": detected,
+        "results_outside_this_folder": {
+            "files_hashed": len(before),
+            "byte_identical_afterwards": same,
+            "changed": changed, "removed": gone, "added": new,
+        },
+    }
+    (out / "ai_run.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(f"\nresults/ after: {len(after)} files hashed; "
+          + ("BYTE IDENTICAL to before" if same else
+             f"CHANGED: {len(changed)} changed, {len(gone)} removed, {len(new)} added"))
+    for k in (changed + gone + new)[:20]:
+        print(f"  {k}")
+    print(f"report -> {out / 'ai_run.json'}")
+    return 0 if same else 1
+
+
+# ai-compare ---------------------------------------------------------------------
+# EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). Judge off against
+# judge on, per image. Both runs are recomputed in memory and then checked
+# against the files on disk pixel for pixel, judge off against results/<label>/
+# and judge on against results/ai_run/<label>/, so the numbers describe exactly
+# what was written. No call is made and no key is read.
+
+
+AI_COMPARE_SCRATCH = config.PROJECT_ROOT / ".cache" / "ai_compare"
+
+
+def _root_clusters(G: nx.Graph, cell_id: int) -> list:
+    """The clusters quantification.cell_root_count counts, one per root, so a
+    root can be asked where it came from. Same nodes, same single linkage, same
+    merge distance."""
+    src = ("cell", cell_id)
+    if not G.has_node(src):
+        return []
+    unmerged = [n for n in G.neighbors(src) if not canaliculi._is_cell_node(n)]
+    clusters = []
+    while unmerged:
+        cluster = [unmerged.pop()]
+        changed = True
+        while changed:
+            changed = False
+            for other in list(unmerged):
+                if any(np.hypot(other[0] - m[0], other[1] - m[1]) <= canaliculi.ROOT_MERGE_DIST_PX
+                       for m in cluster):
+                    cluster.append(other)
+                    unmerged.remove(other)
+                    changed = True
+        clusters.append(cluster)
+    return clusters
+
+
+def _owner_stats(result: dict, n_lacunae: int) -> dict:
+    """Skeleton, owned and unowned px, and the largest owner's share."""
+    skeleton, owner_map = result["skeleton"], result["owner_map"]
+    owned = skeleton & (owner_map > 0)
+    per_cell = np.bincount(owner_map[owned], minlength=n_lacunae + 1)
+    top = int(np.argmax(per_cell[1:])) + 1 if per_cell[1:].any() else 0
+    total = int(skeleton.sum())
+    return {"skeleton_px": total, "owned_px": int(owned.sum()),
+            "unowned_px": int((skeleton & (owner_map == 0)).sum()),
+            "largest_owner": top, "largest_owner_px": int(per_cell[top]) if top else 0,
+            "largest_owner_share": round(float(per_cell[top]) / max(1, total), 4) if top else 0.0}
+
+
+def _pixel_moves(before: np.ndarray, after: np.ndarray) -> tuple:
+    """(pixels that changed hands, {(was, now): pixels}) over the tracing both
+    owner maps own. The same measure the detection record carries as
+    ownership_moved_px."""
+    both = (before > 0) & (after > 0) & (before != after)
+    pairs: dict = {}
+    for a, b in zip(before[both].tolist(), after[both].tolist()):
+        pairs[(int(a), int(b))] = pairs.get((int(a), int(b)), 0) + 1
+    return int(both.sum()), pairs
+
+
+def _segment_moves(before: dict, after: dict) -> dict:
+    """Segments of the judge-on skeleton whose owner changed: a branch, split at
+    junctions as the judge's segments are and at least as long, whose majority
+    owner on the judge-off owner map is one cell and on the judge-on map
+    another. It is the outcome of the shortest path, counted in the unit the
+    judge was asked about."""
+    import ai_judge
+
+    labels = ai_judge._branch_labels(after["skeleton"])
+    was_map, now_map = before["owner_map"], after["owner_map"]
+    moved, px, pairs = 0, 0, {}
+    for index, box in enumerate(ndi.find_objects(labels), start=1):
+        if box is None:
+            continue
+        piece = labels[box] == index
+        if int(piece.sum()) < ai_judge.MIN_SEGMENT_PX:
+            continue
+        was = was_map[box][piece]
+        now = now_map[box][piece]
+        was, now = was[was > 0], now[now > 0]
+        if not was.size or not now.size:
+            continue
+        a, b = int(np.bincount(was).argmax()), int(np.bincount(now).argmax())
+        if a != b:
+            moved += 1
+            px += int(piece.sum())
+            pairs[(a, b)] = pairs.get((a, b), 0) + 1
+    return {"segments": moved, "px": px, "pairs": pairs}
+
+
+def _verdict_split(decisions: dict) -> dict:
+    """Per class, what the verdicts did with ownership: kept by the cell that
+    already owned it, given to a segment nobody owned, moved from one cell to
+    another, or given to no cell. Segments and their own pixels, and the pairs
+    of cells for the moves."""
+    out = {}
+    for case in decisions["cases"]:
+        for seg in case["segments"]:
+            if seg["verdict"] == "unjudged":
+                continue
+            for name in seg.get("classes", []) or ["?"]:
+                row = out.setdefault(name, {k: {"segments": 0, "px": 0} for k in
+                                            ("kept", "from_none", "moved", "no_owner")})
+                row.setdefault("pairs", {})
+                was, now = seg["owner_lacuna_id_before"], seg["owner_lacuna_id"]
+                if not now:
+                    kind = "no_owner"
+                elif now == was:
+                    kind = "kept"
+                elif not was:
+                    kind = "from_none"
+                else:
+                    kind = "moved"
+                    key = f"{was}->{now}"
+                    row["pairs"][key] = row["pairs"].get(key, 0) + 1
+                row[kind]["segments"] += 1
+                row[kind]["px"] += int(seg["px"])
+    return out
+
+
+def _titled_pair(left: np.ndarray, right: np.ndarray, titles: tuple) -> Image.Image:
+    """Two pictures side by side with a title over each and a gap between."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    def rgb(a):
+        a = np.asarray(a)
+        return np.stack([a] * 3, axis=-1) if a.ndim == 2 else a[..., :3]
+
+    left, right = rgb(left), rgb(right)
+    gap, bar = 12, 44
+    h = max(left.shape[0], right.shape[0])
+    canvas = np.full((h + bar, left.shape[1] + gap + right.shape[1], 3), 30, dtype=np.uint8)
+    canvas[bar:bar + left.shape[0], :left.shape[1]] = left
+    canvas[bar:bar + right.shape[0], left.shape[1] + gap:] = right
+    picture = Image.fromarray(canvas)
+    draw = ImageDraw.Draw(picture)
+    try:
+        font = ImageFont.truetype("arial.ttf", 26)
+    except OSError:
+        font = ImageFont.load_default()
+    draw.text((12, 8), titles[0], fill=(255, 255, 255), font=font)
+    draw.text((left.shape[1] + gap + 12, 8), titles[1], fill=(255, 255, 255), font=font)
+    return picture
+
+
+def _ownership_change_picture(before: dict, after: dict) -> np.ndarray:
+    """One frame: the judge-on skeleton in grey, the tracing that changed hands
+    in red, newly owned in green, no longer owned in blue, and every body
+    outlined in white. Each changed pixel is widened by one pixel so a
+    one-pixel thread can be seen at this size; nothing else is drawn."""
+    shape = after["skeleton"].shape
+    was, now = before["owner_map"], after["owner_map"]
+    canvas = np.zeros(shape + (3,), dtype=np.uint8)
+    canvas[before["skeleton"]] = (70, 70, 70)
+    canvas[after["skeleton"]] = (150, 150, 150)
+    widen = morphology.disk(1)
+    for mask, colour in ((((was == 0) & (now > 0)), (0, 220, 0)),
+                         (((was > 0) & (now == 0)), (70, 120, 255)),
+                         (((was > 0) & (now > 0) & (was != now)), (255, 40, 40))):
+        canvas[morphology.dilation(mask, widen)] = colour
+    canvas[segmentation.find_boundaries(after["lacuna_id_map"], mode="outer")] = (255, 255, 255)
+    return canvas
+
+
+def _ai_compare_one(job: tuple) -> dict:
+    from PIL import Image
+
+    import ai_judge
+
+    path_str, compare_str, run_str = job
+    image_path, compare_dir, run_root = Path(path_str), Path(compare_str), Path(run_str)
+    label = lacunae.image_label(image_path)
+    decisions = ai_judge.read_decisions(label)
+
+    config.AI_JUDGE_ENABLED = False
+    before = canaliculi.analyse_image(image_path)
+    config.AI_JUDGE_ENABLED = True
+    after = canaliculi.analyse_image(image_path)
+    config.AI_JUDGE_ENABLED = False
+    n = len(before["lacunae"]["kept"])
+
+    # The comparison must describe the files on disk, not a run of its own.
+    def disk(root, suffix):
+        return lacunae.result_path(root, label, config.SECTION_CANALICULI, suffix)
+
+    sk_before = quantification._read_mask(disk(config.RESULTS_DIR, config.SUFFIX_CANALICULI_SKELETON))
+    sk_after = quantification._read_mask(disk(run_root, config.SUFFIX_CANALICULI_SKELETON))
+    q_before = json.loads(result_json(config.RESULTS_DIR, label).read_text(encoding="utf-8"))
+    q_after = json.loads(result_json(run_root, label).read_text(encoding="utf-8"))
+    roots_before = {int(r["lacuna_id"]): r["roots_count"] for r in q_before["lacunae"]}
+    roots_after = {int(r["lacuna_id"]): r["roots_count"] for r in q_after["lacunae"]}
+    interior = {int(r["lacuna_id"]): not r.get("on_border", False) for r in q_after["lacunae"]}
+
+    # Where every verdict attached its cell, recomputed by the same function the
+    # switch used, from the judge-off run it was applied to.
+    _display, channel = lacunae.load_channel(image_path)
+    ai = ai_judge.apply_to_base(image_path, before["candidate_first_pass"], before,
+                                before["lacunae"], channel)
+    G = after["graph"]
+    nodes = [node for node in G.nodes() if not canaliculi._is_cell_node(node)]
+    coords = np.array(nodes, dtype=np.float64)
+    judge_nodes: dict = {}
+    for lacuna_id, points in ai["attach"].items():
+        for point in points:
+            point = np.asarray(point, dtype=np.float64)
+            gaps = ((coords[:, None, :] - point[None, :, :]) ** 2).sum(axis=2).min(axis=1)
+            judge_nodes.setdefault(int(lacuna_id), set()).add(nodes[int(np.argmin(gaps))])
+    roots_at_a_verdict = {}
+    roots_in_memory = {}
+    for lacuna_id in range(1, n + 1):
+        clusters = _root_clusters(G, lacuna_id)
+        roots_in_memory[lacuna_id] = len(clusters)
+        mine = judge_nodes.get(lacuna_id, set())
+        roots_at_a_verdict[lacuna_id] = sum(1 for c in clusters if mine & set(c))
+    recorded = after["ai_judge"]["counts"]
+    checks = {
+        "judge_off_skeleton_equals_results": bool((sk_before == before["skeleton"]).all()),
+        "judge_on_skeleton_equals_ai_run": bool((sk_after == after["skeleton"]).all()),
+        "roots_in_memory_equal_ai_run_json": all(roots_in_memory[i] == roots_after[i]
+                                                 for i in roots_after),
+        "attachments_recomputed_as_the_switch_made_them": all(
+            ai["counts"][k] == recorded[k] for k in ai["counts"]),
+        "every_verdict_attachment_is_an_edge_of_its_cell": all(
+            G.has_edge(("cell", i), node) for i, ns in judge_nodes.items() for node in ns),
+    }
+
+    moved_px, pixel_pairs = _pixel_moves(before["owner_map"], after["owner_map"])
+    segments = _segment_moves(before, after)
+
+    # Class d on its own: the same switch with every verdict but the class d
+    # ones set to unjudged, so what moves is what class d moves.
+    only_d = json.loads(json.dumps(decisions))
+    for case in only_d["cases"]:
+        for seg in case["segments"]:
+            if "d" not in seg.get("classes", []):
+                seg.update({"verdict": "unjudged", "owner": "none", "owner_lacuna_id": None})
+    scratch = AI_COMPARE_SCRATCH / "class_d_only"
+    (scratch / label).mkdir(parents=True, exist_ok=True)
+    (scratch / label / f"{label}_ai_segments.json").write_text(json.dumps(only_d) + "\n",
+                                                               encoding="utf-8")
+    saved_root = ai_judge.LOG_ROOT
+    ai_judge.LOG_ROOT = scratch
+    try:
+        config.AI_JUDGE_ENABLED = True
+        d_run = canaliculi.analyse_image(image_path)
+    finally:
+        config.AI_JUDGE_ENABLED = False
+        ai_judge.LOG_ROOT = saved_root
+    d_px, d_pairs = _pixel_moves(before["owner_map"], d_run["owner_map"])
+    d_segments = _segment_moves(before, d_run)
+
+    # The pictures.
+    compare_dir.mkdir(parents=True, exist_ok=True)
+    pictures = {}
+    for kind, suffix in (("verification", config.SUFFIX_CANALICULI_VERIFICATION),
+                         ("skeleton", config.SUFFIX_CANALICULI_SKELETON)):
+        left = np.asarray(Image.open(disk(config.RESULTS_DIR, suffix)))
+        right = np.asarray(Image.open(disk(run_root, suffix)))
+        out = compare_dir / f"{label}_{kind}_judge_off_on.png"
+        _titled_pair(left, right, (f"{label}  judge OFF ({kind})",
+                                   f"{label}  judge ON ({kind})")).save(out)
+        pictures[kind] = out.relative_to(config.PROJECT_ROOT).as_posix()
+    out = compare_dir / f"{label}_ownership_changes.png"
+    Image.fromarray(_ownership_change_picture(before, after)).save(out)
+    pictures["ownership_changes"] = out.relative_to(config.PROJECT_ROOT).as_posix()
+
+    unnamed = [{"case_id": c["case_id"], "case_kind": c["case_kind"],
+                "yellow_lacuna_id": c["lacuna_id"], "bodies_outlined_grey": c["bodies_with_no_colour"],
+                "numbered_segments": c["segments_offered"],
+                "every_number_had_both_candidates_named": all(
+                    len(s.get("candidate_colours", [])) == len(s.get("candidates", []))
+                    for s in c["segments"])}
+               for c in decisions["cases"] if c["bodies_with_no_colour"]]
+
+    def pairs_list(pairs):
+        return [{"from": a, "to": b, "count": v}
+                for (a, b), v in sorted(pairs.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+    roots_rows = [{"lacuna_id": i, "interior": interior.get(i, True),
+                   "roots_before": roots_before.get(i), "roots_after": roots_after.get(i),
+                   "roots_after_at_a_verdict_attachment": roots_at_a_verdict[i]}
+                  for i in sorted(roots_after)]
+    return {
+        "image_label": label,
+        "lacunae": n,
+        "checks": checks,
+        "verdicts": {"given_an_owner": int(recorded["attached_segments"]),
+                     "attached_to_another_cell": int(recorded["attached_to_another_cell"]),
+                     "conflicting": int(recorded["conflicting"]),
+                     "by_class": _verdict_split(decisions)},
+        "ownership_moves": {"px": moved_px, "pairs_px": pairs_list(pixel_pairs),
+                            "segments": segments["segments"], "segments_px": segments["px"],
+                            "pairs_segments": pairs_list(segments["pairs"]),
+                            "newly_owned_px": int(recorded["newly_owned_px"]),
+                            "no_longer_owned_px": int(recorded["no_longer_owned_px"])},
+        "class_d_only": {"attached": int(d_run["ai_judge"]["counts"]["attached_segments"]),
+                         "px": d_px, "pairs_px": pairs_list(d_pairs),
+                         "segments": d_segments["segments"], "segments_px": d_segments["px"],
+                         "pairs_segments": pairs_list(d_segments["pairs"])},
+        "roots": {"mean_per_interior_cell_before": q_before["summary"]["roots_count"]["mean"],
+                  "mean_per_interior_cell_after": q_after["summary"]["roots_count"]["mean"],
+                  "total_before": int(sum(v for v in roots_before.values() if v is not None)),
+                  "total_after": int(sum(v for v in roots_after.values() if v is not None)),
+                  "total_after_at_a_verdict_attachment": int(sum(roots_at_a_verdict.values())),
+                  "per_lacuna": roots_rows},
+        "before": _owner_stats(before, n),
+        "after": _owner_stats(after, n),
+        "bodies_not_named": unnamed,
+        "pictures": pictures,
+    }
+
+
+def cmd_ai_compare(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    run_root = Path(args.run).resolve()
+    compare_dir = Path(args.out).resolve()
+    for p in images:
+        if not result_json(run_root, lacunae.image_label(p)).is_file():
+            print(f"Refused: {run_root} has no output for {lacunae.image_label(p)}. "
+                  f"Run python src/diagnostics.py ai-run first.")
+            return 2
+    jobs = [(str(p), str(compare_dir), str(run_root)) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        out = list(ex.map(_ai_compare_one, jobs))
+
+    failed = [(o["image_label"], k) for o in out for k, ok in o["checks"].items() if not ok]
+    report = {
+        "status": ("EXPERIMENT. Judge off (results/<label>/) against judge on "
+                   "(results/ai_run/<label>/), from the decision files in results/ai_log/. "
+                   "NOT VALIDATED: no verdict has been checked against a manual trace."),
+        "written_at": __import__("ai_judge").utc_now(),
+        "definitions": {
+            "given_an_owner": "verdicts applied as a zero weight attachment, after conflicts",
+            "ownership_moves.px": ("tracing owned in both runs whose owner changed, on the owner "
+                                   "maps; the shortest path's doing, not the judge's"),
+            "ownership_moves.segments": ("branches of the judge-on skeleton, at least the judge's "
+                                         "minimum segment length, whose majority owner changed"),
+            "class_d_only": "the same switch with every verdict but the class d ones unjudged",
+            "roots_after_at_a_verdict_attachment": (
+                "roots of the judge-on graph that contain a node a verdict attached its cell "
+                "to; a root is any node attached to the cell, so an attachment far from the "
+                "body counts as one"),
+            "largest_owner_share": "the largest single cell's owned px over all skeleton px",
+        },
+        "checks_failed": failed,
+        "per_image": out,
+    }
+    (compare_dir / "ai_compare.json").write_text(json.dumps(report, indent=2) + "\n",
+                                                 encoding="utf-8")
+    (compare_dir / "REPORT.md").write_text(_ai_compare_markdown(out, failed), encoding="utf-8")
+
+    print_table(["image", "given owner", "moved verdicts", "segments moved", "px moved",
+                 "class d px", "roots before", "roots after", "of them at a verdict"],
+                [[o["image_label"], o["verdicts"]["given_an_owner"],
+                  sum(c["moved"]["segments"] for c in o["verdicts"]["by_class"].values()),
+                  o["ownership_moves"]["segments"], o["ownership_moves"]["px"],
+                  o["class_d_only"]["px"], o["roots"]["total_before"], o["roots"]["total_after"],
+                  o["roots"]["total_after_at_a_verdict_attachment"]] for o in out],
+                title="Judge off against judge on")
+    print_table(["image", "skeleton px", "owned px", "unowned px", "largest owner share"],
+                [[o["image_label"],
+                  f"{o['before']['skeleton_px']} -> {o['after']['skeleton_px']}",
+                  f"{o['before']['owned_px']} -> {o['after']['owned_px']}",
+                  f"{o['before']['unowned_px']} -> {o['after']['unowned_px']}",
+                  f"{o['before']['largest_owner_share']:.3f} (cell {o['before']['largest_owner']})"
+                  f" -> {o['after']['largest_owner_share']:.3f} (cell {o['after']['largest_owner']})"]
+                 for o in out])
+    print(f"\nchecks against the files on disk: "
+          + ("all pass" if not failed else f"FAILED {failed}"))
+    print(f"report -> {compare_dir / 'REPORT.md'} and {compare_dir / 'ai_compare.json'}")
+    return 1 if failed else 0
+
+
+def _ai_compare_markdown(out: list, failed: list) -> str:
+    """The report a person reads. Every number in it is in ai_compare.json."""
+    def pairs_text(pairs, unit, top=4):
+        if not pairs:
+            return "none"
+        shown = ", ".join(f"{p['from']} to {p['to']} ({p['count']} {unit})" for p in pairs[:top])
+        return shown + (f", and {len(pairs) - top} more pairs" if len(pairs) > top else "")
+
+    lines = [
+        f"# Judge off against judge on, {len(out)} image{'s' if len(out) != 1 else ''}",
+        "",
+        "**EXPERIMENT, branch `exp-ai-layer`. NOT VALIDATED: no verdict here has been checked "
+        "against a manual trace.** Judge off is `results/<label>/`, the pipeline as it stands. "
+        "Judge on is `results/ai_run/<label>/`, the same pipeline with `config.AI_JUDGE_ENABLED` "
+        "on for that run only, applying the decision files in `results/ai_log/`. No call was "
+        "made and no key was read.",
+        "",
+        "Made by `python src/diagnostics.py ai-compare --dir data/WT`. Both runs are recomputed in "
+        "memory and checked against the files on disk pixel for pixel before any number is "
+        "reported: the judge-off skeleton against `results/`, the judge-on skeleton against "
+        "`results/ai_run/`, the roots in memory against the judge-on jsons, and the attachments "
+        "against the ones the switch made. "
+        + ("**Every check passed.**" if not failed else
+           "**CHECKS FAILED: " + ", ".join(f"{a} {b}" for a, b in failed) + ".**")
+        + " The full numbers are in `ai_compare.json`.",
+        "",
+        "## Summary",
+        "",
+        "| image | given an owner | moved by a verdict | segments moved | px moved | class d alone, px | "
+        "roots before | roots after | of them at a verdict | skeleton px | owned px | unowned px | "
+        "largest owner share |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    tot = {"given": 0, "moved_v": 0, "seg": 0, "px": 0, "dpx": 0, "rb": 0, "ra": 0, "rv": 0}
+    for o in out:
+        moved_v = sum(c["moved"]["segments"] for c in o["verdicts"]["by_class"].values())
+        b, a = o["before"], o["after"]
+        lines.append(
+            f"| {o['image_label']} | {o['verdicts']['given_an_owner']} | {moved_v} | "
+            f"{o['ownership_moves']['segments']} | {o['ownership_moves']['px']:,} | "
+            f"{o['class_d_only']['px']:,} | {o['roots']['total_before']} | "
+            f"{o['roots']['total_after']} | {o['roots']['total_after_at_a_verdict_attachment']} | "
+            f"{b['skeleton_px']:,} to {a['skeleton_px']:,} | {b['owned_px']:,} to {a['owned_px']:,} | "
+            f"{b['unowned_px']:,} to {a['unowned_px']:,} | "
+            f"{b['largest_owner_share']:.3f} to {a['largest_owner_share']:.3f} |")
+        tot["given"] += o["verdicts"]["given_an_owner"]
+        tot["moved_v"] += moved_v
+        tot["seg"] += o["ownership_moves"]["segments"]
+        tot["px"] += o["ownership_moves"]["px"]
+        tot["dpx"] += o["class_d_only"]["px"]
+        tot["rb"] += o["roots"]["total_before"]
+        tot["ra"] += o["roots"]["total_after"]
+        tot["rv"] += o["roots"]["total_after_at_a_verdict_attachment"]
+    lines.append(f"| **all {len(out)}** | **{tot['given']}** | **{tot['moved_v']}** | **{tot['seg']}** | "
+                 f"**{tot['px']:,}** | **{tot['dpx']:,}** | **{tot['rb']:,}** | **{tot['ra']:,}** | "
+                 f"**{tot['rv']}** | | | | |")
+    lines += [
+        "",
+        "- **given an owner**: verdicts applied as a zero weight attachment, after conflicts "
+        "(there were none). **moved by a verdict**: of those, the ones naming a different cell "
+        "from the one that owned the segment.",
+        "- **segments moved** and **px moved** are the outcome: what the shortest path did once "
+        "the attachments were in the graph. A segment here is a branch of the judge-on skeleton, "
+        "at least the judge's minimum segment length, whose majority owner changed.",
+        "- **class d alone**: the same switch with every verdict but the class d ones left "
+        "unjudged, so the pixels that change hands are the ones class d moves on its own.",
+        "- **roots**: summed over every lacuna, from the quantification jsons on disk. **of them "
+        "at a verdict** counts the judge-on roots that contain a node a verdict attached its cell "
+        "to; see the warning below.",
+        "",
+        "## Roots: read this before reading the root counts",
+        "",
+        "A root is counted as any skeleton node attached to the cell's virtual node, clustered at "
+        f"{canaliculi.ROOT_MERGE_DIST_PX:g} px (`quantification.cell_root_count`). A verdict is "
+        "expressed as exactly such an attachment, at the end of the segment nearest the cell, and "
+        "that end can lie tens of pixels from the body. **So every verdict that gives a cell a "
+        "segment away from its body adds a root that is not a thread leaving the body.** The rise "
+        "in roots below is largely that, and the column *of them at a verdict* measures how much. "
+        "That column counts a root as the verdict's when any node in its cluster is a node a "
+        "verdict attached the cell to, and such a cluster can also hold a node the contact rule "
+        "attached, so it is an upper bound on the roots the verdicts add, and *roots on, not at "
+        "one* is a lower bound on the pipeline's own. "
+        "It is a property of how the attachment is counted, not a finding about the cells, and "
+        "it is left as it is here because changing how a verdict is expressed, or how a root is "
+        "counted, is a design decision this report does not take.",
+        "",
+        "| image | roots off | roots on | of them at a verdict attachment | roots on, not at one | "
+        "mean per interior cell, off | on | lacunae whose roots changed |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for o in out:
+        changed = [r for r in o["roots"]["per_lacuna"] if r["roots_before"] != r["roots_after"]]
+        r = o["roots"]
+        lines.append(f"| {o['image_label']} | {r['total_before']} | {r['total_after']} | "
+                     f"{r['total_after_at_a_verdict_attachment']} | "
+                     f"{r['total_after'] - r['total_after_at_a_verdict_attachment']} | "
+                     f"{r['mean_per_interior_cell_before']} | {r['mean_per_interior_cell_after']} | "
+                     f"{len(changed)} of {len(r['per_lacuna'])} |")
+    lines += ["", "## Per image", ""]
+    for o in out:
+        v = o["verdicts"]["by_class"]
+        lines += [f"### {o['image_label']}", ""]
+        lines.append("Verdicts by class (segments, and their own px):")
+        lines.append("")
+        lines.append("| class | kept by its owner | given to a segment nobody owned | moved to another "
+                     "cell | given no owner |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for name in sorted(v):
+            c = v[name]
+            lines.append(f"| {name} | " + " | ".join(
+                f"{c[k]['segments']} ({c[k]['px']} px)"
+                for k in ("kept", "from_none", "moved", "no_owner")) + " |")
+        m = o["ownership_moves"]
+        d = o["class_d_only"]
+        lines += [
+            "",
+            f"- Ownership moves between cells: **{m['segments']} segments ({m['segments_px']:,} px)**, "
+            f"and **{m['px']:,} px** of tracing changed hands on the owner maps. Pairs by px: "
+            f"{pairs_text(m['pairs_px'], 'px')}. Pairs by segments: "
+            f"{pairs_text(m['pairs_segments'], 'segments')}.",
+            f"- Newly owned: {m['newly_owned_px']:,} px. No longer owned: "
+            f"{m['no_longer_owned_px']:,} px.",
+            f"- **Class d alone**: {d['attached']} verdicts attached, {d['segments']} segments "
+            f"({d['segments_px']:,} px) and {d['px']:,} px changed hands. Pairs by px: "
+            f"{pairs_text(d['pairs_px'], 'px')}.",
+            f"- Class d verdicts: "
+            + (f"{v['d']['moved']['segments']} moved to the other cell, "
+               f"{v['d']['kept']['segments']} kept by their owner, "
+               f"{v['d']['no_owner']['segments']} given no owner; pairs "
+               + (", ".join(f"{k.replace('->', ' to ')} ({n})" for k, n in sorted(v['d']['pairs'].items(),
+                                                            key=lambda kv: -kv[1])) or "none")
+               if "d" in v else "none") + ".",
+            f"- Roots, summed: {o['roots']['total_before']} to {o['roots']['total_after']}, of "
+            f"which {o['roots']['total_after_at_a_verdict_attachment']} contain a verdict's "
+            f"attachment node. Mean per interior cell {o['roots']['mean_per_interior_cell_before']}"
+            f" to {o['roots']['mean_per_interior_cell_after']}.",
+            f"- Skeleton {o['before']['skeleton_px']:,} to {o['after']['skeleton_px']:,} px; owned "
+            f"{o['before']['owned_px']:,} to {o['after']['owned_px']:,}; unowned "
+            f"{o['before']['unowned_px']:,} to {o['after']['unowned_px']:,}; largest owner "
+            f"cell {o['before']['largest_owner']} at {o['before']['largest_owner_share']:.3f} to "
+            f"cell {o['after']['largest_owner']} at {o['after']['largest_owner_share']:.3f}.",
+            f"- Pictures: `{o['pictures']['verification']}`, `{o['pictures']['skeleton']}`, "
+            f"`{o['pictures']['ownership_changes']}` (red changed hands, green newly owned, "
+            f"blue no longer owned, grey the rest, each changed pixel widened by one so it shows).",
+            "",
+        ]
+    lines += ["## Cases where a body could not be named", "",
+              "A body beyond the sixth colour in a picture is outlined grey and has no name the "
+              "judge could answer with. A number is only asked where both of its candidates have a "
+              "colour, so a grey body should be context only; the last column checks that it was, "
+              "number by number, from the decision files.", "",
+              "| image | case | kind | yellow lacuna | grey lacunae | numbered segments | "
+              "both candidates named for every number |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+    any_unnamed = False
+    for o in out:
+        for c in o["bodies_not_named"]:
+            any_unnamed = True
+            lines.append(f"| {o['image_label']} | {c['case_id']} | {c['case_kind']} | "
+                         f"{c['yellow_lacuna_id']} | {', '.join(map(str, c['bodies_outlined_grey']))} | "
+                         f"{c['numbered_segments']} | "
+                         f"{'yes' if c['every_number_had_both_candidates_named'] else 'NO'} |")
+    if not any_unnamed:
+        lines.append("| none | | | | | | |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _ai_same_decisions(a: dict, b: dict) -> bool:
+    """Do two decision files hold the same verdicts for the same candidates?"""
+    if a.get("geometry_sha256") != b.get("geometry_sha256"):
+        print("  the candidates differ")
+        return False
+    same = True
+    for case_a, case_b in zip(a["cases"], b["cases"]):
+        for seg_a, seg_b in zip(case_a["segments"], case_b["segments"]):
+            if (seg_a["verdict"], seg_a["owner"]) != (seg_b["verdict"], seg_b["owner"]):
+                print(f"  {case_a['case_id']} segment {seg_a['n']}: "
+                      f"{seg_a['verdict']}/{seg_a['owner']} against "
+                      f"{seg_b['verdict']}/{seg_b['owner']}")
+                same = False
+    return same
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -5221,6 +6663,65 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each (two runs each).")
     p.set_defaults(func=cmd_hole_check)
+    p = sub.add_parser("ai-candidates",
+                       help="EXPERIMENT: what the AI judge would be asked about, per lacuna.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path,
+                   default=config.RESULTS_DIR / config.AI_DRY_RUN_DIR,
+                   help="Output folder (default: results/ai_dry_run).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_ai_candidates)
+
+    p = sub.add_parser("ai-dry-run",
+                       help="EXPERIMENT: what a real judge run would cost, and the pictures.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path,
+                   default=config.RESULTS_DIR / config.AI_DRY_RUN_DIR,
+                   help="Output folder (default: results/ai_dry_run).")
+    p.add_argument("--pictures", default="",
+                   help="Image labels, comma separated, to write every case picture for, "
+                        "or 'all' for every image.")
+    p.add_argument("--count-tokens", dest="count_tokens", action="store_true",
+                   help="Count the input tokens with the API instead of estimating them "
+                        "(free, but it is a real connection, so it needs ALLOW_EXTERNAL_API=1).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_ai_dry_run)
+
+    p = sub.add_parser("ai-run",
+                       help="EXPERIMENT: detection, canaliculi and quantification with the AI "
+                            "judge switch on for this run only, into results/ai_run/.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR,
+                   help="Output folder (default: results/ai_run).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_ai_run)
+
+    p = sub.add_parser("ai-compare",
+                       help="EXPERIMENT: judge off against judge on per image, pictures and report.")
+    add_images_arguments(p)
+    p.add_argument("--run", type=Path, default=AI_RUN_DIR,
+                   help="The judge-on output of ai-run (default: results/ai_run).")
+    p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR / "compare",
+                   help="Where the pictures and the report go (default: results/ai_run/compare).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_ai_compare)
+
+    p = sub.add_parser("ai-judge",
+                       help="EXPERIMENT: run the AI judge on an image, or replay it from the log.")
+    add_images_arguments(p)
+    p.add_argument("--replay", action="store_true",
+                   help="No network: rerun from results/ai_log/ and check the verdicts match.")
+    p.add_argument("-s", "--self-test", dest="self_test", action="store_true",
+                   help="Rehearse the whole chain on one image with a stub judge, no network "
+                        "and no key, writing only to .cache/ai_self_test.")
+    p.add_argument("-o", dest="out", type=Path, default=None,
+                   help="Where a replay writes its decision file (default: beside the log, "
+                        "which overwrites it with the same content).")
+    p.set_defaults(func=cmd_ai_judge)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
