@@ -1,6 +1,6 @@
 # Figure review, figures v2
 
-**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); every old and new path: [results/RENAMES.csv](../results/RENAMES.csv)). The `figures_out/` paths quoted below are where each value was written at the time; that folder is retired and the files are at the git tag `archive-2026-10-13`.
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); the table of every old and new path, `results/RENAMES.csv`, was removed on 2026-10-20 and is at commit `41c00ae`). The `figures_out/` paths quoted below are where each value was written at the time; that folder is retired and the files are at the git tag `archive-2026-10-13`.
 
 Each exported PNG is viewed at 1000 px wide (a column-width preview) and as a 100% crop of its densest
 region. Defects found, what was changed, and what remains. At most two rounds per figure.
@@ -94,12 +94,8 @@ near the frame are zero padded (black), for example 543-2 L1 and L4, 542_z06 L3.
 
 ## N3 hand-count tiles
 
-86 tiles (every interior lacuna of the 8 images), 240 x 240 px, 8-bit. Checks: a key path inside the
-repository was refused before anything was written; every tile holds only the IHDR, IDAT and IEND
-chunks (no text, time or dpi); six tiles compared with crops of the raw files: identical; a second run
-skipped all 86. Eight tiles viewed: the centre lacuna is clear, padding is black. The order comes from
-the operating system's random source, so it cannot be rebuilt from the repository. The key is at
-`F:/lcn-quant-keys/validation_tiles_key.csv`, outside the repository.
+Removed on 2026-10-20 with the rest of the manual-trace material (`docs/METHODS.md` section 15). The
+tiles, the command that made them and this section's review of them are at commit `41c00ae`.
 
 ## P1 rejected candidates (overview F1, contact sheets F2)
 
@@ -230,7 +226,7 @@ the new caption line; every assertion passed again.
 ## O1 layout
 
 `figures_out/` now holds `main/` (Fig01 to Fig04), `supplement/` (S01 to S03), `per_image/<image>/`
-(overview, network, gallery, logs, `display_variants/`), `validation_tiles/`, `_thumbs/`, `README.md`,
+(overview, network, gallery, logs, `display_variants/`), the hand-count tiles (since removed), `_thumbs/`, `README.md`,
 `INDEX.md` and `display_window.json`. Moves were made with `git mv`; the old flat `F1_<image>_inset.json`
 files (the old inset rule) were removed, since `per_image/<image>/inset.json` replaces them. Every
 command of `make_figures.py` was run after the move and found all its outputs (skipped).

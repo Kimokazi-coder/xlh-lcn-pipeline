@@ -111,7 +111,6 @@ ALL_IMAGES_DIR = "all_images"
 ALL_IMAGES_ARCHIVE_DIR = "archive_not_used"
 ALL_IMAGES_FIGURES_DIR = "figures"
 ALL_IMAGES_QUANT_DIR = "quantification"
-VALIDATION_TILES_DIR = "validation_tiles"
 
 # File names. A per-image file is <label>_<suffix>; a suffix without an
 # extension is written with each extension given in its comment.

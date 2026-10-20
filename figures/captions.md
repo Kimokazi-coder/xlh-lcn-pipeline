@@ -94,12 +94,6 @@ flagged canal region), roots, ring length 30 px, area. The header gives the coun
 `<label>_figure_cell_gallery_checks.json`). Lacunae touching the frame are not shown; the footnote gives how many. Scale bar
 50 px. Fixed display window. Pre-validation, pixel units, WT.
 
-## validation_tiles/ (86 tiles)
-
-**Tiles for counting roots by hand.** One 240 px crop of the raw red channel per interior lacuna, with no
-outline, skeleton, dot or number, named T001 to T086 in a random order. The key stays outside the
-repository. See `results/validation_tiles/README.md`.
-
 ## Fig01_contact_sheet (and S02_contact_sheet_with_rejected_candidates, S03_contact_sheet_coded)
 
 **All 8 WT sections with the kept lacunae.** Red channel with lacuna outlines (cyan interior, yellow

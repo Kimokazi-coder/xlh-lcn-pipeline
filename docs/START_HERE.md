@@ -81,10 +81,9 @@ owning their threads, but carrying no area or shape measure.
 | `src/` | `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off) |
 | `data/WT/` | the 8 input images |
-| `results/` | the pipeline output: one folder per image, `all_images/` and `validation_tiles/`; the reference for every check; guide: `results/README.md` |
-| `manual_trace/` | four raw tiles for the blind hand trace that will produce the ground truth |
+| `results/` | the pipeline output: one folder per image and `all_images/`; the reference for every check; guide: `results/README.md` |
 | `figures/` | the figure code (`make_figures.py`), captions and review notes |
-| `docs/` | this page, `METHODS.md` and `NETWORK_TUNING_PROTOCOL.md` |
+| `docs/` | this page, `METHODS.md` and `EXPERIMENT_AI.md` |
 
 Earlier experiments, the older intensity-threshold method, the ablation that chose this one and every
 earlier report are preserved at the git tag `archive-2026-10-13` and are not in the working tree. `main`
@@ -94,8 +93,7 @@ is the only branch.
 
 1. `README.md`: how to run the pipeline, the method, the limits, the measures and the results table.
 2. `docs/METHODS.md`: every step and parameter with its origin, limitations and decisions.
-3. `docs/NETWORK_TUNING_PROTOCOL.md`: what may be tuned once hand counts exist, fixed in advance.
-4. `results/README.md`, to find a figure or a result.
+3. `results/README.md`, to find a figure or a result.
 
 ## The switches
 
@@ -124,7 +122,6 @@ python -u figures/make_figures.py all                    # every figure, into re
 python -u figures/make_figures.py check                  # drawn numbers against results/
 python src/diagnostics.py survey -d data/WT -o results/survey     # what it does to every image (not tracked)
 python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
-python src/validate_manual.py                            # score against a hand tracing
 ```
 
 Do not write a new `results/` unless a switch is adopted on purpose; `results/` is the reference that

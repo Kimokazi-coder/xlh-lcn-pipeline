@@ -16,7 +16,6 @@ Usage (from the repo root):
     python -u figures/make_figures.py network -a          # network overlay per image (and Fig02)
     python -u figures/make_figures.py gallery -a          # cell gallery per image
     python -u figures/make_figures.py variants -a         # per-image display window variants
-    python -u figures/make_figures.py tiles -k KEY        # hand-count tiles, KEY outside the repository
     python -u figures/make_figures.py contact             # contact sheet (Fig01)
     python -u figures/make_figures.py contact -r          # with rejected candidates (S02)
     python -u figures/make_figures.py contact -b -k KEY   # labelled with blinding codes (S03)
@@ -29,8 +28,8 @@ Where the figures go (names from config.py): results/<label>/3_publication_figur
 (the per-image brightness variants and the low-cut overview layer, kept for
 history), results/all_images/figures/main/ (Fig01 to Fig04),
 results/all_images/figures/supplement/ (S01, S02), results/all_images/
-archive_not_used/ (S03, the coded contact sheet), results/all_images/figures/
-display_window.json and results/validation_tiles/.
+archive_not_used/ (S03, the coded contact sheet) and results/all_images/figures/
+display_window.json.
 Each output is skipped if its PNG and PDF exist; delete them to redraw.
 
 Shared style (one place, used by every figure):
@@ -1099,121 +1098,6 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
                     "tiles": all_checks})
 
 
-TILES_DIR = RESULTS / config.VALIDATION_TILES_DIR
-KEY_COLUMNS = ["code", "image", "lacuna_id", "centre_x", "centre_y"]
-
-TILES_README = """# Hand-count tiles
-
-Pre-validation, pixel units. One tile per interior lacuna of the 8 WT sections: a 240 x 240 px crop of
-the raw red channel (8-bit, the values of the image file, no display window), centred on the centre of
-the lacuna's bounding box, zero padded (black) where the crop leaves the frame. There is no outline,
-skeleton, root dot or number on any tile, and the PNG files hold pixel data only (no file name or text
-in any metadata).
-
-**Purpose.** These tiles are for counting roots by hand without seeing the pipeline result. Count the
-roots (distinct canalicular threads leaving the lacuna surface) of the lacuna at the centre of each tile
-and enter the number in `annotation_template.csv` (columns code, hand_roots, hand_notes). Do not open
-any other folder of `results/` while counting.
-
-**Codes.** The tiles are named T001, T002 and so on in a random order drawn from the operating system's
-random source, so the order cannot be rebuilt from this repository. The key (code, image, lacuna id,
-centre x and y) stays outside the repository, at the path given with `-k` when the tiles were made; the
-command refuses a key path inside the repository. Join the key to the filled template to compare the
-hand counts with `roots_count` in `results/<image>/5_quantification/<image>_quantification.json` (the
-image column of the key is the folder label).
-
-**Limits.** The tiles hide the pipeline result, not the image: a tile can be matched to its section by
-appearance. A neighbouring lacuna can be partly visible at a tile edge; only the centre lacuna is
-counted.
-
-Regenerate (the key path must be outside the repository):
-`python -u figures/make_figures.py tiles -k PATH_OUTSIDE_REPO/validation_tiles_key.csv`
-With an existing key the tiles are rebuilt from it; without one, a new random order is drawn.
-"""
-
-
-def inside_repo(path: Path) -> bool:
-    try:
-        path.resolve().relative_to(ROOT.resolve())
-        return True
-    except ValueError:
-        return False
-
-
-def tile_pixels(d: dict, lacuna_id: int) -> np.ndarray:
-    """The 240 px raw red crop (uint8, the file's values) centred on the
-    lacuna's bounding box centre, zero padded outside the frame."""
-    raw8 = np.round(d["channel"] * 255).astype(np.uint8)
-    cx, cy = bbox_centre(d, lacuna_id)
-    crop, _x0, _y0 = padded_crop(raw8, cx, cy, GALLERY_TILE_PX)
-    return crop
-
-
-def write_tile_png(path: Path, pixels: np.ndarray) -> None:
-    """8-bit greyscale PNG with pixel data only (no text, time or dpi chunk)."""
-    from PIL import Image
-
-    tmp = path.with_name(path.name + ".tmp")
-    Image.fromarray(pixels).save(tmp, format="PNG")
-    os.replace(tmp, path)
-
-
-def make_validation_tiles(key_path: Path) -> None:
-    """N3: one raw red tile per interior lacuna of every image, under random
-    codes; the key goes to key_path, which must be outside the repository."""
-    import csv
-    import secrets
-
-    if inside_repo(key_path):
-        raise SystemExit(f"refused: the key path {key_path} is inside the repository")
-    TILES_DIR.mkdir(parents=True, exist_ok=True)
-    if key_path.is_file():
-        with open(key_path, newline="") as f:
-            key = list(csv.DictReader(f))
-        print(f"using the existing key ({len(key)} tiles)")
-    else:
-        if list(TILES_DIR.glob("T*.png")):
-            raise SystemExit("refused: tiles exist but the key is missing; their key cannot be rebuilt")
-        entries = []
-        for p in image_paths():
-            d = image_data(short(p))
-            for lid in d["interior_ids"]:
-                cx, cy = bbox_centre(d, lid)
-                entries.append({"image": d["short"], "lacuna_id": lid, "centre_x": cx, "centre_y": cy})
-        secrets.SystemRandom().shuffle(entries)
-        key = [{"code": f"T{k + 1:03d}", **e} for k, e in enumerate(entries)]
-        key_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = key_path.with_name(key_path.name + ".tmp")
-        with open(tmp, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=KEY_COLUMNS, lineterminator="\n")
-            w.writeheader()
-            w.writerows(key)
-        os.replace(tmp, key_path)
-        print(f"key written outside the repository ({len(key)} tiles)")
-    data, written = {}, 0
-    for row in key:
-        out = TILES_DIR / f"{row['code']}.png"
-        if out.is_file():
-            continue
-        name = row["image"]
-        if name not in data:
-            data[name] = image_data(name)
-        write_tile_png(out, tile_pixels(data[name], int(row["lacuna_id"])))
-        written += 1
-    template = TILES_DIR / "annotation_template.csv"
-    if not template.is_file():
-        lines = ["code,hand_roots,hand_notes"] + [f"{r['code']},," for r in sorted(key, key=lambda r: r["code"])]
-        tmp = template.with_name(template.name + ".tmp")
-        tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        os.replace(tmp, template)
-    readme = TILES_DIR / "README.md"
-    if not readme.is_file():
-        tmp = readme.with_name(readme.name + ".tmp")
-        tmp.write_text(TILES_README, encoding="utf-8")
-        os.replace(tmp, readme)
-    print(f"{written} tiles written, {len(key) - written} existed; {TILES_DIR.relative_to(ROOT)}")
-
-
 def figure_display_variants(name: str) -> None:
     """P8: the overview, network and gallery of one image with the image's own
     display window, PNG only, in results/<label>/4_archive_not_used/
@@ -1920,8 +1804,7 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
 DEFAULT_FIELD_DIR = ROOT / ".cache" / "field_summary"
 
 
-def figure_all(tiles_key: Path | None = None, blind_key: Path | None = None,
-               field_dir: Path = DEFAULT_FIELD_DIR) -> int:
+def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DIR) -> int:
     """O4: regenerate every figure in the results layout. Every step
     skips outputs that exist; delete a file to redraw it. Prints one row per
     output: written, skipped, failed or missing. Returns 1 if any step failed."""
@@ -1956,9 +1839,6 @@ def figure_all(tiles_key: Path | None = None, blind_key: Path | None = None,
     s03 = pair(fig_stem("S03_contact_sheet_coded"))
     if blind_key is not None:
         steps.append(("S03", figure_contact, (blind_key, False), s03))
-    tiles = sorted(TILES_DIR.glob("T*.png")) + [TILES_DIR / "annotation_template.csv", TILES_DIR / "README.md"]
-    if tiles_key is not None:
-        steps.append(("validation tiles", make_validation_tiles, (tiles_key,), tiles))
 
     def stamp(paths):
         return {p: p.stat().st_mtime_ns if p.is_file() else None for p in paths}
@@ -1979,9 +1859,6 @@ def figure_all(tiles_key: Path | None = None, blind_key: Path | None = None,
         failed += bool(code)
     if blind_key is None:
         rows += [("S03", p, "kept (needs -b KEY)" if p.is_file() else "missing (needs -b KEY)") for p in s03]
-    if tiles_key is None:
-        rows += [("validation tiles", TILES_DIR, f"kept, {len(list(TILES_DIR.glob('T*.png')))} tiles "
-                  "(needs -k KEY to redraw)")]
 
     width = max(len(r[0]) for r in rows)
     print(f"\n{'step':<{width}}  {'status':<10}  file")
@@ -2046,21 +1923,15 @@ def main() -> int:
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q = sub.add_parser("all", help="Regenerate every figure in results/; prints what was written or skipped.")
-    q.add_argument("-k", dest="tiles_key", type=Path, default=None,
-                   help="Key of the hand-count tiles (outside the repository); without it the tiles are kept.")
     q.add_argument("-b", dest="blind_key", type=Path, default=None,
                    help="Blinding key for S03 (outside the repository); without it S03 is kept.")
     q.add_argument("-f", dest="field_dir", type=Path, default=DEFAULT_FIELD_DIR,
                    help="Output folder of field-summary (default: .cache/field_summary).")
-    q = sub.add_parser("tiles", help="Hand-count tiles (raw red, random codes); key outside the repository.")
-    q.add_argument("-k", dest="key", type=Path, required=True, help="Key path, outside the repository.")
     args = p.parse_args()
     if args.cmd == "check":
         return run("N0", _selftest_n0)
     if args.cmd == "all":
-        return figure_all(args.tiles_key, args.blind_key, args.field_dir)
-    if args.cmd == "tiles":
-        return run("N3", make_validation_tiles, args.key)
+        return figure_all(args.blind_key, args.field_dir)
     if args.cmd == "variants":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
         return max(run("P8", figure_display_variants, n) for n in names)

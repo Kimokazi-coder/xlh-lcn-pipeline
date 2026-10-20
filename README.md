@@ -40,9 +40,8 @@ External API use approved on 2026-10-15, approver: Karim.
 | `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (the judge), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
 | `data/WT/` | the 8 input images | |
-| `manual_trace/` | four raw tiles for the blind hand trace that will produce the ground truth | |
 | `figures/` | the figure code, captions and review notes | |
-| `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md), [`NETWORK_TUNING_PROTOCOL.md`](docs/NETWORK_TUNING_PROTOCOL.md) | |
+| `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md) | |
 
 Not tracked: `.cache/` and `venv/`, and the diagnostic and archive folders that
 commands write into `results/`; [`results/README.md`](results/README.md) lists
@@ -192,7 +191,6 @@ python src/diagnostics.py switch-check       # what each switch in config.py cha
 python src/diagnostics.py --help             # every other diagnostic
 python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image (not tracked)
 python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
-python src/validate_manual.py                # score against a hand tracing, when one exists
 ```
 
 The AI judge method, offline from the decision files already in the repository:
@@ -273,9 +271,8 @@ not been chosen.
 ## Still open
 
 1. **Validation** against manual (ImageJ) counts. Roots per cell is the
-   per-cell number to compare. The tiles for the blind trace are in
-   `manual_trace/`; the rules for tuning afterwards are fixed in advance in
-   [docs/NETWORK_TUNING_PROTOCOL.md](docs/NETWORK_TUNING_PROTOCOL.md).
+   per-cell number to compare. No manual trace exists yet, and the pipeline
+   has not been validated against one.
 2. **The ridge scales and the 50 um limit are unvalidated.** The scales were
    measured on this data and the limit comes from the literature; neither has
    been checked against a hand trace.
@@ -285,8 +282,8 @@ not been chosen.
 4. **Two thin kept objects on vascular bands**, probably not lacunae: 542_z06 at
    (555,149) and 682_z23 at (363,7). Both are counted now.
 5. **The choice between the deterministic method and the AI judge method.**
-   Neither has been checked against a manual trace; the hand trace in
-   `manual_trace/` is what should decide it.
+   Neither has been checked against a manual trace, and a comparison with
+   manual counts is what should decide it.
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:

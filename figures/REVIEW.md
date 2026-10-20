@@ -1,6 +1,6 @@
 # Figure review
 
-**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); every old and new path: [results/RENAMES.csv](../results/RENAMES.csv)). The `figures_out/` paths quoted below are where each value was written at the time; that folder is retired and the files are at the git tag `archive-2026-10-13`.
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); the table of every old and new path, `results/RENAMES.csv`, was removed on 2026-10-20 and is at commit `41c00ae`). The `figures_out/` paths quoted below are where each value was written at the time; that folder is retired and the files are at the git tag `archive-2026-10-13`.
 
 Each exported PNG is viewed at 1000 px wide (a column-width preview). Defects found, what was changed,
 and what remains. At most two rounds per figure.

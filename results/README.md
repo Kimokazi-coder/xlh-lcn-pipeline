@@ -33,8 +33,6 @@ here are not tracked; see Not tracked at the end.
 ```
 results/
   README.md                 this guide
-  RENAMES.csv               old path and new path of every file moved by the folder change of
-                            2026-10-05, which was before detection and quantification were split
   all_images/
     quantification/         quantification_all_images.csv, .xlsx and .pdf: one row per image
     figures/main/           Fig01 to Fig04
@@ -50,7 +48,6 @@ results/
                             <label>_figure_network_checks.json, _figure_cell_gallery_checks.json,
                             _figure_inset_choice.json
     5_quantification/       every measured number: <label>_quantification.json, .xlsx and .pdf
-  validation_tiles/         tiles for counting roots by hand
   before_after/             whole-frame verification pictures of one rule change each; its own README
                             says which pair documents which change
 ```
@@ -109,8 +106,6 @@ Figures, in `3_publication_figures/`:
   root dots and ring pixels against the pipeline numbers (they are equal).
 - `<label>_figure_inset_choice.json`: which lacunae the insets show and the rule that chose them.
 - `all_images/figures/display_window.json`: the fixed display window used by every main figure.
-- `validation_tiles/`: 86 raw tiles, one per interior lacuna, for counting roots by hand without seeing the
-  pipeline result; see its README. The key is outside the repository.
 
 ## Per image
 

@@ -1112,8 +1112,8 @@ def group_readme(group: str, source: str, rows: list) -> str:
                  f"`{source}`. Every file it looked at, copied or skipped, and why, is in\n"
                  f"`data/{config.IMPORT_INVENTORY_NAME}`; the rule is in `config.py` (image import).\n")
     if skipped and not copied:
-        text += (f"\nThis group has no image the pipeline can read yet, so it has no results folder. When TIFF\n"
-                 f"files of these sections are available, put them in a folder and run the command above on it.\n")
+        text += ("\nThis group has no image the pipeline can read yet, so it has no results folder. When TIFF\n"
+                 "files of these sections are available, put them in a folder and run the command above on it.\n")
     return text
 
 
@@ -1625,8 +1625,8 @@ def cmd_network_sweep(args) -> int:
 
 
 # validate-network ------------------------------------------------------------------
-# The validation harness (the canaliculi v2 report, tag archive-2026-10-13, V1; docs/NETWORK_TUNING_
-# PROTOCOL.md). Hand counts of the blinded tiles are joined to the pipeline
+# The validation harness (the canaliculi v2 report, tag archive-2026-10-13, V1). It
+# has not been used: no hand count exists. Hand counts of blinded tiles are joined to the pipeline
 # output through the key, which must lie outside the repository; unblinding
 # happens only here and only in the output tables. Optional: hand-traced thread
 # masks against the pipeline skeleton. -s runs a self-test on synthetic data in

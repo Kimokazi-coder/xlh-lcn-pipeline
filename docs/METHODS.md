@@ -6,6 +6,9 @@ cannot do yet, and the decisions behind its current shape.
 **Status: pre-validation.** No output has been checked against manual
 (ImageJ) counts.
 
+**How the rules were chosen.** Every rule and value was chosen by visual
+inspection of the WT images. No parameter may be tuned on the other groups.
+
 **Two methods, and the choice is pending.** Sections 1 to 19 describe the
 **deterministic method**, the pipeline as `config.py` ships it, whose output is
 `results/`. Section 20 describes the **AI judge method**, the same pipeline
@@ -933,9 +936,8 @@ With all off, `results/` is reproduced exactly
 - `field-summary`: fields from lacuna centroid matching (25 px), per-field means; the field is the unit.
 - `network-sweep`: one network parameter at a time at a low and a high value. The three bridging
   parameters went with gap bridging.
-- `validate-network`: roots and Sholl crossings against the blind hand counts, and the skeleton against
-  the traced threads. The tiles to trace are in `manual_trace/`; what may be tuned afterwards is fixed
-  in advance in `docs/NETWORK_TUNING_PROTOCOL.md`.
+- `validate-network`: roots and Sholl crossings against blind hand counts, and the skeleton against
+  traced threads. No hand count exists, so it has only run its self test (`-s`).
 - `contact`: does each lacuna own the threads that touch it. Per named lacuna, the one rule that holds
   every touching thread away from it; per image and over the set, roots, owned px, and the skeleton
   within 8 px of a body that the body does not own. Measurement only. `--contact-reach 0` runs it with
@@ -959,15 +961,11 @@ versions, config hash), and `requirements.txt` pins the versions.
 
 ## 14. Figures
 
-**`make_figures.py all` currently fails on 96 of its figures, and it failed in
-the same way before the contact rule** (checked by running it at the previous
-commit, 69a6a38). Two causes, both in the figure script's readers and neither in
-the pipeline: it unpacks `canaliculi.nearest_lacuna_map` into two values where
-that function has returned three since ownership began testing signal, and it
-asserts on `area_px2` for every lacuna, which the dim and out-of-focus classes
-deliberately do not carry (section 9). Nothing here was changed to repair it,
-because the figure layer is its own piece of work and this change was an
-ownership rule. The numbers the figures draw are in `results/` and are current.
+**`make_figures.py all` passes** (2026-10-20: exit 0, every figure it makes
+present and skipped, S03 waiting for its blinding key). It skips a figure whose
+PNG and PDF exist, so that run did not redraw any. An earlier note here said
+it failed on 96 figures because it unpacked `canaliculi.nearest_lacuna_map`
+into two values; it now takes the three that function returns.
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
 into `results/` (map: `results/README.md`). One display window for the whole
@@ -986,10 +984,8 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
   lacuna by the pipeline's own rule, white otherwise; roots are magenta dots at
   the root cluster centres. Per interior lacuna the vermillion pixels equal
   `ring_length_r30_px` and the dots equal `roots_count` (asserted).
-- **Gallery and hand-count tiles.** Every interior lacuna in a 240 px tile at 3x
-  (`<label>_figure_cell_gallery`), and the same crops of the raw red channel
-  under random codes for counting roots by hand (`results/validation_tiles/`,
-  key outside the repository).
+- **Gallery.** Every interior lacuna in a 240 px tile at 3x
+  (`<label>_figure_cell_gallery`).
 - **Rejected candidates** (at least 150 px²) carry the filter that rejected
   them, one colour per meaning; "c" marks a lacuna inside a flagged canal
   region; insets sit at least 60 px from the frame.
@@ -1001,21 +997,17 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
 
 ## 15. Validation against a manual tracing
 
-The gate everything here is pre-validation against. `src/validate_manual.py`
-compares what the pipeline traced with what a person traced by hand and reports
-where the two differ. It is not a measure of the pipeline's own.
+**Not done. No output of the pipeline has been validated against a manual
+trace or a manual count**, and every number in this repository is
+pre-validation.
 
-```
-python src/validate_manual.py                        # every image that has a tracing
-python src/validate_manual.py -o results/validation  # and write the json
-```
-
-It reads `manual_trace/<label>_manual.png`, a binary mask the size of the whole
-image, and `manual_trace/<label>_manual_lacunae.csv`, a header `x,y` and one row
-per hand-marked lacuna centre. Both are optional and scored independently, and
-with neither present it prints `no manual masks yet` and returns 0, so it can sit
-in a check sequence from the day it was written. The format is in
-`manual_trace/README.md`.
+The material that was prepared for it was removed on 2026-10-20: the scoring
+script `src/validate_manual.py`, the four raw tiles for a blind hand trace in
+`manual_trace/`, the 86 hand-count tiles of `results/validation_tiles/`, the
+tuning protocol `docs/NETWORK_TUNING_PROTOCOL.md` and `results/RENAMES.csv`.
+All of it is at commit `41c00ae`, the last that holds it. What the
+scoring script measured, kept here as the record of what a validation would
+report:
 
 | it reports | what it means |
 |---|---|
@@ -1024,16 +1016,9 @@ in a check sequence from the day it was written. The format is in
 | f1 | their harmonic mean |
 | lacunae matched, missed, extra | a point matches the lacuna whose body contains it, or the nearest within 25 px; each lacuna can be claimed once |
 
-The tolerance is 2 px = 0.26 um. A hand line and a skeleton of the same thread
-never agree pixel for pixel, and a thread is about 6 px wide, so 2 px compares
-the same structure without letting the next thread over count as a match. The
-25 px lacuna tolerance is 3.25 um, well under the spacing between neighbours.
-
-It was checked both ways before being committed: scored against the pipeline's
-own skeleton and centroids it returns precision 1.0, recall 1.0 and every lacuna
-matched; against a tracing deliberately broken (left half dropped, shifted 5 px,
-two lacunae withheld and one invented) it returns precision 0.137, recall 0.259,
-9 matched, 1 missed and 2 extra.
+The tolerance was 2 px = 0.26 um, because a hand line and a skeleton of the
+same thread never agree pixel for pixel and a thread is about 6 px wide; the
+lacuna tolerance was 25 px = 3.25 um, well under the spacing between neighbours.
 
 ## 16. History
 
@@ -1403,9 +1388,8 @@ owned an 11 px stub through three rounds of ownership work, owns a network in
 the after picture.
 
 **Not validated.** None of this is a hand count. The rule recovers thread the
-method was throwing away, and whether that thread is real is a question for the
-manual tracing in `manual_trace/`, under the protocol fixed in advance in
-`docs/NETWORK_TUNING_PROTOCOL.md`.
+method was throwing away, and whether that thread is real is a question only a
+manual tracing can answer; none has been made.
 
 ## 19. The zone from the hole, the gain inside it, and what the hole measure can read
 
@@ -1643,9 +1627,8 @@ glow zone version is 6,766 on 543-2 and 6,941 on 543_3.
 
 **Not validated.** No hand count chose the margin, the percentile, the clip, the
 skip or the guard, and none of these numbers is a validation. Whether the thread
-this rule recovers is real is a question for the manual tracing in
-`manual_trace/`, under the protocol fixed in advance in
-`docs/NETWORK_TUNING_PROTOCOL.md`.
+this rule recovers is real is a question only a manual tracing can answer; none
+has been made.
 
 ## 20. The second method: the AI judge
 
@@ -1723,5 +1706,5 @@ run estimate of $1.19 and a ceiling of `config.MAX_COST_USD` = $5; one answer in
 **Not established.** No verdict has been checked against a manual trace, so
 nothing here says the judge's answer is better than the shortest path's. A
 thread given to the wrong cell moves that cell's whole measured network, so the
-cost of a wrong answer is not symmetric. The hand trace in `manual_trace/` is
-what should decide between the two methods.
+cost of a wrong answer is not symmetric. A manual trace is what should decide
+between the two methods, and none has been made.
