@@ -67,7 +67,7 @@ id. `figures/inset_overrides.csv` (image, lacuna_id; empty by default) or option
 lacuna. The choice is logged in `<label>_figure_inset_choice.json` ("overview"). Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT.
 
-`543_3_figure_overview_low_cut_layer` (in `results/543_3/4_archive_not_used/`, not tracked: regenerate with `python -u figures/make_figures.py all`) is the same figure with option `-r`: objects that the lacuna stage keeps only
+`543_3_figure_overview_low_cut_layer` (in `results/WT/543_3/4_archive_not_used/`, not tracked: regenerate with `python -u figures/make_figures.py all`) is the same figure with option `-r`: objects that the lacuna stage keeps only
 at 0.8 times t_hi are added in light blue dotted outlines. This layer is not the default output.
 
 ## <label>_figure_network (8 figures) and Fig02_network_overlay_543-2

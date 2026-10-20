@@ -1,4 +1,4 @@
-# results_ai_judge/ai_log
+# results_ai_judge/WT/ai_log
 
 **EXPERIMENT, branch `exp-ai-layer` only. See `docs/EXPERIMENT_AI.md`.**
 
@@ -6,19 +6,20 @@ Everything the AI judge was asked and everything it answered, one folder per
 image. It holds **the real run on all 8 images, made on 2026-10-19**: 143 calls,
 $1.60, one unreadable answer retried and recovered, and no segment left
 unjudged. It replays offline to identical verdicts on every image
-(`results_ai_judge/replay.txt`). What the verdicts then did to the network
-is in `results_ai_judge/compare/REPORT.md`. **Not validated**: no verdict here has
+(`results_ai_judge/WT/replay.txt`). What the verdicts then did to the network
+is in `results_ai_judge/WT/compare/REPORT.md`. **Not validated**: no verdict here has
 been checked against a manual trace.
 
 **Where this folder was.** The run was made when this log lived in
-`results/ai_log/`, and the log records and decision files keep the `picture`
+`results/ai_log/`; it moved to `results_ai_judge/ai_log/` and, on 2026-10-20,
+to `results_ai_judge/WT/ai_log/`, and the log records and decision files keep the `picture`
 paths they were written with, `results/ai_log/<label>/pictures/...`. They are
 left as written, because they are the record of what was sent. The pictures are
 in `pictures/` beside each image's records, and nothing reads the recorded
 path: the replay rebuilds every picture and compares its sha256 with the logged
 one.
 
-What a run writes, under `results_ai_judge/ai_log/<image label>/`:
+What a run writes, under `results_ai_judge/WT/ai_log/<image label>/`:
 
 | file | what it is |
 | --- | --- |

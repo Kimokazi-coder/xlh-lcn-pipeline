@@ -7,7 +7,10 @@ and measures it per lacuna and per field.
 
 **Status: pre-validation.** No number here has been checked against manual
 (ImageJ) counts yet, and no parameter or limit has been tuned against one. The
-data are 8 wild-type (WT) sections; no Hyp images have been processed.
+data are organised in four groups (see Groups). Only WT, the 8 wild-type
+sections every rule was chosen on, holds images: the source files of WT_HP,
+Hyp_RD and Hyp_HP are all JPEG and were not imported, so no Hyp image has
+been processed.
 
 **Two methods, and the choice between them is pending.**
 
@@ -34,12 +37,13 @@ External API use approved on 2026-10-15, approver: Karim.
 | folder | what it is | the one command that makes it |
 |---|---|---|
 | `results/` | **set 1, the deterministic method**, one folder per group: `results/WT/` holds every WT image's detection, quantification and figures, and the cross-image table; see [`results/README.md`](results/README.md) | `python src/lacunae.py --dir data/WT; python src/canaliculi.py --dir data/WT; python src/quantification.py --dir data/WT; python -u figures/make_figures.py all` (one line; the four stages run in that order) |
-| `results_ai_judge/` | **set 2, the AI judge method**, WT only, in `results_ai_judge/WT/`: the same per-image layout, the judge log with the case pictures that were sent, and `compare/`; see [`results_ai_judge/README.md`](results_ai_judge/README.md) | `python src/diagnostics.py ai-run --dir data/WT` (offline, from the decision files in `results_ai_judge/ai_log/`) |
+| `results_ai_judge/` | **set 2, the AI judge method**, WT only, in `results_ai_judge/WT/`: the same per-image layout, the judge log with the case pictures that were sent, and `compare/`; see [`results_ai_judge/README.md`](results_ai_judge/README.md) | `python src/diagnostics.py ai-run --dir data/WT` (offline, from the decision files in `results_ai_judge/WT/ai_log/`) |
 | `results_ai_judge/WT/compare/` | the two sets side by side: pictures, `REPORT.md`, and `compare_methods.csv` and `.xlsx` | `python src/diagnostics.py ai-compare --dir data/WT`, then `python src/diagnostics.py compare-methods --dir data/WT` |
 | `results_ai_judge/WT/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
 | `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (the judge), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
-| `data/WT/` | the 8 input images | |
+| `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/`, each with a README and no image yet; `image_inventory.csv` lists every source file looked at and why it was or was not copied | `python src/diagnostics.py import-group --group GROUP --src SOURCE_FOLDER` |
+| `results/group_overview.csv`, `.xlsx`, `results/group_qc.csv` | every group side by side, one row per image, and the QC list of the new groups (see Groups) | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc` |
 | `figures/` | the figure code, captions and review notes | |
 | `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md) | |
 
@@ -56,6 +60,59 @@ parameters block of every result and switches every scale bar to micrometres, so
 setting it would change the recorded values and a fresh run would no longer equal
 `results/WT/` at tolerance 0. Convert with 0.13 um/px where a physical length is
 wanted.
+
+## Groups
+
+The images are organised by type, one folder per group in `data/` and in
+`results/` (`config.GROUPS`). RD is regular diet, HP high phosphorus.
+
+| group | what it is | images | data | results |
+|---|---|---|---|---|
+| `WT` | wild type: the reference group, the 8 sections every rule was chosen on | 8 | `data/WT/` | `results/WT/` |
+| `WT_HP` | wild type, high phosphorus diet | 0 | `data/WT_HP/` | none yet |
+| `Hyp_RD` | Hyp, regular diet | 0 | `data/Hyp_RD/` | none yet |
+| `Hyp_HP` | Hyp, high phosphorus diet | 0 | `data/Hyp_HP/` | none yet |
+
+**Every group runs with the same settings.** The rules were chosen by visual
+inspection of the WT images, and no parameter may be tuned on any other group
+(`docs/METHODS.md` section 21).
+
+**Why the three new groups are empty.** Their source folders, the images used
+for the ImageJ quantification, hold 27 files, and every one is a JPEG, including
+`876_z76c1-2.tif`, which is a JPEG named .tif. The pipeline reads TIFF only,
+and the import rule copies a file only if it is a TIFF by content with the WT
+images' shape, channels and sample type and no pixel size that disagrees with
+0.13 um/px, so all 27 were skipped. `data/image_inventory.csv` lists every file
+with its size, shape, channels, metadata and the reason. TIFF exports of the
+same sections are what is needed.
+
+Copy a group's images (the source folder is only read):
+
+```
+python src/diagnostics.py import-group --group Hyp_RD --src "SOURCE_FOLDER"
+```
+
+One command per group, once its images are in `data/<group>/` (the three stages
+on one line, in order):
+
+```
+python src/lacunae.py --dir data/WT_HP -o results/WT_HP; python src/canaliculi.py --dir data/WT_HP -o results/WT_HP; python src/quantification.py --dir data/WT_HP -o results/WT_HP
+python src/lacunae.py --dir data/Hyp_RD -o results/Hyp_RD; python src/canaliculi.py --dir data/Hyp_RD -o results/Hyp_RD; python src/quantification.py --dir data/Hyp_RD -o results/Hyp_RD
+python src/lacunae.py --dir data/Hyp_HP -o results/Hyp_HP; python src/canaliculi.py --dir data/Hyp_HP -o results/Hyp_HP; python src/quantification.py --dir data/Hyp_HP -o results/Hyp_HP
+```
+
+WT is made by the command in the folder table above; a run with no `-o` writes
+to `results/<name of the input folder>/`. An image that fails is listed in
+`results/<group>/all_images/failed_images_<stage>.csv` and skipped, and the
+others carry on; a folder with no image writes nothing. Then, over every group:
+
+```
+python src/diagnostics.py group-overview   # results/group_overview.csv and .xlsx: one row per image, no statistics
+python src/diagnostics.py group-qc         # results/group_qc.csv: lacuna count, rejected candidates by rule, flag outside the WT range
+```
+
+On 2026-10-20 the overview holds the 8 WT rows and the QC list is empty,
+because no new group has an image.
 
 ## The canalicular method
 
@@ -257,7 +314,7 @@ together.
 
 Interior means per cell; field density is skeleton px over analysed px. Both
 sets side by side, per lacuna and with the cell pairs whose tracing changed
-hands, are in `results_ai_judge/compare/compare_methods.xlsx`. With the judge
+hands, are in `results_ai_judge/WT/compare/compare_methods.xlsx`. With the judge
 on, roots per cell are counted only from the pipeline's own attachments; a
 verdict's attachment splits the network but is not a root (`docs/METHODS.md`
 section 20).
@@ -286,6 +343,9 @@ not been chosen.
 5. **The choice between the deterministic method and the AI judge method.**
    Neither has been checked against a manual trace, and a comparison with
    manual counts is what should decide it.
+6. **TIFF files for the new groups.** WT_HP, Hyp_RD and Hyp_HP hold no image:
+   their 27 source files are JPEG (`data/image_inventory.csv`). TIFF exports of
+   the same sections are needed before any of them can be run.
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:

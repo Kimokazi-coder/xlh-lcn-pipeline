@@ -26,7 +26,8 @@ a physical length is wanted; the experimental ridge method (section 7) works in
 micrometres throughout.
 
 **Data: 8 wild-type (WT) confocal optical sections** (`data/WT/`, red channel,
-1024 x 1024 px). No Hyp or Hyp;Enpp1 image has been processed, and
+1024 x 1024 px), the reference group of four (section 21). The other three
+groups hold no image yet: no Hyp or Hyp;Enpp1 image has been processed, and
 periosteocytic lesions (POLs) are not measured.
 
 ## 1. Pipeline steps
@@ -952,6 +953,8 @@ With all off, `results/WT/` is reproduced exactly
 - `empty-zone`: what makes the hole in the skeleton around a lacuna. How wide it is, by angular sector;
   what the hole holds against the band immediately beyond it; and which stage of the pipeline drops each
   visible pixel inside it. Measurement only; its answer is section 18.
+- `import-group`, `group-overview`, `group-qc`: copy a group's images under the import rule, the
+  table of every group side by side, and the QC list of the groups other than WT (section 21).
 - `glow-check`: the glow zone rule on against off, each image run twice. The skeleton inside and outside
   the zones, the empty width, roots, owned and unowned px, and the three checks the rule has to pass.
   `canaliculi.GLOW_ZONE_MAX_PX = 0` is what turns it off.
@@ -1708,3 +1711,61 @@ nothing here says the judge's answer is better than the shortest path's. A
 thread given to the wrong cell moves that cell's whole measured network, so the
 cost of a wrong answer is not symmetric. A manual trace is what should decide
 between the two methods, and none has been made.
+
+## 21. Groups
+
+**The groups.** `config.GROUPS`: WT, WT_HP, Hyp_RD and Hyp_HP; RD is regular
+diet and HP high phosphorus. Each has its own folder in `data/` and in
+`results/`, with the same layout inside; the AI judge set holds WT only, in
+`results_ai_judge/WT/`.
+
+**WT is the reference, and nothing is tuned on the others.** Every rule and value
+in sections 1 to 19 was chosen by visual inspection of the 8 WT images. The other
+groups run with exactly the same code and settings, and no parameter may be tuned
+on them, so a difference between groups is measured by one fixed method. Whether
+that method serves Hyp bone as well as WT is not established: it is validated on
+no group (section 15).
+
+**What goes into a group** (`python src/diagnostics.py import-group`, the image
+import constants of `config.py`). A source file is copied into `data/<group>/`
+under its own name only if the pipeline would read it as it reads WT: a TIFF by
+content, not by name (a `.tiff` is copied as `.tif`); a pixel shape, channel count
+and sample type the WT images have (1024 x 1024; 3, or 4 with alpha; uint8); and
+no pixel size in the metadata that disagrees with 0.13 um/px at two decimals. A
+resolution per inch is a print density, not a pixel size, and is only recorded.
+Every other file is skipped and listed with the reason in
+`data/image_inventory.csv`. JPEG is excluded on purpose: it is lossy, and it
+stores the colour detail that carries the red channel at half resolution in each
+direction (4:2:0), which changes the pixels a ridge filter of 3 to 4.2 px
+measures. With WT in uncompressed TIFF, a JPEG group would differ from it by
+format as well as by biology.
+
+**State on 2026-10-20.** The source folders of the three new groups hold 27 files,
+9 per group, every one a JPEG (1024 x 1024 x 3, uint8, 4:2:0, 300 dpi print
+density); one, `876_z76c1-2.tif`, is a JPEG named .tif. All 27 were skipped, so
+**no image of WT_HP, Hyp_RD or Hyp_HP has been processed** and those groups have
+no results. No TIFF of the same name exists in the source tree. Raw z-stacks
+exist for some animals (534, 535, 701, 876), but taking a plane from a stack makes
+a new image rather than copying one, and it was not done.
+
+**Running a group.** The three stages with `--dir data/<group> -o results/<group>`.
+With no `-o` a stage writes to `results/<name of the input folder>/`
+(`lacunae.output_root`), so no group can write into another's folder. An image
+that fails in a stage is listed with the error in
+`results/<group>/all_images/failed_images_<stage>.csv` and skipped, and the
+others carry on; a folder with no `.tif` writes nothing.
+
+**Across groups.** `group-overview` writes `results/group_overview.csv` and
+`.xlsx`, one row per image with its group: lacuna count, interior count, roots per
+cell, ring length 30 px, field length density, skeleton px, unowned px and width
+median. It computes no statistic and compares no groups. Skeleton and unowned px
+come from each image's saved skeleton and graph through the owner map the
+pipeline builds; on WT they equal what `compare-methods` measured on the
+in-memory owner maps. `group-qc` writes `results/group_qc.csv`, per image of every
+group but WT: the lacuna count, the candidates of at least 150 px² the lacuna
+stage rejected, by the rule that rejected each (area too small or too large,
+solidity, aspect ratio; smaller specks counted apart), a flag where the count is
+outside the WT range, and a rank of which outlines to look at first. The range is
+the minimum and maximum lacuna count of the WT images, 11 to 19, read from
+`results/WT/` when the command runs. A flag says where to look; nothing is tuned
+from it.

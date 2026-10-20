@@ -34,6 +34,8 @@ here are not tracked; see Not tracked at the end.
 ```
 results/
   README.md                   this guide
+  group_overview.csv, .xlsx   every group side by side, one row per image (diagnostics group-overview)
+  group_qc.csv                QC list of the groups other than WT (diagnostics group-qc); empty so far
   WT/                         one folder per group; WT, the reference group, is the only one with images
     all_images/
       quantification/         quantification_all_images.csv, .xlsx and .pdf: one row per image
