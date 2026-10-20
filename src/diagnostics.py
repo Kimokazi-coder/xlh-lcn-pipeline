@@ -80,6 +80,8 @@ Subcommands:
                       proving every file under results/ is unchanged
     ai-compare        EXPERIMENT: judge off against judge on, per image: the
                       pictures side by side and what the verdicts moved
+    group-overview    one table over every group, one row per image, in
+                      results/group_overview.csv and .xlsx; no statistics
     compare-methods   both result sets side by side, results/WT/ and
                       results_ai_judge/WT/: csv and xlsx per lacuna, per image and
                       overall, and the cell pairs whose segments changed hands
@@ -6853,6 +6855,131 @@ def cmd_compare_methods(args) -> int:
     return 0
 
 
+# group-overview -------------------------------------------------------------------
+# One table over every group, one row per image, written to
+# results/group_overview.csv and .xlsx. It reads what quantification wrote for
+# each group (results/<group>/), and the owner map rebuilt from the saved
+# skeleton and graph for the unowned px. No statistic and no comparison between
+# groups is computed here: the table only puts the rows side by side.
+
+OVERVIEW_NAME = "group_overview"  # .csv and .xlsx in config.RESULTS_ROOT
+# (column of the table, column of quantification_all_images.csv or None when the
+# value is read from the image's own files)
+OVERVIEW_COLUMNS = [
+    ("lacuna count", "lacuna count"),
+    ("interior lacuna count", "interior lacuna count"),
+    ("roots per cell", "roots per cell"),
+    ("ring length 30 px per cell (px)", "ring length 30 px per cell (px)"),
+    ("field length density (px^-1)", "field length density (px^-1)"),
+    ("skeleton px", None),
+    ("unowned px", None),
+    ("canalicular width median (px)", "canalicular width median (px)"),
+]
+
+
+def group_summary_rows(group: str) -> list:
+    """The rows of results/<group>/all_images/quantification/quantification_all_images.csv,
+    or [] when the group has no results."""
+    path = quantification.summary_path(config.RESULTS_ROOT / group, ".csv")
+    if not path.is_file():
+        return []
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def unowned_px(root: Path, label: str) -> tuple:
+    """(skeleton px, unowned px) of one image from what detection saved: the
+    skeleton png and the owner map rebuilt from the saved graph, the map the
+    pipeline built in memory (canaliculi.build_owner_pixel_map)."""
+    from skan import Skeleton
+
+    d = quantification.load_detection(root, label)
+    skeleton = d["skeleton"]
+    skel_obj = Skeleton(skeleton) if skeleton.any() else None
+    owner_map = canaliculi.build_owner_pixel_map(skeleton.shape, skel_obj, d["graph"], d["edge_owner"], d["owner"])
+    return int(skeleton.sum()), int((skeleton & (owner_map == 0)).sum())
+
+
+def cmd_group_overview(args) -> int:
+    import openpyxl
+
+    header = ["group", "image"] + [c for c, _src in OVERVIEW_COLUMNS]
+    rows, empty = [], []
+    for group in config.GROUPS:
+        found = group_summary_rows(group)
+        if not found:
+            empty.append(group)
+            continue
+        root = config.RESULTS_ROOT / group
+        for r in found:
+            label = r.get("image_label") or lacunae.image_label(r["image"])
+            skeleton, unowned = unowned_px(root, label)
+            q = json.loads(result_json(root, label).read_text(encoding="utf-8"))
+            if int(round(q["field"]["total_skeleton_length_px"])) != skeleton:
+                print(f"{group} {label}: the skeleton png and the quantification json disagree")
+                return 1
+            row = [group, label]
+            for column, source in OVERVIEW_COLUMNS:
+                if source is not None:
+                    row.append(r[source])
+                elif column == "skeleton px":
+                    row.append(skeleton)
+                else:
+                    row.append(unowned)
+            rows.append(row)
+    out = config.RESULTS_ROOT
+    with open(out / f"{OVERVIEW_NAME}.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(header)
+        w.writerows(rows)
+    note = ("Pre-validation, pixel units. One row per image, every group side by side; no statistic and no "
+            "comparison between groups. Per-cell values are means over interior lacunae. Read from "
+            "results/<group>/all_images/quantification/quantification_all_images.csv, and skeleton and unowned "
+            "px from each image's saved skeleton and graph (python src/diagnostics.py group-overview).")
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "per_image"
+    ws.append(header)
+    for row in rows:
+        ws.append([_number(v) for v in row])
+    notes = wb.create_sheet("notes")
+    notes.append([note])
+    for group in empty:
+        notes.append([f"{group}: no results. {_group_absence(group)}"])
+    wb.save(out / f"{OVERVIEW_NAME}.xlsx")
+    print_table(header, rows, title=f"group overview ({len(rows)} images) -> results/{OVERVIEW_NAME}.csv and .xlsx\n")
+    for group in empty:
+        print(f"{group}: no results. {_group_absence(group)}")
+    return 0
+
+
+def _number(value):
+    """A table cell as a number where it is one, so the xlsx sorts and sums."""
+    if isinstance(value, (int, float)):
+        return value
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return value
+    return int(f) if f.is_integer() and "." not in str(value) else f
+
+
+def _group_absence(group: str) -> str:
+    """Why a group has no results, from data/image_inventory.csv."""
+    path = config.DATA_DIR / config.IMPORT_INVENTORY_NAME
+    rows = []
+    if path.is_file():
+        with open(path, newline="", encoding="utf-8") as f:
+            rows = [r for r in csv.DictReader(f) if r["group"] == group]
+    if not rows:
+        return f"data/{group}/ has no recorded import."
+    copied = [r for r in rows if r["decision"] in ("copied", "already present")]
+    if copied:
+        return (f"{len(copied)} image(s) in data/{group}/ but no quantification table: run the three "
+                f"stages on it.")
+    reasons = sorted({r["reason"].split(":")[0] for r in rows})
+    return f"all {len(rows)} source files were skipped by the import rule ({'; '.join(reasons)})."
+
 def _ai_same_decisions(a: dict, b: dict) -> bool:
     """Do two decision files hold the same verdicts for the same candidates?"""
     if a.get("geometry_sha256") != b.get("geometry_sha256"):
@@ -7171,6 +7298,11 @@ def main() -> None:
                    help="Where a replay writes its decision file (default: beside the log, "
                         "which overwrites it with the same content).")
     p.set_defaults(func=cmd_ai_judge)
+
+    p = sub.add_parser("group-overview",
+                       help="One table over every group, one row per image: results/group_overview.csv "
+                            "and .xlsx. No statistic and no comparison between groups.")
+    p.set_defaults(func=cmd_group_overview)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
