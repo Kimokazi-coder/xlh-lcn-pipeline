@@ -6,6 +6,13 @@ cannot do yet, and the decisions behind its current shape.
 **Status: pre-validation.** No output has been checked against manual
 (ImageJ) counts.
 
+**Two methods, and the choice is pending.** Sections 1 to 19 describe the
+**deterministic method**, the pipeline as `config.py` ships it, whose output is
+`results/`. Section 20 describes the **AI judge method**, the same pipeline
+with `config.AI_JUDGE_ENABLED` on, whose output is `results_ai_judge/`. Which
+the study uses has not been decided, and **neither has been validated against a
+manual trace**.
+
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
 confirmed for all 8 images and rounded to two decimals. The pipeline reports
 px and px² all the same: `PIXEL_SIZE_UM` is deliberately `None`, because it is
@@ -1639,3 +1646,82 @@ skip or the guard, and none of these numbers is a validation. Whether the thread
 this rule recovers is real is a question for the manual tracing in
 `manual_trace/`, under the protocol fixed in advance in
 `docs/NETWORK_TUNING_PROTOCOL.md`.
+
+## 20. The second method: the AI judge
+
+**Status: one of two methods, the choice between them pending, NOT VALIDATED
+against a manual trace.** The full write-up, with every decision and number, is
+[docs/EXPERIMENT_AI.md](EXPERIMENT_AI.md); this section says what the method is
+and how it differs from the deterministic one.
+
+**What it changes.** Ownership in the deterministic method goes by the shortest
+path through the skeleton (section 8). That is right for a thread its own cell
+traced and wrong at a join: a whole connected network can go to a cell that
+reaches it through one thread while another cell lies closer to where those
+threads start and has no skeleton path to them. The AI judge method asks a
+judgement where that is a judgement call, and feeds the answer to the same
+shortest path step. Deterministic code still does every pixel operation; the
+model only answers questions about numbered segments in a picture.
+
+**What the judge is asked.** A segment is a branch of the skeleton, at least
+1.3 um long. It is put to the judge when it falls in one of four classes:
+(a) unowned, with a lacuna within reach; (b) new, a faint piece a permissive
+cut finds inside a lacuna's zone of the hole (section 19) that the pipeline did
+not keep; (c) touching a body that does not own it; (d) owned by a lacuna that
+is not the nearest one by straight distance, where the nearest lacuna's body
+lies within its own zone of the hole plus 10 px. "Within reach" is that same
+test, so the method defines no number of its own. For a, c and d the question is
+**which osteocyte the thread starts from: the first candidate, the second, or
+none**; for b it is also **whether it is a real thread or glow texture**. Over the
+8 images: 895 segments in 145 cases, class d alone 210 segments involving 77 of
+the 108 lacunae.
+
+**How a verdict is used.** A verdict naming a cell adds a **zero weight
+attachment from that cell to the end of the segment nearest it**, and then the
+existing multi source shortest path assignment and the 50 um cap run unchanged.
+Nothing is reassigned by hand; the network stays connected and the old owner
+keeps whatever the shortest path still gives it. "None" adds nothing. A segment
+two cases answer differently is left alone and counted. Only a class b segment
+can be added (judged real) or refused (judged artifact), so nothing the judge
+says deletes tracing the pipeline made.
+
+**Roots.** A verdict's attachment is marked `judged`. It splits the network like
+any other attachment but is **not a root**: a root is counted only for an
+attachment the pipeline's own contact or attach rule made, within reach of the
+body (`quantification.root_points`). Before this was fixed, every verdict that
+gave a cell a segment away from its body added a root, and judge-on roots rose
+from 1,045 to 1,482 over the 8 images; with the fix they are 1,113. With the
+switch off no edge is marked and every number is the deterministic method's.
+
+**What it does to the numbers**, over the 8 images
+(`results_ai_judge/compare/compare_methods.xlsx`):
+
+| measure | deterministic | AI judge |
+| --- | --- | --- |
+| roots per interior cell, pooled | 10.27 | 10.95 |
+| roots, all lacunae | 1,045 | 1,113 |
+| ring length r30 px per interior cell, pooled | 398.9 | 440.9 |
+| field length density per px | 0.03970 | 0.04068 |
+| skeleton px | 323,707 | 331,691 |
+| owned px | 261,129 | 277,235 |
+| unowned px | 62,578 | 54,456 |
+| largest owner share, highest image | 0.189 | 0.195 |
+
+21,373 px of tracing changed hands between cells, in 770 segments and 100 cell
+pairs, as whole connected networks; no single cell takes over an image.
+
+**Reproducibility, cost and approval.** The model is pinned
+(`claude-sonnet-5-5`), no temperature is sent (the model rejects one) and
+thinking is off. Every request and answer is logged with its hash in
+`results_ai_judge/ai_log/`, with the case pictures that were actually sent, and
+the replay reruns the whole log offline to identical verdicts on all 8 images.
+The real run was made once, on 2026-10-19: **143 calls, $1.60**, against a dry
+run estimate of $1.19 and a ceiling of `config.MAX_COST_USD` = $5; one answer in
+143 could not be read and its retry was valid, so no segment was left unjudged.
+**External API use approved on 2026-10-15, approver: Karim.**
+
+**Not established.** No verdict has been checked against a manual trace, so
+nothing here says the judge's answer is better than the shortest path's. A
+thread given to the wrong cell moves that cell's whole measured network, so the
+cost of a wrong answer is not symmetric. The hand trace in `manual_trace/` is
+what should decide between the two methods.

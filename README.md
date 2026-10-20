@@ -9,13 +9,44 @@ and measures it per lacuna and per field.
 (ImageJ) counts yet, and no parameter or limit has been tuned against one. The
 data are 8 wild-type (WT) sections; no Hyp images have been processed.
 
-**You are on the branch `exp-ai-layer`.** It adds one experiment on top of the
-pipeline: an AI judge that decides, for every candidate thread near an
-osteocyte, whether it is a real thread and which lacuna owns it
-(`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). It is **off by default**
-(`config.AI_JUDGE_ENABLED = False`) and with it off every output of this branch
-is what `main` produces, checked by `python src/diagnostics.py regression`.
-Nothing on this branch is validated and nothing from it has been merged.
+**Two methods, and the choice between them is pending.**
+
+- The **deterministic method** is the pipeline as `config.py` ships it. Its
+  output is `results/`, and it is the reference `python src/diagnostics.py
+  regression` checks.
+- The **AI judge method** is the same pipeline with `config.AI_JUDGE_ENABLED`
+  on. Where who owns a thread is a judgement call, an AI judge looks at a
+  picture and says which osteocyte the thread starts from, and for a faint
+  piece the pipeline did not trace, whether it is a thread at all; the verdict
+  becomes a zero weight attachment that the existing shortest path step uses to
+  split the network (`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). Its output is
+  `results_ai_judge/`. The switch is **off by default**, and with it off every
+  output is the deterministic method's.
+
+**Which method the study uses has not been decided, and neither has been
+validated against a manual trace.** The judge was run once, on 2026-10-19, on
+all 8 images: 143 calls to the pinned `claude-sonnet-5-5`, **$1.60** (the dry
+run had estimated $1.19). Everything since replays from its log with no network.
+External API use approved on 2026-10-15, approver: Karim.
+
+## What each folder is
+
+| folder | what it is | the one command that makes it |
+|---|---|---|
+| `results/` | **set 1, the deterministic method**: every image's detection, quantification and figures, and the cross-image table; see [`results/README.md`](results/README.md) | `python src/lacunae.py --dir data/WT; python src/canaliculi.py --dir data/WT; python src/quantification.py --dir data/WT; python -u figures/make_figures.py all` (one line; the four stages run in that order) |
+| `results_ai_judge/` | **set 2, the AI judge method**: the same per-image layout, the judge log with the case pictures that were sent, and `compare/`; see [`results_ai_judge/README.md`](results_ai_judge/README.md) | `python src/diagnostics.py ai-run --dir data/WT` (offline, from the decision files in `results_ai_judge/ai_log/`) |
+| `results_ai_judge/compare/` | the two sets side by side: pictures, `REPORT.md`, and `compare_methods.csv` and `.xlsx` | `python src/diagnostics.py ai-compare --dir data/WT`, then `python src/diagnostics.py compare-methods --dir data/WT` |
+| `results_ai_judge/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
+| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (the judge), `diagnostics.py` (every check, as subcommands) | |
+| `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
+| `data/WT/` | the 8 input images | |
+| `manual_trace/` | four raw tiles for the blind hand trace that will produce the ground truth | |
+| `figures/` | the figure code, captions and review notes | |
+| `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md), [`NETWORK_TUNING_PROTOCOL.md`](docs/NETWORK_TUNING_PROTOCOL.md) | |
+
+Not tracked: `.cache/` and `venv/`, and the diagnostic and archive folders that
+commands write into `results/`; [`results/README.md`](results/README.md) lists
+each with the command that makes it again.
 
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
 confirmed for all 8 images and rounded to two decimals
@@ -120,19 +151,9 @@ the optical blur** and is therefore an **upper bound**, not a canalicular
 diameter: no point spread function is subtracted, because the numerical aperture,
 the emission wavelength and the pinhole are unknown.
 
-## Repository map
+## Repository notes
 
-| path | what it holds |
-|---|---|
-| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `diagnostics.py` (every check, as subcommands) |
-| `config.py` | paths, the biological limits, shared settings and the switches (all off by default) |
-| `data/WT/` | the 8 input images |
-| `results/` | the pipeline output and the reference that `regression` checks; see [`results/README.md`](results/README.md) |
-| `manual_trace/` | four raw tiles for the blind hand trace that will produce the ground truth |
-| `figures/` | the figure code, captions and review notes |
-| `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`NETWORK_TUNING_PROTOCOL.md`](docs/NETWORK_TUNING_PROTOCOL.md) |
-
-The lacuna count now includes out-of-focus lacunae, which carry no area or shape;
+The folders are listed at the top, under What each folder is. The lacuna count now includes out-of-focus lacunae, which carry no area or shape;
 see docs/METHODS.md section 9.
 
 Earlier experiments, the older intensity-threshold method, the ablation that
@@ -172,6 +193,15 @@ python src/diagnostics.py --help             # every other diagnostic
 python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image (not tracked)
 python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
 python src/validate_manual.py                # score against a hand tracing, when one exists
+```
+
+The AI judge method, offline from the decision files already in the repository:
+
+```
+python src/diagnostics.py ai-run --dir data/WT            # set 2, results_ai_judge/
+python src/diagnostics.py ai-judge --dir data/WT --replay # the judge log replays to the same verdicts
+python src/diagnostics.py ai-compare --dir data/WT        # judge off against judge on, pictures and report
+python src/diagnostics.py compare-methods --dir data/WT   # both sets side by side, csv and xlsx
 ```
 
 The switches in `config.py` (`NARROW_CRUMB_RULE`, `FILL_ENCLOSED_HOLES_MAX_PX2`,
@@ -214,21 +244,31 @@ and `.pdf`) has one row per image. Per-lacuna numbers are in
 `.pdf` to read), one row per lacuna with its shape and its network measures
 together.
 
-| image | lacunae (interior) | roots per cell | ring 30 px per cell (px) | field density px⁻¹ |
-|---|---|---|---|---|
-| 542_WT_2_z06c1-2 | 19 (15) | 14.53 | 473.2 | 0.0396 |
-| 542_WT_2_z18c1-2 | 13 (11) | 10.36 | 452.7 | 0.0380 |
-| 543-2 | 12 (12) | 7.67 | 340.4 | 0.0394 |
-| 543_3 | 13 (12) | 6.00 | 290.8 | 0.0372 |
-| 543_z13c1-2 | 11 (11) | 7.45 | 351.2 | 0.0420 |
-| 682_z08c1-2 | 11 (9) | 12.56 | 454.1 | 0.0360 |
-| 682_z23c-2 | 14 (11) | 8.64 | 348.4 | 0.0375 |
-| 682_z29c1-3 | 15 (13) | 7.00 | 299.6 | 0.0360 |
+| image | lacunae (interior) | roots per cell, deterministic | AI judge | ring 30 px per cell (px), deterministic | AI judge | field density px⁻¹, deterministic | AI judge |
+|---|---|---|---|---|---|---|---|
+| 542_z06 | 19 (15) | 15.13 | 15.80 | 485.5 | 514.4 | 0.0399 | 0.0411 |
+| 542_z18 | 13 (11) | 11.82 | 12.45 | 478.1 | 517.9 | 0.0389 | 0.0396 |
+| 543-2 | 12 (12) | 8.50 | 9.00 | 369.6 | 410.2 | 0.0431 | 0.0437 |
+| 543_3 | 13 (12) | 7.00 | 8.17 | 325.6 | 411.4 | 0.0403 | 0.0436 |
+| 543_z13 | 11 (11) | 9.27 | 9.55 | 377.2 | 419.2 | 0.0430 | 0.0430 |
+| 682_z08 | 11 (9) | 12.33 | 13.67 | 463.1 | 492.8 | 0.0364 | 0.0367 |
+| 682_z23 | 14 (11) | 9.73 | 10.36 | 384.1 | 423.1 | 0.0392 | 0.0404 |
+| 682_z29 | 15 (13) | 7.85 | 8.23 | 312.9 | 343.7 | 0.0368 | 0.0374 |
 
-The figures under `results/<label>/3_publication_figures/` are regenerated by
-`python -u figures/make_figures.py all` and are not tracked. The pipeline's own
-stage pictures under `1_lacunae/` and `2_canaliculi/` are tracked: the skeleton
-png is an input to `diagnostics.py validate-network`.
+Interior means per cell; field density is skeleton px over analysed px. Both
+sets side by side, per lacuna and with the cell pairs whose tracing changed
+hands, are in `results_ai_judge/compare/compare_methods.xlsx`. With the judge
+on, roots per cell are counted only from the pipeline's own attachments; a
+verdict's attachment splits the network but is not a root (`docs/METHODS.md`
+section 20).
+
+The figures under `results/<label>/3_publication_figures/` and
+`results/all_images/figures/` are tracked, and
+`python -u figures/make_figures.py all` redraws any that is missing. The
+pipeline's own stage pictures under `1_lacunae/` and `2_canaliculi/` are
+tracked too: the skeleton png is an input to `diagnostics.py validate-network`.
+There are no publication figures for the AI judge set, because its method has
+not been chosen.
 
 ## Still open
 
@@ -244,6 +284,9 @@ png is an input to `diagnostics.py validate-network`.
    dimmer and include vascular canal.
 4. **Two thin kept objects on vascular bands**, probably not lacunae: 542_z06 at
    (555,149) and 682_z23 at (363,7). Both are counted now.
+5. **The choice between the deterministic method and the AI judge method.**
+   Neither has been checked against a manual trace; the hand trace in
+   `manual_trace/` is what should decide it.
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:
