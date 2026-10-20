@@ -18,6 +18,61 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 # Input images.
 DATA_DIR = PROJECT_ROOT / "data"
 
+# Groups. The images are organised by type, one folder per group under data/.
+# RD is regular diet and HP high phosphorus. WT is the reference group: its 8
+# sections are the ones every rule of the pipeline was chosen on, by visual
+# inspection, and no parameter may be tuned on any other group.
+GROUPS = ("WT", "WT_HP", "Hyp_RD", "Hyp_HP")
+REFERENCE_GROUP = "WT"
+GROUP_DESCRIPTIONS = {
+    "WT": "Wild type: the reference group, the 8 sections every rule of the pipeline was chosen on",
+    "WT_HP": "Wild type, high phosphorus diet",
+    "Hyp_RD": "Hyp, regular diet",
+    "Hyp_HP": "Hyp, high phosphorus diet",
+}
+
+# Image import (python src/diagnostics.py import-group). A source image is
+# copied into data/<group>/, under its own name, only when the pipeline would
+# read it the way it reads the reference group; every other file is skipped and
+# listed, with the reason, in data/image_inventory.csv. The source is only read.
+#
+# Format: a TIFF by its CONTENT, not only by its name, because the pipeline
+# reads *.tif and a file named .tif can hold a JPEG. A .tiff is copied as .tif.
+# A JPEG is skipped: its compression is lossy, and the colour detail that
+# carries the red channel is stored at half resolution in each direction
+# (4:2:0), which changes the pixels a ridge filter of 3 to 4 px measures. The
+# reference group is uncompressed TIFF, so a group made of JPEGs would differ
+# from it by file format as well as by biology.
+#
+# Shape, channel count and sample type: each must be one the reference group
+# holds, read from data/<REFERENCE_GROUP>/ when the command runs (there:
+# 1024 x 1024 px; 3 channels, or 4 with alpha; uint8). The sample type is held
+# to it for the same reason as the shape: the absolute cuts of the lacuna stage
+# (DIM_LACUNA_MAX_PEAK) sit on the 0 to 1 scale an 8 bit image is read to.
+#
+# Pixel size: a size written in the metadata with a physical unit (an ImageJ
+# unit, a TIFF resolution per centimetre, an LSM or OME voxel size) must round
+# to PIXEL_SIZE_UM_ACQUIRED at the two decimals that value is given to, which is
+# IMPORT_PIXEL_SIZE_TOLERANCE_UM, half of the last decimal. A resolution per
+# INCH is the print density the export software writes (ZEN writes 300 dpi on
+# every export, one image of the reference group included), not a pixel size,
+# so it is recorded and not compared. An image with no pixel size in its
+# metadata is accepted, as the reference group's images are.
+IMPORT_TIFF_SUFFIXES = (".tif", ".tiff")
+IMPORT_PIXEL_SIZE_TOLERANCE_UM = 0.005
+# Git. A copied file over IMPORT_MAX_FILE_MB, or a group whose images total over
+# IMPORT_MAX_GROUP_MB (MB = 10^6 bytes), is still copied, but the group's data
+# folder is added to .gitignore so its images stay on this machine and out of
+# the repository (GitHub refuses a file over 100 MiB). Both values were set by
+# the user on 2026-10-20.
+IMPORT_MAX_FILE_MB = 90.0
+IMPORT_MAX_GROUP_MB = 100.0
+# The inventory names a source folder by its last IMPORT_SOURCE_PATH_PARTS path
+# parts and never by its full path, so no local user name or folder outside the
+# study is written into the repository.
+IMPORT_SOURCE_PATH_PARTS = 2
+IMPORT_INVENTORY_NAME = "image_inventory.csv"  # in DATA_DIR
+
 # Outputs: one folder per image, plus the cross-image files (results/README.md).
 RESULTS_DIR = PROJECT_ROOT / "results"
 # The second, labelled set: the same pipeline with the AI judge switch on

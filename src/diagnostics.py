@@ -21,7 +21,12 @@ Subcommands:
     blind             copy a folder of images under random codes (S001, ...),
                       pixel data only, with the key written outside the repository
     unblind           join a blinding key to a summary table
-    sensitivity       both Otsu cuts scaled 0.8 to 1.2, alone and together,
+    import-group      copy one group's images into data/<group>/ under the
+                      import rule of config.py (a TIFF by content, the
+                      reference group's shape, channels and sample type, no
+                      disagreeing pixel size), and list every file, copied or
+                      skipped, with the reason, in data/image_inventory.csv
+    sensitivity      both Otsu cuts scaled 0.8 to 1.2, alone and together,
                       plus one pooled cut: percent changes of the measures
     field-summary     group images into fields by matching lacuna centroids,
                       and write per-field means (the field is the unit)
@@ -921,6 +926,254 @@ def cmd_unblind(args) -> int:
         w.writerows(out_rows)
     print(f"{len(out_rows)} rows unblinded into {args.out}; {missing} without a key entry.")
     return 0 if missing == 0 else 1
+
+
+# import-group -------------------------------------------------------------------
+# Copies the images of one group into data/<group>/ under the import rule of
+# config.py (format by content, shape, channels, sample type, pixel size), and
+# records every file it looked at, copied or skipped, with the reason, in
+# data/image_inventory.csv. The source folder is only read: nothing in it is
+# modified, moved or renamed. --dry-run reports and writes nothing.
+
+INVENTORY_COLUMNS = ["group", "source_folder", "file", "extension", "size_mb", "format", "shape", "channels",
+                     "dtype", "pixel_size_metadata", "pixel_size_um", "decision", "reason", "copied_as"]
+FORMAT_MAGIC = ((b"II*\x00", "TIFF"), (b"MM\x00*", "TIFF"), (b"II+\x00", "TIFF"), (b"MM\x00+", "TIFF"),
+                (b"\xff\xd8\xff", "JPEG"), (b"\x89PNG", "PNG"), (b"BM", "BMP"))
+# Length units an ImageJ or OME header may give a pixel size in, as micrometres.
+UNIT_UM = {"micron": 1.0, "microns": 1.0, "um": 1.0, "µm": 1.0, "μm": 1.0, "nm": 1e-3,
+           "mm": 1e3, "cm": 1e4, "m": 1e6}
+
+
+def file_format(path: Path) -> str:
+    """The format of a file by its first bytes, whatever its name says."""
+    with open(path, "rb") as f:
+        head = f.read(8)
+    for magic, name in FORMAT_MAGIC:
+        if head.startswith(magic):
+            return name
+    return "unknown"
+
+
+def tiff_pixel_size(path: Path) -> tuple:
+    """(what the metadata says, the pixel size in um or None). Only a size with
+    a physical unit counts; a resolution per inch is a print density
+    (config.py, the import rule)."""
+    import re
+
+    import tifffile
+
+    notes, size = [], None
+    with tifffile.TiffFile(path) as tf:
+        tags = tf.pages[0].tags
+        ij = tf.imagej_metadata or {}
+        xres, unit = tags.get("XResolution"), tags.get("ResolutionUnit")
+        per_unit = None
+        if xres is not None:
+            num, den = xres.value
+            per_unit = num / den if den else None
+        unit_code = int(unit.value) if unit is not None else 2  # the TIFF default unit is the inch
+        ij_unit = str(ij.get("unit", "")).strip().lower()
+        if per_unit and ij_unit in UNIT_UM:
+            size = UNIT_UM[ij_unit] / per_unit
+            notes.append(f"ImageJ {per_unit:g} px per {ij_unit}")
+        elif per_unit and unit_code == 3:
+            size = 1e4 / per_unit
+            notes.append(f"{per_unit:g} px per cm")
+        elif per_unit and unit_code == 2:
+            notes.append(f"{per_unit:g} px per inch (print density, not a pixel size)")
+        elif per_unit:
+            notes.append(f"{per_unit:g} px per unit, no unit given")
+        if tf.is_lsm and tf.lsm_metadata and tf.lsm_metadata.get("VoxelSizeX"):
+            size = float(tf.lsm_metadata["VoxelSizeX"]) * 1e6
+            notes.append("LSM voxel size")
+        if tf.is_ome and tf.ome_metadata:
+            m = re.search(r'PhysicalSizeX="([0-9.eE+-]+)"(?:[^>]*PhysicalSizeXUnit="([^"]+)")?', tf.ome_metadata)
+            if m:
+                size = float(m.group(1)) * UNIT_UM.get((m.group(2) or "um").lower(), 1.0)
+                notes.append("OME physical size")
+    return "; ".join(notes) or "none", size
+
+
+def image_properties(path: Path) -> dict:
+    """What the import rule reads from one file. A TIFF is read the way the
+    pipeline reads it (skimage.io.imread); anything else is decoded with PIL,
+    only to be described."""
+    from PIL import Image
+    from skimage.io import imread
+
+    fmt = file_format(path)
+    out = {"format": fmt, "size_mb": path.stat().st_size / 1e6, "pixel_size_metadata": "none",
+           "pixel_size_um": None, "shape": None, "channels": None, "dtype": None}
+    try:
+        if fmt == "TIFF":
+            arr = np.asarray(imread(path))
+            out["pixel_size_metadata"], out["pixel_size_um"] = tiff_pixel_size(path)
+        else:
+            with Image.open(path) as im:
+                arr = np.asarray(im)
+                dpi = im.info.get("dpi")
+                if dpi:
+                    out["pixel_size_metadata"] = f"{float(dpi[0]):g} dpi (print density, not a pixel size)"
+    except Exception as exc:  # described, then skipped by the rule
+        message = str(exc).replace(str(path), path.name).replace(str(path.parent), "")
+        out["error"] = f"{type(exc).__name__}: {message}"
+        return out
+    if arr.ndim == 3:
+        axis = config.CHANNEL_AXIS % 3
+        out["channels"] = int(arr.shape[axis])
+        out["shape"] = tuple(int(s) for i, s in enumerate(arr.shape) if i != axis)
+    else:
+        out["channels"] = 1
+        out["shape"] = tuple(int(s) for s in arr.shape)
+    out["dtype"] = str(arr.dtype)
+    return out
+
+
+def reference_properties() -> dict:
+    """The shapes, channel counts and sample types the reference group holds."""
+    ref = {"shape": set(), "channels": set(), "dtype": set()}
+    for p in sorted((config.DATA_DIR / config.REFERENCE_GROUP).glob("*.tif")):
+        props = image_properties(p)
+        for key in ref:
+            ref[key].add(props[key])
+    if not ref["shape"]:
+        raise SystemExit(f"No reference images in data/{config.REFERENCE_GROUP}/.")
+    return ref
+
+
+def import_decision(path: Path, props: dict, ref: dict, dest_dir: Path) -> tuple:
+    """(decision, reason, copied_as) for one source file under the import rule."""
+    import filecmp
+
+    suffix = path.suffix.lower()
+    if props.get("error"):
+        return "skipped", f"could not be read: {props['error']}", ""
+    if props["format"] != "TIFF":
+        named = f", although it is named {path.suffix}" if suffix in config.IMPORT_TIFF_SUFFIXES else ""
+        return "skipped", f"{props['format']} content{named}: the pipeline reads TIFF only", ""
+    if suffix not in config.IMPORT_TIFF_SUFFIXES:
+        return "skipped", f"a {path.suffix} file, not .tif or .tiff", ""
+    for key, word in (("shape", "pixel shape"), ("channels", "channel count"), ("dtype", "sample type")):
+        if props[key] not in ref[key]:
+            allowed = ", ".join(sorted(str(v) for v in ref[key]))
+            return "skipped", f"{word} {props[key]}, the reference group has {allowed}", ""
+    size = props["pixel_size_um"]
+    if size is not None and abs(size - config.PIXEL_SIZE_UM_ACQUIRED) > config.IMPORT_PIXEL_SIZE_TOLERANCE_UM:
+        return "skipped", f"pixel size {size:.4f} um in the metadata, not {config.PIXEL_SIZE_UM_ACQUIRED}", ""
+    target = dest_dir / (path.stem + ".tif")
+    if target.exists():
+        if filecmp.cmp(path, target, shallow=False):
+            return "already present", "identical file already in the group folder", target.name
+        return "skipped", f"a different file named {target.name} is already in the group folder", ""
+    return "copied", "", target.name
+
+
+def write_inventory(group: str, rows: list) -> Path:
+    """Replace this group's rows in data/image_inventory.csv, keeping the other
+    groups', in the order of config.GROUPS and then by file name."""
+    path = config.DATA_DIR / config.IMPORT_INVENTORY_NAME
+    kept = []
+    if path.is_file():
+        with open(path, newline="", encoding="utf-8") as f:
+            kept = [r for r in csv.DictReader(f) if r["group"] != group]
+    order = {g: i for i, g in enumerate(config.GROUPS)}
+    every = sorted(kept + rows, key=lambda r: (order.get(r["group"], len(order)), r["group"], r["file"]))
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=INVENTORY_COLUMNS, lineterminator="\n")
+        w.writeheader()
+        w.writerows(every)
+    return path
+
+
+def ignore_group_folder(group: str) -> bool:
+    """Add data/<group>/ to .gitignore. True if the line was added."""
+    gitignore = config.PROJECT_ROOT / ".gitignore"
+    line = f"data/{group}/"
+    text = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
+    if line in text.splitlines():
+        return False
+    note = (f"\n# data/{group}/ is over the size limit of config.py (IMPORT_MAX_FILE_MB, IMPORT_MAX_GROUP_MB):\n"
+            f"# its images stay on this machine; data/image_inventory.csv lists them.\n{line}\n")
+    gitignore.write_text(text.rstrip("\n") + "\n" + note, encoding="utf-8")
+    return True
+
+
+def group_readme(group: str, source: str, rows: list) -> str:
+    copied = [r for r in rows if r["decision"] in ("copied", "already present")]
+    skipped = [r for r in rows if r["decision"] == "skipped"]
+    text = f"# {group}\n\n{config.GROUP_DESCRIPTIONS.get(group, group)}.\n\n"
+    if source == f"data/{group}":
+        text += (f"{len(copied)} image(s), the group's original files. "
+                 f"`python src/diagnostics.py import-group --group {group} --src data/{group}`\n"
+                 f"records them in `data/{config.IMPORT_INVENTORY_NAME}` beside the other groups.\n")
+    else:
+        text += (f"{len(copied)} image(s) here, {len(skipped)} file(s) of the source folder skipped. Made by\n"
+                 f"`python src/diagnostics.py import-group --group {group} --src SOURCE` from the folder\n"
+                 f"`{source}`. Every file it looked at, copied or skipped, and why, is in\n"
+                 f"`data/{config.IMPORT_INVENTORY_NAME}`; the rule is in `config.py` (image import).\n")
+    if skipped and not copied:
+        text += (f"\nThis group has no image the pipeline can read yet, so it has no results folder. When TIFF\n"
+                 f"files of these sections are available, put them in a folder and run the command above on it.\n")
+    return text
+
+
+def cmd_import_group(args) -> int:
+    import shutil as _shutil
+
+    group, src = args.group, args.src
+    if group not in config.GROUPS:
+        print(f"Unknown group {group}; config.GROUPS is {', '.join(config.GROUPS)}.")
+        return 2
+    if not src.is_dir():
+        print(f"No such folder: {src}")
+        return 2
+    dest = config.DATA_DIR / group
+    ref = reference_properties()
+    source = "/".join(src.resolve().parts[-config.IMPORT_SOURCE_PATH_PARTS:])
+    rows, table = [], []
+    # README.md is the note this command writes beside the images, never an image.
+    for path in sorted(p for p in src.iterdir() if p.is_file() and p.name != "README.md"):
+        props = image_properties(path)
+        decision, reason, copied_as = import_decision(path, props, ref, dest)
+        size = props["pixel_size_um"]
+        rows.append({
+            "group": group, "source_folder": source, "file": path.name, "extension": path.suffix,
+            "size_mb": f"{props['size_mb']:.3f}", "format": props["format"],
+            "shape": "x".join(str(s) for s in props["shape"]) if props["shape"] else "",
+            "channels": props["channels"] if props["channels"] is not None else "",
+            "dtype": props["dtype"] or "", "pixel_size_metadata": props["pixel_size_metadata"],
+            "pixel_size_um": f"{size:.4f}" if size is not None else "",
+            "decision": decision, "reason": reason, "copied_as": copied_as,
+        })
+        table.append([path.name, path.suffix, f"{props['size_mb']:.3f}", props["format"],
+                      rows[-1]["shape"], rows[-1]["channels"], rows[-1]["dtype"],
+                      props["pixel_size_metadata"], decision, reason])
+    print_table(["file", "ext", "MB", "format", "shape", "ch", "dtype", "pixel size in metadata", "decision", "reason"],
+                table, title=f"import-group {group} from {source} (reference: data/{config.REFERENCE_GROUP}/, "
+                             f"shapes {sorted(ref['shape'])}, channels {sorted(ref['channels'])}, "
+                             f"types {sorted(ref['dtype'])})\n")
+    accepted = [r for r in rows if r["decision"] in ("copied", "already present")]
+    total_mb = sum(float(r["size_mb"]) for r in accepted)
+    largest = max((float(r["size_mb"]) for r in accepted), default=0.0)
+    too_big = largest > config.IMPORT_MAX_FILE_MB or total_mb > config.IMPORT_MAX_GROUP_MB
+    print(f"\n{len(accepted)} accepted ({sum(r['decision'] == 'copied' for r in rows)} to copy), "
+          f"{len(rows) - len(accepted)} skipped; accepted images total {total_mb:.1f} MB, largest {largest:.1f} MB.")
+    if args.dry_run:
+        print("Dry run: nothing copied and nothing written.")
+        return 0
+    dest.mkdir(parents=True, exist_ok=True)
+    for r in rows:
+        if r["decision"] == "copied":
+            _shutil.copy2(src / r["file"], dest / r["copied_as"])
+    if too_big:
+        added = ignore_group_folder(group)
+        print(f"Over the size limit (a file over {config.IMPORT_MAX_FILE_MB:g} MB or a group over "
+              f"{config.IMPORT_MAX_GROUP_MB:g} MB): data/{group}/ is "
+              f"{'now' if added else 'already'} in .gitignore, and its images are not committed.")
+    (dest / "README.md").write_text(group_readme(group, source, rows), encoding="utf-8")
+    inventory = write_inventory(group, rows)
+    print(f"Wrote data/{group}/README.md and {inventory.relative_to(config.PROJECT_ROOT).as_posix()}.")
+    return 0
 
 
 # sensitivity --------------------------------------------------------------------
@@ -6676,6 +6929,14 @@ def main() -> None:
     p.add_argument("-k", dest="key", type=Path, required=True, help="The key written by blind.")
     p.add_argument("-o", dest="out", type=Path, required=True, help="Unblinded table (CSV) to write.")
     p.set_defaults(func=cmd_unblind)
+
+    p = sub.add_parser("import-group",
+                       help="Copy one group's images into data/<group>/ under the import rule of config.py, "
+                            "and list every file, copied or skipped, in data/image_inventory.csv.")
+    p.add_argument("--group", required=True, help=f"One of {', '.join(config.GROUPS)}.")
+    p.add_argument("--src", type=Path, required=True, help="Source folder; it is only read.")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true", help="Report only; copy and write nothing.")
+    p.set_defaults(func=cmd_import_group)
 
     p = sub.add_parser("sensitivity", help="Both cuts scaled 0.8 to 1.2 and one pooled cut: percent changes.")
     p.add_argument("-d", dest="dir", type=Path, default=DEFAULT_IMAGE_DIR, help="Folder of .tif images.")
