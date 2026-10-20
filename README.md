@@ -12,15 +12,15 @@ data are 8 wild-type (WT) sections; no Hyp images have been processed.
 **Two methods, and the choice between them is pending.**
 
 - The **deterministic method** is the pipeline as `config.py` ships it. Its
-  output is `results/`, and it is the reference `python src/diagnostics.py
-  regression` checks.
+  output is `results/`, one folder per group; `results/WT/` is the reference
+  `python src/diagnostics.py regression` checks.
 - The **AI judge method** is the same pipeline with `config.AI_JUDGE_ENABLED`
   on. Where who owns a thread is a judgement call, an AI judge looks at a
   picture and says which osteocyte the thread starts from, and for a faint
   piece the pipeline did not trace, whether it is a thread at all; the verdict
   becomes a zero weight attachment that the existing shortest path step uses to
   split the network (`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). Its output is
-  `results_ai_judge/`. The switch is **off by default**, and with it off every
+  `results_ai_judge/WT/`, for the WT group only. The switch is **off by default**, and with it off every
   output is the deterministic method's.
 
 **Which method the study uses has not been decided, and neither has been
@@ -33,10 +33,10 @@ External API use approved on 2026-10-15, approver: Karim.
 
 | folder | what it is | the one command that makes it |
 |---|---|---|
-| `results/` | **set 1, the deterministic method**: every image's detection, quantification and figures, and the cross-image table; see [`results/README.md`](results/README.md) | `python src/lacunae.py --dir data/WT; python src/canaliculi.py --dir data/WT; python src/quantification.py --dir data/WT; python -u figures/make_figures.py all` (one line; the four stages run in that order) |
-| `results_ai_judge/` | **set 2, the AI judge method**: the same per-image layout, the judge log with the case pictures that were sent, and `compare/`; see [`results_ai_judge/README.md`](results_ai_judge/README.md) | `python src/diagnostics.py ai-run --dir data/WT` (offline, from the decision files in `results_ai_judge/ai_log/`) |
-| `results_ai_judge/compare/` | the two sets side by side: pictures, `REPORT.md`, and `compare_methods.csv` and `.xlsx` | `python src/diagnostics.py ai-compare --dir data/WT`, then `python src/diagnostics.py compare-methods --dir data/WT` |
-| `results_ai_judge/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
+| `results/` | **set 1, the deterministic method**, one folder per group: `results/WT/` holds every WT image's detection, quantification and figures, and the cross-image table; see [`results/README.md`](results/README.md) | `python src/lacunae.py --dir data/WT; python src/canaliculi.py --dir data/WT; python src/quantification.py --dir data/WT; python -u figures/make_figures.py all` (one line; the four stages run in that order) |
+| `results_ai_judge/` | **set 2, the AI judge method**, WT only, in `results_ai_judge/WT/`: the same per-image layout, the judge log with the case pictures that were sent, and `compare/`; see [`results_ai_judge/README.md`](results_ai_judge/README.md) | `python src/diagnostics.py ai-run --dir data/WT` (offline, from the decision files in `results_ai_judge/ai_log/`) |
+| `results_ai_judge/WT/compare/` | the two sets side by side: pictures, `REPORT.md`, and `compare_methods.csv` and `.xlsx` | `python src/diagnostics.py ai-compare --dir data/WT`, then `python src/diagnostics.py compare-methods --dir data/WT` |
+| `results_ai_judge/WT/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
 | `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (the judge), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
 | `data/WT/` | the 8 input images | |
@@ -54,7 +54,7 @@ micrometres and converted with it. The measures themselves stay in px and px²:
 `config.PIXEL_SIZE_UM` is deliberately `None`, because it is recorded in the
 parameters block of every result and switches every scale bar to micrometres, so
 setting it would change the recorded values and a fresh run would no longer equal
-`results/` at tolerance 0. Convert with 0.13 um/px where a physical length is
+`results/WT/` at tolerance 0. Convert with 0.13 um/px where a physical length is
 wanted.
 
 ## The canalicular method
@@ -170,23 +170,25 @@ command from the repository root, in this order.
 python src/lacunae.py --dir data/WT          # feature 1: find and label the lacunae
 python src/canaliculi.py --dir data/WT       # feature 2: trace the network
 python src/quantification.py --dir data/WT   # measure both, per image and for all images
-python -u figures/make_figures.py all        # every figure, into results/
+python -u figures/make_figures.py all        # every figure, into results/WT/
 ```
 
 Detection draws and labels; quantification measures what detection saved, and
 every measured number is written only by it. Detection writes
-`results/<label>/1_lacunae/` and `2_canaliculi/`: the overlay, the mask, the
+`results/WT/<label>/1_lacunae/` and `2_canaliculi/`: the overlay, the mask, the
 skeleton, the verification picture, the lacuna label image, the vascular mask,
 the graph with its ownership, and a record of what it did. Quantification reads
-those and writes every number into `results/<label>/5_quantification/` and, for a
-folder run, `results/all_images/quantification/quantification_all_images.xlsx`,
-`.csv` and `.pdf`. `-o` picks another output folder for all three commands.
+those and writes every number into `results/WT/<label>/5_quantification/` and, for a
+folder run, `results/WT/all_images/quantification/quantification_all_images.xlsx`,
+`.csv` and `.pdf`. `-o` picks another output folder for all three commands;
+without it a run writes to `results/<name of the input folder>/`, so
+`--dir data/WT` writes `results/WT/`.
 
 Check it:
 
 ```
 python src/diagnostics.py reference-check    # must PASS: 161.00 / 21.63 / 8.50 on 543-2
-python src/diagnostics.py regression         # every number against results/, tolerance 0
+python src/diagnostics.py regression         # every number against results/WT/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
 python src/diagnostics.py --help             # every other diagnostic
 python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image (not tracked)
@@ -196,7 +198,7 @@ python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # 
 The AI judge method, offline from the decision files already in the repository:
 
 ```
-python src/diagnostics.py ai-run --dir data/WT            # set 2, results_ai_judge/
+python src/diagnostics.py ai-run --dir data/WT            # set 2, results_ai_judge/WT/
 python src/diagnostics.py ai-judge --dir data/WT --replay # the judge log replays to the same verdicts
 python src/diagnostics.py ai-compare --dir data/WT        # judge off against judge on, pictures and report
 python src/diagnostics.py compare-methods --dir data/WT   # both sets side by side, csv and xlsx
@@ -236,9 +238,9 @@ cell".
 
 ## Results
 
-`results/all_images/quantification/quantification_all_images.xlsx` (and `.csv`
+`results/WT/all_images/quantification/quantification_all_images.xlsx` (and `.csv`
 and `.pdf`) has one row per image. Per-lacuna numbers are in
-`results/<label>/5_quantification/<label>_quantification.xlsx` (and `.json`, and
+`results/WT/<label>/5_quantification/<label>_quantification.xlsx` (and `.json`, and
 `.pdf` to read), one row per lacuna with its shape and its network measures
 together.
 
@@ -260,8 +262,8 @@ on, roots per cell are counted only from the pipeline's own attachments; a
 verdict's attachment splits the network but is not a root (`docs/METHODS.md`
 section 20).
 
-The figures under `results/<label>/3_publication_figures/` and
-`results/all_images/figures/` are tracked, and
+The figures under `results/WT/<label>/3_publication_figures/` and
+`results/WT/all_images/figures/` are tracked, and
 `python -u figures/make_figures.py all` redraws any that is missing. The
 pipeline's own stage pictures under `1_lacunae/` and `2_canaliculi/` are
 tracked too: the skeleton png is an input to `diagnostics.py validate-network`.

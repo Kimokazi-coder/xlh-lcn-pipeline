@@ -2,7 +2,7 @@
 
 PRE-VALIDATION, PIXEL units. Every figure shows the default pipeline output as
 it is (src/ with every switch off), unless its caption says otherwise. The
-figures go into the results layout (results/README.md) as PNG (300 dpi) and
+figures go into the results layout of the WT group, results/WT/ (results/README.md) as PNG (300 dpi) and
 PDF (fonts embedded); no pipeline result file is written here. Coordinates
 are (x, y) = (column, row).
 
@@ -23,19 +23,19 @@ Usage (from the repo root):
     python -u figures/make_figures.py fields -f FIELD_DIR # per-field plot (Fig04; -m merged)
     python -u figures/make_figures.py switches            # crumb rule and hole fill (S01)
 
-Where the figures go (names from config.py): results/<label>/3_publication_figures/
-(overview, network, cell gallery and their logs), results/<label>/4_archive_not_used/
+Where the figures go (names from config.py): results/WT/<label>/3_publication_figures/
+(overview, network, cell gallery and their logs), results/WT/<label>/4_archive_not_used/
 (the per-image brightness variants and the low-cut overview layer, kept for
-history), results/all_images/figures/main/ (Fig01 to Fig04),
-results/all_images/figures/supplement/ (S01, S02), results/all_images/
-archive_not_used/ (S03, the coded contact sheet) and results/all_images/figures/
+history), results/WT/all_images/figures/main/ (Fig01 to Fig04),
+results/WT/all_images/figures/supplement/ (S01, S02), results/WT/all_images/
+archive_not_used/ (S03, the coded contact sheet) and results/WT/all_images/figures/
 display_window.json.
 Each output is skipped if its PNG and PDF exist; delete them to redraw.
 
 Shared style (one place, used by every figure):
     display window   fixed for the whole dataset: the 1st and 99.8th percentile
                      of the pooled red channel of all images, the same for every
-                     image and panel (results/all_images/figures/display_window.json)
+                     image and panel (results/WT/all_images/figures/display_window.json)
     fonts            Arial (Helvetica if present, else DejaVu Sans), 7 to 9 pt
                      at 180 mm figure width; PDF fonts embedded (TrueType)
     colours          one colour, one meaning (PALETTE): interior lacuna
@@ -197,9 +197,9 @@ def scale_bar(ax, image_width_px: int, length_px: int = SCALE_BAR_PX, colour: st
 
 def fig_stem(name: str) -> Path:
     """Where a numbered figure lives: main figures (Fig01, ...) in
-    results/all_images/figures/main/, supplementary figures (S01, ...) in
-    results/all_images/figures/supplement/, and the coded contact sheet (S03,
-    kept for history) in results/all_images/archive_not_used/."""
+    results/WT/all_images/figures/main/, supplementary figures (S01, ...) in
+    results/WT/all_images/figures/supplement/, and the coded contact sheet (S03,
+    kept for history) in results/WT/all_images/archive_not_used/."""
     figures = config.ALL_IMAGES_FIGURES_DIR
     if name.startswith("S03_contact_sheet_coded"):
         return lacunae.all_images_path(RESULTS, name, config.ALL_IMAGES_ARCHIVE_DIR)
@@ -361,7 +361,7 @@ def src_hash() -> str:
 
 def results_numbers(path: Path) -> tuple[list, list]:
     """(lacuna rows, cell rows) of the committed default output in
-    results/<label>/5_quantification/, the pipeline numbers every drawn number
+    results/WT/<label>/5_quantification/, the pipeline numbers every drawn number
     must equal. One row per lacuna now holds the shape and the network measures
     together, so both halves are the same list."""
     label = lacunae.image_label(path)
@@ -452,7 +452,7 @@ def ring_classes(skeleton: np.ndarray, lacuna_id_map: np.ndarray, interior_ids) 
 
 def image_data(name: str) -> dict:
     """Everything the v2 figures draw for one image, checked against the
-    pipeline numbers in results/<image>/ (rule 11). Raises AssertionFailed on
+    pipeline numbers in results/WT/<image>/ (rule 11). Raises AssertionFailed on
     any difference."""
     path = path_of(name)
     name = short(path)
@@ -785,7 +785,7 @@ def done_at(stem: Path, exts: tuple = ("png", "pdf")) -> bool:
 
 
 # Display windows (P8). The main per-image figures use the fixed dataset
-# window; their variants in results/<label>/4_archive_not_used/
+# window; their variants in results/WT/<label>/4_archive_not_used/
 # variants_per_image_brightness/ use the 1st
 # and 99.8th percentile of that image's own red channel (PNG only, to keep
 # the repository small). Display only; no measurement uses either window.
@@ -803,7 +803,7 @@ def exts_for(window) -> tuple:
 
 
 def update_inset_log(name: str, key: str, entry: dict) -> None:
-    """results/<label>/3_publication_figures/<label>_figure_inset_choice.json
+    """results/WT/<label>/3_publication_figures/<label>_figure_inset_choice.json
     holds one entry per figure kind."""
     path = fig_path(name, config.SUFFIX_FIGURE_INSET)
     log = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"image": name}
@@ -1100,7 +1100,7 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
 
 def figure_display_variants(name: str) -> None:
     """P8: the overview, network and gallery of one image with the image's own
-    display window, PNG only, in results/<label>/4_archive_not_used/
+    display window, PNG only, in results/WT/<label>/4_archive_not_used/
     variants_per_image_brightness/ (kept for history)."""
     d = image_data(name)
     name = d["short"]
@@ -1117,7 +1117,7 @@ def figure_display_variants(name: str) -> None:
                     "percentiles": list(WINDOW_PERCENTILES),
                     "note": "Display window of this image only: the 1st and 99.8th percentile of its red channel. "
                             "Display only; no measurement uses it. The main figures use the fixed dataset window "
-                            "(results/all_images/figures/display_window.json)."})
+                            "(results/WT/all_images/figures/display_window.json)."})
     figure_image(name, window=win, stem=variant(config.SUFFIX_FIGURE_OVERVIEW))
     figure_network(name, window=win, stem=variant(config.SUFFIX_FIGURE_NETWORK))
     figure_gallery(name, window=win, stem=variant(config.SUFFIX_FIGURE_GALLERY))
@@ -1128,7 +1128,7 @@ FIG02_IMAGE = "543-2"
 
 def copy_fig02() -> None:
     """Fig02 is a copy of the network figure of 543-2
-    (results/543-2/3_publication_figures/543-2_figure_network)."""
+    (results/WT/543-2/3_publication_figures/543-2_figure_network)."""
     import shutil
 
     src = fig_path(FIG02_IMAGE, config.SUFFIX_FIGURE_NETWORK)

@@ -19,7 +19,7 @@ Method, per image:
        lacuna_count but every summary statistic uses interior objects only,
        because their size and shape are truncated by the field of view.
 
-Outputs, per image, in results/<label>/1_lacunae/ (the label is the short
+Outputs, per image, in results/<group>/<label>/1_lacunae/ (the label is the short
 image name of config.IMAGE_LABELS; see image_label and result_path):
     <label>_lacunae_outlines.png  the image with kept lacunae outlined in green
     <label>_lacunae_results.xlsx  "summary" (counts and interior mean, median,
@@ -29,12 +29,14 @@ image name of config.IMAGE_LABELS; see image_label and result_path):
 Usage (from the repo root):
     python src/lacunae.py --dir data/WT
     python src/lacunae.py --image "data/WT/543-2.tif"
-    python src/lacunae.py --dir data/WT -o OTHER_FOLDER    (default output: results/)
+    python src/lacunae.py --dir data/WT -o OTHER_FOLDER
+(default output: results/<name of the input folder>, so data/WT writes results/WT)
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
@@ -836,7 +838,7 @@ def parameters() -> dict:
 DETECTION_NOTE = (
     "Detection record: what feature 1 did, with no measured value in it. The "
     "lacunae it found are the 1..N labels of the label image, and every number "
-    "measured from them is in results/<label>/5_quantification/ "
+    "measured from them is in this image's 5_quantification folder "
     "(src/quantification.py)."
 )
 
@@ -897,10 +899,51 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     group.add_argument("--image", type=Path, help="One .tif image.")
     group.add_argument("--dir", type=Path, help="A folder of .tif images.")
     parser.add_argument(
-        "-o", "--out", type=Path, default=config.RESULTS_DIR,
-        help="Results folder (default: results/). Each image gets its own subfolder, named by its label; "
-             "a folder run of src/canaliculi.py also writes all_images/summary_all_images.xlsx and .csv there.",
+        "-o", "--out", type=Path, default=None,
+        help="Results folder (default: results/<name of the input folder>, so data/WT writes results/WT). "
+             "Each image gets its own subfolder, named by its label; a folder run of "
+             "src/quantification.py also writes the cross-image table in all_images/.",
     )
+
+
+def output_root(args) -> Path:
+    """The results folder of a run: the -o folder if one was given, else
+    results/<name of the input folder> (config.RESULTS_ROOT), so a run on
+    data/WT writes results/WT/ and a run on data/Hyp_RD writes results/Hyp_RD/.
+    One rule for the three stages, so a group can never write into another."""
+    if args.out is not None:
+        return Path(args.out)
+    folder = args.dir if args.dir is not None else args.image.parent
+    return config.RESULTS_ROOT / Path(folder).resolve().name
+
+
+def report_failures(out_root: Path, stage: str, failures: list) -> None:
+    """List the images a run could not process, with the error, in
+    <out_root>/all_images/failed_images_<stage>.csv, and print them. With no
+    failure, a list an earlier run left is removed."""
+    path = all_images_path(out_root, config.FAILED_IMAGES_NAME.format(stage=stage))
+    if not failures:
+        if path.is_file():
+            path.unlink()
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f, lineterminator="\n")
+        w.writerow(["image", "error"])
+        w.writerows(failures)
+    print(f"\n{len(failures)} image(s) failed in {stage} and were skipped; the others carried on.")
+    for name, error in failures:
+        print(f"  FAILED {name}: {error}")
+    print(f"listed in {path}")
+
+
+def no_images(args, paths: list) -> bool:
+    """True, with a message, when a folder holds no .tif image: the run then
+    does nothing and writes nothing."""
+    if paths:
+        return False
+    print(f"No .tif image in {args.dir}: nothing to do, nothing written.")
+    return True
 
 
 def main() -> None:
@@ -908,16 +951,30 @@ def main() -> None:
                                                  "src/quantification.py.")
     add_input_arguments(parser)
     args = parser.parse_args()
+    args.out = output_root(args)
+    paths = image_paths(args)
+    if no_images(args, paths):
+        return
 
-    for image_path in image_paths(args):
-        result = analyse_image(image_path)
+    failures = []
+    for image_path in paths:
+        # An image that fails is listed and skipped; the others carry on.
+        try:
+            result = analyse_image(image_path)
+            write_outputs(result, args.out)
+        except Exception as exc:
+            failures.append([image_path.name, f"{type(exc).__name__}: {exc}"])
+            print(f"{image_path.name}: FAILED, skipped ({type(exc).__name__}: {exc})")
+            continue
         out_dir = args.out / image_label(image_path) / config.SECTION_LACUNAE
-        write_outputs(result, args.out)
         print(
             f"{image_path.name}: lacunae={result['lacuna_count']} "
             f"(interior {result['interior_lacuna_count']}, border {result['border_lacuna_count']})  "
             f"t_hi={result['t_hi']:.6f}  -> {out_dir}"
         )
+    report_failures(args.out, "lacunae", failures)
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

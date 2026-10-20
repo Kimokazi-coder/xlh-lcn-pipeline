@@ -11,8 +11,8 @@ inspection of the WT images. No parameter may be tuned on the other groups.
 
 **Two methods, and the choice is pending.** Sections 1 to 19 describe the
 **deterministic method**, the pipeline as `config.py` ships it, whose output is
-`results/`. Section 20 describes the **AI judge method**, the same pipeline
-with `config.AI_JUDGE_ENABLED` on, whose output is `results_ai_judge/`. Which
+`results/`, one folder per group. Section 20 describes the **AI judge method**, the same pipeline
+with `config.AI_JUDGE_ENABLED` on, whose output is `results_ai_judge/WT/`. Which
 the study uses has not been decided, and **neither has been validated against a
 manual trace**.
 
@@ -21,7 +21,7 @@ confirmed for all 8 images and rounded to two decimals. The pipeline reports
 px and px² all the same: `PIXEL_SIZE_UM` is deliberately `None`, because it is
 recorded in every result's parameters block and switches every scale bar to
 micrometres, so setting it would change the recorded values and a fresh run
-would no longer equal `results/` at tolerance 0. Convert with 0.13 um/px where
+would no longer equal `results/WT/` at tolerance 0. Convert with 0.13 um/px where
 a physical length is wanted; the experimental ridge method (section 7) works in
 micrometres throughout.
 
@@ -110,9 +110,9 @@ Reads the label image, the masks and the graph above, and measures them
 (section 3). Per lacuna: area, major and minor axis, aspect ratio,
 eccentricity, solidity, orientation, centroid, the frame-edge flag, and every
 network measure. Per image: the counts, the interior statistics and the field
-measures. It writes `results/<label>/5_quantification/` (json, xlsx and a plain
+measures. It writes `results/WT/<label>/5_quantification/` (json, xlsx and a plain
 pdf) and the one cross-image table,
-`results/all_images/quantification/quantification_all_images.csv`, `.xlsx` and
+`results/WT/all_images/quantification/quantification_all_images.csv`, `.xlsx` and
 `.pdf`. Every statistic is over interior lacunae only, as before.
 
 ## 2. Parameters and where each value came from
@@ -908,7 +908,7 @@ step); Sholl crossings at 10 / 20 / 30 px, the skeleton components crossing a
 
 In `config.py`; each comment names its evidence. They all act on the **lacuna**
 stage: the canalicular method has no switch, because there is only one method.
-With all off, `results/` is reproduced exactly
+With all off, `results/WT/` is reproduced exactly
 (`python src/diagnostics.py regression`).
 
 - `NARROW_CRUMB_RULE` (False): after the filters, a dropped watershed piece joins a kept lacuna if it
@@ -927,7 +927,7 @@ With all off, `results/` is reproduced exactly
   543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
   being a headline measure that does not depend on ownership.
 - `regression`: regenerate every image into an ignored folder and compare every json and summary number
-  with `results/` at tolerance 0 (provenance ignored), with and without the fast stage.
+  with `results/WT/` at tolerance 0 (provenance ignored), with and without the fast stage.
 - `switch-check`: each switch on alone; every lacuna whose area, roots or ring 30 px change.
 - `fast-check`: fast against original lacuna stage, labels pixel for pixel at $t_\mathrm{hi}$ 0.8 to 1.2.
 - `blind` / `unblind`: coded copies (pixel data only), key outside the repository; join a key to a table.
@@ -968,7 +968,7 @@ it failed on 96 figures because it unpacked `canaliculi.nearest_lacuna_map`
 into two values; it now takes the three that function returns.
 
 `figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
-into `results/` (map: `results/README.md`). One display window for the whole
+into `results/WT/` (map: `results/README.md`). One display window for the whole
 dataset (1st and 99.8th percentile of the pooled red channel); interior lacunae
 cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
 `figures/captions.md`; review notes: `figures/REVIEW.md` and
@@ -990,7 +990,7 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
   them, one colour per meaning; "c" marks a lacuna inside a flagged canal
   region; insets sit at least 60 px from the frame.
 - **Regenerate** with `python -u figures/make_figures.py all`; `check` compares
-  the drawing data with `results/`. Every figure it draws is reproducible, so
+  the drawing data with `results/WT/`. Every figure it draws is reproducible, so
   none is tracked. The pipeline's own stage pictures under `1_lacunae/` and
   `2_canaliculi/` are tracked: the skeleton png is an input to
   `validate-network`.
@@ -1677,7 +1677,7 @@ from 1,045 to 1,482 over the 8 images; with the fix they are 1,113. With the
 switch off no edge is marked and every number is the deterministic method's.
 
 **What it does to the numbers**, over the 8 images
-(`results_ai_judge/compare/compare_methods.xlsx`):
+(`results_ai_judge/WT/compare/compare_methods.xlsx`):
 
 | measure | deterministic | AI judge |
 | --- | --- | --- |
@@ -1696,7 +1696,7 @@ pairs, as whole connected networks; no single cell takes over an image.
 **Reproducibility, cost and approval.** The model is pinned
 (`claude-sonnet-5-5`), no temperature is sent (the model rejects one) and
 thinking is off. Every request and answer is logged with its hash in
-`results_ai_judge/ai_log/`, with the case pictures that were actually sent, and
+`results_ai_judge/WT/ai_log/`, with the case pictures that were actually sent, and
 the replay reruns the whole log offline to identical verdicts on all 8 images.
 The real run was made once, on 2026-10-19: **143 calls, $1.60**, against a dry
 run estimate of $1.19 and a ceiling of `config.MAX_COST_USD` = $5; one answer in

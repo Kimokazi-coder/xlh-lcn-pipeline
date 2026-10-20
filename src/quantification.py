@@ -926,13 +926,13 @@ NOTE = (
 # Reading what detection saved
 
 def quant_path(out_root: Path, label: str, extension: str) -> Path:
-    """results/<label>/5_quantification/<label>_quantification.<extension>."""
+    """results/<group>/<label>/5_quantification/<label>_quantification.<extension>."""
     return lacunae.result_path(out_root, label, config.SECTION_QUANTIFICATION,
                                config.SUFFIX_QUANTIFICATION + extension)
 
 
 def summary_path(out_root: Path, extension: str) -> Path:
-    """results/all_images/quantification/quantification_all_images.<extension>."""
+    """results/<group>/all_images/quantification/quantification_all_images.<extension>."""
     return lacunae.all_images_path(out_root, config.QUANT_SUMMARY_NAME + extension,
                                    config.ALL_IMAGES_QUANT_DIR)
 
@@ -1735,18 +1735,28 @@ def main() -> None:
     parser.add_argument("-m", "--roi-dir", type=Path, default=None,
                         help="Folder of bone ROI masks (white = bone), for field_density_in_roi_per_px.")
     args = parser.parse_args()
+    args.out = lacunae.output_root(args)
 
     image_paths = lacunae.image_paths(args)
-    results = []
+    if lacunae.no_images(args, image_paths):
+        return
+    results, failures = [], []
     for image_path in image_paths:
         label = lacunae.image_label(image_path)
-        detection = load_detection(args.out, label)
-        roi_mask = None
-        if args.roi_dir is not None:
-            roi_mask, _name = canaliculi.load_roi_mask(args.roi_dir, image_path,
-                                                       detection["lacuna_id_map"].shape)
-        result = quantify(detection, image_path, roi_mask)
-        write_outputs(result, args.out)
+        # An image that fails, here or in a detection stage before, is listed
+        # and skipped; the others carry on and the table holds them alone.
+        try:
+            detection = load_detection(args.out, label)
+            roi_mask = None
+            if args.roi_dir is not None:
+                roi_mask, _name = canaliculi.load_roi_mask(args.roi_dir, image_path,
+                                                           detection["lacuna_id_map"].shape)
+            result = quantify(detection, image_path, roi_mask)
+            write_outputs(result, args.out)
+        except Exception as exc:
+            failures.append([image_path.name, f"{type(exc).__name__}: {exc}"])
+            print(f"{image_path.name}: FAILED, skipped ({type(exc).__name__}: {exc})")
+            continue
         results.append(result)
         print(f"{image_path.name}: lacunae={result['lacuna_count']} "
               f"(interior {result['interior_lacuna_count']})  "
@@ -1755,9 +1765,12 @@ def main() -> None:
               f"width median={result['width']['width_median_px']} px  "
               f"-> {quant_path(args.out, label, '.json').parent}")
 
-    if len(results) > 1 or args.dir:
+    if results and (len(results) > 1 or args.dir):
         write_summary_table(results, args.out)
         print(f"cross-image table -> {summary_path(args.out, '.xlsx')}, .csv and .pdf")
+    lacunae.report_failures(args.out, "quantification", failures)
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

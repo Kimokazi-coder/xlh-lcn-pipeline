@@ -1,9 +1,9 @@
 # Figure captions (draft)
 
 Drafts for every figure in `results/` (PNG at 300 dpi and PDF; see `results/README.md`): the per-image
-figures in `results/<label>/3_publication_figures/`, the others in `results/all_images/figures/`. Main
+figures in `results/WT/<label>/3_publication_figures/`, the others in `results/WT/all_images/figures/`. Main
 figures are Fig01 to Fig04, supplementary figures S01 and S02 (the coded contact sheet S03 is kept in
-`results/all_images/archive_not_used/`, not a result and not tracked: regenerate with `python -u figures/make_figures.py all -b KEY`); fields are called Field 1 to Field 4, so no field name looks like a
+`results/WT/all_images/archive_not_used/`, not a result and not tracked: regenerate with `python -u figures/make_figures.py all -b KEY`); fields are called Field 1 to Field 4, so no field name looks like a
 figure name. Every caption applies these common
 facts: **pre-validation** (nothing has been checked against manual counts); **pixel units** (the images
 carry no spatial calibration, so lengths are px, areas px² and densities px⁻¹, and every scale bar is
@@ -16,12 +16,12 @@ lie partly outside the focal plane are not detected by the pipeline and are not 
 ## Display window
 
 **Fixed dataset window** (every main figure): the 1st and 99.8th percentile of the pooled red channel
-of all 8 WT images, 20 to 255 grey levels of 255 (`results/all_images/figures/display_window.json`). Images are not
+of all 8 WT images, 20 to 255 grey levels of 255 (`results/WT/all_images/figures/display_window.json`). Images are not
 stretched one by one, so their brightness can be compared by eye. The comparison figures (Fig01, S02,
 S03 contact sheets, Fig03 threshold figure, S01 switch examples; Fig04 shows no image) use only this
 window, and so do the main per-image figures (`<label>_figure_overview`, `_figure_network`, `_figure_cell_gallery`).
 
-**Per-image window** (only in `results/<label>/4_archive_not_used/variants_per_image_brightness/`, not tracked: regenerate with `python -u figures/make_figures.py all`; kept
+**Per-image window** (only in `results/WT/<label>/4_archive_not_used/variants_per_image_brightness/`, not tracked: regenerate with `python -u figures/make_figures.py all`; kept
 for history): the same overview, network and
 gallery drawn with the 1st and 99.8th percentile of that image's own red channel
 (`display_window_this_image.json` there), PNG only, with "Display window: this image only, display
@@ -100,7 +100,7 @@ flagged canal region), roots, ring length 30 px, area. The header gives the coun
 frame edge; "c" beside a lacuna in a flagged canal region) and two count lines under each panel. One
 fixed display window for all panels, so the brighter background of the 543 sections is real. Scale bar
 200 px (uncalibrated). `S02_contact_sheet_with_rejected_candidates` adds the rejected lacuna-scale candidates (grey
-dashed, with A, S or a). The coded version (`S03_contact_sheet_coded`, a blinding test, kept in `results/all_images/archive_not_used/`, not tracked: regenerate with `python -u figures/make_figures.py all -b KEY`) labels the panels S001 to S008 from a blinding key and
+dashed, with A, S or a). The coded version (`S03_contact_sheet_coded`, a blinding test, kept in `results/WT/all_images/archive_not_used/`, not tracked: regenerate with `python -u figures/make_figures.py all -b KEY`) labels the panels S001 to S008 from a blinding key and
 orders them by code; it hides the names, not the appearance. Pre-validation, pixel units.
 
 ## Fig03_threshold_sensitivity
@@ -126,7 +126,7 @@ centroids across sections (Field 1: 542_z06 + 542_z18; Field 2: 543-2 + 543_3 + 
 interior lacunae), labelled with the short image name; blue bar: field mean. 682_z08 (open diamond) is
 alone in its field by the data-derived grouping, probably the same field as 682_z23 and 682_z29 at
 another depth. All y axes start at zero. Sections of one field repeat the same cells, so the field is
-the unit; with 4 fields no statistical test is shown. The dots equal `results/all_images/summary_all_images.csv` (roots,
+the unit; with 4 fields no statistical test is shown. The dots equal `results/WT/all_images/summary_all_images.csv` (roots,
 ring 30, field density) and the pipeline run (the two normalised measures), and the bars equal
 `field_summary.csv` (asserted; values in `Fig04_per_field_values.json`). Pre-validation, pixel units, WT.
 

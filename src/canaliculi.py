@@ -65,7 +65,7 @@ Measures:
     of the skeleton is graph-connected to any lacuna in these 2D sections,
     and owned threads can lie hundreds of px from their cell.
 
-Outputs, per image, in results/<label>/2_canaliculi/ (the label is the short
+Outputs, per image, in results/<group>/<label>/2_canaliculi/ (the label is the short
 image name of config.IMAGE_LABELS; see lacunae.image_label and result_path):
     <label>_canaliculi_skeleton.png       the skeleton, unannotated
     <label>_canaliculi_mask.png           the network mask, unannotated
@@ -74,8 +74,8 @@ image name of config.IMAGE_LABELS; see lacunae.image_label and result_path):
     <label>_canaliculi_verification.png   each lacuna and the threads it owns in
                                   one colour, over the original image, to check
                                   the tracing against the real threads
-After a --dir run, also results/all_images/summary_all_images.xlsx and .csv
-(one row per image; see write_summary_table).
+Every measured number, and the cross-image table, is written by
+src/quantification.py.
 
 Regression check: 543-2 must give 161.00 edges per interior cell, 21.63 px
 mean edge length and 8.50 roots per interior cell
@@ -84,7 +84,8 @@ mean edge length and 8.50 roots per interior cell
 Usage (from the repo root):
     python src/canaliculi.py --dir data/WT
     python src/canaliculi.py --image "data/WT/543-2.tif"
-    python src/canaliculi.py --dir data/WT -o OTHER_FOLDER    (default output: results/)
+    python src/canaliculi.py --dir data/WT -o OTHER_FOLDER
+(default output: results/<name of the input folder>, so data/WT writes results/WT)
 """
 
 from __future__ import annotations
@@ -1825,7 +1826,7 @@ DETECTION_NOTE = (
     "Detection record: what feature 2 did, with no measured value in it. The "
     "mask, the skeleton, the vascular mask and the graph file beside it are what "
     "it produced; every number measured from them is in "
-    "results/<label>/5_quantification/ (src/quantification.py). The method is "
+    "this image's 5_quantification folder (src/quantification.py). The method is "
     "the ridge method with gap bridging off, so no gap was joined."
 )
 
@@ -1900,7 +1901,7 @@ def write_outputs(result: dict, out_root: Path) -> None:
 
 # Bone ROI masks (option -m). One PNG per image, white = bone, the size of the
 # image, named by the image's clean name or by its short name, the label used
-# in results/ (config.IMAGE_LABELS, the one naming table). No ROI is applied
+# in results/<group>/ (config.IMAGE_LABELS, the one naming table). No ROI is applied
 # without -m.
 ROI_SHORT_NAMES = config.IMAGE_LABELS
 
@@ -1929,20 +1930,35 @@ def main() -> None:
     )
     lacunae.add_input_arguments(parser)
     args = parser.parse_args()
+    explicit_out = args.out is not None
+    args.out = lacunae.output_root(args)
+    paths = lacunae.image_paths(args)
+    if lacunae.no_images(args, paths):
+        return
 
-    for image_path in lacunae.image_paths(args):
-        result = analyse_image(image_path)
+    failures = []
+    for image_path in paths:
+        # An image that fails is listed and skipped; the others carry on.
+        try:
+            result = analyse_image(image_path)
+            write_outputs(result, args.out)
+        except Exception as exc:
+            failures.append([image_path.name, f"{type(exc).__name__}: {exc}"])
+            print(f"{image_path.name}: FAILED, skipped ({type(exc).__name__}: {exc})")
+            continue
         out_dir = args.out / lacunae.image_label(image_path)
-        write_outputs(result, args.out)
         print(
             f"{image_path.name}: lacunae={result['lacunae']['lacuna_count']}  "
             f"skeleton px={int(result['skeleton'].sum())}  "
             f"t_lo={result['t_lo']:.6f}  -> {out_dir}"
         )
+    lacunae.report_failures(args.out, "canaliculi", failures)
 
     print("Measure these with: python src/quantification.py "
           + (f"--dir {args.dir}" if args.dir else f'--image "{args.image}"')
-          + (f" -o {args.out}" if args.out != config.RESULTS_DIR else ""))
+          + (f" -o {args.out}" if explicit_out else ""))
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

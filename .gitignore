@@ -25,9 +25,10 @@ code_key*
 # Removed from the repository on 2026-10-20 (cleanup). Each is written again when
 # its command reruns, so it is ignored rather than tracked a second time. The
 # command that makes each one is cited where the docs use it, and the files as
-# they were are at commit bf3b982.
-results/*/4_archive_not_used/
-results/all_images/archive_not_used/
+# they were are at commit bf3b982. Since 2026-10-20 the per-image and all_images
+# folders sit one level down, in results/<group>/.
+results/*/*/4_archive_not_used/
+results/*/all_images/archive_not_used/
 results/diagnosis_543_3/
 results/ai_dry_run/
 results/ridge_background/

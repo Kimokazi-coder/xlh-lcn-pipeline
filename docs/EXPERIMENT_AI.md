@@ -272,7 +272,7 @@ longer asked about, and class d and the crops that can hold two candidate bodies
 **The pictures of every case of all 8 images, exactly as the judge would see them, are in
 `results/ai_dry_run/pictures/`** (145 of them, 18 MB; not tracked, regenerate with the command
 above). They are the pictures a run would send; the ones that were actually sent are in
-`results_ai_judge/ai_log/<label>/pictures/`.
+`results_ai_judge/WT/ai_log/<label>/pictures/`.
 
 ## The self-test
 
@@ -322,7 +322,7 @@ the same reason the stub's verdicts are, and they are not reported here as anyth
 - **The model is pinned** in `config.AI_JUDGE_MODEL` (`claude-sonnet-5-5`), and no server side
   fallback to another model is enabled: a refusal is logged and the case stays unjudged, because a
   silent fallback would break the pin.
-- **Every request and every answer is logged** to `results_ai_judge/ai_log/<label>/`, one json per attempt,
+- **Every request and every answer is logged** to `results_ai_judge/WT/ai_log/<label>/`, one json per attempt,
   with the sha256 of the canonical request, of the picture, of the prompt and of the examples. The
   picture that was sent is written beside it.
 - **Replay** reruns from the log with no network: the request is rebuilt, its hash compared with the
@@ -393,7 +393,7 @@ The brief left these open. Each was decided, and here is the reason.
 ## Step 7: the real run, its replay, and what it did to the network
 
 **The real run was made on 2026-10-19, 15:58 to 16:14 UTC, on all 8 images**, and its every request
-and answer is in `results_ai_judge/ai_log/`. From the log:
+and answer is in `results_ai_judge/WT/ai_log/`. From the log:
 
 | image | calls | answers retried | cases left unjudged | input tokens | output tokens | cost USD |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -424,18 +424,18 @@ and answer is in `results_ai_judge/ai_log/`. From the log:
 **The replay reproduces it offline.** `python src/diagnostics.py ai-judge --dir data/WT --replay`
 rebuilds every request and every picture, finds every hash equal to the one logged, and gets
 IDENTICAL verdicts on all 8 images: 143 attempts, 0 requests and 0 pictures differing from what was
-sent (`results_ai_judge/replay.txt`). A replay never reads `ALLOW_EXTERNAL_API` or
+sent (`results_ai_judge/WT/replay.txt`). A replay never reads `ALLOW_EXTERNAL_API` or
 `ANTHROPIC_API_KEY`; only a live run asks.
 
 **The pipeline with the switch on** was run by `python src/diagnostics.py ai-run --dir data/WT`,
 which turns `config.AI_JUDGE_ENABLED` on for that process only, runs detection, canaliculi and
-quantification exactly as the three scripts do, and writes to `results_ai_judge/`, the second
-labelled set, a sibling of `results/` with the same per-image layout (its own README says what is
+quantification exactly as the three scripts do, and writes to `results_ai_judge/WT/`, the second
+labelled set, a sibling of `results/WT/` with the same per-image layout (its own README says what is
 in it). `config.py` still ships with the switch off. The command hashes every file under `results/`
 and every file of the judge log before and after, and **both were byte identical afterwards**
-(`results_ai_judge/ai_run.json`).
+(`results_ai_judge/WT/ai_run.json`).
 
-**Judge off against judge on** is in `results_ai_judge/compare/REPORT.md`, made by
+**Judge off against judge on** is in `results_ai_judge/WT/compare/REPORT.md`, made by
 `python src/diagnostics.py ai-compare --dir data/WT`, with the verification and skeleton pictures
 side by side and a picture of what changed hands for every image. Both runs are recomputed and
 checked against the files on disk pixel for pixel before a number is reported, and every check
@@ -475,7 +475,7 @@ switch off no edge is marked, so every number is what it was.
 
 The 68 roots that remain above judge off are tracing the judge added that touches a body, which the
 pipeline's own contact rule attaches like any other thread. Every lacuna is in
-`results_ai_judge/roots_before_and_after_the_fix.md`, and `results_ai_judge/compare/REPORT.md`
+`results_ai_judge/WT/roots_before_and_after_the_fix.md`, and `results_ai_judge/WT/compare/REPORT.md`
 recomputes the before-the-fix count from the judge-on graph itself.
 
 The two guards a run leans on are still rehearsed in the self-test with no network: with every
@@ -517,8 +517,8 @@ python src/diagnostics.py ai-judge --dir data/WT
 # The same run again, offline, from the log.
 python src/diagnostics.py ai-judge --dir data/WT --replay
 
-# The pipeline with the switch on for that run only, into results_ai_judge/, and
-# judge off against judge on with the pictures, into results_ai_judge/compare/.
+# The pipeline with the switch on for that run only, into results_ai_judge/WT/, and
+# judge off against judge on with the pictures, into results_ai_judge/WT/compare/.
 python src/diagnostics.py ai-run --dir data/WT
 python src/diagnostics.py ai-compare --dir data/WT
 

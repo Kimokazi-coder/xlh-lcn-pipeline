@@ -73,13 +73,21 @@ IMPORT_MAX_GROUP_MB = 100.0
 IMPORT_SOURCE_PATH_PARTS = 2
 IMPORT_INVENTORY_NAME = "image_inventory.csv"  # in DATA_DIR
 
-# Outputs: one folder per image, plus the cross-image files (results/README.md).
-RESULTS_DIR = PROJECT_ROOT / "results"
+# Outputs: one folder per group, results/<group>/, each holding one folder per
+# image and the cross-image files (results/README.md). RESULTS_DIR is the
+# reference group's folder, results/WT/: the deterministic method on the 8 WT
+# sections, and what python src/diagnostics.py regression compares a fresh run
+# with. A run given no output folder writes to RESULTS_ROOT/<name of its input
+# folder>, so a run on data/WT writes results/WT/ (lacunae.output_root).
+RESULTS_ROOT = PROJECT_ROOT / "results"
+RESULTS_DIR = RESULTS_ROOT / REFERENCE_GROUP
 # The second, labelled set: the same pipeline with the AI judge switch on
-# (docs/EXPERIMENT_AI.md), with the same per-image layout, the comparison
-# against results/, and the judge log with the case pictures that were sent.
-# results/ stays the deterministic method and is never written by the judge.
-AI_RESULTS_DIR = PROJECT_ROOT / "results_ai_judge"
+# (docs/EXPERIMENT_AI.md), for the WT group only, in results_ai_judge/WT/ with
+# the same per-image layout, the comparison against results/WT/, and the judge
+# log with the case pictures that were sent. results/ stays the deterministic
+# method and is never written by the judge.
+AI_RESULTS_ROOT = PROJECT_ROOT / "results_ai_judge"
+AI_RESULTS_DIR = AI_RESULTS_ROOT / REFERENCE_GROUP
 
 # Result layout. Every result file is named after its image. The label of an
 # image is its short name, from this table (key: the cleaned file name made by
@@ -97,7 +105,7 @@ IMAGE_LABELS = {
     "682_z29c1-3": "682_z29",
 }
 
-# Folders inside results/<label>/. Detection writes 1_lacunae and
+# Folders inside results/<group>/<label>/. Detection writes 1_lacunae and
 # 2_canaliculi, src/quantification.py writes 5_quantification, and every
 # measured number lives in 5_quantification alone.
 SECTION_LACUNAE = "1_lacunae"
@@ -106,7 +114,7 @@ SECTION_FIGURES = "3_publication_figures"
 SECTION_ARCHIVE = "4_archive_not_used"
 SECTION_QUANTIFICATION = "5_quantification"
 
-# Cross-image folders inside results/.
+# Cross-image folders inside results/<group>/.
 ALL_IMAGES_DIR = "all_images"
 ALL_IMAGES_ARCHIVE_DIR = "archive_not_used"
 ALL_IMAGES_FIGURES_DIR = "figures"
@@ -146,6 +154,10 @@ SUMMARY_NAME = "summary_all_images"  # .csv and .xlsx in ALL_IMAGES_DIR
 # One row per image, in ALL_IMAGES_DIR/ALL_IMAGES_QUANT_DIR. This becomes the
 # only cross-image table; it replaces summary_all_images with the same columns.
 QUANT_SUMMARY_NAME = "quantification_all_images"  # .csv, .xlsx and .pdf
+# A run lists every image it could not process, one file per stage, in
+# ALL_IMAGES_DIR, and the other images carry on. The file is written only when
+# an image fails, and a later run in which none fails removes it.
+FAILED_IMAGES_NAME = "failed_images_{stage}.csv"
 DISPLAY_WINDOW_FILE = "display_window.json"  # in ALL_IMAGES_DIR/ALL_IMAGES_FIGURES_DIR
 
 # Image and channel selection
@@ -171,7 +183,7 @@ INVERT_SIGNAL = False
 # here because PIXEL_SIZE_UM is recorded in the parameters block of every result
 # (lacunae.parameters, canaliculi.parameters) and switches every figure scale bar
 # to micrometres: setting it would change those recorded values and the figures,
-# so a fresh run would no longer equal results/ at tolerance 0. The units of the
+# so a fresh run would no longer equal results/WT/ at tolerance 0. The units of the
 # pipeline's output are a choice; the calibration is not missing.
 PIXEL_SIZE_UM = None
 
@@ -561,7 +573,7 @@ RANDOM_SEED = 0
 
 # Switches (all OFF by default)
 # Each changes the pipeline only when turned on. With every switch off the
-# outputs equal results/ exactly (python src/diagnostics.py regression), and
+# outputs equal results/WT/ exactly (python src/diagnostics.py regression), and
 # python src/diagnostics.py switch-check shows what each one changes. Karim
 # decides which to turn on. Evidence: the overnight report, tag archive-2026-10-13.
 
@@ -605,11 +617,11 @@ FAST_LACUNA_STAGE = False
 # building it, is written up in docs/EXPERIMENT_AI.md.
 #
 # Nothing below changes any pipeline number while AI_JUDGE_ENABLED is False,
-# which is how it ships: with it off the outputs equal results/ exactly
+# which is how it ships: with it off the outputs equal results/WT/ exactly
 # (python src/diagnostics.py regression).
 
 # The switch. When True, src/canaliculi.py reads the judge's decision file for
-# the image it is analysing (results_ai_judge/ai_log/<label>/<label>_ai_segments.json),
+# the image it is analysing (results_ai_judge/WT/ai_log/<label>/<label>_ai_segments.json),
 # joins the segments judged real to the skeleton, drops the segments judged
 # artifact, and then runs the existing ownership, 50 um cap and quantification
 # unchanged. An image with no decision file is an error and not a silent pass,
@@ -669,7 +681,8 @@ AI_MAX_UNJUDGED_SHARE = 0.20
 # Where the requests, the answers, the pictures that were sent and the decision
 # files are written, inside AI_RESULTS_DIR. One folder per image.
 AI_LOG_DIR = "ai_log"
-# Where the dry run writes its report and its pictures, inside RESULTS_DIR.
+# Where the dry run writes its report and its pictures, inside RESULTS_ROOT
+# (results/ai_dry_run/, not tracked).
 AI_DRY_RUN_DIR = "ai_dry_run"
 
 # Candidates (step 1 of the experiment). Inside each lacuna's measured empty

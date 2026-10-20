@@ -13,7 +13,7 @@ rounded to two decimals (`config.PIXEL_SIZE_UM_ACQUIRED`). Every biological limi
 micrometres and converted with it. The measures stay in px and px², because `config.PIXEL_SIZE_UM` is
 deliberately `None`: it is recorded in every result's parameters block and switches every scale bar to
 micrometres, so setting it would change the recorded values and a fresh run would no longer equal
-`results/` at tolerance 0. Convert with 0.13 um/px where a physical length is wanted.
+`results/WT/` at tolerance 0. Convert with 0.13 um/px where a physical length is wanted.
 
 ## The one canalicular method
 
@@ -81,7 +81,7 @@ owning their threads, but carrying no area or shape measure.
 | `src/` | `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off) |
 | `data/WT/` | the 8 input images |
-| `results/` | the pipeline output: one folder per image and `all_images/`; the reference for every check; guide: `results/README.md` |
+| `results/` | the pipeline output, one folder per group: `results/WT/` holds one folder per image and `all_images/`, and is the reference for every check; guide: `results/README.md` |
 | `figures/` | the figure code (`make_figures.py`), captions and review notes |
 | `docs/` | this page, `METHODS.md` and `EXPERIMENT_AI.md` |
 
@@ -98,7 +98,7 @@ is the only branch.
 ## The switches
 
 In `config.py`. They all act on the **lacuna** stage, they are all off by default, and with all off the
-pipeline gives `results/` exactly.
+pipeline gives `results/WT/` exactly.
 
 | switch | default | what it does when on |
 |---|---|---|
@@ -116,13 +116,13 @@ python src/lacunae.py --dir data/WT                      # feature 1 detection (
 python src/canaliculi.py --dir data/WT                   # feature 2 detection
 python src/quantification.py --dir data/WT               # every measure and both tables
 python src/diagnostics.py reference-check                # must PASS: 161.00 / 21.63 / 8.50 on 543-2
-python src/diagnostics.py regression                     # every number against results/, tolerance 0
+python src/diagnostics.py regression                     # every number against results/WT/, tolerance 0
 python src/diagnostics.py switch-check                   # what each switch changes
-python -u figures/make_figures.py all                    # every figure, into results/
-python -u figures/make_figures.py check                  # drawn numbers against results/
+python -u figures/make_figures.py all                    # every figure, into results/WT/
+python -u figures/make_figures.py check                  # drawn numbers against results/WT/
 python src/diagnostics.py survey -d data/WT -o results/survey     # what it does to every image (not tracked)
 python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
 ```
 
-Do not write a new `results/` unless a switch is adopted on purpose; `results/` is the reference that
+Do not write a new `results/WT/` unless a switch is adopted on purpose; `results/WT/` is the reference that
 `regression` compares with.
