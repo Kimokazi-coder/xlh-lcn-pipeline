@@ -3,10 +3,12 @@
 **EXPERIMENT, branch `exp-ai-layer` only. See `docs/EXPERIMENT_AI.md`.**
 
 Everything the AI judge was asked and everything it answered, one folder per
-image. This folder is empty of runs because **no real call has been made yet**:
-`ALLOW_EXTERNAL_API=1` and `ANTHROPIC_API_KEY` were not set, so the judge has
-never been allowed to call out. Checked again on 2026-10-19, in the session, in
-the Windows user environment and in the machine environment.
+image. It holds **the real run on all 8 images, made on 2026-10-19**: 143 calls,
+$1.60, one unreadable answer retried and recovered, and no segment left
+unjudged. It replays offline to identical verdicts on every image
+(`results/ai_run/step1_replay.txt`). What the verdicts then did to the network
+is in `results/ai_run/compare/REPORT.md`. **Not validated**: no verdict here has
+been checked against a manual trace.
 
 What a run writes, under `results/ai_log/<image label>/`:
 

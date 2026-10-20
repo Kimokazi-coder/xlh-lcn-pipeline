@@ -13,7 +13,7 @@ pipeline output is byte for byte what `main` produces: `reference-check` PASS at
 
 External API use approved on 2026-10-15, approver: Karim
 
-## The question
+## The question  
 
 Ownership goes by the shortest path through the skeleton. That is the right rule for a thread whose
 own cell traced it, and the wrong one at a join: a whole connected network can go to a cell that
@@ -387,33 +387,80 @@ The brief left these open. Each was decided, and here is the reason.
 | Server side refusal fallback | not enabled | it would break the pinned model |
 | Where the fixed prompt lives | `src/judge_prompt.md` | the code loads it and hashes it; it is part of the method, like `config.py` |
 
-## Step 7: the real run is waiting, and both of its guards are rehearsed
+## Step 7: the real run, its replay, and what it did to the network
 
-**No real call has been made. `results/ai_log/` holds no answers.** Checked again on 2026-10-19:
-neither `ALLOW_EXTERNAL_API` nor `ANTHROPIC_API_KEY` is set, in the session, in the Windows user
-environment or in the machine environment, and there is no `.env`. The judge therefore refuses to
-call out, which is the design:
+**The real run was made on 2026-10-19, 15:58 to 16:14 UTC, on all 8 images**, and its every request
+and answer is in `results/ai_log/`. From the log:
 
-```
-> python src/diagnostics.py ai-judge --image "data/WT/543-2.tif"
-Refused: a real run needs a connection and ALLOW_EXTERNAL_API is not set to 1.
-Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.
-```
+| image | calls | answers retried | cases left unjudged | input tokens | output tokens | cost USD |
+| --- | --- | --- | --- | --- | --- | --- |
+| 542_z06 | 23 | 0 | 0 | 85,055 | 6,598 | 0.2361 |
+| 542_z18 | 19 | 0 | 0 | 71,493 | 6,588 | 0.2089 |
+| 543-2 | 16 | 0 | 0 | 59,932 | 5,180 | 0.1717 |
+| 543_3 | 23 | 0 | 0 | 87,831 | 9,154 | 0.2672 |
+| 543_z13 | 16 | 1 | 0 | 60,189 | 5,418 | 0.1746 |
+| 682_z08 | 12 | 0 | 0 | 45,129 | 4,159 | 0.1318 |
+| 682_z23 | 16 | 0 | 0 | 61,129 | 6,507 | 0.1873 |
+| 682_z29 | 18 | 0 | 0 | 69,407 | 8,012 | 0.2189 |
+| **all 8** | **143** | **1** | **0** | **540,165** | **51,616** | **1.60** |
 
-Everything that does not need the network has been built and run: the candidates and the four
-classes on all 8 images, the 145 case pictures, the dry run with its cost, the whole chain end to
-end against a stub judge, and the switch through the pipeline to quantification.
+- Every answer came from the pinned `claude-sonnet-5-5`, and no request needed the thinking
+  fallback.
+- **One answer in 143 could not be read** (543_z13 `case_0004`, a red number with no verdict). It was
+  retried once and the retry was valid, so **no case and no segment was left unjudged**. The quality
+  gate never came near tripping.
+- 3 of the 145 cases had no numbered segment once the crop was drawn and needed no call, which is
+  why there are 143 calls and not 145.
+- 895 segments judged: 722 real and 173 artifact. Of the 554 verdicts that named an owner, 52 left
+  the segment with the cell that already owned it, 364 gave an owner to a segment nobody owned, and
+  **138 moved a segment from one cell to another**.
+- **The dry run estimated $1.19 and the run cost $1.60.** The estimate ran about 27% low, nearly all
+  of it on input tokens (540,165 against 424,320 estimated). It stayed well inside the $5 ceiling,
+  but a later estimate should be read as a floor.
 
-The two guards a run of 8 images leans on are rehearsed in the self-test, with no network:
+**The replay reproduces it offline.** `python src/diagnostics.py ai-judge --dir data/WT --replay`
+rebuilds every request and every picture, finds every hash equal to the one logged, and gets
+IDENTICAL verdicts on all 8 images: 143 attempts, 0 requests and 0 pictures differing from what was
+sent (`results/ai_run/step1_replay.txt`). A replay never reads `ALLOW_EXTERNAL_API` or
+`ANTHROPIC_API_KEY`; only a live run asks.
 
-- **the quality gate.** With every answer deliberately unreadable, the run stops after 20 calls and
-  10 of 16 cases, reporting that 10 of 10 cases had no valid answer after their one retry, which is
-  above the 20% it allows. Nothing after that point is attempted.
-- **a billing error.** With the first call raising what a spent balance raises, the run stops at
-  `case_0001` after 0 calls, raises, and leaves **no decision file**. Nothing is marked unjudged.
+**The pipeline with the switch on** was run by `python src/diagnostics.py ai-run --dir data/WT`,
+which turns `config.AI_JUDGE_ENABLED` on for that process only, runs detection, canaliculi and
+quantification exactly as the three scripts do, and writes to `results/ai_run/`. `config.py` still
+ships with the switch off. The command hashes every file under `results/` outside its own folder
+before and after: **all 760 were byte identical afterwards** (`results/ai_run/ai_run.json`).
 
-**To make the real run happen** (PowerShell, in this repository, the key in the session only and
-never in a file):
+**Judge off against judge on** is in `results/ai_run/compare/REPORT.md`, made by
+`python src/diagnostics.py ai-compare --dir data/WT`, with the verification and skeleton pictures
+side by side and a picture of what changed hands for every image. Both runs are recomputed and
+checked against the files on disk pixel for pixel before a number is reported, and every check
+passed. Over the 8 images:
+
+- **21,373 px of tracing changed hands between cells, in 770 segments**, and they move as whole
+  connected networks, which is what the design is for: the shortest path, given the attachment,
+  splits the network where the two cells' paths meet. Class d on its own moves 21,843 px.
+- **No single cell takes over an image**: the largest owner's share of the skeleton moves by at most
+  0.015 on any image (542_z18, 0.091 to 0.106).
+- Owned tracing rises and unowned falls on every image, by 1,211 to 4,030 px owned.
+
+**And one result that must be read before any root count is.** Roots per cell rise sharply with the
+switch on: 1,045 roots to 1,482 over the 8 images, and on 543-2 the mean per interior cell goes from
+8.5 to 12.92. **That rise is mostly not biology.** A root is counted as any node attached to a cell's
+virtual node, and a verdict is expressed as exactly such an attachment, at the end of the segment
+nearest the cell, which can lie tens of pixels from the body. So every verdict that gives a cell a
+segment away from its body adds a root that is not a thread leaving the body. 493 of the 1,482
+judge-on roots contain a verdict's attachment node; leave them out and the count is 989, against
+1,045 with the switch off. (493 is an upper bound on what the verdicts add, because such a root can
+also hold a node the contact rule attached.) Until either the attachment or the root count is
+changed so that the two are not the same thing, **no root number made with the switch on means what
+a root number means**. This report does not change either, because both are design decisions.
+
+The two guards a run leans on are still rehearsed in the self-test with no network: with every
+answer unreadable the run stops after 20 calls, and a billing error stops it at the first case with
+no decision file written.
+
+**To run the judge again** (PowerShell, in this repository, the key in the session only and never in
+a file):
 
 ```powershell
 $env:ALLOW_EXTERNAL_API = "1"
@@ -426,17 +473,8 @@ python src/diagnostics.py ai-judge   --dir data/WT --replay               # offl
 
 Use `$env:` and not `setx`: `setx` writes the key into the Windows registry, where it outlives the
 session and every process in it. The key is never read back, printed, logged or written to a file by
-anything here, and it is scrubbed out of an error message before that message is logged. To put the
-key in for one session without it appearing in the console history, use
-`$env:ANTHROPIC_API_KEY = (Read-Host "key" -AsSecureString | ConvertFrom-SecureString -AsPlainText)`
-on PowerShell 7, or paste it into the assignment above and then clear the history with
-`Clear-History`. In Git Bash the two lines are `export ALLOW_EXTERNAL_API=1` and
-`export ANTHROPIC_API_KEY=sk-ant-...`.
-
-That run will cost about **$1.19 for 145 calls**, refuse to start if an image's own estimate is above
-`config.MAX_COST_USD`, stop if the running total passes it, stop if too many answers cannot be read,
-and stop at once on a billing or authentication error. It writes the log, the pictures and the
-decision file under `results/ai_log/<label>/`.
+anything here, and it is scrubbed out of an error message before that message is logged. In Git Bash
+the two lines are `export ALLOW_EXTERNAL_API=1` and `export ANTHROPIC_API_KEY=sk-ant-...`.
 
 ## How to run it
 
@@ -455,6 +493,11 @@ python src/diagnostics.py ai-judge --dir data/WT
 
 # The same run again, offline, from the log.
 python src/diagnostics.py ai-judge --dir data/WT --replay
+
+# The pipeline with the switch on for that run only, into results/ai_run/, and
+# judge off against judge on with the pictures, into results/ai_run/compare/.
+python src/diagnostics.py ai-run --dir data/WT
+python src/diagnostics.py ai-compare --dir data/WT
 
 # The pipeline with the judge applied: set config.AI_JUDGE_ENABLED = True and run
 # the pipeline as usual. It needs a decision file for every image it is given.
@@ -477,10 +520,14 @@ Established, and each one measured rather than asserted:
 - two answers that disagree are no answer, and the segment is left as the pipeline had it;
 - the whole chain replays offline to the same verdicts, with every request hashed;
 - a billing error stops the run at once, and a run whose answers cannot be read stops itself;
+- the real run on all 8 images left no segment unjudged, cost $1.60, and replays offline to the same
+  verdicts; with the switch on, 21,373 px of tracing change hands between cells as whole networks,
+  and nothing under `results/` outside `results/ai_run/` changes by a byte;
 - with the switch off every number is `main`'s, over 6,800 of them at tolerance 0.
 
 **Not established, and nothing here should be read as if it were.** No verdict has been checked
-against a manual trace. No judgement in this design has been shown to be a better judgement than the
+against a manual trace. The root counts made with the switch on are inflated by the way a verdict is
+attached (Step 7) and mean nothing until that is resolved. No judgement in this design has been shown to be a better judgement than the
 pipeline's. The 145 pictures say what the judge would be asked; they do not say the answer would be
 right, and the cost of a wrong answer is not symmetric, because a thread given to the wrong cell
 moves that cell's whole measured network. **Nothing here is validated**, nothing here has produced a
