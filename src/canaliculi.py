@@ -1232,6 +1232,14 @@ def attach_judged_segments(G: nx.Graph, extra_attach: dict | None) -> nx.Graph:
     judge grants ownership and never vetoes it, the old owner keeps whatever the
     shortest path still gives it, and no ownership rule moves into the model.
 
+    The edge is marked `judged`. It splits the network through the shortest
+    path exactly like any other attachment, but it is NOT a root: it sits at a
+    segment end that can lie tens of px from the body, so it is not a thread
+    leaving the body, and quantification.root_points leaves it out. Where the
+    pipeline's own contact or attach rule already joined this cell to this node,
+    the edge stays the pipeline's and stays a root; the verdict only sets its
+    weight to 0, as it always did.
+
     A node both the judge and the contact rule reach at weight 0 goes to the
     lower cell id, which is how every other tie in this file is broken."""
     if not extra_attach:
@@ -1244,7 +1252,11 @@ def attach_judged_segments(G: nx.Graph, extra_attach: dict | None) -> nx.Graph:
         for pixels in segments:
             pixels = np.asarray(pixels, dtype=np.float64)
             gaps = ((coords[:, None, :] - pixels[None, :, :]) ** 2).sum(axis=2).min(axis=1)
-            G.add_edge(("cell", int(lacuna_id)), nodes[int(np.argmin(gaps))], weight=0.0)
+            cell, node = ("cell", int(lacuna_id)), nodes[int(np.argmin(gaps))]
+            if G.has_edge(cell, node):
+                G[cell][node]["weight"] = 0.0
+            else:
+                G.add_edge(cell, node, weight=0.0, judged=True)
     return G
 
 

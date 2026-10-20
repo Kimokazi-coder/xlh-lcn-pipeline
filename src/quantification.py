@@ -359,18 +359,30 @@ def cell_edge_lengths(G: nx.Graph, edge_owner: dict, cell_id: int) -> list[float
     return lengths
 
 
-def cell_root_count(G: nx.Graph, cell_id: int) -> int:
-    """Distinct threads leaving this lacuna's surface: the skeleton nodes
-    attached to its virtual node, clustered by single linkage at
-    canaliculi.ROOT_MERGE_DIST_PX so one thick thread counts once."""
+def root_points(G: nx.Graph, cell_id: int, count_judged: bool = False) -> list:
+    """The skeleton nodes that count as roots of this lacuna: every node its
+    virtual node is attached to by the pipeline's own contact or attach rule,
+    which only ever attach within reach of the body.
+
+    An attachment an AI judge verdict made (edge attribute `judged`,
+    canaliculi.attach_judged_segments) splits the network through the shortest
+    path like any other, but is not a thread leaving the body, so it is left
+    out. With the judge switch off no edge carries the attribute and this is
+    every attached node, as it always was. `count_judged` counts them anyway,
+    which is only for measuring what the old count did."""
     src = ("cell", cell_id)
     if not G.has_node(src):
-        return 0
-    points = [n for n in G.neighbors(src) if not canaliculi._is_cell_node(n)]
-    if not points:
-        return 0
+        return []
+    return [n for n in G.neighbors(src) if not canaliculi._is_cell_node(n)
+            and (count_judged or not G[src][n].get("judged", False))]
 
-    unmerged = list(points)
+
+def root_clusters(G: nx.Graph, cell_id: int, count_judged: bool = False) -> list[list]:
+    """The roots of one lacuna as clusters of nodes: `root_points` clustered by
+    single linkage at canaliculi.ROOT_MERGE_DIST_PX, so one thick thread counts
+    once. The one copy of this rule; the root count, the figures and the
+    diagnostics all use it."""
+    unmerged = root_points(G, cell_id, count_judged)
     clusters: list[list] = []
     while unmerged:
         seed = unmerged.pop()
@@ -384,7 +396,13 @@ def cell_root_count(G: nx.Graph, cell_id: int) -> int:
                     unmerged.remove(other)
                     changed = True
         clusters.append(cluster)
-    return len(clusters)
+    return clusters
+
+
+def cell_root_count(G: nx.Graph, cell_id: int) -> int:
+    """Distinct threads leaving this lacuna's surface: the clusters of
+    `root_clusters`."""
+    return len(root_clusters(G, cell_id))
 
 
 def ring_lengths(skeleton: np.ndarray, dist_to_lacuna: np.ndarray, nearest_id: np.ndarray, n_lacunae: int) -> dict:

@@ -282,27 +282,10 @@ def windowed(channel: np.ndarray, dim: float = 1.0) -> np.ndarray:
 # Pipeline output for one image ----------------------------------------------------------
 
 def root_clusters(G, cell_id: int) -> list[tuple[float, float]]:
-    """The roots of one lacuna as (x, y) points: a copy of
-    quantification.cell_root_count that returns the cluster centres instead of
-    their number. Checked against roots_count when the cache is built."""
-    src = ("cell", cell_id)
-    if not G.has_node(src):
-        return []
-    points = [n for n in G.neighbors(src) if not canaliculi._is_cell_node(n)]
-    unmerged = list(points)
-    clusters = []
-    while unmerged:
-        seed = unmerged.pop()
-        cluster = [seed]
-        changed = True
-        while changed:
-            changed = False
-            for other in list(unmerged):
-                if any(np.hypot(other[0] - m[0], other[1] - m[1]) <= canaliculi.ROOT_MERGE_DIST_PX for m in cluster):
-                    cluster.append(other)
-                    unmerged.remove(other)
-                    changed = True
-        clusters.append(cluster)
+    """The roots of one lacuna as (x, y) points: the cluster centres of
+    quantification.root_clusters, the one rule the root count uses. Checked
+    against roots_count when the cache is built."""
+    clusters = quantification.root_clusters(G, cell_id)
     return [(float(np.mean([c[1] for c in cl])), float(np.mean([c[0] for c in cl]))) for cl in clusters]
 
 

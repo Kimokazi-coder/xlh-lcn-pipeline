@@ -5890,30 +5890,6 @@ def cmd_ai_run(args) -> int:
 AI_COMPARE_SCRATCH = config.PROJECT_ROOT / ".cache" / "ai_compare"
 
 
-def _root_clusters(G: nx.Graph, cell_id: int) -> list:
-    """The clusters quantification.cell_root_count counts, one per root, so a
-    root can be asked where it came from. Same nodes, same single linkage, same
-    merge distance."""
-    src = ("cell", cell_id)
-    if not G.has_node(src):
-        return []
-    unmerged = [n for n in G.neighbors(src) if not canaliculi._is_cell_node(n)]
-    clusters = []
-    while unmerged:
-        cluster = [unmerged.pop()]
-        changed = True
-        while changed:
-            changed = False
-            for other in list(unmerged):
-                if any(np.hypot(other[0] - m[0], other[1] - m[1]) <= canaliculi.ROOT_MERGE_DIST_PX
-                       for m in cluster):
-                    cluster.append(other)
-                    unmerged.remove(other)
-                    changed = True
-        clusters.append(cluster)
-    return clusters
-
-
 def _owner_stats(result: dict, n_lacunae: int) -> dict:
     """Skeleton, owned and unowned px, and the largest owner's share."""
     skeleton, owner_map = result["skeleton"], result["owner_map"]
@@ -6085,13 +6061,12 @@ def _ai_compare_one(job: tuple) -> dict:
             point = np.asarray(point, dtype=np.float64)
             gaps = ((coords[:, None, :] - point[None, :, :]) ** 2).sum(axis=2).min(axis=1)
             judge_nodes.setdefault(int(lacuna_id), set()).add(nodes[int(np.argmin(gaps))])
-    roots_at_a_verdict = {}
-    roots_in_memory = {}
-    for lacuna_id in range(1, n + 1):
-        clusters = _root_clusters(G, lacuna_id)
-        roots_in_memory[lacuna_id] = len(clusters)
-        mine = judge_nodes.get(lacuna_id, set())
-        roots_at_a_verdict[lacuna_id] = sum(1 for c in clusters if mine & set(c))
+    # Roots by the fixed rule, which is what the judge-on json holds, and by the
+    # old one, which counted a verdict's attachment as a root: that is what the
+    # switch reported before the fix.
+    roots_in_memory = {i: len(quantification.root_clusters(G, i)) for i in range(1, n + 1)}
+    roots_old_count = {i: len(quantification.root_clusters(G, i, count_judged=True))
+                       for i in range(1, n + 1)}
     recorded = after["ai_judge"]["counts"]
     checks = {
         "judge_off_skeleton_equals_results": bool((sk_before == before["skeleton"]).all()),
@@ -6102,6 +6077,10 @@ def _ai_compare_one(job: tuple) -> dict:
             ai["counts"][k] == recorded[k] for k in ai["counts"]),
         "every_verdict_attachment_is_an_edge_of_its_cell": all(
             G.has_edge(("cell", i), node) for i, ns in judge_nodes.items() for node in ns),
+        "no_verdict_only_attachment_is_a_root": all(
+            node not in quantification.root_points(G, i)
+            for i, ns in judge_nodes.items() for node in ns
+            if G[("cell", i)][node].get("judged", False)),
     }
 
     moved_px, pixel_pairs = _pixel_moves(before["owner_map"], after["owner_map"])
@@ -6157,9 +6136,15 @@ def _ai_compare_one(job: tuple) -> dict:
                 for (a, b), v in sorted(pairs.items(), key=lambda kv: (-kv[1], kv[0]))]
 
     roots_rows = [{"lacuna_id": i, "interior": interior.get(i, True),
-                   "roots_before": roots_before.get(i), "roots_after": roots_after.get(i),
-                   "roots_after_at_a_verdict_attachment": roots_at_a_verdict[i]}
+                   "roots_judge_off": roots_before.get(i),
+                   "roots_judge_on_before_the_fix": roots_old_count[i],
+                   "roots_judge_on": roots_after.get(i)}
                   for i in sorted(roots_after)]
+
+    def interior_mean(values):
+        picked = [values[i] for i in values if interior.get(i, True) and values[i] is not None]
+        return round(float(np.mean(picked)), 4) if picked else None
+
     return {
         "image_label": label,
         "lacunae": n,
@@ -6179,9 +6164,10 @@ def _ai_compare_one(job: tuple) -> dict:
                          "pairs_segments": pairs_list(d_segments["pairs"])},
         "roots": {"mean_per_interior_cell_before": q_before["summary"]["roots_count"]["mean"],
                   "mean_per_interior_cell_after": q_after["summary"]["roots_count"]["mean"],
+                  "mean_per_interior_cell_after_before_the_fix": interior_mean(roots_old_count),
                   "total_before": int(sum(v for v in roots_before.values() if v is not None)),
                   "total_after": int(sum(v for v in roots_after.values() if v is not None)),
-                  "total_after_at_a_verdict_attachment": int(sum(roots_at_a_verdict.values())),
+                  "total_after_before_the_fix": int(sum(roots_old_count.values())),
                   "per_lacuna": roots_rows},
         "before": _owner_stats(before, n),
         "after": _owner_stats(after, n),
@@ -6219,10 +6205,12 @@ def cmd_ai_compare(args) -> int:
             "ownership_moves.segments": ("branches of the judge-on skeleton, at least the judge's "
                                          "minimum segment length, whose majority owner changed"),
             "class_d_only": "the same switch with every verdict but the class d ones unjudged",
-            "roots_after_at_a_verdict_attachment": (
-                "roots of the judge-on graph that contain a node a verdict attached its cell "
-                "to; a root is any node attached to the cell, so an attachment far from the "
-                "body counts as one"),
+            "roots": ("a root is an attachment the pipeline's own contact or attach rule made, "
+                      "clustered at canaliculi.ROOT_MERGE_DIST_PX; a verdict's attachment splits "
+                      "the network but is not a root (quantification.root_points)"),
+            "roots_judge_on_before_the_fix": (
+                "the same judge-on graph counted the old way, with every verdict attachment "
+                "counted as a root, which is what the switch reported before the fix"),
             "largest_owner_share": "the largest single cell's owned px over all skeleton px",
         },
         "checks_failed": failed,
@@ -6233,12 +6221,13 @@ def cmd_ai_compare(args) -> int:
     (compare_dir / "REPORT.md").write_text(_ai_compare_markdown(out, failed), encoding="utf-8")
 
     print_table(["image", "given owner", "moved verdicts", "segments moved", "px moved",
-                 "class d px", "roots before", "roots after", "of them at a verdict"],
+                 "class d px", "roots off", "roots on, before the fix", "roots on"],
                 [[o["image_label"], o["verdicts"]["given_an_owner"],
                   sum(c["moved"]["segments"] for c in o["verdicts"]["by_class"].values()),
                   o["ownership_moves"]["segments"], o["ownership_moves"]["px"],
-                  o["class_d_only"]["px"], o["roots"]["total_before"], o["roots"]["total_after"],
-                  o["roots"]["total_after_at_a_verdict_attachment"]] for o in out],
+                  o["class_d_only"]["px"], o["roots"]["total_before"],
+                  o["roots"]["total_after_before_the_fix"], o["roots"]["total_after"]]
+                 for o in out],
                 title="Judge off against judge on")
     print_table(["image", "skeleton px", "owned px", "unowned px", "largest owner share"],
                 [[o["image_label"],
@@ -6283,7 +6272,7 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
         "## Summary",
         "",
         "| image | given an owner | moved by a verdict | segments moved | px moved | class d alone, px | "
-        "roots before | roots after | of them at a verdict | skeleton px | owned px | unowned px | "
+        "roots off | roots on, before the fix | roots on | skeleton px | owned px | unowned px | "
         "largest owner share |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
@@ -6295,7 +6284,7 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
             f"| {o['image_label']} | {o['verdicts']['given_an_owner']} | {moved_v} | "
             f"{o['ownership_moves']['segments']} | {o['ownership_moves']['px']:,} | "
             f"{o['class_d_only']['px']:,} | {o['roots']['total_before']} | "
-            f"{o['roots']['total_after']} | {o['roots']['total_after_at_a_verdict_attachment']} | "
+            f"{o['roots']['total_after_before_the_fix']} | {o['roots']['total_after']} | "
             f"{b['skeleton_px']:,} to {a['skeleton_px']:,} | {b['owned_px']:,} to {a['owned_px']:,} | "
             f"{b['unowned_px']:,} to {a['unowned_px']:,} | "
             f"{b['largest_owner_share']:.3f} to {a['largest_owner_share']:.3f} |")
@@ -6306,10 +6295,10 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
         tot["dpx"] += o["class_d_only"]["px"]
         tot["rb"] += o["roots"]["total_before"]
         tot["ra"] += o["roots"]["total_after"]
-        tot["rv"] += o["roots"]["total_after_at_a_verdict_attachment"]
+        tot["rv"] += o["roots"]["total_after_before_the_fix"]
     lines.append(f"| **all {len(out)}** | **{tot['given']}** | **{tot['moved_v']}** | **{tot['seg']}** | "
-                 f"**{tot['px']:,}** | **{tot['dpx']:,}** | **{tot['rb']:,}** | **{tot['ra']:,}** | "
-                 f"**{tot['rv']}** | | | | |")
+                 f"**{tot['px']:,}** | **{tot['dpx']:,}** | **{tot['rb']:,}** | **{tot['rv']:,}** | "
+                 f"**{tot['ra']:,}** | | | | |")
     lines += [
         "",
         "- **given an owner**: verdicts applied as a zero weight attachment, after conflicts "
@@ -6320,38 +6309,33 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
         "at least the judge's minimum segment length, whose majority owner changed.",
         "- **class d alone**: the same switch with every verdict but the class d ones left "
         "unjudged, so the pixels that change hands are the ones class d moves on its own.",
-        "- **roots**: summed over every lacuna, from the quantification jsons on disk. **of them "
-        "at a verdict** counts the judge-on roots that contain a node a verdict attached its cell "
-        "to; see the warning below.",
+        "- **roots**: summed over every lacuna. *roots off* and *roots on* are the quantification "
+        "jsons on disk; *roots on, before the fix* is the same judge-on graph counted the old way, "
+        "with a verdict's attachment counted as a root. See below.",
         "",
-        "## Roots: read this before reading the root counts",
+        "## Roots, and the fix",
         "",
-        "A root is counted as any skeleton node attached to the cell's virtual node, clustered at "
-        f"{canaliculi.ROOT_MERGE_DIST_PX:g} px (`quantification.cell_root_count`). A verdict is "
-        "expressed as exactly such an attachment, at the end of the segment nearest the cell, and "
-        "that end can lie tens of pixels from the body. **So every verdict that gives a cell a "
-        "segment away from its body adds a root that is not a thread leaving the body.** The rise "
-        "in roots below is largely that, and the column *of them at a verdict* measures how much. "
-        "That column counts a root as the verdict's when any node in its cluster is a node a "
-        "verdict attached the cell to, and such a cluster can also hold a node the contact rule "
-        "attached, so it is an upper bound on the roots the verdicts add, and *roots on, not at "
-        "one* is a lower bound on the pipeline's own. "
-        "It is a property of how the attachment is counted, not a finding about the cells, and "
-        "it is left as it is here because changing how a verdict is expressed, or how a root is "
-        "counted, is a design decision this report does not take.",
+        "A verdict is expressed as a zero weight attachment from the cell it names to the end of "
+        "the segment nearest that cell, and that end can lie tens of pixels from the body. The "
+        "root count used to count every node attached to a cell's virtual node, so **every such "
+        "verdict added a root that is not a thread leaving the body**. The fix keeps the "
+        "attachment, so the shortest path still splits the network exactly as it did, and counts "
+        "a root only for an attachment the pipeline's own contact or attach rule made, which only "
+        "ever attach within reach of the body (`quantification.root_points`). A verdict's own edge "
+        "is marked `judged` when it is made and is left out; where the pipeline had already joined "
+        "that cell to that node, the edge stays the pipeline's and stays a root. With the switch "
+        "off no edge is marked, so every number is what it was.",
         "",
-        "| image | roots off | roots on | of them at a verdict attachment | roots on, not at one | "
-        "mean per interior cell, off | on | lacunae whose roots changed |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| image | roots off | roots on, before the fix | roots on | mean per interior cell, off | "
+        "on, before the fix | on |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for o in out:
-        changed = [r for r in o["roots"]["per_lacuna"] if r["roots_before"] != r["roots_after"]]
         r = o["roots"]
-        lines.append(f"| {o['image_label']} | {r['total_before']} | {r['total_after']} | "
-                     f"{r['total_after_at_a_verdict_attachment']} | "
-                     f"{r['total_after'] - r['total_after_at_a_verdict_attachment']} | "
-                     f"{r['mean_per_interior_cell_before']} | {r['mean_per_interior_cell_after']} | "
-                     f"{len(changed)} of {len(r['per_lacuna'])} |")
+        lines.append(f"| {o['image_label']} | {r['total_before']} | {r['total_after_before_the_fix']} | "
+                     f"{r['total_after']} | {r['mean_per_interior_cell_before']} | "
+                     f"{r['mean_per_interior_cell_after_before_the_fix']} | "
+                     f"{r['mean_per_interior_cell_after']} |")
     lines += ["", "## Per image", ""]
     for o in out:
         v = o["verdicts"]["by_class"]
@@ -6386,10 +6370,12 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
                + (", ".join(f"{k.replace('->', ' to ')} ({n})" for k, n in sorted(v['d']['pairs'].items(),
                                                             key=lambda kv: -kv[1])) or "none")
                if "d" in v else "none") + ".",
-            f"- Roots, summed: {o['roots']['total_before']} to {o['roots']['total_after']}, of "
-            f"which {o['roots']['total_after_at_a_verdict_attachment']} contain a verdict's "
-            f"attachment node. Mean per interior cell {o['roots']['mean_per_interior_cell_before']}"
-            f" to {o['roots']['mean_per_interior_cell_after']}.",
+            f"- Roots, summed: {o['roots']['total_before']} with the judge off, "
+            f"{o['roots']['total_after_before_the_fix']} with it on before the fix, "
+            f"{o['roots']['total_after']} with it on. Per lacuna, off / on before the fix / on: "
+            + ", ".join(f"{row['lacuna_id']}: {row['roots_judge_off']} / "
+                        f"{row['roots_judge_on_before_the_fix']} / {row['roots_judge_on']}"
+                        for row in o["roots"]["per_lacuna"]) + ".",
             f"- Skeleton {o['before']['skeleton_px']:,} to {o['after']['skeleton_px']:,} px; owned "
             f"{o['before']['owned_px']:,} to {o['after']['owned_px']:,}; unowned "
             f"{o['before']['unowned_px']:,} to {o['after']['unowned_px']:,}; largest owner "
