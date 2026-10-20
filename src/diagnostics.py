@@ -75,6 +75,9 @@ Subcommands:
                       proving every other file under results/ is unchanged
     ai-compare        EXPERIMENT: judge off against judge on, per image: the
                       pictures side by side and what the verdicts moved
+    compare-methods   both result sets side by side, results/ and
+                      results_ai_judge/: csv and xlsx per lacuna, per image and
+                      overall, and the cell pairs whose segments changed hands
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -6419,6 +6422,184 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
     return "\n".join(lines)
 
 
+# compare-methods ----------------------------------------------------------------
+# The two labelled result sets side by side: results/ (the deterministic method)
+# and results_ai_judge/ (the same pipeline with the AI judge switch on). The same
+# measures for both, per lacuna, per image and over all images, and the cell
+# pairs whose segments changed hands. Reads files only: the quantification
+# jsons of both sets, and results_ai_judge/compare/ai_compare.json for what
+# needs the owner maps (owned and unowned px, the largest owner's share, the
+# pairs), which ai-compare measured and checked against both sets pixel for
+# pixel. It refuses if ai_compare.json no longer agrees with the jsons.
+
+METHOD_NAMES = ("deterministic", "ai_judge")
+
+
+def _method_rows(root: Path, label: str) -> dict:
+    q = json.loads(result_json(root, label).read_text(encoding="utf-8"))
+    lacunae_rows = {int(r["lacuna_id"]): r for r in q["lacunae"]}
+    interior = [r for r in q["lacunae"] if not r["on_border"]]
+    return {
+        "q": q,
+        "lacunae": lacunae_rows,
+        "roots_total": int(sum(r["roots_count"] for r in q["lacunae"])),
+        "roots_interior": [r["roots_count"] for r in interior],
+        "ring_interior": [r["ring_length_r30_px"] for r in interior],
+        "area": float(q["field"]["analysed_area_px2"]),
+        "skeleton_px": int(q["field"]["total_skeleton_length_px"]),
+    }
+
+
+def cmd_compare_methods(args) -> int:
+    import openpyxl
+
+    images = images_from(args)
+    det_root, ai_root = config.RESULTS_DIR, config.AI_RESULTS_DIR
+    compare_json = Path(args.compare).resolve()
+    out = Path(args.out).resolve()
+    if not compare_json.is_file():
+        print(f"Refused: {compare_json} is missing. Run python src/diagnostics.py ai-compare first.")
+        return 2
+    comparison = {o["image_label"]: o for o in
+                  json.loads(compare_json.read_text(encoding="utf-8"))["per_image"]}
+
+    per_image, per_lacuna, pairs, problems = [], [], [], []
+    pooled = {m: {"roots": [], "ring": [], "roots_total": 0, "area": 0.0, "skeleton": 0,
+                  "owned": 0, "unowned": 0, "shares": []} for m in METHOD_NAMES}
+    for image_path in images:
+        label = lacunae.image_label(image_path)
+        det, ai = _method_rows(det_root, label), _method_rows(ai_root, label)
+        c = comparison.get(label)
+        if c is None:
+            problems.append(f"{label}: not in {compare_json.name}")
+            continue
+        # ai_compare.json must describe these very files, or its owner-map
+        # numbers belong to another run.
+        if (c["before"]["skeleton_px"] != det["skeleton_px"]
+                or c["after"]["skeleton_px"] != ai["skeleton_px"]
+                or c["roots"]["total_before"] != det["roots_total"]
+                or c["roots"]["total_after"] != ai["roots_total"]):
+            problems.append(f"{label}: {compare_json.name} does not match the quantification jsons")
+            continue
+        owner = {"deterministic": c["before"], "ai_judge": c["after"]}
+        values = {
+            "roots per interior cell": (det["q"]["summary"]["roots_count"]["mean"],
+                                        ai["q"]["summary"]["roots_count"]["mean"]),
+            "roots, all lacunae": (det["roots_total"], ai["roots_total"]),
+            "ring length r30 px per interior cell": (det["q"]["summary"]["ring_length_r30_px"]["mean"],
+                                                     ai["q"]["summary"]["ring_length_r30_px"]["mean"]),
+            "field length density per px": (det["q"]["field"]["canalicular_length_density_per_px"],
+                                             ai["q"]["field"]["canalicular_length_density_per_px"]),
+            "skeleton px": (det["skeleton_px"], ai["skeleton_px"]),
+            "owned px": (owner["deterministic"]["owned_px"], owner["ai_judge"]["owned_px"]),
+            "unowned px": (owner["deterministic"]["unowned_px"], owner["ai_judge"]["unowned_px"]),
+            "largest owner share": (owner["deterministic"]["largest_owner_share"],
+                                    owner["ai_judge"]["largest_owner_share"]),
+            "largest owner, lacuna id": (owner["deterministic"]["largest_owner"],
+                                         owner["ai_judge"]["largest_owner"]),
+        }
+        for measure, (a, b) in values.items():
+            diff = None if "lacuna id" in measure else round(float(b) - float(a), 6)
+            per_image.append([label, measure, a, b, diff])
+        for lacuna_id in sorted(det["lacunae"]):
+            d, j = det["lacunae"][lacuna_id], ai["lacunae"][lacuna_id]
+            per_lacuna.append([label, lacuna_id, "no" if d["on_border"] else "yes",
+                               d["roots_count"], j["roots_count"], j["roots_count"] - d["roots_count"],
+                               d["ring_length_r30_px"], j["ring_length_r30_px"],
+                               round(j["ring_length_r30_px"] - d["ring_length_r30_px"], 4)])
+        by_pair: dict = {}
+        for p in c["ownership_moves"]["pairs_px"]:
+            by_pair.setdefault((p["from"], p["to"]), [0, 0])[0] = p["count"]
+        for p in c["ownership_moves"]["pairs_segments"]:
+            by_pair.setdefault((p["from"], p["to"]), [0, 0])[1] = p["count"]
+        verdicts = c["verdicts"]["by_class"].get("d", {}).get("pairs", {})
+        for (a, b), (px, segs) in sorted(by_pair.items(), key=lambda kv: (-kv[1][0], kv[0])):
+            pairs.append([label, a, b, px, segs, verdicts.get(f"{a}->{b}", 0)])
+        for m, rows, own in (("deterministic", det, owner["deterministic"]),
+                             ("ai_judge", ai, owner["ai_judge"])):
+            pool = pooled[m]
+            pool["roots"] += rows["roots_interior"]
+            pool["ring"] += rows["ring_interior"]
+            pool["roots_total"] += rows["roots_total"]
+            pool["area"] += rows["area"]
+            pool["skeleton"] += rows["skeleton_px"]
+            pool["owned"] += own["owned_px"]
+            pool["unowned"] += own["unowned_px"]
+            pool["shares"].append(own["largest_owner_share"])
+    if problems:
+        print("Refused, so no table mixes two runs:")
+        for p in problems:
+            print(f"  {p}")
+        print("Rerun python src/diagnostics.py ai-compare --dir data/WT, then this.")
+        return 3
+
+    overall = []
+    for measure, f in (
+            ("roots per interior cell, pooled", lambda p: round(float(np.mean(p["roots"])), 4)),
+            ("roots, all lacunae", lambda p: p["roots_total"]),
+            ("ring length r30 px per interior cell, pooled", lambda p: round(float(np.mean(p["ring"])), 4)),
+            ("field length density per px, all skeleton over all area",
+             lambda p: round(p["skeleton"] / p["area"], 8)),
+            ("skeleton px", lambda p: p["skeleton"]),
+            ("owned px", lambda p: p["owned"]),
+            ("unowned px", lambda p: p["unowned"]),
+            ("largest owner share, highest image", lambda p: round(max(p["shares"]), 4)),
+            ("largest owner share, mean of images", lambda p: round(float(np.mean(p["shares"])), 4))):
+        a, b = f(pooled["deterministic"]), f(pooled["ai_judge"])
+        overall.append(["all images", measure, a, b, round(float(b) - float(a), 6)])
+
+    out.mkdir(parents=True, exist_ok=True)
+    header = ["image", "measure", "deterministic (results/)", "ai_judge (results_ai_judge/)",
+              "difference, ai_judge minus deterministic"]
+    lacuna_header = ["image", "lacuna_id", "interior", "roots deterministic", "roots ai_judge",
+                     "roots difference", "ring length r30 px deterministic",
+                     "ring length r30 px ai_judge", "ring length r30 px difference"]
+    pair_header = ["image", "from lacuna", "to lacuna", "px that changed hands",
+                   "segments that changed hands", "class d verdicts naming this move"]
+    for name, head, rows in (("compare_methods.csv", header, per_image + overall),
+                             ("compare_methods_per_lacuna.csv", lacuna_header, per_lacuna),
+                             ("compare_methods_cell_pairs.csv", pair_header, pairs)):
+        with open(out / name, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(head)
+            writer.writerows(rows)
+    notes = [
+        ["EXPERIMENT. NOT VALIDATED: neither method has been checked against a manual trace, "
+         "and which is used is a choice still pending."],
+        ["deterministic: results/, the pipeline as config.py ships it, AI_JUDGE_ENABLED off."],
+        ["ai_judge: results_ai_judge/, the same pipeline with AI_JUDGE_ENABLED on, from the "
+         "decision files in results_ai_judge/ai_log/."],
+        ["Roots, ring length, field length density and skeleton px are read from each set's "
+         "quantification json."],
+        ["Owned px, unowned px, the largest owner's share and the cell pairs are read from "
+         f"{compare_json.relative_to(config.PROJECT_ROOT).as_posix()}, which ai-compare measured on "
+         "the owner maps of both runs and checked against both sets pixel for pixel. A cell "
+         "pair is a lacuna whose tracing went to another: px on the owner maps, segments as "
+         "branches of the judge-on skeleton whose majority owner changed."],
+        ["Made by python src/diagnostics.py compare-methods --dir data/WT."],
+    ]
+    wb = openpyxl.Workbook()
+    for index, (title, head, rows) in enumerate((("per_image", header, per_image),
+                                                 ("overall", header, overall),
+                                                 ("per_lacuna", lacuna_header, per_lacuna),
+                                                 ("cell_pairs", pair_header, pairs),
+                                                 ("notes", ["note"], notes))):
+        ws = wb.active if index == 0 else wb.create_sheet()
+        ws.title = title
+        ws.append(head)
+        for row in rows:
+            ws.append(row)
+    wb.save(out / "compare_methods.xlsx")
+
+    print_table(["measure", "deterministic", "ai_judge", "difference"],
+                [row[1:] for row in overall], title="Both methods over all the images")
+    print(f"\n{len(per_image)} per-image rows, {len(per_lacuna)} lacunae, {len(pairs)} cell pairs")
+    for name in ("compare_methods.csv", "compare_methods_per_lacuna.csv",
+                 "compare_methods_cell_pairs.csv", "compare_methods.xlsx"):
+        print(f"-> {(out / name).relative_to(config.PROJECT_ROOT).as_posix()}")
+    return 0
+
+
 def _ai_same_decisions(a: dict, b: dict) -> bool:
     """Do two decision files hold the same verdicts for the same candidates?"""
     if a.get("geometry_sha256") != b.get("geometry_sha256"):
@@ -6706,6 +6887,16 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_ai_compare)
+
+    p = sub.add_parser("compare-methods",
+                       help="Both result sets side by side: csv and xlsx per lacuna, per image, "
+                            "overall, and the cell pairs that changed hands.")
+    add_images_arguments(p)
+    p.add_argument("--compare", type=Path, default=AI_RUN_DIR / "compare" / "ai_compare.json",
+                   help="ai-compare's record (default: results_ai_judge/compare/ai_compare.json).")
+    p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR / "compare",
+                   help="Output folder (default: results_ai_judge/compare).")
+    p.set_defaults(func=cmd_compare_methods)
 
     p = sub.add_parser("ai-judge",
                        help="EXPERIMENT: run the AI judge on an image, or replay it from the log.")
