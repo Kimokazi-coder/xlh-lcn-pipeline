@@ -5551,11 +5551,14 @@ def cmd_ai_judge(args) -> int:
     if args.self_test:
         return _ai_self_test(images[:1])
     mode = "replay" if args.replay else "live"
-    allowed, why = ai_judge.external_calls_allowed()
-    if mode == "live" and not allowed:
-        print(f"Refused: a real run needs a connection and {why}.")
-        print("Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.")
-        return 2
+    # Only a live run asks whether it may call out. A replay never looks at
+    # either environment variable, the key least of all: it has no use for it.
+    if mode == "live":
+        allowed, why = ai_judge.external_calls_allowed()
+        if not allowed:
+            print(f"Refused: a real run needs a connection and {why}.")
+            print("Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.")
+            return 2
 
     # The quality gate, over the whole run and not one image: it stops the run
     # if too many answers cannot be read, and one counter watches every image.
@@ -5615,9 +5618,14 @@ def cmd_ai_judge(args) -> int:
               f"{totals['segments_artifact']} artifact "
               f"({100.0 * totals['segments_artifact'] / offered:.1f}%), "
               f"{totals['segments_unjudged']} unjudged")
-        print(f"owners: {totals['segments_given_an_owner']} segments given one, of which "
-              f"{totals['owner_moved_by_a_verdict']} to a cell that did not own them; "
-              f"{totals['segments_given_no_owner']} given none")
+        given = [s for c in decisions["cases"] for s in c["segments"]
+                 if s["verdict"] != "unjudged" and s["owner_lacuna_id"]]
+        kept_owner = sum(1 for s in given if s["owner_lacuna_id"] == s["owner_lacuna_id_before"])
+        from_none = sum(1 for s in given if not s["owner_lacuna_id_before"])
+        between = len(given) - kept_owner - from_none
+        print(f"owners: {len(given)} segments given one: {kept_owner} the cell that already "
+              f"owned it, {from_none} a segment nobody owned, {between} moved from one cell to "
+              f"another; {totals['segments_given_no_owner']} given none")
         print(f"json failures: {totals['invalid_attempts']} of {totals['attempts']} attempts "
               f"({totals['call_errors']} of them a failed call, "
               f"{totals['refusals']} a refusal), "
