@@ -1,0 +1,54 @@
+{
+  "schema": "lcn-ai-judge-log-1",
+  "written_at": "2026-10-19T16:05:12Z",
+  "mode": "live",
+  "image_label": "543_3",
+  "lacuna_id": 5,
+  "case_id": "case_0017",
+  "attempt": 1,
+  "picture": "results/ai_log/543_3/pictures/case_0017.png",
+  "picture_sha256": "b0c4d26d97d3295f92b806179475af56596ca8e95336cba4f41e6598b45ae582",
+  "prompt_sha256": "3d48d88ec823640a6557709f7cda262e94d2bc547fb0506802a31effee6ccf37",
+  "examples_sha256": "393055e5c350e89be96bcb011582f5bee45c99fb5d6676992ce59765aeb446a0",
+  "request_sha256": "8be218adda42a24a985e2464cffd120733cb68f4f673ed15adb4de0400c4310e",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 8000,
+    "temperature": "not sent: claude-sonnet-5-5 rejects a non-default temperature with HTTP 400",
+    "thinking": {
+      "type": "between_tools"
+    },
+    "system_sha256": "71c163a464e2d5271fdb1311e2f9d2091c88acffecca0acb15e6b23f0599a889",
+    "user_text": "This case has 1 numbered segment(s). The square of tissue is 512 px across, enlarged 1x. The bodies outlined are: yellow, cyan, magenta, orange, green, with yellow in the middle.\n\n  1: drawn in white, the pipeline has traced it. Which cell does it start from: \"yellow\" or \"orange\", or \"none\"?\n\nAnswer for every number, and for each one name only a colour offered for that number or \"none\", in one json object.",
+    "image": {
+      "media_type": "image/png",
+      "sha256": "b0c4d26d97d3295f92b806179475af56596ca8e95336cba4f41e6598b45ae582",
+      "bytes": 313447
+    }
+  },
+  "response": {
+    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"Short white piece at ~(850,308) lies right next to the yellow body and aligns with yellow's leftward thread, pointing at its outline.\"}\n]}",
+    "id": "msg_011CgBt3am8Y8XtmLuTnnmrR",
+    "model": "claude-sonnet-5-5",
+    "stop_reason": "end_turn",
+    "thinking_fallback": false,
+    "usage": {
+      "input_tokens": 3531,
+      "output_tokens": 80
+    }
+  },
+  "cost_usd": 0.007862,
+  "valid": true,
+  "invalid_reason": null,
+  "parsed": [
+    {
+      "n": 1,
+      "verdict": "real",
+      "owner": "yellow",
+      "owner_lacuna_id": 5,
+      "why": "Short white piece at ~(850,308) lies right next to the yellow body and aligns with yellow's leftward thread, pointing at its outline.",
+      "verdict_asked_for": false,
+      "verdict_in_the_answer": null
+    }
+  ]
+}

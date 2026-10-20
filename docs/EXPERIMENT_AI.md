@@ -11,7 +11,7 @@ pipeline output is byte for byte what `main` produces: `reference-check` PASS at
 161.00 / 21.63 / 8.50 and `regression` PASS over 6,800 numbers at tolerance 0, rechecked on
 2026-10-19.
 
-External API use approved on 2026-10-15, approver: (Karim fills in)
+External API use approved on 2026-10-15, approver: Karim
 
 ## The question
 

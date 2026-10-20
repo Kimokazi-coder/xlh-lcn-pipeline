@@ -1,0 +1,63 @@
+{
+  "schema": "lcn-ai-judge-log-1",
+  "written_at": "2026-10-19T16:02:41Z",
+  "mode": "live",
+  "image_label": "543-2",
+  "lacuna_id": 4,
+  "case_id": "case_0004",
+  "attempt": 1,
+  "picture": "results/ai_log/543-2/pictures/case_0004.png",
+  "picture_sha256": "84a5c40dca6fc500560451dc7fb77ed5e8498cc669ed9c0dbc8c06f7fea1ef53",
+  "prompt_sha256": "3d48d88ec823640a6557709f7cda262e94d2bc547fb0506802a31effee6ccf37",
+  "examples_sha256": "393055e5c350e89be96bcb011582f5bee45c99fb5d6676992ce59765aeb446a0",
+  "request_sha256": "f39b17bec01b8c3d7692cf0aef81d9f7189258bd2e6054c58875a385759a11db",
+  "request": {
+    "model": "claude-sonnet-5-5",
+    "max_tokens": 8000,
+    "temperature": "not sent: claude-sonnet-5-5 rejects a non-default temperature with HTTP 400",
+    "thinking": {
+      "type": "between_tools"
+    },
+    "system_sha256": "71c163a464e2d5271fdb1311e2f9d2091c88acffecca0acb15e6b23f0599a889",
+    "user_text": "This case has 2 numbered segment(s). The square of tissue is 256 px across, enlarged 2x. The bodies outlined are: yellow, with yellow in the middle.\n\n  1: drawn in white, the pipeline has traced it. Which cell does it start from: \"yellow\", or \"none\"?\n  2: drawn in red, the pipeline has not traced it. Is it a real thread or glow texture, and which cell does it start from: \"yellow\", or \"none\"?\n\nAnswer for every number, and for each one name only a colour offered for that number or \"none\", in one json object.",
+    "image": {
+      "media_type": "image/png",
+      "sha256": "84a5c40dca6fc500560451dc7fb77ed5e8498cc669ed9c0dbc8c06f7fea1ef53",
+      "bytes": 92243
+    }
+  },
+  "response": {
+    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"Short white piece sits at the left edge just beside the yellow body, in line with the yellow thread leaving the body there.\"},\n  {\"n\": 2, \"verdict\": \"artifact\", \"owner\": \"none\", \"why\": \"Tiny isolated red dash in the glow ring, touches no body or thread, too short to be a line.\"}\n]}",
+    "id": "msg_011CgBsrUdEi9xwxv9XtH7wM",
+    "model": "claude-sonnet-5-5",
+    "stop_reason": "end_turn",
+    "thinking_fallback": false,
+    "usage": {
+      "input_tokens": 3566,
+      "output_tokens": 134
+    }
+  },
+  "cost_usd": 0.008472,
+  "valid": true,
+  "invalid_reason": null,
+  "parsed": [
+    {
+      "n": 1,
+      "verdict": "real",
+      "owner": "yellow",
+      "owner_lacuna_id": 4,
+      "why": "Short white piece sits at the left edge just beside the yellow body, in line with the yellow thread leaving the body there.",
+      "verdict_asked_for": false,
+      "verdict_in_the_answer": null
+    },
+    {
+      "n": 2,
+      "verdict": "artifact",
+      "owner": "none",
+      "owner_lacuna_id": null,
+      "why": "Tiny isolated red dash in the glow ring, touches no body or thread, too short to be a line.",
+      "verdict_asked_for": true,
+      "verdict_in_the_answer": "artifact"
+    }
+  ]
+}
