@@ -70,6 +70,11 @@ Subcommands:
     ai-judge          EXPERIMENT: the judge itself, one call per lacuna, every
                       request and answer logged; --replay reruns from the log
                       offline and checks the verdicts come back the same
+    ai-run            EXPERIMENT: detection, canaliculi and quantification with
+                      the judge switch on for that run only, into results/ai_run/,
+                      proving every other file under results/ is unchanged
+    ai-compare        EXPERIMENT: judge off against judge on, per image: the
+                      pictures side by side and what the verdicts moved
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -5753,6 +5758,670 @@ def _ai_conflict_check(image_path: Path, label: str, run: dict, after: dict) -> 
     }
 
 
+# ai-run -------------------------------------------------------------------------
+# EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). The pipeline itself,
+# detection, canaliculi and quantification, with config.AI_JUDGE_ENABLED on for
+# this one process, into a folder of its own. config.py is not touched: the
+# switch ships off and stays off. It reads only the decision files already in
+# results/ai_log/, makes no call and needs no key. Every file under results/
+# outside its own output folder is hashed before and after, so the run proves it
+# changed nothing it was not asked to write.
+
+
+AI_RUN_DIR = config.RESULTS_DIR / "ai_run"
+
+
+def _tree_manifest(root: Path, exclude: Path) -> dict:
+    """{path relative to root: sha256} for every file under root, leaving out
+    everything under `exclude`. Byte for byte, so a changed timestamp is not a
+    change and a changed byte is."""
+    import hashlib
+
+    exclude = exclude.resolve()
+    out = {}
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        resolved = path.resolve()
+        if resolved == exclude or exclude in resolved.parents:
+            continue
+        out[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return out
+
+
+def _ai_run_detect(job: tuple) -> dict:
+    """Both detection stages for one image with the switch on, written exactly
+    as src/lacunae.py and src/canaliculi.py write them."""
+    path_str, out_str = job
+    config.AI_JUDGE_ENABLED = True
+    image_path, out_root = Path(path_str), Path(out_str)
+    lac = lacunae.analyse_image(image_path)
+    lacunae.write_outputs(lac, out_root)
+    net = canaliculi.analyse_image(image_path)
+    canaliculi.write_outputs(net, out_root)
+    counts = net["ai_judge"]["counts"]
+    return {"image_label": lacunae.image_label(image_path),
+            "skeleton_px": int(net["skeleton"].sum()),
+            "ai_judge": {k: counts[k] for k in sorted(counts)}}
+
+
+def cmd_ai_run(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    import ai_judge
+
+    images = images_from(args)
+    out = Path(args.out)
+    results_root = config.RESULTS_DIR
+    for image_path in images:
+        label = lacunae.image_label(image_path)
+        if not ai_judge.decisions_path(label).is_file():
+            print(f"Refused: no decision file for {label} at {ai_judge.decisions_path(label)}. "
+                  f"Run or replay the judge first.")
+            return 2
+    print(f"The pipeline with the AI judge switch on, for this process only, into {out}")
+    print("Reads results/ai_log/ only. No call is made and no key is read.")
+    before = _tree_manifest(results_root, out)
+    print(f"results/ before: {len(before)} files hashed (leaving out {out.name}/)")
+
+    out.mkdir(parents=True, exist_ok=True)
+    jobs = [(str(p), str(out)) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        detected = list(ex.map(_ai_run_detect, jobs))
+    for row in detected:
+        c = row["ai_judge"]
+        print(f"  {row['image_label']}: detection written, skeleton {row['skeleton_px']} px, "
+              f"{c['real']} real and {c['artifact']} artifact verdicts applied, "
+              f"{c['attached_segments']} attached, {c['conflicting']} conflicting, "
+              f"{c['ownership_moved_px']} px changed hands")
+
+    # Quantification exactly as src/quantification.py runs it: from the files
+    # detection has just written, then the cross-image table.
+    config.AI_JUDGE_ENABLED = True
+    quantified = []
+    for image_path in images:
+        label = lacunae.image_label(image_path)
+        detection = quantification.load_detection(out, label)
+        result = quantification.quantify(detection, image_path, None)
+        quantification.write_outputs(result, out)
+        quantified.append(result)
+        print(f"  {label}: quantified, lacunae={result['lacuna_count']} "
+              f"(interior {result['interior_lacuna_count']}), roots per cell="
+              f"{result['summary']['roots_count']['mean']}")
+    quantification.write_summary_table(quantified, out)
+    config.AI_JUDGE_ENABLED = False
+
+    after = _tree_manifest(results_root, out)
+    changed = sorted(k for k in before if k in after and before[k] != after[k])
+    gone = sorted(k for k in before if k not in after)
+    new = sorted(k for k in after if k not in before)
+    same = not (changed or gone or new)
+    report = {
+        "status": ("EXPERIMENT. The pipeline with config.AI_JUDGE_ENABLED on for this run "
+                   "only, from the decision files in results/ai_log/. Not validated."),
+        "written_at": ai_judge.utc_now(),
+        "images": [lacunae.image_label(p) for p in images],
+        "per_image": detected,
+        "results_outside_this_folder": {
+            "files_hashed": len(before),
+            "byte_identical_afterwards": same,
+            "changed": changed, "removed": gone, "added": new,
+        },
+    }
+    (out / "ai_run.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(f"\nresults/ after: {len(after)} files hashed; "
+          + ("BYTE IDENTICAL to before" if same else
+             f"CHANGED: {len(changed)} changed, {len(gone)} removed, {len(new)} added"))
+    for k in (changed + gone + new)[:20]:
+        print(f"  {k}")
+    print(f"report -> {out / 'ai_run.json'}")
+    return 0 if same else 1
+
+
+# ai-compare ---------------------------------------------------------------------
+# EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). Judge off against
+# judge on, per image. Both runs are recomputed in memory and then checked
+# against the files on disk pixel for pixel, judge off against results/<label>/
+# and judge on against results/ai_run/<label>/, so the numbers describe exactly
+# what was written. No call is made and no key is read.
+
+
+AI_COMPARE_SCRATCH = config.PROJECT_ROOT / ".cache" / "ai_compare"
+
+
+def _root_clusters(G: nx.Graph, cell_id: int) -> list:
+    """The clusters quantification.cell_root_count counts, one per root, so a
+    root can be asked where it came from. Same nodes, same single linkage, same
+    merge distance."""
+    src = ("cell", cell_id)
+    if not G.has_node(src):
+        return []
+    unmerged = [n for n in G.neighbors(src) if not canaliculi._is_cell_node(n)]
+    clusters = []
+    while unmerged:
+        cluster = [unmerged.pop()]
+        changed = True
+        while changed:
+            changed = False
+            for other in list(unmerged):
+                if any(np.hypot(other[0] - m[0], other[1] - m[1]) <= canaliculi.ROOT_MERGE_DIST_PX
+                       for m in cluster):
+                    cluster.append(other)
+                    unmerged.remove(other)
+                    changed = True
+        clusters.append(cluster)
+    return clusters
+
+
+def _owner_stats(result: dict, n_lacunae: int) -> dict:
+    """Skeleton, owned and unowned px, and the largest owner's share."""
+    skeleton, owner_map = result["skeleton"], result["owner_map"]
+    owned = skeleton & (owner_map > 0)
+    per_cell = np.bincount(owner_map[owned], minlength=n_lacunae + 1)
+    top = int(np.argmax(per_cell[1:])) + 1 if per_cell[1:].any() else 0
+    total = int(skeleton.sum())
+    return {"skeleton_px": total, "owned_px": int(owned.sum()),
+            "unowned_px": int((skeleton & (owner_map == 0)).sum()),
+            "largest_owner": top, "largest_owner_px": int(per_cell[top]) if top else 0,
+            "largest_owner_share": round(float(per_cell[top]) / max(1, total), 4) if top else 0.0}
+
+
+def _pixel_moves(before: np.ndarray, after: np.ndarray) -> tuple:
+    """(pixels that changed hands, {(was, now): pixels}) over the tracing both
+    owner maps own. The same measure the detection record carries as
+    ownership_moved_px."""
+    both = (before > 0) & (after > 0) & (before != after)
+    pairs: dict = {}
+    for a, b in zip(before[both].tolist(), after[both].tolist()):
+        pairs[(int(a), int(b))] = pairs.get((int(a), int(b)), 0) + 1
+    return int(both.sum()), pairs
+
+
+def _segment_moves(before: dict, after: dict) -> dict:
+    """Segments of the judge-on skeleton whose owner changed: a branch, split at
+    junctions as the judge's segments are and at least as long, whose majority
+    owner on the judge-off owner map is one cell and on the judge-on map
+    another. It is the outcome of the shortest path, counted in the unit the
+    judge was asked about."""
+    import ai_judge
+
+    labels = ai_judge._branch_labels(after["skeleton"])
+    was_map, now_map = before["owner_map"], after["owner_map"]
+    moved, px, pairs = 0, 0, {}
+    for index, box in enumerate(ndi.find_objects(labels), start=1):
+        if box is None:
+            continue
+        piece = labels[box] == index
+        if int(piece.sum()) < ai_judge.MIN_SEGMENT_PX:
+            continue
+        was = was_map[box][piece]
+        now = now_map[box][piece]
+        was, now = was[was > 0], now[now > 0]
+        if not was.size or not now.size:
+            continue
+        a, b = int(np.bincount(was).argmax()), int(np.bincount(now).argmax())
+        if a != b:
+            moved += 1
+            px += int(piece.sum())
+            pairs[(a, b)] = pairs.get((a, b), 0) + 1
+    return {"segments": moved, "px": px, "pairs": pairs}
+
+
+def _verdict_split(decisions: dict) -> dict:
+    """Per class, what the verdicts did with ownership: kept by the cell that
+    already owned it, given to a segment nobody owned, moved from one cell to
+    another, or given to no cell. Segments and their own pixels, and the pairs
+    of cells for the moves."""
+    out = {}
+    for case in decisions["cases"]:
+        for seg in case["segments"]:
+            if seg["verdict"] == "unjudged":
+                continue
+            for name in seg.get("classes", []) or ["?"]:
+                row = out.setdefault(name, {k: {"segments": 0, "px": 0} for k in
+                                            ("kept", "from_none", "moved", "no_owner")})
+                row.setdefault("pairs", {})
+                was, now = seg["owner_lacuna_id_before"], seg["owner_lacuna_id"]
+                if not now:
+                    kind = "no_owner"
+                elif now == was:
+                    kind = "kept"
+                elif not was:
+                    kind = "from_none"
+                else:
+                    kind = "moved"
+                    key = f"{was}->{now}"
+                    row["pairs"][key] = row["pairs"].get(key, 0) + 1
+                row[kind]["segments"] += 1
+                row[kind]["px"] += int(seg["px"])
+    return out
+
+
+def _titled_pair(left: np.ndarray, right: np.ndarray, titles: tuple) -> Image.Image:
+    """Two pictures side by side with a title over each and a gap between."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    def rgb(a):
+        a = np.asarray(a)
+        return np.stack([a] * 3, axis=-1) if a.ndim == 2 else a[..., :3]
+
+    left, right = rgb(left), rgb(right)
+    gap, bar = 12, 44
+    h = max(left.shape[0], right.shape[0])
+    canvas = np.full((h + bar, left.shape[1] + gap + right.shape[1], 3), 30, dtype=np.uint8)
+    canvas[bar:bar + left.shape[0], :left.shape[1]] = left
+    canvas[bar:bar + right.shape[0], left.shape[1] + gap:] = right
+    picture = Image.fromarray(canvas)
+    draw = ImageDraw.Draw(picture)
+    try:
+        font = ImageFont.truetype("arial.ttf", 26)
+    except OSError:
+        font = ImageFont.load_default()
+    draw.text((12, 8), titles[0], fill=(255, 255, 255), font=font)
+    draw.text((left.shape[1] + gap + 12, 8), titles[1], fill=(255, 255, 255), font=font)
+    return picture
+
+
+def _ownership_change_picture(before: dict, after: dict) -> np.ndarray:
+    """One frame: the judge-on skeleton in grey, the tracing that changed hands
+    in red, newly owned in green, no longer owned in blue, and every body
+    outlined in white. Each changed pixel is widened by one pixel so a
+    one-pixel thread can be seen at this size; nothing else is drawn."""
+    shape = after["skeleton"].shape
+    was, now = before["owner_map"], after["owner_map"]
+    canvas = np.zeros(shape + (3,), dtype=np.uint8)
+    canvas[before["skeleton"]] = (70, 70, 70)
+    canvas[after["skeleton"]] = (150, 150, 150)
+    widen = morphology.disk(1)
+    for mask, colour in ((((was == 0) & (now > 0)), (0, 220, 0)),
+                         (((was > 0) & (now == 0)), (70, 120, 255)),
+                         (((was > 0) & (now > 0) & (was != now)), (255, 40, 40))):
+        canvas[morphology.dilation(mask, widen)] = colour
+    canvas[segmentation.find_boundaries(after["lacuna_id_map"], mode="outer")] = (255, 255, 255)
+    return canvas
+
+
+def _ai_compare_one(job: tuple) -> dict:
+    from PIL import Image
+
+    import ai_judge
+
+    path_str, compare_str, run_str = job
+    image_path, compare_dir, run_root = Path(path_str), Path(compare_str), Path(run_str)
+    label = lacunae.image_label(image_path)
+    decisions = ai_judge.read_decisions(label)
+
+    config.AI_JUDGE_ENABLED = False
+    before = canaliculi.analyse_image(image_path)
+    config.AI_JUDGE_ENABLED = True
+    after = canaliculi.analyse_image(image_path)
+    config.AI_JUDGE_ENABLED = False
+    n = len(before["lacunae"]["kept"])
+
+    # The comparison must describe the files on disk, not a run of its own.
+    def disk(root, suffix):
+        return lacunae.result_path(root, label, config.SECTION_CANALICULI, suffix)
+
+    sk_before = quantification._read_mask(disk(config.RESULTS_DIR, config.SUFFIX_CANALICULI_SKELETON))
+    sk_after = quantification._read_mask(disk(run_root, config.SUFFIX_CANALICULI_SKELETON))
+    q_before = json.loads(result_json(config.RESULTS_DIR, label).read_text(encoding="utf-8"))
+    q_after = json.loads(result_json(run_root, label).read_text(encoding="utf-8"))
+    roots_before = {int(r["lacuna_id"]): r["roots_count"] for r in q_before["lacunae"]}
+    roots_after = {int(r["lacuna_id"]): r["roots_count"] for r in q_after["lacunae"]}
+    interior = {int(r["lacuna_id"]): not r.get("on_border", False) for r in q_after["lacunae"]}
+
+    # Where every verdict attached its cell, recomputed by the same function the
+    # switch used, from the judge-off run it was applied to.
+    _display, channel = lacunae.load_channel(image_path)
+    ai = ai_judge.apply_to_base(image_path, before["candidate_first_pass"], before,
+                                before["lacunae"], channel)
+    G = after["graph"]
+    nodes = [node for node in G.nodes() if not canaliculi._is_cell_node(node)]
+    coords = np.array(nodes, dtype=np.float64)
+    judge_nodes: dict = {}
+    for lacuna_id, points in ai["attach"].items():
+        for point in points:
+            point = np.asarray(point, dtype=np.float64)
+            gaps = ((coords[:, None, :] - point[None, :, :]) ** 2).sum(axis=2).min(axis=1)
+            judge_nodes.setdefault(int(lacuna_id), set()).add(nodes[int(np.argmin(gaps))])
+    roots_at_a_verdict = {}
+    roots_in_memory = {}
+    for lacuna_id in range(1, n + 1):
+        clusters = _root_clusters(G, lacuna_id)
+        roots_in_memory[lacuna_id] = len(clusters)
+        mine = judge_nodes.get(lacuna_id, set())
+        roots_at_a_verdict[lacuna_id] = sum(1 for c in clusters if mine & set(c))
+    recorded = after["ai_judge"]["counts"]
+    checks = {
+        "judge_off_skeleton_equals_results": bool((sk_before == before["skeleton"]).all()),
+        "judge_on_skeleton_equals_ai_run": bool((sk_after == after["skeleton"]).all()),
+        "roots_in_memory_equal_ai_run_json": all(roots_in_memory[i] == roots_after[i]
+                                                 for i in roots_after),
+        "attachments_recomputed_as_the_switch_made_them": all(
+            ai["counts"][k] == recorded[k] for k in ai["counts"]),
+        "every_verdict_attachment_is_an_edge_of_its_cell": all(
+            G.has_edge(("cell", i), node) for i, ns in judge_nodes.items() for node in ns),
+    }
+
+    moved_px, pixel_pairs = _pixel_moves(before["owner_map"], after["owner_map"])
+    segments = _segment_moves(before, after)
+
+    # Class d on its own: the same switch with every verdict but the class d
+    # ones set to unjudged, so what moves is what class d moves.
+    only_d = json.loads(json.dumps(decisions))
+    for case in only_d["cases"]:
+        for seg in case["segments"]:
+            if "d" not in seg.get("classes", []):
+                seg.update({"verdict": "unjudged", "owner": "none", "owner_lacuna_id": None})
+    scratch = AI_COMPARE_SCRATCH / "class_d_only"
+    (scratch / label).mkdir(parents=True, exist_ok=True)
+    (scratch / label / f"{label}_ai_segments.json").write_text(json.dumps(only_d) + "\n",
+                                                               encoding="utf-8")
+    saved_root = ai_judge.LOG_ROOT
+    ai_judge.LOG_ROOT = scratch
+    try:
+        config.AI_JUDGE_ENABLED = True
+        d_run = canaliculi.analyse_image(image_path)
+    finally:
+        config.AI_JUDGE_ENABLED = False
+        ai_judge.LOG_ROOT = saved_root
+    d_px, d_pairs = _pixel_moves(before["owner_map"], d_run["owner_map"])
+    d_segments = _segment_moves(before, d_run)
+
+    # The pictures.
+    compare_dir.mkdir(parents=True, exist_ok=True)
+    pictures = {}
+    for kind, suffix in (("verification", config.SUFFIX_CANALICULI_VERIFICATION),
+                         ("skeleton", config.SUFFIX_CANALICULI_SKELETON)):
+        left = np.asarray(Image.open(disk(config.RESULTS_DIR, suffix)))
+        right = np.asarray(Image.open(disk(run_root, suffix)))
+        out = compare_dir / f"{label}_{kind}_judge_off_on.png"
+        _titled_pair(left, right, (f"{label}  judge OFF ({kind})",
+                                   f"{label}  judge ON ({kind})")).save(out)
+        pictures[kind] = out.relative_to(config.PROJECT_ROOT).as_posix()
+    out = compare_dir / f"{label}_ownership_changes.png"
+    Image.fromarray(_ownership_change_picture(before, after)).save(out)
+    pictures["ownership_changes"] = out.relative_to(config.PROJECT_ROOT).as_posix()
+
+    unnamed = [{"case_id": c["case_id"], "case_kind": c["case_kind"],
+                "yellow_lacuna_id": c["lacuna_id"], "bodies_outlined_grey": c["bodies_with_no_colour"],
+                "numbered_segments": c["segments_offered"],
+                "every_number_had_both_candidates_named": all(
+                    len(s.get("candidate_colours", [])) == len(s.get("candidates", []))
+                    for s in c["segments"])}
+               for c in decisions["cases"] if c["bodies_with_no_colour"]]
+
+    def pairs_list(pairs):
+        return [{"from": a, "to": b, "count": v}
+                for (a, b), v in sorted(pairs.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+    roots_rows = [{"lacuna_id": i, "interior": interior.get(i, True),
+                   "roots_before": roots_before.get(i), "roots_after": roots_after.get(i),
+                   "roots_after_at_a_verdict_attachment": roots_at_a_verdict[i]}
+                  for i in sorted(roots_after)]
+    return {
+        "image_label": label,
+        "lacunae": n,
+        "checks": checks,
+        "verdicts": {"given_an_owner": int(recorded["attached_segments"]),
+                     "attached_to_another_cell": int(recorded["attached_to_another_cell"]),
+                     "conflicting": int(recorded["conflicting"]),
+                     "by_class": _verdict_split(decisions)},
+        "ownership_moves": {"px": moved_px, "pairs_px": pairs_list(pixel_pairs),
+                            "segments": segments["segments"], "segments_px": segments["px"],
+                            "pairs_segments": pairs_list(segments["pairs"]),
+                            "newly_owned_px": int(recorded["newly_owned_px"]),
+                            "no_longer_owned_px": int(recorded["no_longer_owned_px"])},
+        "class_d_only": {"attached": int(d_run["ai_judge"]["counts"]["attached_segments"]),
+                         "px": d_px, "pairs_px": pairs_list(d_pairs),
+                         "segments": d_segments["segments"], "segments_px": d_segments["px"],
+                         "pairs_segments": pairs_list(d_segments["pairs"])},
+        "roots": {"mean_per_interior_cell_before": q_before["summary"]["roots_count"]["mean"],
+                  "mean_per_interior_cell_after": q_after["summary"]["roots_count"]["mean"],
+                  "total_before": int(sum(v for v in roots_before.values() if v is not None)),
+                  "total_after": int(sum(v for v in roots_after.values() if v is not None)),
+                  "total_after_at_a_verdict_attachment": int(sum(roots_at_a_verdict.values())),
+                  "per_lacuna": roots_rows},
+        "before": _owner_stats(before, n),
+        "after": _owner_stats(after, n),
+        "bodies_not_named": unnamed,
+        "pictures": pictures,
+    }
+
+
+def cmd_ai_compare(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = images_from(args)
+    run_root = Path(args.run).resolve()
+    compare_dir = Path(args.out).resolve()
+    for p in images:
+        if not result_json(run_root, lacunae.image_label(p)).is_file():
+            print(f"Refused: {run_root} has no output for {lacunae.image_label(p)}. "
+                  f"Run python src/diagnostics.py ai-run first.")
+            return 2
+    jobs = [(str(p), str(compare_dir), str(run_root)) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        out = list(ex.map(_ai_compare_one, jobs))
+
+    failed = [(o["image_label"], k) for o in out for k, ok in o["checks"].items() if not ok]
+    report = {
+        "status": ("EXPERIMENT. Judge off (results/<label>/) against judge on "
+                   "(results/ai_run/<label>/), from the decision files in results/ai_log/. "
+                   "NOT VALIDATED: no verdict has been checked against a manual trace."),
+        "written_at": __import__("ai_judge").utc_now(),
+        "definitions": {
+            "given_an_owner": "verdicts applied as a zero weight attachment, after conflicts",
+            "ownership_moves.px": ("tracing owned in both runs whose owner changed, on the owner "
+                                   "maps; the shortest path's doing, not the judge's"),
+            "ownership_moves.segments": ("branches of the judge-on skeleton, at least the judge's "
+                                         "minimum segment length, whose majority owner changed"),
+            "class_d_only": "the same switch with every verdict but the class d ones unjudged",
+            "roots_after_at_a_verdict_attachment": (
+                "roots of the judge-on graph that contain a node a verdict attached its cell "
+                "to; a root is any node attached to the cell, so an attachment far from the "
+                "body counts as one"),
+            "largest_owner_share": "the largest single cell's owned px over all skeleton px",
+        },
+        "checks_failed": failed,
+        "per_image": out,
+    }
+    (compare_dir / "ai_compare.json").write_text(json.dumps(report, indent=2) + "\n",
+                                                 encoding="utf-8")
+    (compare_dir / "REPORT.md").write_text(_ai_compare_markdown(out, failed), encoding="utf-8")
+
+    print_table(["image", "given owner", "moved verdicts", "segments moved", "px moved",
+                 "class d px", "roots before", "roots after", "of them at a verdict"],
+                [[o["image_label"], o["verdicts"]["given_an_owner"],
+                  sum(c["moved"]["segments"] for c in o["verdicts"]["by_class"].values()),
+                  o["ownership_moves"]["segments"], o["ownership_moves"]["px"],
+                  o["class_d_only"]["px"], o["roots"]["total_before"], o["roots"]["total_after"],
+                  o["roots"]["total_after_at_a_verdict_attachment"]] for o in out],
+                title="Judge off against judge on")
+    print_table(["image", "skeleton px", "owned px", "unowned px", "largest owner share"],
+                [[o["image_label"],
+                  f"{o['before']['skeleton_px']} -> {o['after']['skeleton_px']}",
+                  f"{o['before']['owned_px']} -> {o['after']['owned_px']}",
+                  f"{o['before']['unowned_px']} -> {o['after']['unowned_px']}",
+                  f"{o['before']['largest_owner_share']:.3f} (cell {o['before']['largest_owner']})"
+                  f" -> {o['after']['largest_owner_share']:.3f} (cell {o['after']['largest_owner']})"]
+                 for o in out])
+    print(f"\nchecks against the files on disk: "
+          + ("all pass" if not failed else f"FAILED {failed}"))
+    print(f"report -> {compare_dir / 'REPORT.md'} and {compare_dir / 'ai_compare.json'}")
+    return 1 if failed else 0
+
+
+def _ai_compare_markdown(out: list, failed: list) -> str:
+    """The report a person reads. Every number in it is in ai_compare.json."""
+    def pairs_text(pairs, unit, top=4):
+        if not pairs:
+            return "none"
+        shown = ", ".join(f"{p['from']} to {p['to']} ({p['count']} {unit})" for p in pairs[:top])
+        return shown + (f", and {len(pairs) - top} more pairs" if len(pairs) > top else "")
+
+    lines = [
+        f"# Judge off against judge on, {len(out)} image{'s' if len(out) != 1 else ''}",
+        "",
+        "**EXPERIMENT, branch `exp-ai-layer`. NOT VALIDATED: no verdict here has been checked "
+        "against a manual trace.** Judge off is `results/<label>/`, the pipeline as it stands. "
+        "Judge on is `results/ai_run/<label>/`, the same pipeline with `config.AI_JUDGE_ENABLED` "
+        "on for that run only, applying the decision files in `results/ai_log/`. No call was "
+        "made and no key was read.",
+        "",
+        "Made by `python src/diagnostics.py ai-compare --dir data/WT`. Both runs are recomputed in "
+        "memory and checked against the files on disk pixel for pixel before any number is "
+        "reported: the judge-off skeleton against `results/`, the judge-on skeleton against "
+        "`results/ai_run/`, the roots in memory against the judge-on jsons, and the attachments "
+        "against the ones the switch made. "
+        + ("**Every check passed.**" if not failed else
+           "**CHECKS FAILED: " + ", ".join(f"{a} {b}" for a, b in failed) + ".**")
+        + " The full numbers are in `ai_compare.json`.",
+        "",
+        "## Summary",
+        "",
+        "| image | given an owner | moved by a verdict | segments moved | px moved | class d alone, px | "
+        "roots before | roots after | of them at a verdict | skeleton px | owned px | unowned px | "
+        "largest owner share |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    tot = {"given": 0, "moved_v": 0, "seg": 0, "px": 0, "dpx": 0, "rb": 0, "ra": 0, "rv": 0}
+    for o in out:
+        moved_v = sum(c["moved"]["segments"] for c in o["verdicts"]["by_class"].values())
+        b, a = o["before"], o["after"]
+        lines.append(
+            f"| {o['image_label']} | {o['verdicts']['given_an_owner']} | {moved_v} | "
+            f"{o['ownership_moves']['segments']} | {o['ownership_moves']['px']:,} | "
+            f"{o['class_d_only']['px']:,} | {o['roots']['total_before']} | "
+            f"{o['roots']['total_after']} | {o['roots']['total_after_at_a_verdict_attachment']} | "
+            f"{b['skeleton_px']:,} to {a['skeleton_px']:,} | {b['owned_px']:,} to {a['owned_px']:,} | "
+            f"{b['unowned_px']:,} to {a['unowned_px']:,} | "
+            f"{b['largest_owner_share']:.3f} to {a['largest_owner_share']:.3f} |")
+        tot["given"] += o["verdicts"]["given_an_owner"]
+        tot["moved_v"] += moved_v
+        tot["seg"] += o["ownership_moves"]["segments"]
+        tot["px"] += o["ownership_moves"]["px"]
+        tot["dpx"] += o["class_d_only"]["px"]
+        tot["rb"] += o["roots"]["total_before"]
+        tot["ra"] += o["roots"]["total_after"]
+        tot["rv"] += o["roots"]["total_after_at_a_verdict_attachment"]
+    lines.append(f"| **all {len(out)}** | **{tot['given']}** | **{tot['moved_v']}** | **{tot['seg']}** | "
+                 f"**{tot['px']:,}** | **{tot['dpx']:,}** | **{tot['rb']:,}** | **{tot['ra']:,}** | "
+                 f"**{tot['rv']}** | | | | |")
+    lines += [
+        "",
+        "- **given an owner**: verdicts applied as a zero weight attachment, after conflicts "
+        "(there were none). **moved by a verdict**: of those, the ones naming a different cell "
+        "from the one that owned the segment.",
+        "- **segments moved** and **px moved** are the outcome: what the shortest path did once "
+        "the attachments were in the graph. A segment here is a branch of the judge-on skeleton, "
+        "at least the judge's minimum segment length, whose majority owner changed.",
+        "- **class d alone**: the same switch with every verdict but the class d ones left "
+        "unjudged, so the pixels that change hands are the ones class d moves on its own.",
+        "- **roots**: summed over every lacuna, from the quantification jsons on disk. **of them "
+        "at a verdict** counts the judge-on roots that contain a node a verdict attached its cell "
+        "to; see the warning below.",
+        "",
+        "## Roots: read this before reading the root counts",
+        "",
+        "A root is counted as any skeleton node attached to the cell's virtual node, clustered at "
+        f"{canaliculi.ROOT_MERGE_DIST_PX:g} px (`quantification.cell_root_count`). A verdict is "
+        "expressed as exactly such an attachment, at the end of the segment nearest the cell, and "
+        "that end can lie tens of pixels from the body. **So every verdict that gives a cell a "
+        "segment away from its body adds a root that is not a thread leaving the body.** The rise "
+        "in roots below is largely that, and the column *of them at a verdict* measures how much. "
+        "That column counts a root as the verdict's when any node in its cluster is a node a "
+        "verdict attached the cell to, and such a cluster can also hold a node the contact rule "
+        "attached, so it is an upper bound on the roots the verdicts add, and *roots on, not at "
+        "one* is a lower bound on the pipeline's own. "
+        "It is a property of how the attachment is counted, not a finding about the cells, and "
+        "it is left as it is here because changing how a verdict is expressed, or how a root is "
+        "counted, is a design decision this report does not take.",
+        "",
+        "| image | roots off | roots on | of them at a verdict attachment | roots on, not at one | "
+        "mean per interior cell, off | on | lacunae whose roots changed |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for o in out:
+        changed = [r for r in o["roots"]["per_lacuna"] if r["roots_before"] != r["roots_after"]]
+        r = o["roots"]
+        lines.append(f"| {o['image_label']} | {r['total_before']} | {r['total_after']} | "
+                     f"{r['total_after_at_a_verdict_attachment']} | "
+                     f"{r['total_after'] - r['total_after_at_a_verdict_attachment']} | "
+                     f"{r['mean_per_interior_cell_before']} | {r['mean_per_interior_cell_after']} | "
+                     f"{len(changed)} of {len(r['per_lacuna'])} |")
+    lines += ["", "## Per image", ""]
+    for o in out:
+        v = o["verdicts"]["by_class"]
+        lines += [f"### {o['image_label']}", ""]
+        lines.append("Verdicts by class (segments, and their own px):")
+        lines.append("")
+        lines.append("| class | kept by its owner | given to a segment nobody owned | moved to another "
+                     "cell | given no owner |")
+        lines.append("| --- | --- | --- | --- | --- |")
+        for name in sorted(v):
+            c = v[name]
+            lines.append(f"| {name} | " + " | ".join(
+                f"{c[k]['segments']} ({c[k]['px']} px)"
+                for k in ("kept", "from_none", "moved", "no_owner")) + " |")
+        m = o["ownership_moves"]
+        d = o["class_d_only"]
+        lines += [
+            "",
+            f"- Ownership moves between cells: **{m['segments']} segments ({m['segments_px']:,} px)**, "
+            f"and **{m['px']:,} px** of tracing changed hands on the owner maps. Pairs by px: "
+            f"{pairs_text(m['pairs_px'], 'px')}. Pairs by segments: "
+            f"{pairs_text(m['pairs_segments'], 'segments')}.",
+            f"- Newly owned: {m['newly_owned_px']:,} px. No longer owned: "
+            f"{m['no_longer_owned_px']:,} px.",
+            f"- **Class d alone**: {d['attached']} verdicts attached, {d['segments']} segments "
+            f"({d['segments_px']:,} px) and {d['px']:,} px changed hands. Pairs by px: "
+            f"{pairs_text(d['pairs_px'], 'px')}.",
+            f"- Class d verdicts: "
+            + (f"{v['d']['moved']['segments']} moved to the other cell, "
+               f"{v['d']['kept']['segments']} kept by their owner, "
+               f"{v['d']['no_owner']['segments']} given no owner; pairs "
+               + (", ".join(f"{k.replace('->', ' to ')} ({n})" for k, n in sorted(v['d']['pairs'].items(),
+                                                            key=lambda kv: -kv[1])) or "none")
+               if "d" in v else "none") + ".",
+            f"- Roots, summed: {o['roots']['total_before']} to {o['roots']['total_after']}, of "
+            f"which {o['roots']['total_after_at_a_verdict_attachment']} contain a verdict's "
+            f"attachment node. Mean per interior cell {o['roots']['mean_per_interior_cell_before']}"
+            f" to {o['roots']['mean_per_interior_cell_after']}.",
+            f"- Skeleton {o['before']['skeleton_px']:,} to {o['after']['skeleton_px']:,} px; owned "
+            f"{o['before']['owned_px']:,} to {o['after']['owned_px']:,}; unowned "
+            f"{o['before']['unowned_px']:,} to {o['after']['unowned_px']:,}; largest owner "
+            f"cell {o['before']['largest_owner']} at {o['before']['largest_owner_share']:.3f} to "
+            f"cell {o['after']['largest_owner']} at {o['after']['largest_owner_share']:.3f}.",
+            f"- Pictures: `{o['pictures']['verification']}`, `{o['pictures']['skeleton']}`, "
+            f"`{o['pictures']['ownership_changes']}` (red changed hands, green newly owned, "
+            f"blue no longer owned, grey the rest, each changed pixel widened by one so it shows).",
+            "",
+        ]
+    lines += ["## Cases where a body could not be named", "",
+              "A body beyond the sixth colour in a picture is outlined grey and has no name the "
+              "judge could answer with. A number is only asked where both of its candidates have a "
+              "colour, so a grey body should be context only; the last column checks that it was, "
+              "number by number, from the decision files.", "",
+              "| image | case | kind | yellow lacuna | grey lacunae | numbered segments | "
+              "both candidates named for every number |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+    any_unnamed = False
+    for o in out:
+        for c in o["bodies_not_named"]:
+            any_unnamed = True
+            lines.append(f"| {o['image_label']} | {c['case_id']} | {c['case_kind']} | "
+                         f"{c['yellow_lacuna_id']} | {', '.join(map(str, c['bodies_outlined_grey']))} | "
+                         f"{c['numbered_segments']} | "
+                         f"{'yes' if c['every_number_had_both_candidates_named'] else 'NO'} |")
+    if not any_unnamed:
+        lines.append("| none | | | | | | |")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _ai_same_decisions(a: dict, b: dict) -> bool:
     """Do two decision files hold the same verdicts for the same candidates?"""
     if a.get("geometry_sha256") != b.get("geometry_sha256"):
@@ -6019,6 +6688,27 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_ai_dry_run)
+
+    p = sub.add_parser("ai-run",
+                       help="EXPERIMENT: detection, canaliculi and quantification with the AI "
+                            "judge switch on for this run only, into results/ai_run/.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR,
+                   help="Output folder (default: results/ai_run).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_ai_run)
+
+    p = sub.add_parser("ai-compare",
+                       help="EXPERIMENT: judge off against judge on per image, pictures and report.")
+    add_images_arguments(p)
+    p.add_argument("--run", type=Path, default=AI_RUN_DIR,
+                   help="The judge-on output of ai-run (default: results/ai_run).")
+    p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR / "compare",
+                   help="Where the pictures and the report go (default: results/ai_run/compare).")
+    p.add_argument("-w", dest="workers", type=int, default=4,
+                   help="Parallel processes, one image each.")
+    p.set_defaults(func=cmd_ai_compare)
 
     p = sub.add_parser("ai-judge",
                        help="EXPERIMENT: run the AI judge on an image, or replay it from the log.")
