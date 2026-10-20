@@ -82,6 +82,9 @@ Subcommands:
                       pictures side by side and what the verdicts moved
     group-overview    one table over every group, one row per image, in
                       results/group_overview.csv and .xlsx; no statistics
+    group-qc          per image of every group but the reference: lacuna
+                      count, rejected candidates by rule, and a flag outside
+                      the reference group's range, in results/group_qc.csv
     compare-methods   both result sets side by side, results/WT/ and
                       results_ai_judge/WT/: csv and xlsx per lacuna, per image and
                       overall, and the cell pairs whose segments changed hands
@@ -6980,6 +6983,94 @@ def _group_absence(group: str) -> str:
     reasons = sorted({r["reason"].split(":")[0] for r in rows})
     return f"all {len(rows)} source files were skipped by the import rule ({'; '.join(reasons)})."
 
+
+# group-qc ---------------------------------------------------------------------------
+# A check list for every group other than the reference: per image, the lacuna
+# count, the lacuna-scale candidates the lacuna stage rejected and the rule that
+# rejected each, and a flag where the count falls outside the range the
+# reference group's images span. A flag says "look at the outlines", never
+# "this is wrong", and nothing is tuned from it. Written to results/group_qc.csv.
+
+QC_NAME = "group_qc.csv"  # in config.RESULTS_ROOT
+# Rejected candidates smaller than this are specks of the lacuna mask, not
+# lacuna-scale objects; it is the floor below which the figures do not draw a
+# rejected candidate (figures/make_figures.py REJECTED_MIN_DRAW_PX2), so a
+# reviewer is pointed at the same objects the overview figure shows. They are
+# still counted, in their own column.
+QC_REJECTED_MIN_AREA_PX2 = 150
+QC_COLUMNS = ["group", "image", "lacuna count", "interior lacuna count",
+              "rejected: area too small", "rejected: area too large", "rejected: solidity",
+              "rejected: aspect ratio", f"specks under {QC_REJECTED_MIN_AREA_PX2} px2 (not counted above)",
+              "reference range", "outside reference range", "look first (rank)"]
+
+
+def reference_count_range() -> tuple:
+    """(min, max) lacuna count over the reference group's images."""
+    counts = [int(r["lacuna count"]) for r in group_summary_rows(config.REFERENCE_GROUP)]
+    if not counts:
+        raise SystemExit(f"No results for the reference group in results/{config.REFERENCE_GROUP}/.")
+    return min(counts), max(counts)
+
+
+def qc_rejections(image_path: Path) -> dict:
+    """Rejected candidates of one image by the rule that rejected them, as the
+    lacuna stage decides them (survey_rejections), split at the speck floor."""
+    lac = lacunae.analyse_image(image_path)
+    found = survey_rejections(lac)
+    out = {"minimum area": 0, "maximum area": 0, "solidity": 0, "aspect ratio": 0, "unclear": 0, "specks": 0}
+    for r in found["rejected"]:
+        if r["area_px2"] < QC_REJECTED_MIN_AREA_PX2:
+            out["specks"] += 1
+        else:
+            out[r["rejected_by"]] = out.get(r["rejected_by"], 0) + 1
+    return out
+
+
+def cmd_group_qc(args) -> int:
+    lo, hi = reference_count_range()
+    groups = args.groups.split(",") if args.groups else [g for g in config.GROUPS if g != config.REFERENCE_GROUP]
+    rows, empty = [], []
+    for group in groups:
+        found = group_summary_rows(group)
+        if not found:
+            empty.append(group)
+            continue
+        paths = {lacunae.image_label(p): p for p in sorted((config.DATA_DIR / group).glob("*.tif"))}
+        for r in found:
+            label = r.get("image_label") or lacunae.image_label(r["image"])
+            n = int(r["lacuna count"])
+            rej = qc_rejections(paths[label])
+            outside = n < lo or n > hi
+            distance = (lo - n) if n < lo else (n - hi) if n > hi else 0
+            rows.append({"group": group, "image": label, "lacuna count": n,
+                         "interior lacuna count": int(r["interior lacuna count"]),
+                         "rejected: area too small": rej["minimum area"],
+                         "rejected: area too large": rej["maximum area"],
+                         "rejected: solidity": rej["solidity"], "rejected: aspect ratio": rej["aspect ratio"],
+                         QC_COLUMNS[8]: rej["specks"], "reference range": f"{lo} to {hi}",
+                         "outside reference range": "yes" if outside else "",
+                         "_distance": distance,
+                         "_rejected": rej["minimum area"] + rej["maximum area"] + rej["solidity"]
+                         + rej["aspect ratio"]})
+    # Which outlines to look at first: furthest outside the range, then the most
+    # lacuna-scale rejections, then by name.
+    order = sorted(rows, key=lambda r: (-r["_distance"], -r["_rejected"], r["group"], r["image"]))
+    for rank, r in enumerate(order, start=1):
+        r["look first (rank)"] = rank
+    out = Path(args.out) if args.out else config.RESULTS_ROOT / QC_NAME
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=QC_COLUMNS, extrasaction="ignore", lineterminator="\n")
+        w.writeheader()
+        w.writerows(order)
+    print_table(QC_COLUMNS, [[r.get(c, "") for c in QC_COLUMNS] for r in order],
+                title=f"group QC, reference range {lo} to {hi} lacunae (results/{config.REFERENCE_GROUP}/), "
+                      f"rejections at lacuna scale (>= {QC_REJECTED_MIN_AREA_PX2} px2) -> {out}\n")
+    for group in empty:
+        print(f"{group}: no results. {_group_absence(group)}")
+    return 0
+
+
 def _ai_same_decisions(a: dict, b: dict) -> bool:
     """Do two decision files hold the same verdicts for the same candidates?"""
     if a.get("geometry_sha256") != b.get("geometry_sha256"):
@@ -7303,6 +7394,15 @@ def main() -> None:
                        help="One table over every group, one row per image: results/group_overview.csv "
                             "and .xlsx. No statistic and no comparison between groups.")
     p.set_defaults(func=cmd_group_overview)
+
+    p = sub.add_parser("group-qc",
+                       help="Per image of every group but the reference: lacuna count, rejected "
+                            "candidates by rule, and a flag outside the reference group's range.")
+    p.add_argument("--groups", default="",
+                   help="Groups, comma separated (default: every group but the reference).")
+    p.add_argument("-o", dest="out", type=Path, default=None,
+                   help="CSV to write (default: results/group_qc.csv).")
+    p.set_defaults(func=cmd_group_qc)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
