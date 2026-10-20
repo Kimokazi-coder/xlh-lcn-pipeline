@@ -20,6 +20,11 @@ DATA_DIR = PROJECT_ROOT / "data"
 
 # Outputs: one folder per image, plus the cross-image files (results/README.md).
 RESULTS_DIR = PROJECT_ROOT / "results"
+# The second, labelled set: the same pipeline with the AI judge switch on
+# (docs/EXPERIMENT_AI.md), with the same per-image layout, the comparison
+# against results/, and the judge log with the case pictures that were sent.
+# results/ stays the deterministic method and is never written by the judge.
+AI_RESULTS_DIR = PROJECT_ROOT / "results_ai_judge"
 
 # Result layout. Every result file is named after its image. The label of an
 # image is its short name, from this table (key: the cleaned file name made by
@@ -550,7 +555,7 @@ FAST_LACUNA_STAGE = False
 # (python src/diagnostics.py regression).
 
 # The switch. When True, src/canaliculi.py reads the judge's decision file for
-# the image it is analysing (results/ai_log/<label>/<label>_ai_segments.json),
+# the image it is analysing (results_ai_judge/ai_log/<label>/<label>_ai_segments.json),
 # joins the segments judged real to the skeleton, drops the segments judged
 # artifact, and then runs the existing ownership, 50 um cap and quantification
 # unchanged. An image with no decision file is an error and not a silent pass,
@@ -608,7 +613,7 @@ AI_MIN_CALLS_BEFORE_QUALITY_GATE = 20
 AI_MAX_UNJUDGED_SHARE = 0.20
 
 # Where the requests, the answers, the pictures that were sent and the decision
-# files are written, inside RESULTS_DIR. One folder per image.
+# files are written, inside AI_RESULTS_DIR. One folder per image.
 AI_LOG_DIR = "ai_log"
 # Where the dry run writes its report and its pictures, inside RESULTS_DIR.
 AI_DRY_RUN_DIR = "ai_dry_run"

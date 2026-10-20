@@ -1,0 +1,3618 @@
+{
+  "status": "EXPERIMENT. Judge off (results/<label>/) against judge on (results_ai_judge/<label>/), from the decision files in results_ai_judge/ai_log/. NOT VALIDATED: no verdict has been checked against a manual trace.",
+  "written_at": "2026-10-20T16:27:46Z",
+  "definitions": {
+    "given_an_owner": "verdicts applied as a zero weight attachment, after conflicts",
+    "ownership_moves.px": "tracing owned in both runs whose owner changed, on the owner maps; the shortest path's doing, not the judge's",
+    "ownership_moves.segments": "branches of the judge-on skeleton, at least the judge's minimum segment length, whose majority owner changed",
+    "class_d_only": "the same switch with every verdict but the class d ones unjudged",
+    "roots": "a root is an attachment the pipeline's own contact or attach rule made, clustered at canaliculi.ROOT_MERGE_DIST_PX; a verdict's attachment splits the network but is not a root (quantification.root_points)",
+    "roots_judge_on_before_the_fix": "the same judge-on graph counted the old way, with every verdict attachment counted as a root, which is what the switch reported before the fix",
+    "largest_owner_share": "the largest single cell's owned px over all skeleton px"
+  },
+  "checks_failed": [],
+  "per_image": [
+    {
+      "image_label": "542_z06",
+      "lacunae": 19,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 50,
+        "attached_to_another_cell": 44,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 13,
+              "px": 257
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 30,
+              "px": 938
+            },
+            "pairs": {}
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 25,
+              "px": 468
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 21,
+              "px": 321
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 6,
+              "px": 171
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 6,
+              "px": 326
+            },
+            "no_owner": {
+              "segments": 7,
+              "px": 115
+            },
+            "pairs": {
+              "7->19": 1,
+              "10->9": 2,
+              "15->13": 2,
+              "2->5": 1
+            }
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 973,
+        "pairs_px": [
+          {
+            "from": 9,
+            "to": 14,
+            "count": 203
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 186
+          },
+          {
+            "from": 15,
+            "to": 13,
+            "count": 168
+          },
+          {
+            "from": 2,
+            "to": 5,
+            "count": 163
+          },
+          {
+            "from": 10,
+            "to": 14,
+            "count": 86
+          },
+          {
+            "from": 13,
+            "to": 15,
+            "count": 85
+          },
+          {
+            "from": 7,
+            "to": 19,
+            "count": 47
+          },
+          {
+            "from": 9,
+            "to": 19,
+            "count": 18
+          },
+          {
+            "from": 12,
+            "to": 11,
+            "count": 17
+          }
+        ],
+        "segments": 24,
+        "segments_px": 813,
+        "pairs_segments": [
+          {
+            "from": 9,
+            "to": 14,
+            "count": 8
+          },
+          {
+            "from": 2,
+            "to": 5,
+            "count": 4
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 4
+          },
+          {
+            "from": 15,
+            "to": 13,
+            "count": 3
+          },
+          {
+            "from": 13,
+            "to": 15,
+            "count": 2
+          },
+          {
+            "from": 7,
+            "to": 19,
+            "count": 1
+          },
+          {
+            "from": 9,
+            "to": 19,
+            "count": 1
+          },
+          {
+            "from": 10,
+            "to": 14,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 1478,
+        "no_longer_owned_px": 234
+      },
+      "class_d_only": {
+        "attached": 12,
+        "px": 667,
+        "pairs_px": [
+          {
+            "from": 10,
+            "to": 9,
+            "count": 186
+          },
+          {
+            "from": 15,
+            "to": 13,
+            "count": 168
+          },
+          {
+            "from": 2,
+            "to": 5,
+            "count": 163
+          },
+          {
+            "from": 13,
+            "to": 15,
+            "count": 85
+          },
+          {
+            "from": 7,
+            "to": 19,
+            "count": 47
+          },
+          {
+            "from": 9,
+            "to": 19,
+            "count": 18
+          }
+        ],
+        "segments": 15,
+        "segments_px": 619,
+        "pairs_segments": [
+          {
+            "from": 2,
+            "to": 5,
+            "count": 4
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 4
+          },
+          {
+            "from": 15,
+            "to": 13,
+            "count": 3
+          },
+          {
+            "from": 13,
+            "to": 15,
+            "count": 2
+          },
+          {
+            "from": 7,
+            "to": 19,
+            "count": 1
+          },
+          {
+            "from": 9,
+            "to": 19,
+            "count": 1
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 15.1333,
+        "mean_per_interior_cell_after": 15.8,
+        "mean_per_interior_cell_after_before_the_fix": 17.2667,
+        "total_before": 249,
+        "total_after": 262,
+        "total_after_before_the_fix": 289,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": false,
+            "roots_judge_off": 7,
+            "roots_judge_on_before_the_fix": 7,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 2,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 14,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 14
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 12,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 12
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 29,
+            "roots_judge_on_before_the_fix": 30,
+            "roots_judge_on": 30
+          },
+          {
+            "lacuna_id": 7,
+            "interior": true,
+            "roots_judge_off": 16,
+            "roots_judge_on_before_the_fix": 18,
+            "roots_judge_on": 17
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 17,
+            "roots_judge_on_before_the_fix": 17,
+            "roots_judge_on": 16
+          },
+          {
+            "lacuna_id": 9,
+            "interior": true,
+            "roots_judge_off": 6,
+            "roots_judge_on_before_the_fix": 9,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 16,
+            "roots_judge_on_before_the_fix": 19,
+            "roots_judge_on": 17
+          },
+          {
+            "lacuna_id": 11,
+            "interior": true,
+            "roots_judge_off": 24,
+            "roots_judge_on_before_the_fix": 28,
+            "roots_judge_on": 27
+          },
+          {
+            "lacuna_id": 12,
+            "interior": true,
+            "roots_judge_off": 23,
+            "roots_judge_on_before_the_fix": 25,
+            "roots_judge_on": 22
+          },
+          {
+            "lacuna_id": 13,
+            "interior": true,
+            "roots_judge_off": 20,
+            "roots_judge_on_before_the_fix": 23,
+            "roots_judge_on": 20
+          },
+          {
+            "lacuna_id": 14,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 12
+          },
+          {
+            "lacuna_id": 15,
+            "interior": false,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 11,
+            "roots_judge_on": 9
+          },
+          {
+            "lacuna_id": 16,
+            "interior": false,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 6
+          },
+          {
+            "lacuna_id": 17,
+            "interior": true,
+            "roots_judge_off": 17,
+            "roots_judge_on_before_the_fix": 23,
+            "roots_judge_on": 20
+          },
+          {
+            "lacuna_id": 18,
+            "interior": false,
+            "roots_judge_off": 2,
+            "roots_judge_on_before_the_fix": 4,
+            "roots_judge_on": 3
+          },
+          {
+            "lacuna_id": 19,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 7,
+            "roots_judge_on": 5
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 40198,
+        "owned_px": 32887,
+        "unowned_px": 7311,
+        "largest_owner": 6,
+        "largest_owner_px": 4379,
+        "largest_owner_share": 0.1089
+      },
+      "after": {
+        "skeleton_px": 41330,
+        "owned_px": 34131,
+        "unowned_px": 7199,
+        "largest_owner": 6,
+        "largest_owner_px": 4391,
+        "largest_owner_share": 0.1062
+      },
+      "bodies_not_named": [
+        {
+          "case_id": "case_0023",
+          "case_kind": "left over",
+          "yellow_lacuna_id": 7,
+          "bodies_outlined_grey": [
+            11,
+            12,
+            19
+          ],
+          "numbered_segments": 1,
+          "every_number_had_both_candidates_named": true
+        },
+        {
+          "case_id": "case_0024",
+          "case_kind": "left over",
+          "yellow_lacuna_id": 17,
+          "bodies_outlined_grey": [
+            10
+          ],
+          "numbered_segments": 3,
+          "every_number_had_both_candidates_named": true
+        }
+      ],
+      "pictures": {
+        "verification": "results_ai_judge/compare/542_z06_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/542_z06_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/542_z06_ownership_changes.png"
+      }
+    },
+    {
+      "image_label": "542_z18",
+      "lacunae": 13,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 64,
+        "attached_to_another_cell": 63,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 14,
+              "px": 378
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 35,
+              "px": 879
+            },
+            "pairs": {}
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 32,
+              "px": 453
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 14,
+              "px": 204
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 1,
+              "px": 11
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 17,
+              "px": 418
+            },
+            "no_owner": {
+              "segments": 5,
+              "px": 191
+            },
+            "pairs": {
+              "8->7": 5,
+              "7->8": 3,
+              "9->11": 1,
+              "9->6": 4,
+              "1->4": 2,
+              "2->4": 2
+            }
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 2479,
+        "pairs_px": [
+          {
+            "from": 8,
+            "to": 7,
+            "count": 834
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 454
+          },
+          {
+            "from": 9,
+            "to": 6,
+            "count": 429
+          },
+          {
+            "from": 9,
+            "to": 11,
+            "count": 234
+          },
+          {
+            "from": 2,
+            "to": 4,
+            "count": 225
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 119
+          },
+          {
+            "from": 8,
+            "to": 4,
+            "count": 101
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 72
+          },
+          {
+            "from": 6,
+            "to": 3,
+            "count": 11
+          }
+        ],
+        "segments": 97,
+        "segments_px": 2050,
+        "pairs_segments": [
+          {
+            "from": 8,
+            "to": 7,
+            "count": 36
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 18
+          },
+          {
+            "from": 9,
+            "to": 6,
+            "count": 16
+          },
+          {
+            "from": 2,
+            "to": 4,
+            "count": 9
+          },
+          {
+            "from": 9,
+            "to": 11,
+            "count": 8
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 3
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 3
+          },
+          {
+            "from": 8,
+            "to": 4,
+            "count": 3
+          },
+          {
+            "from": 6,
+            "to": 3,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 2272,
+        "no_longer_owned_px": 252
+      },
+      "class_d_only": {
+        "attached": 18,
+        "px": 2341,
+        "pairs_px": [
+          {
+            "from": 8,
+            "to": 7,
+            "count": 880
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 454
+          },
+          {
+            "from": 9,
+            "to": 6,
+            "count": 429
+          },
+          {
+            "from": 9,
+            "to": 11,
+            "count": 234
+          },
+          {
+            "from": 2,
+            "to": 4,
+            "count": 225
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 119
+          }
+        ],
+        "segments": 90,
+        "segments_px": 1895,
+        "pairs_segments": [
+          {
+            "from": 8,
+            "to": 7,
+            "count": 36
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 18
+          },
+          {
+            "from": 9,
+            "to": 6,
+            "count": 16
+          },
+          {
+            "from": 2,
+            "to": 4,
+            "count": 9
+          },
+          {
+            "from": 9,
+            "to": 11,
+            "count": 8
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 3
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 11.8182,
+        "mean_per_interior_cell_after": 12.4545,
+        "mean_per_interior_cell_after_before_the_fix": 16.1818,
+        "total_before": 133,
+        "total_after": 141,
+        "total_after_before_the_fix": 182,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": false,
+            "roots_judge_off": 3,
+            "roots_judge_on_before_the_fix": 4,
+            "roots_judge_on": 4
+          },
+          {
+            "lacuna_id": 2,
+            "interior": true,
+            "roots_judge_off": 26,
+            "roots_judge_on_before_the_fix": 28,
+            "roots_judge_on": 26
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 19,
+            "roots_judge_on_before_the_fix": 26,
+            "roots_judge_on": 20
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 7,
+            "interior": true,
+            "roots_judge_off": 15,
+            "roots_judge_on_before_the_fix": 20,
+            "roots_judge_on": 15
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 7,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 9,
+            "interior": true,
+            "roots_judge_off": 14,
+            "roots_judge_on_before_the_fix": 22,
+            "roots_judge_on": 16
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 11,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 11,
+            "interior": true,
+            "roots_judge_off": 6,
+            "roots_judge_on_before_the_fix": 9,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 12,
+            "interior": true,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 4
+          },
+          {
+            "lacuna_id": 13,
+            "interior": false,
+            "roots_judge_off": 0,
+            "roots_judge_on_before_the_fix": 0,
+            "roots_judge_on": 0
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 39183,
+        "owned_px": 29658,
+        "unowned_px": 9525,
+        "largest_owner": 8,
+        "largest_owner_px": 3566,
+        "largest_owner_share": 0.091
+      },
+      "after": {
+        "skeleton_px": 39855,
+        "owned_px": 31678,
+        "unowned_px": 8177,
+        "largest_owner": 4,
+        "largest_owner_px": 4226,
+        "largest_owner_share": 0.106
+      },
+      "bodies_not_named": [],
+      "pictures": {
+        "verification": "results_ai_judge/compare/542_z18_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/542_z18_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/542_z18_ownership_changes.png"
+      }
+    },
+    {
+      "image_label": "543-2",
+      "lacunae": 12,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 59,
+        "attached_to_another_cell": 56,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 9,
+              "px": 317
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 2,
+              "px": 28
+            },
+            "pairs": {}
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 24,
+              "px": 474
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 26,
+              "px": 526
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 3,
+              "px": 61
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 23,
+              "px": 667
+            },
+            "no_owner": {
+              "segments": 1,
+              "px": 14
+            },
+            "pairs": {
+              "1->3": 1,
+              "5->3": 1,
+              "5->7": 2,
+              "6->8": 2,
+              "11->12": 1,
+              "10->11": 9,
+              "5->9": 6,
+              "11->10": 1
+            }
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 2813,
+        "pairs_px": [
+          {
+            "from": 5,
+            "to": 9,
+            "count": 757
+          },
+          {
+            "from": 10,
+            "to": 11,
+            "count": 554
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 405
+          },
+          {
+            "from": 7,
+            "to": 9,
+            "count": 213
+          },
+          {
+            "from": 2,
+            "to": 8,
+            "count": 185
+          },
+          {
+            "from": 1,
+            "to": 3,
+            "count": 156
+          },
+          {
+            "from": 11,
+            "to": 9,
+            "count": 145
+          },
+          {
+            "from": 5,
+            "to": 7,
+            "count": 105
+          },
+          {
+            "from": 11,
+            "to": 12,
+            "count": 94
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 69
+          },
+          {
+            "from": 12,
+            "to": 9,
+            "count": 61
+          },
+          {
+            "from": 6,
+            "to": 10,
+            "count": 49
+          },
+          {
+            "from": 5,
+            "to": 3,
+            "count": 20
+          }
+        ],
+        "segments": 104,
+        "segments_px": 2215,
+        "pairs_segments": [
+          {
+            "from": 5,
+            "to": 9,
+            "count": 27
+          },
+          {
+            "from": 10,
+            "to": 11,
+            "count": 21
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 14
+          },
+          {
+            "from": 2,
+            "to": 8,
+            "count": 10
+          },
+          {
+            "from": 7,
+            "to": 9,
+            "count": 10
+          },
+          {
+            "from": 1,
+            "to": 3,
+            "count": 7
+          },
+          {
+            "from": 11,
+            "to": 9,
+            "count": 5
+          },
+          {
+            "from": 5,
+            "to": 7,
+            "count": 3
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 3
+          },
+          {
+            "from": 5,
+            "to": 3,
+            "count": 1
+          },
+          {
+            "from": 6,
+            "to": 10,
+            "count": 1
+          },
+          {
+            "from": 11,
+            "to": 12,
+            "count": 1
+          },
+          {
+            "from": 12,
+            "to": 9,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 1612,
+        "no_longer_owned_px": 297
+      },
+      "class_d_only": {
+        "attached": 26,
+        "px": 3184,
+        "pairs_px": [
+          {
+            "from": 5,
+            "to": 9,
+            "count": 827
+          },
+          {
+            "from": 5,
+            "to": 7,
+            "count": 554
+          },
+          {
+            "from": 10,
+            "to": 11,
+            "count": 516
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 405
+          },
+          {
+            "from": 7,
+            "to": 9,
+            "count": 213
+          },
+          {
+            "from": 2,
+            "to": 8,
+            "count": 185
+          },
+          {
+            "from": 1,
+            "to": 3,
+            "count": 156
+          },
+          {
+            "from": 11,
+            "to": 9,
+            "count": 145
+          },
+          {
+            "from": 11,
+            "to": 12,
+            "count": 94
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 69
+          },
+          {
+            "from": 5,
+            "to": 3,
+            "count": 20
+          }
+        ],
+        "segments": 119,
+        "segments_px": 2494,
+        "pairs_segments": [
+          {
+            "from": 5,
+            "to": 9,
+            "count": 29
+          },
+          {
+            "from": 5,
+            "to": 7,
+            "count": 20
+          },
+          {
+            "from": 10,
+            "to": 11,
+            "count": 19
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 14
+          },
+          {
+            "from": 2,
+            "to": 8,
+            "count": 10
+          },
+          {
+            "from": 7,
+            "to": 9,
+            "count": 10
+          },
+          {
+            "from": 1,
+            "to": 3,
+            "count": 7
+          },
+          {
+            "from": 11,
+            "to": 9,
+            "count": 5
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 3
+          },
+          {
+            "from": 5,
+            "to": 3,
+            "count": 1
+          },
+          {
+            "from": 11,
+            "to": 12,
+            "count": 1
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 8.5,
+        "mean_per_interior_cell_after": 9.0,
+        "mean_per_interior_cell_after_before_the_fix": 12.9167,
+        "total_before": 102,
+        "total_after": 108,
+        "total_after_before_the_fix": 155,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": true,
+            "roots_judge_off": 12,
+            "roots_judge_on_before_the_fix": 16,
+            "roots_judge_on": 13
+          },
+          {
+            "lacuna_id": 2,
+            "interior": true,
+            "roots_judge_off": 11,
+            "roots_judge_on_before_the_fix": 15,
+            "roots_judge_on": 12
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 6,
+            "roots_judge_on_before_the_fix": 11,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 10,
+            "roots_judge_on": 9
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 6
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 10,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 7,
+            "interior": true,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 10,
+            "roots_judge_on": 5
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 12,
+            "roots_judge_on_before_the_fix": 16,
+            "roots_judge_on": 12
+          },
+          {
+            "lacuna_id": 9,
+            "interior": true,
+            "roots_judge_off": 11,
+            "roots_judge_on_before_the_fix": 19,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 11,
+            "roots_judge_on": 9
+          },
+          {
+            "lacuna_id": 11,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 17,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 12,
+            "interior": true,
+            "roots_judge_off": 6,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 6
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 44105,
+        "owned_px": 37623,
+        "unowned_px": 6482,
+        "largest_owner": 2,
+        "largest_owner_px": 5157,
+        "largest_owner_share": 0.1169
+      },
+      "after": {
+        "skeleton_px": 44739,
+        "owned_px": 38938,
+        "unowned_px": 5801,
+        "largest_owner": 9,
+        "largest_owner_px": 5191,
+        "largest_owner_share": 0.116
+      },
+      "bodies_not_named": [],
+      "pictures": {
+        "verification": "results_ai_judge/compare/543-2_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/543-2_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/543-2_ownership_changes.png"
+      }
+    },
+    {
+      "image_label": "543_3",
+      "lacunae": 13,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 117,
+        "attached_to_another_cell": 110,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 17,
+              "px": 344
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 11,
+              "px": 286
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 7,
+              "px": 213
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 46,
+              "px": 1229
+            },
+            "no_owner": {
+              "segments": 1,
+              "px": 16
+            },
+            "pairs": {
+              "3->5": 2,
+              "12->5": 1,
+              "7->6": 1,
+              "6->7": 5,
+              "13->11": 2,
+              "10->13": 16,
+              "10->9": 1,
+              "4->1": 7,
+              "4->5": 1,
+              "4->8": 7,
+              "8->10": 1,
+              "9->10": 2
+            }
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 47,
+              "px": 1427
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 34,
+              "px": 476
+            },
+            "pairs": {}
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 7041,
+        "pairs_px": [
+          {
+            "from": 3,
+            "to": 5,
+            "count": 1090
+          },
+          {
+            "from": 10,
+            "to": 13,
+            "count": 980
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 796
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 683
+          },
+          {
+            "from": 9,
+            "to": 12,
+            "count": 631
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 566
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 545
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 370
+          },
+          {
+            "from": 12,
+            "to": 5,
+            "count": 289
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 227
+          },
+          {
+            "from": 2,
+            "to": 7,
+            "count": 190
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 177
+          },
+          {
+            "from": 3,
+            "to": 12,
+            "count": 111
+          },
+          {
+            "from": 8,
+            "to": 10,
+            "count": 88
+          },
+          {
+            "from": 9,
+            "to": 8,
+            "count": 80
+          },
+          {
+            "from": 13,
+            "to": 8,
+            "count": 66
+          },
+          {
+            "from": 8,
+            "to": 13,
+            "count": 65
+          },
+          {
+            "from": 12,
+            "to": 8,
+            "count": 43
+          },
+          {
+            "from": 7,
+            "to": 6,
+            "count": 33
+          },
+          {
+            "from": 9,
+            "to": 7,
+            "count": 11
+          }
+        ],
+        "segments": 254,
+        "segments_px": 5814,
+        "pairs_segments": [
+          {
+            "from": 3,
+            "to": 5,
+            "count": 39
+          },
+          {
+            "from": 10,
+            "to": 13,
+            "count": 36
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 30
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 28
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 27
+          },
+          {
+            "from": 9,
+            "to": 12,
+            "count": 16
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 15
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 11
+          },
+          {
+            "from": 12,
+            "to": 5,
+            "count": 10
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 8
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 8
+          },
+          {
+            "from": 2,
+            "to": 7,
+            "count": 7
+          },
+          {
+            "from": 3,
+            "to": 12,
+            "count": 4
+          },
+          {
+            "from": 9,
+            "to": 8,
+            "count": 4
+          },
+          {
+            "from": 8,
+            "to": 10,
+            "count": 3
+          },
+          {
+            "from": 12,
+            "to": 8,
+            "count": 3
+          },
+          {
+            "from": 8,
+            "to": 13,
+            "count": 2
+          },
+          {
+            "from": 13,
+            "to": 8,
+            "count": 2
+          },
+          {
+            "from": 7,
+            "to": 6,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 4758,
+        "no_longer_owned_px": 728
+      },
+      "class_d_only": {
+        "attached": 53,
+        "px": 7818,
+        "pairs_px": [
+          {
+            "from": 12,
+            "to": 5,
+            "count": 1554
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 1232
+          },
+          {
+            "from": 10,
+            "to": 13,
+            "count": 1084
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 810
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 693
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 581
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 549
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 370
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 230
+          },
+          {
+            "from": 2,
+            "to": 7,
+            "count": 190
+          },
+          {
+            "from": 9,
+            "to": 5,
+            "count": 187
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 176
+          },
+          {
+            "from": 8,
+            "to": 10,
+            "count": 88
+          },
+          {
+            "from": 7,
+            "to": 6,
+            "count": 33
+          },
+          {
+            "from": 13,
+            "to": 8,
+            "count": 21
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "count": 20
+          }
+        ],
+        "segments": 270,
+        "segments_px": 6025,
+        "pairs_segments": [
+          {
+            "from": 12,
+            "to": 5,
+            "count": 51
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 44
+          },
+          {
+            "from": 10,
+            "to": 13,
+            "count": 35
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 28
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 27
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 26
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 16
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 11
+          },
+          {
+            "from": 2,
+            "to": 7,
+            "count": 7
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 7
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 7
+          },
+          {
+            "from": 9,
+            "to": 5,
+            "count": 5
+          },
+          {
+            "from": 8,
+            "to": 10,
+            "count": 3
+          },
+          {
+            "from": 3,
+            "to": 1,
+            "count": 1
+          },
+          {
+            "from": 7,
+            "to": 6,
+            "count": 1
+          },
+          {
+            "from": 13,
+            "to": 8,
+            "count": 1
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 7.0,
+        "mean_per_interior_cell_after": 8.1667,
+        "mean_per_interior_cell_after_before_the_fix": 14.25,
+        "total_before": 86,
+        "total_after": 100,
+        "total_after_before_the_fix": 183,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": true,
+            "roots_judge_off": 7,
+            "roots_judge_on_before_the_fix": 15,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 2,
+            "interior": true,
+            "roots_judge_off": 15,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 14
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 10,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 16,
+            "roots_judge_on_before_the_fix": 21,
+            "roots_judge_on": 18
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 11,
+            "roots_judge_on_before_the_fix": 18,
+            "roots_judge_on": 12
+          },
+          {
+            "lacuna_id": 7,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 6
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 3,
+            "roots_judge_on_before_the_fix": 16,
+            "roots_judge_on": 5
+          },
+          {
+            "lacuna_id": 9,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 9,
+            "roots_judge_on": 6
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 11,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 11,
+            "interior": false,
+            "roots_judge_off": 2,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 2
+          },
+          {
+            "lacuna_id": 12,
+            "interior": true,
+            "roots_judge_off": 2,
+            "roots_judge_on_before_the_fix": 11,
+            "roots_judge_on": 5
+          },
+          {
+            "lacuna_id": 13,
+            "interior": true,
+            "roots_judge_off": 3,
+            "roots_judge_on_before_the_fix": 19,
+            "roots_judge_on": 3
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 41269,
+        "owned_px": 36517,
+        "unowned_px": 4752,
+        "largest_owner": 3,
+        "largest_owner_px": 5239,
+        "largest_owner_share": 0.1269
+      },
+      "after": {
+        "skeleton_px": 44604,
+        "owned_px": 40547,
+        "unowned_px": 4057,
+        "largest_owner": 7,
+        "largest_owner_px": 5144,
+        "largest_owner_share": 0.1153
+      },
+      "bodies_not_named": [],
+      "pictures": {
+        "verification": "results_ai_judge/compare/543_3_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/543_3_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/543_3_ownership_changes.png"
+      }
+    },
+    {
+      "image_label": "543_z13",
+      "lacunae": 11,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 58,
+        "attached_to_another_cell": 49,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 12,
+              "px": 382
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 5,
+              "px": 148
+            },
+            "pairs": {}
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 30,
+              "px": 543
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 18,
+              "px": 238
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 9,
+              "px": 226
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 7,
+              "px": 295
+            },
+            "no_owner": {
+              "segments": 2,
+              "px": 75
+            },
+            "pairs": {
+              "1->4": 1,
+              "6->7": 1,
+              "10->9": 2,
+              "11->10": 1,
+              "5->4": 1,
+              "7->9": 1
+            }
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 2518,
+        "pairs_px": [
+          {
+            "from": 5,
+            "to": 4,
+            "count": 765
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 516
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 255
+          },
+          {
+            "from": 11,
+            "to": 8,
+            "count": 206
+          },
+          {
+            "from": 7,
+            "to": 9,
+            "count": 197
+          },
+          {
+            "from": 2,
+            "to": 3,
+            "count": 122
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "count": 122
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 121
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 98
+          },
+          {
+            "from": 6,
+            "to": 5,
+            "count": 63
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 30
+          },
+          {
+            "from": 7,
+            "to": 3,
+            "count": 20
+          },
+          {
+            "from": 9,
+            "to": 6,
+            "count": 3
+          }
+        ],
+        "segments": 88,
+        "segments_px": 1881,
+        "pairs_segments": [
+          {
+            "from": 5,
+            "to": 4,
+            "count": 34
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 16
+          },
+          {
+            "from": 2,
+            "to": 3,
+            "count": 7
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 7
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "count": 5
+          },
+          {
+            "from": 7,
+            "to": 9,
+            "count": 5
+          },
+          {
+            "from": 11,
+            "to": 8,
+            "count": 5
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 3
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 2
+          },
+          {
+            "from": 6,
+            "to": 5,
+            "count": 2
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 1
+          },
+          {
+            "from": 7,
+            "to": 3,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 2741,
+        "no_longer_owned_px": 1380
+      },
+      "class_d_only": {
+        "attached": 16,
+        "px": 2648,
+        "pairs_px": [
+          {
+            "from": 7,
+            "to": 9,
+            "count": 787
+          },
+          {
+            "from": 5,
+            "to": 4,
+            "count": 749
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 520
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 246
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "count": 122
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 110
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 84
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 30
+          }
+        ],
+        "segments": 88,
+        "segments_px": 1967,
+        "pairs_segments": [
+          {
+            "from": 5,
+            "to": 4,
+            "count": 33
+          },
+          {
+            "from": 7,
+            "to": 9,
+            "count": 21
+          },
+          {
+            "from": 4,
+            "to": 1,
+            "count": 16
+          },
+          {
+            "from": 11,
+            "to": 10,
+            "count": 7
+          },
+          {
+            "from": 3,
+            "to": 2,
+            "count": 5
+          },
+          {
+            "from": 10,
+            "to": 9,
+            "count": 3
+          },
+          {
+            "from": 1,
+            "to": 4,
+            "count": 2
+          },
+          {
+            "from": 6,
+            "to": 7,
+            "count": 1
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 9.2727,
+        "mean_per_interior_cell_after": 9.5455,
+        "mean_per_interior_cell_after_before_the_fix": 13.0909,
+        "total_before": 102,
+        "total_after": 105,
+        "total_after_before_the_fix": 144,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 2,
+            "interior": true,
+            "roots_judge_off": 11,
+            "roots_judge_on_before_the_fix": 17,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 13,
+            "roots_judge_on_before_the_fix": 16,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 7,
+            "roots_judge_on": 5
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 6
+          },
+          {
+            "lacuna_id": 7,
+            "interior": true,
+            "roots_judge_off": 14,
+            "roots_judge_on_before_the_fix": 20,
+            "roots_judge_on": 13
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 9,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 11,
+            "interior": true,
+            "roots_judge_off": 12,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 12
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 44246,
+        "owned_px": 34599,
+        "unowned_px": 9647,
+        "largest_owner": 5,
+        "largest_owner_px": 5218,
+        "largest_owner_share": 0.1179
+      },
+      "after": {
+        "skeleton_px": 44193,
+        "owned_px": 35960,
+        "unowned_px": 8233,
+        "largest_owner": 2,
+        "largest_owner_px": 5130,
+        "largest_owner_share": 0.1161
+      },
+      "bodies_not_named": [],
+      "pictures": {
+        "verification": "results_ai_judge/compare/543_z13_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/543_z13_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/543_z13_ownership_changes.png"
+      }
+    },
+    {
+      "image_label": "682_z08",
+      "lacunae": 11,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 43,
+        "attached_to_another_cell": 41,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 14,
+              "px": 475
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 12,
+              "px": 324
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 2,
+              "px": 37
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 5,
+              "px": 151
+            },
+            "no_owner": {
+              "segments": 0,
+              "px": 0
+            },
+            "pairs": {
+              "4->2": 1,
+              "6->5": 2,
+              "4->8": 2
+            }
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 22,
+              "px": 350
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 17,
+              "px": 207
+            },
+            "pairs": {}
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 611,
+        "pairs_px": [
+          {
+            "from": 6,
+            "to": 5,
+            "count": 284
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 176
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 65
+          },
+          {
+            "from": 4,
+            "to": 2,
+            "count": 43
+          },
+          {
+            "from": 4,
+            "to": 6,
+            "count": 43
+          }
+        ],
+        "segments": 22,
+        "segments_px": 483,
+        "pairs_segments": [
+          {
+            "from": 6,
+            "to": 5,
+            "count": 10
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 7
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 2
+          },
+          {
+            "from": 4,
+            "to": 6,
+            "count": 2
+          },
+          {
+            "from": 4,
+            "to": 2,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 1412,
+        "no_longer_owned_px": 201
+      },
+      "class_d_only": {
+        "attached": 7,
+        "px": 490,
+        "pairs_px": [
+          {
+            "from": 6,
+            "to": 5,
+            "count": 271
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 176
+          },
+          {
+            "from": 4,
+            "to": 2,
+            "count": 43
+          }
+        ],
+        "segments": 17,
+        "segments_px": 372,
+        "pairs_segments": [
+          {
+            "from": 6,
+            "to": 5,
+            "count": 9
+          },
+          {
+            "from": 4,
+            "to": 8,
+            "count": 7
+          },
+          {
+            "from": 4,
+            "to": 2,
+            "count": 1
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 12.3333,
+        "mean_per_interior_cell_after": 13.6667,
+        "mean_per_interior_cell_after_before_the_fix": 15.3333,
+        "total_before": 131,
+        "total_after": 143,
+        "total_after_before_the_fix": 163,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": false,
+            "roots_judge_off": 16,
+            "roots_judge_on_before_the_fix": 17,
+            "roots_judge_on": 16
+          },
+          {
+            "lacuna_id": 2,
+            "interior": true,
+            "roots_judge_off": 13,
+            "roots_judge_on_before_the_fix": 15,
+            "roots_judge_on": 14
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 18,
+            "roots_judge_on_before_the_fix": 20,
+            "roots_judge_on": 19
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 19,
+            "roots_judge_on_before_the_fix": 24,
+            "roots_judge_on": 24
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 9
+          },
+          {
+            "lacuna_id": 7,
+            "interior": false,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 4
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 15,
+            "roots_judge_on_before_the_fix": 20,
+            "roots_judge_on": 18
+          },
+          {
+            "lacuna_id": 9,
+            "interior": true,
+            "roots_judge_off": 12,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 14
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 12,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 11,
+            "interior": true,
+            "roots_judge_off": 6,
+            "roots_judge_on_before_the_fix": 7,
+            "roots_judge_on": 6
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 36997,
+        "owned_px": 28414,
+        "unowned_px": 8583,
+        "largest_owner": 8,
+        "largest_owner_px": 6982,
+        "largest_owner_share": 0.1887
+      },
+      "after": {
+        "skeleton_px": 37374,
+        "owned_px": 29625,
+        "unowned_px": 7749,
+        "largest_owner": 8,
+        "largest_owner_px": 7279,
+        "largest_owner_share": 0.1948
+      },
+      "bodies_not_named": [],
+      "pictures": {
+        "verification": "results_ai_judge/compare/682_z08_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/682_z08_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/682_z08_ownership_changes.png"
+      }
+    },
+    {
+      "image_label": "682_z23",
+      "lacunae": 14,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 76,
+        "attached_to_another_cell": 65,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 23,
+              "px": 599
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 29,
+              "px": 754
+            },
+            "pairs": {}
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 31,
+              "px": 585
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 15,
+              "px": 217
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 11,
+              "px": 252
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 11,
+              "px": 288
+            },
+            "no_owner": {
+              "segments": 0,
+              "px": 0
+            },
+            "pairs": {
+              "8->7": 3,
+              "9->10": 2,
+              "12->10": 2,
+              "14->12": 1,
+              "13->11": 1,
+              "5->9": 1,
+              "10->14": 1
+            }
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 2182,
+        "pairs_px": [
+          {
+            "from": 10,
+            "to": 14,
+            "count": 860
+          },
+          {
+            "from": 2,
+            "to": 5,
+            "count": 282
+          },
+          {
+            "from": 5,
+            "to": 8,
+            "count": 237
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 181
+          },
+          {
+            "from": 7,
+            "to": 5,
+            "count": 134
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 123
+          },
+          {
+            "from": 8,
+            "to": 7,
+            "count": 78
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 72
+          },
+          {
+            "from": 5,
+            "to": 9,
+            "count": 57
+          },
+          {
+            "from": 9,
+            "to": 5,
+            "count": 42
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 29
+          },
+          {
+            "from": 7,
+            "to": 6,
+            "count": 27
+          },
+          {
+            "from": 14,
+            "to": 12,
+            "count": 23
+          },
+          {
+            "from": 10,
+            "to": 12,
+            "count": 22
+          },
+          {
+            "from": 3,
+            "to": 7,
+            "count": 15
+          }
+        ],
+        "segments": 75,
+        "segments_px": 1741,
+        "pairs_segments": [
+          {
+            "from": 10,
+            "to": 14,
+            "count": 28
+          },
+          {
+            "from": 5,
+            "to": 8,
+            "count": 9
+          },
+          {
+            "from": 2,
+            "to": 5,
+            "count": 8
+          },
+          {
+            "from": 7,
+            "to": 5,
+            "count": 6
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 5
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 4
+          },
+          {
+            "from": 8,
+            "to": 7,
+            "count": 4
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 3
+          },
+          {
+            "from": 9,
+            "to": 5,
+            "count": 2
+          },
+          {
+            "from": 3,
+            "to": 7,
+            "count": 1
+          },
+          {
+            "from": 5,
+            "to": 9,
+            "count": 1
+          },
+          {
+            "from": 7,
+            "to": 6,
+            "count": 1
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 1
+          },
+          {
+            "from": 10,
+            "to": 12,
+            "count": 1
+          },
+          {
+            "from": 14,
+            "to": 12,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 3256,
+        "no_longer_owned_px": 508
+      },
+      "class_d_only": {
+        "attached": 22,
+        "px": 2029,
+        "pairs_px": [
+          {
+            "from": 10,
+            "to": 14,
+            "count": 862
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 458
+          },
+          {
+            "from": 5,
+            "to": 8,
+            "count": 237
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 136
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 115
+          },
+          {
+            "from": 8,
+            "to": 7,
+            "count": 92
+          },
+          {
+            "from": 5,
+            "to": 9,
+            "count": 57
+          },
+          {
+            "from": 10,
+            "to": 12,
+            "count": 49
+          },
+          {
+            "from": 14,
+            "to": 12,
+            "count": 23
+          }
+        ],
+        "segments": 65,
+        "segments_px": 1551,
+        "pairs_segments": [
+          {
+            "from": 10,
+            "to": 14,
+            "count": 28
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 15
+          },
+          {
+            "from": 5,
+            "to": 8,
+            "count": 9
+          },
+          {
+            "from": 8,
+            "to": 7,
+            "count": 4
+          },
+          {
+            "from": 9,
+            "to": 10,
+            "count": 3
+          },
+          {
+            "from": 10,
+            "to": 12,
+            "count": 2
+          },
+          {
+            "from": 13,
+            "to": 11,
+            "count": 2
+          },
+          {
+            "from": 5,
+            "to": 9,
+            "count": 1
+          },
+          {
+            "from": 14,
+            "to": 12,
+            "count": 1
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 9.7273,
+        "mean_per_interior_cell_after": 10.3636,
+        "mean_per_interior_cell_after_before_the_fix": 14.0909,
+        "total_before": 125,
+        "total_after": 132,
+        "total_after_before_the_fix": 182,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": false,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 4
+          },
+          {
+            "lacuna_id": 2,
+            "interior": false,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 6,
+            "roots_judge_on": 4
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 10,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 11,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 15,
+            "roots_judge_on_before_the_fix": 20,
+            "roots_judge_on": 16
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 6,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 5
+          },
+          {
+            "lacuna_id": 7,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 15,
+            "roots_judge_on": 13
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 9,
+            "interior": false,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 15,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 11,
+            "interior": true,
+            "roots_judge_off": 7,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 7
+          },
+          {
+            "lacuna_id": 12,
+            "interior": true,
+            "roots_judge_off": 14,
+            "roots_judge_on_before_the_fix": 18,
+            "roots_judge_on": 14
+          },
+          {
+            "lacuna_id": 13,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 10,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 14,
+            "interior": true,
+            "roots_judge_off": 12,
+            "roots_judge_on_before_the_fix": 22,
+            "roots_judge_on": 12
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 40046,
+        "owned_px": 32023,
+        "unowned_px": 8023,
+        "largest_owner": 4,
+        "largest_owner_px": 4845,
+        "largest_owner_share": 0.121
+      },
+      "after": {
+        "skeleton_px": 41329,
+        "owned_px": 34771,
+        "unowned_px": 6558,
+        "largest_owner": 4,
+        "largest_owner_px": 4929,
+        "largest_owner_share": 0.1193
+      },
+      "bodies_not_named": [],
+      "pictures": {
+        "verification": "results_ai_judge/compare/682_z23_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/682_z23_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/682_z23_ownership_changes.png"
+      }
+    },
+    {
+      "image_label": "682_z29",
+      "lacunae": 15,
+      "checks": {
+        "judge_off_skeleton_equals_results": true,
+        "judge_on_skeleton_equals_results_ai_judge": true,
+        "roots_in_memory_equal_the_judge_on_json": true,
+        "attachments_recomputed_as_the_switch_made_them": true,
+        "every_verdict_attachment_is_an_edge_of_its_cell": true,
+        "no_verdict_only_attachment_is_a_root": true
+      },
+      "verdicts": {
+        "given_an_owner": 87,
+        "attached_to_another_cell": 74,
+        "conflicting": 0,
+        "by_class": {
+          "a": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 23,
+              "px": 567
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 17,
+              "px": 549
+            },
+            "pairs": {}
+          },
+          "b": {
+            "kept": {
+              "segments": 0,
+              "px": 0
+            },
+            "from_none": {
+              "segments": 28,
+              "px": 516
+            },
+            "moved": {
+              "segments": 0,
+              "px": 0
+            },
+            "no_owner": {
+              "segments": 35,
+              "px": 596
+            },
+            "pairs": {}
+          },
+          "d": {
+            "kept": {
+              "segments": 13,
+              "px": 298
+            },
+            "from_none": {
+              "segments": 0,
+              "px": 0
+            },
+            "moved": {
+              "segments": 23,
+              "px": 530
+            },
+            "no_owner": {
+              "segments": 4,
+              "px": 105
+            },
+            "pairs": {
+              "6->4": 1,
+              "6->5": 1,
+              "4->6": 5,
+              "7->8": 3,
+              "4->15": 1,
+              "6->15": 2,
+              "9->12": 1,
+              "3->5": 6,
+              "4->5": 1,
+              "6->8": 2
+            }
+          }
+        }
+      },
+      "ownership_moves": {
+        "px": 2756,
+        "pairs_px": [
+          {
+            "from": 8,
+            "to": 6,
+            "count": 765
+          },
+          {
+            "from": 4,
+            "to": 6,
+            "count": 475
+          },
+          {
+            "from": 6,
+            "to": 5,
+            "count": 467
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 229
+          },
+          {
+            "from": 4,
+            "to": 15,
+            "count": 162
+          },
+          {
+            "from": 6,
+            "to": 15,
+            "count": 146
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 102
+          },
+          {
+            "from": 13,
+            "to": 6,
+            "count": 73
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 60
+          },
+          {
+            "from": 3,
+            "to": 6,
+            "count": 58
+          },
+          {
+            "from": 7,
+            "to": 4,
+            "count": 58
+          },
+          {
+            "from": 5,
+            "to": 6,
+            "count": 55
+          },
+          {
+            "from": 6,
+            "to": 4,
+            "count": 47
+          },
+          {
+            "from": 9,
+            "to": 12,
+            "count": 38
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 15
+          },
+          {
+            "from": 14,
+            "to": 13,
+            "count": 6
+          }
+        ],
+        "segments": 106,
+        "segments_px": 2348,
+        "pairs_segments": [
+          {
+            "from": 8,
+            "to": 6,
+            "count": 26
+          },
+          {
+            "from": 4,
+            "to": 6,
+            "count": 18
+          },
+          {
+            "from": 6,
+            "to": 5,
+            "count": 17
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 10
+          },
+          {
+            "from": 6,
+            "to": 15,
+            "count": 9
+          },
+          {
+            "from": 4,
+            "to": 15,
+            "count": 5
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 5
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 4
+          },
+          {
+            "from": 5,
+            "to": 6,
+            "count": 3
+          },
+          {
+            "from": 6,
+            "to": 4,
+            "count": 2
+          },
+          {
+            "from": 9,
+            "to": 12,
+            "count": 2
+          },
+          {
+            "from": 3,
+            "to": 6,
+            "count": 1
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 1
+          },
+          {
+            "from": 7,
+            "to": 4,
+            "count": 1
+          },
+          {
+            "from": 13,
+            "to": 6,
+            "count": 1
+          },
+          {
+            "from": 14,
+            "to": 13,
+            "count": 1
+          }
+        ],
+        "newly_owned_px": 2726,
+        "no_longer_owned_px": 549
+      },
+      "class_d_only": {
+        "attached": 36,
+        "px": 2666,
+        "pairs_px": [
+          {
+            "from": 8,
+            "to": 6,
+            "count": 765
+          },
+          {
+            "from": 6,
+            "to": 5,
+            "count": 475
+          },
+          {
+            "from": 4,
+            "to": 6,
+            "count": 421
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 248
+          },
+          {
+            "from": 4,
+            "to": 15,
+            "count": 162
+          },
+          {
+            "from": 6,
+            "to": 15,
+            "count": 146
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 103
+          },
+          {
+            "from": 13,
+            "to": 6,
+            "count": 73
+          },
+          {
+            "from": 6,
+            "to": 4,
+            "count": 62
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 60
+          },
+          {
+            "from": 3,
+            "to": 6,
+            "count": 58
+          },
+          {
+            "from": 5,
+            "to": 6,
+            "count": 55
+          },
+          {
+            "from": 9,
+            "to": 12,
+            "count": 23
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 15
+          }
+        ],
+        "segments": 100,
+        "segments_px": 2177,
+        "pairs_segments": [
+          {
+            "from": 8,
+            "to": 6,
+            "count": 26
+          },
+          {
+            "from": 4,
+            "to": 6,
+            "count": 17
+          },
+          {
+            "from": 6,
+            "to": 5,
+            "count": 17
+          },
+          {
+            "from": 3,
+            "to": 5,
+            "count": 10
+          },
+          {
+            "from": 6,
+            "to": 15,
+            "count": 9
+          },
+          {
+            "from": 4,
+            "to": 15,
+            "count": 5
+          },
+          {
+            "from": 6,
+            "to": 8,
+            "count": 4
+          },
+          {
+            "from": 5,
+            "to": 6,
+            "count": 3
+          },
+          {
+            "from": 7,
+            "to": 8,
+            "count": 3
+          },
+          {
+            "from": 6,
+            "to": 4,
+            "count": 2
+          },
+          {
+            "from": 3,
+            "to": 6,
+            "count": 1
+          },
+          {
+            "from": 4,
+            "to": 5,
+            "count": 1
+          },
+          {
+            "from": 9,
+            "to": 12,
+            "count": 1
+          },
+          {
+            "from": 13,
+            "to": 6,
+            "count": 1
+          }
+        ]
+      },
+      "roots": {
+        "mean_per_interior_cell_before": 7.8462,
+        "mean_per_interior_cell_after": 8.2308,
+        "mean_per_interior_cell_after_before_the_fix": 12.6154,
+        "total_before": 117,
+        "total_after": 122,
+        "total_after_before_the_fix": 184,
+        "per_lacuna": [
+          {
+            "lacuna_id": 1,
+            "interior": false,
+            "roots_judge_off": 4,
+            "roots_judge_on_before_the_fix": 7,
+            "roots_judge_on": 4
+          },
+          {
+            "lacuna_id": 2,
+            "interior": true,
+            "roots_judge_off": 17,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 14
+          },
+          {
+            "lacuna_id": 3,
+            "interior": true,
+            "roots_judge_off": 6,
+            "roots_judge_on_before_the_fix": 8,
+            "roots_judge_on": 6
+          },
+          {
+            "lacuna_id": 4,
+            "interior": true,
+            "roots_judge_off": 12,
+            "roots_judge_on_before_the_fix": 16,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 5,
+            "interior": true,
+            "roots_judge_off": 7,
+            "roots_judge_on_before_the_fix": 20,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 6,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 17,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 7,
+            "interior": false,
+            "roots_judge_off": 11,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 8,
+            "interior": true,
+            "roots_judge_off": 8,
+            "roots_judge_on_before_the_fix": 16,
+            "roots_judge_on": 8
+          },
+          {
+            "lacuna_id": 9,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 14,
+            "roots_judge_on": 9
+          },
+          {
+            "lacuna_id": 10,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 6,
+            "roots_judge_on": 6
+          },
+          {
+            "lacuna_id": 11,
+            "interior": true,
+            "roots_judge_off": 5,
+            "roots_judge_on_before_the_fix": 9,
+            "roots_judge_on": 5
+          },
+          {
+            "lacuna_id": 12,
+            "interior": true,
+            "roots_judge_off": 3,
+            "roots_judge_on_before_the_fix": 9,
+            "roots_judge_on": 4
+          },
+          {
+            "lacuna_id": 13,
+            "interior": true,
+            "roots_judge_off": 9,
+            "roots_judge_on_before_the_fix": 16,
+            "roots_judge_on": 11
+          },
+          {
+            "lacuna_id": 14,
+            "interior": true,
+            "roots_judge_off": 10,
+            "roots_judge_on_before_the_fix": 13,
+            "roots_judge_on": 10
+          },
+          {
+            "lacuna_id": 15,
+            "interior": true,
+            "roots_judge_off": 2,
+            "roots_judge_on_before_the_fix": 6,
+            "roots_judge_on": 2
+          }
+        ]
+      },
+      "before": {
+        "skeleton_px": 37663,
+        "owned_px": 29408,
+        "unowned_px": 8255,
+        "largest_owner": 2,
+        "largest_owner_px": 5711,
+        "largest_owner_share": 0.1516
+      },
+      "after": {
+        "skeleton_px": 38267,
+        "owned_px": 31585,
+        "unowned_px": 6682,
+        "largest_owner": 2,
+        "largest_owner_px": 5889,
+        "largest_owner_share": 0.1539
+      },
+      "bodies_not_named": [
+        {
+          "case_id": "case_0019",
+          "case_kind": "left over",
+          "yellow_lacuna_id": 8,
+          "bodies_outlined_grey": [
+            11,
+            15
+          ],
+          "numbered_segments": 5,
+          "every_number_had_both_candidates_named": true
+        }
+      ],
+      "pictures": {
+        "verification": "results_ai_judge/compare/682_z29_verification_judge_off_on.png",
+        "skeleton": "results_ai_judge/compare/682_z29_skeleton_judge_off_on.png",
+        "ownership_changes": "results_ai_judge/compare/682_z29_ownership_changes.png"
+      }
+    }
+  ]
+}

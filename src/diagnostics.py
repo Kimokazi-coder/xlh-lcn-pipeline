@@ -71,7 +71,7 @@ Subcommands:
                       request and answer logged; --replay reruns from the log
                       offline and checks the verdicts come back the same
     ai-run            EXPERIMENT: detection, canaliculi and quantification with
-                      the judge switch on for that run only, into results/ai_run/,
+                      the judge switch on for that run only, into results_ai_judge/,
                       proving every other file under results/ is unchanged
     ai-compare        EXPERIMENT: judge off against judge on, per image: the
                       pictures side by side and what the verdicts moved
@@ -5761,14 +5761,14 @@ def _ai_conflict_check(image_path: Path, label: str, run: dict, after: dict) -> 
 # ai-run -------------------------------------------------------------------------
 # EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). The pipeline itself,
 # detection, canaliculi and quantification, with config.AI_JUDGE_ENABLED on for
-# this one process, into a folder of its own. config.py is not touched: the
-# switch ships off and stays off. It reads only the decision files already in
-# results/ai_log/, makes no call and needs no key. Every file under results/
-# outside its own output folder is hashed before and after, so the run proves it
-# changed nothing it was not asked to write.
+# this one process, into results_ai_judge/, the second labelled set. config.py
+# is not touched: the switch ships off and stays off. It reads only the decision
+# files already in results_ai_judge/ai_log/, makes no call and needs no key.
+# Every file under results/, and every file of the judge log, is hashed before
+# and after, so the run proves it changed nothing it was not asked to write.
 
 
-AI_RUN_DIR = config.RESULTS_DIR / "ai_run"
+AI_RUN_DIR = config.AI_RESULTS_DIR
 
 
 def _tree_manifest(root: Path, exclude: Path) -> dict:
@@ -5820,9 +5820,11 @@ def cmd_ai_run(args) -> int:
                   f"Run or replay the judge first.")
             return 2
     print(f"The pipeline with the AI judge switch on, for this process only, into {out}")
-    print("Reads results/ai_log/ only. No call is made and no key is read.")
+    print("Reads results_ai_judge/ai_log/ only. No call is made and no key is read.")
     before = _tree_manifest(results_root, out)
-    print(f"results/ before: {len(before)} files hashed (leaving out {out.name}/)")
+    log_root = ai_judge.log_root()
+    log_before = _tree_manifest(log_root, log_root / "__nothing_excluded__")
+    print(f"results/ before: {len(before)} files hashed; judge log: {len(log_before)} files hashed")
 
     out.mkdir(parents=True, exist_ok=True)
     jobs = [(str(p), str(out)) for p in images]
@@ -5856,23 +5858,32 @@ def cmd_ai_run(args) -> int:
     changed = sorted(k for k in before if k in after and before[k] != after[k])
     gone = sorted(k for k in before if k not in after)
     new = sorted(k for k in after if k not in before)
-    same = not (changed or gone or new)
+    log_after = _tree_manifest(log_root, log_root / "__nothing_excluded__")
+    log_same = log_after == log_before
+    same = not (changed or gone or new) and log_same
     report = {
         "status": ("EXPERIMENT. The pipeline with config.AI_JUDGE_ENABLED on for this run "
-                   "only, from the decision files in results/ai_log/. Not validated."),
+                   "only, from the decision files in results_ai_judge/ai_log/. Not validated."),
         "written_at": ai_judge.utc_now(),
         "images": [lacunae.image_label(p) for p in images],
         "per_image": detected,
         "results_outside_this_folder": {
             "files_hashed": len(before),
-            "byte_identical_afterwards": same,
+            "byte_identical_afterwards": not (changed or gone or new),
             "changed": changed, "removed": gone, "added": new,
+        },
+        "judge_log": {
+            "folder": log_root.relative_to(config.PROJECT_ROOT).as_posix(),
+            "files_hashed": len(log_before),
+            "byte_identical_afterwards": log_same,
         },
     }
     (out / "ai_run.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(f"\nresults/ after: {len(after)} files hashed; "
-          + ("BYTE IDENTICAL to before" if same else
+          + ("BYTE IDENTICAL to before" if not (changed or gone or new) else
              f"CHANGED: {len(changed)} changed, {len(gone)} removed, {len(new)} added"))
+    print(f"judge log after: {len(log_after)} files hashed; "
+          + ("BYTE IDENTICAL to before" if log_same else "CHANGED"))
     for k in (changed + gone + new)[:20]:
         print(f"  {k}")
     print(f"report -> {out / 'ai_run.json'}")
@@ -5883,7 +5894,7 @@ def cmd_ai_run(args) -> int:
 # EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). Judge off against
 # judge on, per image. Both runs are recomputed in memory and then checked
 # against the files on disk pixel for pixel, judge off against results/<label>/
-# and judge on against results/ai_run/<label>/, so the numbers describe exactly
+# and judge on against results_ai_judge/<label>/, so the numbers describe exactly
 # what was written. No call is made and no key is read.
 
 
@@ -6070,8 +6081,8 @@ def _ai_compare_one(job: tuple) -> dict:
     recorded = after["ai_judge"]["counts"]
     checks = {
         "judge_off_skeleton_equals_results": bool((sk_before == before["skeleton"]).all()),
-        "judge_on_skeleton_equals_ai_run": bool((sk_after == after["skeleton"]).all()),
-        "roots_in_memory_equal_ai_run_json": all(roots_in_memory[i] == roots_after[i]
+        "judge_on_skeleton_equals_results_ai_judge": bool((sk_after == after["skeleton"]).all()),
+        "roots_in_memory_equal_the_judge_on_json": all(roots_in_memory[i] == roots_after[i]
                                                  for i in roots_after),
         "attachments_recomputed_as_the_switch_made_them": all(
             ai["counts"][k] == recorded[k] for k in ai["counts"]),
@@ -6195,7 +6206,7 @@ def cmd_ai_compare(args) -> int:
     failed = [(o["image_label"], k) for o in out for k, ok in o["checks"].items() if not ok]
     report = {
         "status": ("EXPERIMENT. Judge off (results/<label>/) against judge on "
-                   "(results/ai_run/<label>/), from the decision files in results/ai_log/. "
+                   "(results_ai_judge/<label>/), from the decision files in results_ai_judge/ai_log/. "
                    "NOT VALIDATED: no verdict has been checked against a manual trace."),
         "written_at": __import__("ai_judge").utc_now(),
         "definitions": {
@@ -6256,14 +6267,14 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
         "",
         "**EXPERIMENT, branch `exp-ai-layer`. NOT VALIDATED: no verdict here has been checked "
         "against a manual trace.** Judge off is `results/<label>/`, the pipeline as it stands. "
-        "Judge on is `results/ai_run/<label>/`, the same pipeline with `config.AI_JUDGE_ENABLED` "
-        "on for that run only, applying the decision files in `results/ai_log/`. No call was "
+        "Judge on is `results_ai_judge/<label>/`, the same pipeline with `config.AI_JUDGE_ENABLED` "
+        "on for that run only, applying the decision files in `results_ai_judge/ai_log/`. No call was "
         "made and no key was read.",
         "",
         "Made by `python src/diagnostics.py ai-compare --dir data/WT`. Both runs are recomputed in "
         "memory and checked against the files on disk pixel for pixel before any number is "
         "reported: the judge-off skeleton against `results/`, the judge-on skeleton against "
-        "`results/ai_run/`, the roots in memory against the judge-on jsons, and the attachments "
+        "`results_ai_judge/`, the roots in memory against the judge-on jsons, and the attachments "
         "against the ones the switch made. "
         + ("**Every check passed.**" if not failed else
            "**CHECKS FAILED: " + ", ".join(f"{a} {b}" for a, b in failed) + ".**")
@@ -6677,10 +6688,10 @@ def main() -> None:
 
     p = sub.add_parser("ai-run",
                        help="EXPERIMENT: detection, canaliculi and quantification with the AI "
-                            "judge switch on for this run only, into results/ai_run/.")
+                            "judge switch on for this run only, into results_ai_judge/.")
     add_images_arguments(p)
     p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR,
-                   help="Output folder (default: results/ai_run).")
+                   help="Output folder (default: results_ai_judge).")
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_ai_run)
@@ -6689,9 +6700,9 @@ def main() -> None:
                        help="EXPERIMENT: judge off against judge on per image, pictures and report.")
     add_images_arguments(p)
     p.add_argument("--run", type=Path, default=AI_RUN_DIR,
-                   help="The judge-on output of ai-run (default: results/ai_run).")
+                   help="The judge-on output of ai-run (default: results_ai_judge).")
     p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR / "compare",
-                   help="Where the pictures and the report go (default: results/ai_run/compare).")
+                   help="Where the pictures and the report go (default: results_ai_judge/compare).")
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_ai_compare)
@@ -6700,7 +6711,7 @@ def main() -> None:
                        help="EXPERIMENT: run the AI judge on an image, or replay it from the log.")
     add_images_arguments(p)
     p.add_argument("--replay", action="store_true",
-                   help="No network: rerun from results/ai_log/ and check the verdicts match.")
+                   help="No network: rerun from results_ai_judge/ai_log/ and check the verdicts match.")
     p.add_argument("-s", "--self-test", dest="self_test", action="store_true",
                    help="Rehearse the whole chain on one image with a stub judge, no network "
                         "and no key, writing only to .cache/ai_self_test.")

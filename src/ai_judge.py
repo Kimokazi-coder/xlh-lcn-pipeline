@@ -18,7 +18,7 @@ Where the parts live:
 
   src/judge_prompt.md      the one fixed prompt, used for every image
   docs/judge_examples.md   Karim's worked examples, loaded into the prompt
-  results/ai_log/<label>/  every request and answer, the pictures that were
+  results_ai_judge/ai_log/<label>/  every request and answer, the pictures that were
                            sent, the decision file and the run report
   config.py                the switch, the pinned model, the prices, the cost
                            ceiling and every number the candidate rule uses
@@ -1424,7 +1424,7 @@ def parse_answer(text: str, numbers: list, colours: dict, questions: dict) -> tu
 
 # The log, and the replay that reads it back
 
-# The log lives in results/ai_log/. LOG_ROOT replaces that for one process, the
+# The log lives in results_ai_judge/ai_log/. LOG_ROOT replaces that for one process, the
 # module-override idiom the sweep diagnostics use: the self-test sets it so that
 # a rehearsal with a stub judge can never leave verdicts in results/ for the
 # pipeline to pick up.
@@ -1432,7 +1432,7 @@ LOG_ROOT = None
 
 
 def log_root() -> Path:
-    return Path(LOG_ROOT) if LOG_ROOT else config.RESULTS_DIR / config.AI_LOG_DIR
+    return Path(LOG_ROOT) if LOG_ROOT else config.AI_RESULTS_DIR / config.AI_LOG_DIR
 
 
 def log_dir(label: str) -> Path:

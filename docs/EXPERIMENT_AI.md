@@ -319,7 +319,7 @@ the same reason the stub's verdicts are, and they are not reported here as anyth
 - **The model is pinned** in `config.AI_JUDGE_MODEL` (`claude-sonnet-5-5`), and no server side
   fallback to another model is enabled: a refusal is logged and the case stays unjudged, because a
   silent fallback would break the pin.
-- **Every request and every answer is logged** to `results/ai_log/<label>/`, one json per attempt,
+- **Every request and every answer is logged** to `results_ai_judge/ai_log/<label>/`, one json per attempt,
   with the sha256 of the canonical request, of the picture, of the prompt and of the examples. The
   picture that was sent is written beside it.
 - **Replay** reruns from the log with no network: the request is rebuilt, its hash compared with the
@@ -390,7 +390,7 @@ The brief left these open. Each was decided, and here is the reason.
 ## Step 7: the real run, its replay, and what it did to the network
 
 **The real run was made on 2026-10-19, 15:58 to 16:14 UTC, on all 8 images**, and its every request
-and answer is in `results/ai_log/`. From the log:
+and answer is in `results_ai_judge/ai_log/`. From the log:
 
 | image | calls | answers retried | cases left unjudged | input tokens | output tokens | cost USD |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -421,16 +421,18 @@ and answer is in `results/ai_log/`. From the log:
 **The replay reproduces it offline.** `python src/diagnostics.py ai-judge --dir data/WT --replay`
 rebuilds every request and every picture, finds every hash equal to the one logged, and gets
 IDENTICAL verdicts on all 8 images: 143 attempts, 0 requests and 0 pictures differing from what was
-sent (`results/ai_run/step1_replay.txt`). A replay never reads `ALLOW_EXTERNAL_API` or
+sent (`results_ai_judge/replay.txt`). A replay never reads `ALLOW_EXTERNAL_API` or
 `ANTHROPIC_API_KEY`; only a live run asks.
 
 **The pipeline with the switch on** was run by `python src/diagnostics.py ai-run --dir data/WT`,
 which turns `config.AI_JUDGE_ENABLED` on for that process only, runs detection, canaliculi and
-quantification exactly as the three scripts do, and writes to `results/ai_run/`. `config.py` still
-ships with the switch off. The command hashes every file under `results/` outside its own folder
-before and after: **all 760 were byte identical afterwards** (`results/ai_run/ai_run.json`).
+quantification exactly as the three scripts do, and writes to `results_ai_judge/`, the second
+labelled set, a sibling of `results/` with the same per-image layout (its own README says what is
+in it). `config.py` still ships with the switch off. The command hashes every file under `results/`
+and every file of the judge log before and after, and **both were byte identical afterwards**
+(`results_ai_judge/ai_run.json`).
 
-**Judge off against judge on** is in `results/ai_run/compare/REPORT.md`, made by
+**Judge off against judge on** is in `results_ai_judge/compare/REPORT.md`, made by
 `python src/diagnostics.py ai-compare --dir data/WT`, with the verification and skeleton pictures
 side by side and a picture of what changed hands for every image. Both runs are recomputed and
 checked against the files on disk pixel for pixel before a number is reported, and every check
@@ -443,17 +445,35 @@ passed. Over the 8 images:
   0.015 on any image (542_z18, 0.091 to 0.106).
 - Owned tracing rises and unowned falls on every image, by 1,211 to 4,030 px owned.
 
-**And one result that must be read before any root count is.** Roots per cell rise sharply with the
-switch on: 1,045 roots to 1,482 over the 8 images, and on 543-2 the mean per interior cell goes from
-8.5 to 12.92. **That rise is mostly not biology.** A root is counted as any node attached to a cell's
-virtual node, and a verdict is expressed as exactly such an attachment, at the end of the segment
-nearest the cell, which can lie tens of pixels from the body. So every verdict that gives a cell a
-segment away from its body adds a root that is not a thread leaving the body. 493 of the 1,482
-judge-on roots contain a verdict's attachment node; leave them out and the count is 989, against
-1,045 with the switch off. (493 is an upper bound on what the verdicts add, because such a root can
-also hold a node the contact rule attached.) Until either the attachment or the root count is
-changed so that the two are not the same thing, **no root number made with the switch on means what
-a root number means**. This report does not change either, because both are design decisions.
+**Roots, and the fix.** A root is counted from the nodes attached to a cell's virtual node, and a
+verdict is expressed as exactly such an attachment, at the end of the segment nearest the cell,
+which can lie tens of pixels from the body. Before the fix every such verdict added a root that is
+not a thread leaving the body: judge-on roots rose from 1,045 to 1,482 over the 8 images, and on
+543-2 the mean per interior cell from 8.5 to 12.92.
+
+**The fix keeps the attachment and stops counting it.** The edge a verdict makes is marked `judged`
+(`canaliculi.attach_judged_segments`), it splits the network through the shortest path exactly as
+before, and a root is counted only for an attachment the pipeline's own contact or attach rule made,
+which only ever attach within reach of the body (`quantification.root_points`). Where the pipeline
+had already joined that cell to that node, the edge stays the pipeline's and stays a root. With the
+switch off no edge is marked, so every number is what it was.
+
+| image | roots, judge off | judge on, before the fix | judge on, after the fix | mean per interior cell: off / before / after |
+| --- | --- | --- | --- | --- |
+| 542_z06 | 249 | 289 | 262 | 15.13 / 17.27 / 15.80 |
+| 542_z18 | 133 | 182 | 141 | 11.82 / 16.18 / 12.45 |
+| 543-2 | 102 | 155 | 108 | 8.50 / 12.92 / 9.00 |
+| 543_3 | 86 | 183 | 100 | 7.00 / 14.25 / 8.17 |
+| 543_z13 | 102 | 144 | 105 | 9.27 / 13.09 / 9.55 |
+| 682_z08 | 131 | 163 | 143 | 12.33 / 15.33 / 13.67 |
+| 682_z23 | 125 | 182 | 132 | 9.73 / 14.09 / 10.36 |
+| 682_z29 | 117 | 184 | 122 | 7.85 / 12.62 / 8.23 |
+| **all 8** | **1,045** | **1,482** | **1,113** | |
+
+The 68 roots that remain above judge off are tracing the judge added that touches a body, which the
+pipeline's own contact rule attaches like any other thread. Every lacuna is in
+`results_ai_judge/roots_before_and_after_the_fix.md`, and `results_ai_judge/compare/REPORT.md`
+recomputes the before-the-fix count from the judge-on graph itself.
 
 The two guards a run leans on are still rehearsed in the self-test with no network: with every
 answer unreadable the run stops after 20 calls, and a billing error stops it at the first case with
@@ -494,8 +514,8 @@ python src/diagnostics.py ai-judge --dir data/WT
 # The same run again, offline, from the log.
 python src/diagnostics.py ai-judge --dir data/WT --replay
 
-# The pipeline with the switch on for that run only, into results/ai_run/, and
-# judge off against judge on with the pictures, into results/ai_run/compare/.
+# The pipeline with the switch on for that run only, into results_ai_judge/, and
+# judge off against judge on with the pictures, into results_ai_judge/compare/.
 python src/diagnostics.py ai-run --dir data/WT
 python src/diagnostics.py ai-compare --dir data/WT
 
@@ -522,12 +542,11 @@ Established, and each one measured rather than asserted:
 - a billing error stops the run at once, and a run whose answers cannot be read stops itself;
 - the real run on all 8 images left no segment unjudged, cost $1.60, and replays offline to the same
   verdicts; with the switch on, 21,373 px of tracing change hands between cells as whole networks,
-  and nothing under `results/` outside `results/ai_run/` changes by a byte;
+  and nothing under `results/` outside `results_ai_judge/` changes by a byte;
 - with the switch off every number is `main`'s, over 6,800 of them at tolerance 0.
 
 **Not established, and nothing here should be read as if it were.** No verdict has been checked
-against a manual trace. The root counts made with the switch on are inflated by the way a verdict is
-attached (Step 7) and mean nothing until that is resolved. No judgement in this design has been shown to be a better judgement than the
+against a manual trace. No judgement in this design has been shown to be a better judgement than the
 pipeline's. The 145 pictures say what the judge would be asked; they do not say the answer would be
 right, and the cost of a wrong answer is not symmetric, because a thread given to the wrong cell
 moves that cell's whole measured network. **Nothing here is validated**, nothing here has produced a
