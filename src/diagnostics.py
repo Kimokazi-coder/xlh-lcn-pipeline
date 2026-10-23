@@ -7343,6 +7343,9 @@ FORMAT_MEASURES = [
     ("canalicular width median (px)", "canalicular width median (px)"),
     ("loops per cell", "loops per cell"),
 ]
+# A measure whose WT values fall on this many distinct values or fewer is
+# reported as quantised by the pixel grid next to its SD.
+FORMAT_FEW_LEVELS = 3
 FORMAT_CSV_COLUMNS = ["row", "set", "image", "measure", "tiff", "jpeg", "difference jpeg - tiff",
                       "lacunae matched within 25 px", "pairs", "mean difference", "largest absolute difference",
                       "pairs higher", "pairs lower", "pairs equal", "SD across the 8 WT images",
@@ -7501,6 +7504,183 @@ def _fmt(value: float) -> str:
     return f"{value:.6g}"
 
 
+# The report, results/format_test/format_test.md. Every sentence of it is
+# written from the numbers by the rules below, so a rerun rewrites it whole:
+# which way each measure moved in how many pairs, by how much, and that change
+# as a share of the SD of the measure over the 8 WT images. It decides nothing.
+
+
+def _read_csv(path: Path) -> list:
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def _md_table(header: list, rows: list) -> str:
+    lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
+    lines += ["| " + " | ".join(str(c) for c in r) + " |" for r in rows]
+    return "\n".join(lines)
+
+
+def _moved(entry: dict) -> str:
+    """One plain sentence on how one measure moved over the pairs of a set."""
+    n = entry["pairs"]
+    if entry["pairs equal"] == n:
+        return "identical in every pair."
+    ways = []
+    for key, word in (("pairs higher", "higher"), ("pairs lower", "lower"), ("pairs equal", "equal")):
+        if entry[key]:
+            ways.append(f"{word} in {entry[key]}")
+    ratio = entry["mean difference / SD"]
+    largest = float(entry["largest absolute difference"])
+    sd = float(entry["SD across the 8 WT images"])
+    return (f"{', '.join(ways)} of {n} pairs; mean change {float(entry['mean difference']):+.4g}, "
+            f"largest {largest:.4g}; the SD between the 8 WT images is {sd:.4g}, so the mean change is "
+            f"{ratio} SD and the largest {largest / sd:.3f} SD." if sd > 0 else
+            f"{', '.join(ways)} of {n} pairs; mean change {float(entry['mean difference']):+.4g}.")
+
+
+def format_markdown(found: dict) -> Path:
+    twins = _read_csv(FORMAT_REPORT_DIR / "twin_check.csv")
+    prints = _read_csv(FORMAT_REPORT_DIR / "tiff_fingerprints.csv")
+    synthetic = _read_csv(FORMAT_REPORT_DIR / "synthetic_check.csv")
+    values, pooled, labels, sd = found["values"], found["pooled"], found["labels"], found["sd"]
+    measures = [m for m, _c in FORMAT_MEASURES]
+    identical = [t["image"] for t in twins if t["red mean absolute difference (0-255)"] in ("0", "0.0")]
+    out = ["# Format test: TIFF against JPEG on the WT images", "",
+           "**Pre-validation, pixel units. Measurement only: nothing here decides anything, and no default "
+           "changed.** Made by `python src/diagnostics.py format-test --twins-src FOLDER` (steps twins, "
+           "synthetic, run, report). The images and the three runs are in `.cache/format_test/`, not tracked; "
+           "the tables are here, in `results/format_test/`. A difference is always JPEG minus TIFF.", ""]
+
+    out += ["## What the WT TIFFs are", "",
+            f"The four real JPEG twins are the same fields as their WT TIFFs: the same shape, and the cross "
+            f"correlation of the red channels peaks at a shift of 0,0 px for "
+            f"{sum(t['best shift dy,dx (px)'] == '0,0' for t in twins)} of {len(twins)}. "
+            f"For {len(identical)} of them ({', '.join(identical) or 'none'}) the decoded JPEG equals the TIFF "
+            f"pixel for pixel.", "",
+            _md_table(["image", "red mean absolute difference (0-255)", "red correlation at shift 0", "best shift",
+                       "same field"],
+                      [[t["image"], t["red mean absolute difference (0-255)"], t["red correlation at shift 0"],
+                        t["best shift dy,dx (px)"], t["same field"]] for t in twins]), "",
+            "Two fingerprints of a JPEG compression on all 8 WT TIFFs: green that is not zero although the sections "
+            "are red and blue, and steps in the red channel that are larger across the edges of the 8 px blocks a "
+            "JPEG codes in than inside them (a ratio of 1 means no block structure; the null moves the grid by "
+            "4 px, where no edge was coded).", "",
+            _md_table(FINGERPRINT_COLUMNS, [[r[c] for c in FINGERPRINT_COLUMNS] for r in prints]), ""]
+
+    def above_null(r: dict) -> bool:
+        ratio = [float(v) for v in r["red block-edge step ratio (x, y)"].split(",")]
+        null = [float(v) for v in r["red null, grid moved 4 px (x, y)"].split(",")]
+        return all(a > b for a, b in zip(ratio, null))
+
+    marked = [r["image"] for r in prints if float(r["green > 0 share"]) > 0 and above_null(r)]
+    if identical or len(marked) == len(prints):
+        out += [f"Both fingerprints are on {len(marked)} of {len(prints)} WT TIFFs, and {len(identical)} TIFF(s) "
+                "equal a decoded JPEG pixel for pixel. So the WT TIFFs hold decoded JPEG pixels. There is no "
+                "uncompressed original of any WT field here, and this test therefore cannot measure what a FIRST "
+                "JPEG compression does. What it measures is what a SECOND compression at the same tables does "
+                "(the synthetic set) and what a different decode of the same JPEG does (the real set).", ""]
+    else:
+        out += [f"Both fingerprints are on {len(marked)} of {len(prints)} WT TIFFs and no TIFF equals a decoded "
+                "JPEG, so the synthetic set measures a first compression.", ""]
+
+    q = synthetic[0]["quality"] if synthetic else ""
+    mads = [float(r["red mean absolute difference (0-255)"]) for r in synthetic]
+    tables_ok = sum(r[SYNTHETIC_COLUMNS[4]] == "True" for r in synthetic)
+    out += ["## The synthetic twins", "",
+            f"Each WT TIFF saved as JPEG with Pillow at 4:2:0 and quality {q}, the quality whose quantization "
+            f"tables equal the real JPEGs' (luma table first coefficient "
+            f"{synthetic[0]['luma table first coefficient'] if synthetic else ''}); tables equal on "
+            f"{tables_ok} of "
+            f"{len(synthetic)}. Red channel against the TIFF: mean absolute difference {min(mads):.2f} to "
+            f"{max(mads):.2f} grey levels, best shift 0,0 on every image.", "",
+            "## The TIFF run", "",
+            f"The WT TIFFs run again into `.cache/format_test/tiff/` equal `results/{config.REFERENCE_GROUP}/` in "
+            f"every cell of the cross-image table: {found['tiff_equals_reference']}.", ""]
+
+    def pooled_table(name):
+        return _md_table(["measure", "pairs", "mean difference", "largest absolute difference",
+                          "higher / lower / equal", "SD over the 8 WT images", "mean difference / SD"],
+                         [[m, pooled[(name, m)]["pairs"], pooled[(name, m)]["mean difference"],
+                           pooled[(name, m)]["largest absolute difference"],
+                           f"{pooled[(name, m)]['pairs higher']} / {pooled[(name, m)]['pairs lower']} / "
+                           f"{pooled[(name, m)]['pairs equal']}", pooled[(name, m)]["SD across the 8 WT images"],
+                           pooled[(name, m)]["mean difference / SD"]] for m in measures if (name, m) in pooled])
+
+    def pairs_table(name):
+        rows = []
+        for lab in labels:
+            if lab not in values[name]:
+                continue
+            t, j = values["tiff"][lab], values[name][lab]
+            matched = len(_mutual_matches(t["centroids"], j["centroids"], FORMAT_MATCH_PX))
+            rows.append([lab, f"{matched} of {len(t['centroids'])}"] + [_fmt(j[m] - t[m]) for m in measures])
+        return _md_table(["image", "lacunae matched"] + [f"{m}, difference" for m in measures], rows)
+
+    out += ["## Each measure, pooled", "",
+            "Mean difference keeps its sign; the largest is the largest absolute difference of one pair. The SD "
+            "is the sample SD of the measure over the 8 WT TIFF images, the spread between images that the "
+            "format effect is read against.", ""]
+    for name, title in (("synthetic", "Synthetic twins, 8 pairs"), ("real", "Real twins")):
+        n_matched = pooled[(name, "lacuna count")]["lacunae matched within 25 px"] if (name, "lacuna count") in pooled else ""
+        out += [f"### {title}", "", pooled_table(name), "",
+                f"Lacunae matched by centroid within {FORMAT_MATCH_PX:g} px (mutual nearest neighbours): {n_matched}.",
+                "", pairs_table(name), ""]
+
+    out += ["## The 8 WT images, TIFF", "",
+            _md_table(["image"] + measures, [[lab] + [_fmt(values["tiff"][lab][m]) for m in measures] for lab in labels]
+                      + [["SD"] + [_fmt(sd[m]) for m in measures]]), ""]
+
+    both = [lab for lab in labels if lab in values["real"] and lab in values["synthetic"]]
+    side = []
+    for lab in both:
+        for m in measures:
+            t, r, y = values["tiff"][lab][m], values["real"][lab][m], values["synthetic"][lab][m]
+            side.append([lab, m, _fmt(t), _fmt(r), _fmt(y), _fmt(r - t), _fmt(y - t)])
+    out += ["## Real and synthetic twins of the same fields", "",
+            _md_table(["image", "measure", "tiff", "real JPEG", "synthetic JPEG", "real - tiff", "synthetic - tiff"],
+                      side), ""]
+
+    order = sorted(measures, key=lambda m: -abs(float(pooled[("synthetic", m)]["mean difference / SD"] or 0)))
+    out += ["## What it shows", ""]
+    for name, title in (("synthetic", "A second compression (synthetic twins)"),
+                        ("real", "A different decode of the same JPEG (real twins)")):
+        out += [f"**{title}.**", ""]
+        out += [f"- {m}: {_moved(pooled[(name, m)])}" for m in measures if (name, m) in pooled]
+        changed = [(lab, values[name][lab]["lacuna count"] - values["tiff"][lab]["lacuna count"])
+                   for lab in labels if lab in values[name]
+                   and values[name][lab]["lacuna count"] != values["tiff"][lab]["lacuna count"]]
+        if changed:
+            out += ["", f"The lacuna count changed in {len(changed)} of {pooled[(name, 'lacuna count')]['pairs']} "
+                        "pairs: " + ", ".join(
+                            f"{lab} ({d:+.0f} lacuna; roots per interior cell "
+                            f"{values[name][lab]['roots per interior cell'] - values['tiff'][lab]['roots per interior cell']:+.4g}, "
+                            f"ring length 30 px per cell "
+                            f"{values[name][lab]['ring length 30 px per cell (px)'] - values['tiff'][lab]['ring length 30 px per cell (px)']:+.4g})"
+                            for lab, d in changed)
+                    + ". A per-cell measure is a mean over the interior lacunae, so it moves with the number of "
+                      "cells it is divided among as well as with the tracing."]
+        out += [""]
+    out += [f"Against the spread between the 8 WT images, the synthetic mean changes rank, largest first: "
+            + "; ".join(f"{m} {pooled[('synthetic', m)]['mean difference / SD']} SD" for m in order) + ".", ""]
+    # A measure that takes very few values over the WT images has an SD set by
+    # the pixel grid, and one step between its values reads as a large share of it.
+    for m in measures:
+        levels = sorted({values["tiff"][lab][m] for lab in labels})
+        if 1 < len(levels) <= FORMAT_FEW_LEVELS and sd[m] > 0:
+            step = min(b - a for a, b in zip(levels, levels[1:]))
+            out += [f"{m} takes only {len(levels)} values over the 8 WT images ({', '.join(_fmt(v) for v in levels)}), "
+                    f"so its SD is set by the pixel grid: one step between them, {_fmt(step)}, is "
+                    f"{step / sd[m]:.2f} SD.", ""]
+    out += ["Limits: 8 pairs for the synthetic set and 4 for the real set, one run each; the comparison is of "
+            "a second compression and of a decoder, not of a first compression, for the reason given at the top. "
+            "Nothing here is validated against a manual count.", ""]
+    path = FORMAT_REPORT_DIR / "format_test.md"
+    path.write_text("\n".join(out), encoding="utf-8")
+    print(f"-> {path.relative_to(config.PROJECT_ROOT).as_posix()}")
+    return path
+
+
 def cmd_format_test(args) -> int:
     steps = FORMAT_STEPS if args.step == "all" else (args.step,)
     if "twins" in steps:
@@ -7510,7 +7690,7 @@ def cmd_format_test(args) -> int:
     if "run" in steps:
         format_run(args)
     if "report" in steps:
-        format_compare(args)
+        format_markdown(format_compare(args))
     return 0
 
 
