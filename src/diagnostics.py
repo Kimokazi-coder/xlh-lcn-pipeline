@@ -7120,31 +7120,37 @@ def qc_rejections(image_path: Path) -> dict:
 
 
 def cmd_group_qc(args) -> int:
+    from concurrent.futures import ProcessPoolExecutor
+
     lo, hi = reference_count_range()
     groups = args.groups.split(",") if args.groups else [g for g in config.GROUPS if g != config.REFERENCE_GROUP]
-    rows, empty = [], []
+    rows, empty, jobs = [], [], []
     for group in groups:
         found = group_summary_rows(group)
         if not found:
             empty.append(group)
             continue
         paths = {lacunae.image_label(p): p for p in sorted((config.DATA_DIR / group).glob("*.tif"))}
-        for r in found:
-            label = r.get("image_label") or lacunae.image_label(r["image"])
-            n = int(r["lacuna count"])
-            rej = qc_rejections(paths[label])
-            outside = n < lo or n > hi
-            distance = (lo - n) if n < lo else (n - hi) if n > hi else 0
-            rows.append({"group": group, "image": label, "lacuna count": n,
-                         "interior lacuna count": int(r["interior lacuna count"]),
-                         "rejected: area too small": rej["minimum area"],
-                         "rejected: area too large": rej["maximum area"],
-                         "rejected: solidity": rej["solidity"], "rejected: aspect ratio": rej["aspect ratio"],
-                         QC_COLUMNS[8]: rej["specks"], "reference range": f"{lo} to {hi}",
-                         "outside reference range": "yes" if outside else "",
-                         "_distance": distance,
-                         "_rejected": rej["minimum area"] + rej["maximum area"] + rej["solidity"]
-                         + rej["aspect ratio"]})
+        jobs += [(group, r, paths[r.get("image_label") or lacunae.image_label(r["image"])]) for r in found]
+    # The lacuna stage of every image, rerun to attribute its rejections, one
+    # image per process: the same work as one after another, only sooner.
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(jobs) or 1))) as ex:
+        rejections = list(ex.map(qc_rejections, [path for _g, _r, path in jobs]))
+    for (group, r, _path), rej in zip(jobs, rejections):
+        label = r.get("image_label") or lacunae.image_label(r["image"])
+        n = int(r["lacuna count"])
+        outside = n < lo or n > hi
+        distance = (lo - n) if n < lo else (n - hi) if n > hi else 0
+        rows.append({"group": group, "image": label, "lacuna count": n,
+                     "interior lacuna count": int(r["interior lacuna count"]),
+                     "rejected: area too small": rej["minimum area"],
+                     "rejected: area too large": rej["maximum area"],
+                     "rejected: solidity": rej["solidity"], "rejected: aspect ratio": rej["aspect ratio"],
+                     QC_COLUMNS[8]: rej["specks"], "reference range": f"{lo} to {hi}",
+                     "outside reference range": "yes" if outside else "",
+                     "_distance": distance,
+                     "_rejected": rej["minimum area"] + rej["maximum area"] + rej["solidity"]
+                     + rej["aspect ratio"]})
     # Which outlines to look at first: furthest outside the range, then the most
     # lacuna-scale rejections, then by name.
     order = sorted(rows, key=lambda r: (-r["_distance"], -r["_rejected"], r["group"], r["image"]))
@@ -8114,6 +8120,7 @@ def main() -> None:
                    help="Groups, comma separated (default: every group but the reference).")
     p.add_argument("-o", dest="out", type=Path, default=None,
                    help="CSV to write (default: results/group_qc.csv).")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes, one image each (default 8).")
     p.set_defaults(func=cmd_group_qc)
 
     p = sub.add_parser("format-test",
