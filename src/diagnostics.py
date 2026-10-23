@@ -85,6 +85,10 @@ Subcommands:
     group-qc          per image of every group but the reference: lacuna
                       count, rejected candidates by rule, and a flag outside
                       the reference group's range, in results/group_qc.csv
+    format-test       how much saving an image as JPEG changes what the
+                      pipeline measures, on the WT images: the real JPEG
+                      twins checked against their TIFF, synthetic twins,
+                      and every measure TIFF against JPEG
     compare-methods   both result sets side by side, results/WT/ and
                       results_ai_judge/WT/: csv and xlsx per lacuna, per image and
                       overall, and the cell pairs whose segments changed hands
@@ -7071,6 +7075,174 @@ def cmd_group_qc(args) -> int:
     return 0
 
 
+# format-test ------------------------------------------------------------------------
+# How much saving an image as JPEG changes what the pipeline measures, measured on
+# the WT images before any JPEG group is run. Measurement only: nothing is
+# decided here and no default changes. The images and pipeline runs go to
+# .cache/format_test/ (ignored); only the small tables of results/format_test/ are
+# tracked. Nothing under results/WT/ or results_ai_judge/WT/ is read for writing.
+#
+#   twins      copy the real JPEG twins of four WT fields (the source is only read)
+#              and check that each is the same field as its WT TIFF
+
+FORMAT_DIR = config.PROJECT_ROOT / ".cache" / "format_test"
+FORMAT_REPORT_DIR = config.RESULTS_ROOT / "format_test"
+FORMAT_STEPS = ("twins",)
+# The real JPEG twins: four WT fields that were also exported as JPEG, keyed by
+# the name of the WT TIFF, by their path under the folder given with --twins-src.
+FORMAT_REAL_TWINS = {
+    "542 WT  2_z06c1-2.tif": "542 WT  2/542 WT  2_z06c1-2.jpg",
+    "542 WT  2_z18c1-2.tif": "542 WT  2/542 WT  2_z18c1-2.jpg",
+    "543_z13c1-2.tif": "543/543_z13c1-2.jpg",
+    "682_z08c1-2.tif": "682/682_z08c1-2.jpg",
+}
+TWIN_COLUMNS = ["image", "tiff", "jpeg", "tiff shape", "jpeg shape", "same shape",
+                "red mean absolute difference (0-255)", "red mean difference jpeg - tiff (0-255)",
+                "red correlation at shift 0", "best shift dy,dx (px)", "same field"]
+
+
+def red_uint8(path: Path) -> np.ndarray:
+    """The red channel as the file stores it, 0 to 255: a TIFF read the way the
+    pipeline reads it, anything else decoded with Pillow."""
+    from PIL import Image
+    from skimage.io import imread
+
+    if file_format(path) == "TIFF":
+        arr = np.asarray(imread(path))
+    else:
+        with Image.open(path) as im:
+            arr = np.asarray(im.convert("RGB"))
+    return arr[..., config.CHANNEL] if arr.ndim == 3 else arr
+
+
+def best_shift(a: np.ndarray, b: np.ndarray) -> tuple:
+    """(dy, dx): the shift of b against a at the peak of their cross correlation,
+    computed over every shift at once by FFT on the zero-mean images."""
+    fa = np.fft.rfft2(a.astype(float) - a.mean())
+    fb = np.fft.rfft2(b.astype(float) - b.mean())
+    cc = np.fft.irfft2(fa * np.conj(fb), s=a.shape)
+    dy, dx = (int(v) for v in np.unravel_index(int(np.argmax(cc)), cc.shape))
+    dy = dy - a.shape[0] if dy > a.shape[0] // 2 else dy
+    dx = dx - a.shape[1] if dx > a.shape[1] // 2 else dx
+    return -dy, -dx
+
+
+def pixel_comparison(tiff_path: Path, other_path: Path) -> dict:
+    """Red channel of a file against the WT TIFF of the same field."""
+    a, b = red_uint8(tiff_path), red_uint8(other_path)
+    out = {"tiff shape": "x".join(map(str, a.shape)), "jpeg shape": "x".join(map(str, b.shape)),
+           "same shape": a.shape == b.shape}
+    if not out["same shape"]:
+        out.update({"red mean absolute difference (0-255)": "", "red mean difference jpeg - tiff (0-255)": "",
+                    "red correlation at shift 0": "", "best shift dy,dx (px)": "", "same field": False})
+        return out
+    d = b.astype(float) - a.astype(float)
+    shift = best_shift(a, b)
+    out.update({"red mean absolute difference (0-255)": round(float(np.abs(d).mean()), 4),
+                "red mean difference jpeg - tiff (0-255)": round(float(d.mean()), 4),
+                "red correlation at shift 0": round(float(np.corrcoef(a.ravel(), b.ravel())[0, 1]), 6),
+                "best shift dy,dx (px)": f"{shift[0]},{shift[1]}",
+                "same field": shift == (0, 0)})
+    return out
+
+
+def write_rows_csv(path: Path, columns: list, rows: list) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=columns, extrasaction="ignore", lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+
+
+# What the WT TIFFs carry of an earlier JPEG compression. A JPEG codes the image
+# in 8 x 8 px blocks, so a decoded JPEG steps more across a block edge than inside
+# a block; the same ratio with the grid moved by half a block is the null, where
+# no edge is coded. And a JPEG keeps colour as luma and two chroma planes, so an
+# image whose green channel was empty comes back with green that is not zero.
+FINGERPRINT_BLOCK_PX = 8
+# Read on red only: blue is carried mostly by the chroma planes, kept at half
+# resolution, which step every second pixel wherever the grid is, so its null is
+# not a null.
+FINGERPRINT_COLUMNS = ["image", "green > 0 share", "green max",
+                       "red block-edge step ratio (x, y)", "red null, grid moved 4 px (x, y)"]
+
+
+def block_edge_ratio(channel: np.ndarray, offset: int = 0) -> str:
+    """Mean absolute step across the 8 px block edges over the mean step inside
+    the blocks, along x and along y, with the grid moved by `offset` px."""
+    out = []
+    for axis in (1, 0):
+        steps = np.abs(np.diff(channel.astype(float), axis=axis))
+        index = (np.arange(steps.shape[axis]) - offset) % FINGERPRINT_BLOCK_PX == FINGERPRINT_BLOCK_PX - 1
+        at = steps[:, index] if axis == 1 else steps[index, :]
+        inside = steps[:, ~index] if axis == 1 else steps[~index, :]
+        out.append(f"{at.mean() / inside.mean():.3f}")
+    return ", ".join(out)
+
+
+def tiff_fingerprints() -> list:
+    """The two JPEG fingerprints on every WT TIFF."""
+    from skimage.io import imread
+
+    rows = []
+    for path in sorted((config.DATA_DIR / config.REFERENCE_GROUP).glob("*.tif")):
+        a = np.asarray(imread(path))
+        half = FINGERPRINT_BLOCK_PX // 2
+        rows.append({"image": lacunae.image_label(path),
+                     "green > 0 share": round(float((a[..., 1] > 0).mean()), 4),
+                     "green max": int(a[..., 1].max()),
+                     "red block-edge step ratio (x, y)": block_edge_ratio(a[..., 0]),
+                     "red null, grid moved 4 px (x, y)": block_edge_ratio(a[..., 0], half)})
+    return rows
+
+
+def format_twins(args) -> list:
+    """Copy the real twins into the cache (never move them) and keep those that
+    are the same field as their WT TIFF: the same shape, and the cross
+    correlation of the red channels peaking at a shift of 0 px."""
+    import filecmp
+    import shutil as _shutil
+
+    folder = FORMAT_DIR / "real_jpeg"
+    folder.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for tiff_name, rel in FORMAT_REAL_TWINS.items():
+        tiff = config.DATA_DIR / config.REFERENCE_GROUP / tiff_name
+        cached = folder / Path(rel).name
+        if args.twins_src is not None:
+            source = Path(args.twins_src) / rel
+            if not source.is_file():
+                print(f"{rel}: not in {args.twins_src}; left out")
+                continue
+            if not (cached.is_file() and filecmp.cmp(source, cached, shallow=False)):
+                _shutil.copy2(source, cached)
+        if not cached.is_file():
+            print(f"{rel}: no copy in {folder} and no --twins-src; left out")
+            continue
+        row = {"image": lacunae.image_label(tiff), "tiff": f"data/{config.REFERENCE_GROUP}/{tiff_name}", "jpeg": rel}
+        row.update(pixel_comparison(tiff, cached))
+        rows.append(row)
+    write_rows_csv(FORMAT_REPORT_DIR / "twin_check.csv", TWIN_COLUMNS, rows)
+    print_table(TWIN_COLUMNS, [[r[c] for c in TWIN_COLUMNS] for r in rows],
+                title=f"real JPEG twins against their WT TIFF (red channel) -> "
+                      f"{(FORMAT_REPORT_DIR / 'twin_check.csv').relative_to(config.PROJECT_ROOT).as_posix()}\n")
+    for r in rows:
+        if not r["same field"]:
+            print(f"{r['image']}: NOT the same field as its TIFF; dropped from the test")
+    prints = tiff_fingerprints()
+    write_rows_csv(FORMAT_REPORT_DIR / "tiff_fingerprints.csv", FINGERPRINT_COLUMNS, prints)
+    print_table(FINGERPRINT_COLUMNS, [[r[c] for c in FINGERPRINT_COLUMNS] for r in prints],
+                title="\nJPEG fingerprints on the WT TIFFs -> results/format_test/tiff_fingerprints.csv\n")
+    return [r for r in rows if r["same field"]]
+
+
+def cmd_format_test(args) -> int:
+    steps = FORMAT_STEPS if args.step == "all" else (args.step,)
+    if "twins" in steps:
+        format_twins(args)
+    return 0
+
+
 def _ai_same_decisions(a: dict, b: dict) -> bool:
     """Do two decision files hold the same verdicts for the same candidates?"""
     if a.get("geometry_sha256") != b.get("geometry_sha256"):
@@ -7403,6 +7575,17 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, default=None,
                    help="CSV to write (default: results/group_qc.csv).")
     p.set_defaults(func=cmd_group_qc)
+
+    p = sub.add_parser("format-test",
+                       help="How much saving an image as JPEG changes what the pipeline measures, "
+                            "on the WT images. Measurement only.")
+    p.add_argument("--step", choices=("all",) + FORMAT_STEPS, default="all",
+                   help="One step only (default: all, in order).")
+    p.add_argument("--twins-src", dest="twins_src", type=Path, default=None,
+                   help="Folder holding the real JPEG twins; it is only read. Without it the copies "
+                        "already in .cache/format_test/real_jpeg/ are used.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_format_test)
 
     args = parser.parse_args()
     sys.exit(args.func(args))
