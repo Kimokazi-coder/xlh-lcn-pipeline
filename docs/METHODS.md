@@ -25,9 +25,10 @@ would no longer equal `results/WT/` at tolerance 0. Convert with 0.13 um/px wher
 a physical length is wanted; the experimental ridge method (section 7) works in
 micrometres throughout.
 
-**Data: 8 wild-type (WT) confocal optical sections** (`data/WT/`, red channel,
-1024 x 1024 px), the reference group of four (section 21). The other three
-groups hold no image yet: no Hyp or Hyp;Enpp1 image has been processed, and
+**Data: four groups** (section 21): 8 wild-type (WT) confocal optical sections,
+the reference group (`data/WT/`, red channel, 1024 x 1024 px), and WT_HP,
+Hyp_RD and Hyp_HP with 9 sections each. **The pixels of all four groups are
+JPEG-decoded** (sections 21 and 22). No Hyp;Enpp1 image has been processed, and
 periosteocytic lesions (POLs) are not measured.
 
 ## 1. Pipeline steps
@@ -1727,29 +1728,43 @@ that method serves Hyp bone as well as WT is not established: it is validated on
 no group (section 15).
 
 **What goes into a group** (`python src/diagnostics.py import-group`, the image
-import constants of `config.py`). A source file is copied into `data/<group>/`
-under its own name only if the pipeline would read it as it reads WT: a TIFF by
-content, not by name (a `.tiff` is copied as `.tif`); a pixel shape, channel count
-and sample type the WT images have (1024 x 1024; 3, or 4 with alpha; uint8); and
-no pixel size in the metadata that disagrees with 0.13 um/px at two decimals. A
-resolution per inch is a print density, not a pixel size, and is only recorded.
-Every other file is skipped and listed with the reason in
-`data/image_inventory.csv`. JPEG is excluded on purpose: it is lossy, and it
-stores the colour detail that carries the red channel at half resolution in each
-direction (4:2:0), which changes the pixels a ridge filter of 3 to 4.2 px
-measures. **Corrected on 2026-10-23:** this section said WT is uncompressed TIFF,
-so that a JPEG group would differ from it by format. The WT files are TIFF, but
-their pixels are decoded JPEGs at the same quantization tables as the new
-groups' JPEGs (section 22). The rule is unchanged; whether to change it has not
-been decided.
+import constants of `config.py`). The format is read from a file's content,
+never from its name. A TIFF is copied byte for byte (a `.tiff` as `.tif`). A
+JPEG is accepted by **lossless decoding** (`config.IMPORT_DECODE_JPEG`): it is
+decoded with Pillow to the uint8 pixels it holds and written as an uncompressed
+TIFF under its own name with `.tif`, never recompressed, resized or converted in
+colour; the TIFF is read back as the pipeline reads it and must equal the
+decoded pixels, or it is removed and the file skipped. Every accepted file must
+also have a pixel shape, channel count and sample type the WT images have
+(1024 x 1024; 3, or 4 with alpha; uint8), and no pixel size in the metadata that
+disagrees with 0.13 um/px at two decimals; a resolution per inch is a print
+density and is only recorded. Any other format, and every file that fails a
+test, is skipped. `data/image_inventory.csv` lists every file looked at, what
+was done with it, the decoder (Pillow 11.3.0, libjpeg-turbo 3.1.1) and the
+SHA-256 of its pixels.
 
-**State on 2026-10-20.** The source folders of the three new groups hold 27 files,
-9 per group, every one a JPEG (1024 x 1024 x 3, uint8, 4:2:0, 300 dpi print
-density); one, `876_z76c1-2.tif`, is a JPEG named .tif. All 27 were skipped, so
-**no image of WT_HP, Hyp_RD or Hyp_HP has been processed** and those groups have
-no results. No TIFF of the same name exists in the source tree. Raw z-stacks
-exist for some animals (534, 535, 701, 876), but taking a plane from a stack makes
-a new image rather than copying one, and it was not done.
+**Why JPEG is accepted** (the user's decision of 2026-10-23). Until then a JPEG
+was skipped, on the stated reason that WT is uncompressed TIFF and a JPEG group
+would differ from it by format. The format test (section 22) showed that reason
+to be wrong: the WT TIFFs hold decoded JPEG pixels at the same quantization
+tables as the new groups' JPEGs, and three of four WT fields that also exist as
+JPEG decode to their TIFF pixel for pixel. Decoding the new groups' JPEGs puts
+every group through the same path. **Caution: the pixels are JPEG-decoded in
+all four groups.** JPEG is lossy and keeps the colour detail that carries the
+red channel at half resolution in each direction (4:2:0), no group has an
+uncompressed original, and what that first compression does to the measures
+cannot be measured with this data. A second compression at the same tables
+moved the pooled means by under 0.05 SD of the spread between WT images and
+single images by up to 0.78 SD (section 22).
+
+**State on 2026-10-23.** The source folders of the three new groups hold 27
+files, 9 per group, every one a JPEG (1024 x 1024 x 3, uint8, 4:2:0, quality 95
+tables, 300 dpi print density); one, `876_z76c1-2.tif`, is a JPEG named .tif. All
+27 were decoded into `data/<group>/` and passed the lossless check, and all 27
+were run through the three stages with the settings WT was run with. The
+pixel size, 0.13 um/px, is confirmed for the 8 WT images only (acquisition
+record); the 27 new images carry no pixel size in their files and are taken to
+share it, so every limit written in micrometres rests on that assumption for them.
 
 **Running a group.** The three stages with `--dir data/<group> -o results/<group>`.
 With no `-o` a stage writes to `results/<name of the input folder>/`
@@ -1820,6 +1835,10 @@ mean is divided among a different number of cells. The real twins: three pairs
 are identical in every measure, and on 542_z06 a different decode, differing by
 at most 3 grey levels in 4% of the pixels, moved unowned px by 1,840 (1.13 SD),
 loops per cell by -1.13 and roots per interior cell by -0.4.
+
+**What was decided afterwards.** On 2026-10-23 the user decided to accept JPEG
+content by lossless decoding, and the three new groups were imported and run
+(section 21). The format test itself decided nothing.
 
 **Not established.** The effect of a first compression, which is what a JPEG
 group would differ by if its sections had TIFF originals, is not measured here.

@@ -7,8 +7,9 @@ are separate scripts, and every measured number comes from the quantification st
 measures are roots per cell, ring length 30 px, field length density and the canalicular width.
 Everything is **pre-validation**: nothing has been compared with manual counts yet, and no parameter or
 limit has been tuned against one. The data are 8 wild-type sections, which are sections of 3 or 4 fields:
-the WT group, the reference. Three more groups, WT_HP, Hyp_RD and Hyp_HP, are set up with the same
-settings and hold no image yet, because their source files are JPEG (README, Groups).
+the WT group, the reference. Three more groups, WT_HP, Hyp_RD and Hyp_HP, 9 sections each, run with the
+same settings; their JPEGs are decoded losslessly into TIFF, and the pixels of all four groups are
+JPEG-decoded (README, Groups).
 
 **Units.** The pixel size is 0.13 um/px, from the acquisition record, confirmed for all 8 images and
 rounded to two decimals (`config.PIXEL_SIZE_UM_ACQUIRED`). Every biological limit is written in
@@ -82,7 +83,7 @@ owning their threads, but carrying no area or shape measure.
 |---|---|
 | `src/` | `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off) |
-| `data/` | one folder per group: `WT/` with the 8 input images, `WT_HP/`, `Hyp_RD/`, `Hyp_HP/` empty so far; `image_inventory.csv` says why |
+| `data/` | one folder per group: `WT/` with the 8 input images, `WT_HP/`, `Hyp_RD/`, `Hyp_HP/` with 9 each, decoded from JPEG; `image_inventory.csv` records every file |
 | `results/` | the pipeline output, one folder per group: `results/WT/` holds one folder per image and `all_images/`, and is the reference for every check; guide: `results/README.md` |
 | `figures/` | the figure code (`make_figures.py`), captions and review notes |
 | `docs/` | this page, `METHODS.md` and `EXPERIMENT_AI.md` |

@@ -7,10 +7,11 @@ and measures it per lacuna and per field.
 
 **Status: pre-validation.** No number here has been checked against manual
 (ImageJ) counts yet, and no parameter or limit has been tuned against one. The
-data are organised in four groups (see Groups). Only WT, the 8 wild-type
-sections every rule was chosen on, holds images: the source files of WT_HP,
-Hyp_RD and Hyp_HP are all JPEG and were not imported, so no Hyp image has
-been processed.
+data are organised in four groups (see Groups): WT, the 8 wild-type sections
+every rule was chosen on, and WT_HP, Hyp_RD and Hyp_HP with 9 sections each,
+run with the same settings. The pixels of all four groups are JPEG-decoded:
+the WT TIFFs were made from JPEGs, and the other groups' JPEGs are decoded into
+lossless TIFF the same way.
 
 **Two methods, and the choice between them is pending.**
 
@@ -42,7 +43,7 @@ External API use approved on 2026-10-15, approver: Karim.
 | `results_ai_judge/WT/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
 | `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (the judge), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
-| `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/`, each with a README and no image yet; `image_inventory.csv` lists every source file looked at and why it was or was not copied | `python src/diagnostics.py import-group --group GROUP --src SOURCE_FOLDER` |
+| `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group --group GROUP --src SOURCE_FOLDER` |
 | `results/group_overview.csv`, `.xlsx`, `results/group_qc.csv` | every group side by side, one row per image, and the QC list of the new groups (see Groups) | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc` |
 | `figures/` | the figure code, captions and review notes | |
 | `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md) | |
@@ -69,31 +70,33 @@ The images are organised by type, one folder per group in `data/` and in
 | group | what it is | images | data | results |
 |---|---|---|---|---|
 | `WT` | wild type: the reference group, the 8 sections every rule was chosen on | 8 | `data/WT/` | `results/WT/` |
-| `WT_HP` | wild type, high phosphorus diet | 0 | `data/WT_HP/` | none yet |
-| `Hyp_RD` | Hyp, regular diet | 0 | `data/Hyp_RD/` | none yet |
-| `Hyp_HP` | Hyp, high phosphorus diet | 0 | `data/Hyp_HP/` | none yet |
+| `WT_HP` | wild type, high phosphorus diet | 9 | `data/WT_HP/` | `results/WT_HP/` |
+| `Hyp_RD` | Hyp, regular diet | 9 | `data/Hyp_RD/` | `results/Hyp_RD/` |
+| `Hyp_HP` | Hyp, high phosphorus diet | 9 | `data/Hyp_HP/` | `results/Hyp_HP/` |
 
 **Every group runs with the same settings.** The rules were chosen by visual
 inspection of the WT images, and no parameter may be tuned on any other group
 (`docs/METHODS.md` section 21).
 
-**Why the three new groups are empty.** Their source folders, the images used
-for the ImageJ quantification, hold 27 files, and every one is a JPEG, including
-`876_z76c1-2.tif`, which is a JPEG named .tif. The pipeline reads TIFF only,
-and the import rule copies a file only if it is a TIFF by content with the WT
-images' shape, channels and sample type and no pixel size that disagrees with
-0.13 um/px, so all 27 were skipped. `data/image_inventory.csv` lists every file
-with its size, shape, channels, metadata and the reason. TIFF exports of the
-same sections are what is needed.
+**JPEG content is accepted by lossless decoding.** The new groups' source files,
+the images used for the ImageJ quantification, are 27 JPEGs; one,
+`876_z76c1-2.tif`, is a JPEG named .tif. Each is decoded with Pillow to the
+uint8 pixels it holds and written as an uncompressed TIFF in `data/<group>/`
+under its own name with `.tif`. Nothing is recompressed, resized or converted
+in colour; the TIFF is read back and must equal the decoded pixels; and
+`data/image_inventory.csv` records the decoder and the checksum of the pixels
+of every file. Shape, channels, sample type and pixel size are still checked.
 
-**The WT TIFFs are decoded JPEGs themselves.** Three of the four WT fields that
-also exist as JPEG decode to their WT TIFF pixel for pixel, and every WT TIFF
-carries the fingerprints of a JPEG compression at the same tables.
-`python src/diagnostics.py format-test` measures what a second compression and a
-different decode do to every measure, against the spread between the WT images;
-the report is [`results/format_test/format_test.md`](results/format_test/format_test.md)
-(`docs/METHODS.md` section 22). It decides nothing, and the import rule is
-unchanged.
+Why: the format test (`python src/diagnostics.py format-test`, report in
+[`results/format_test/format_test.md`](results/format_test/format_test.md),
+`docs/METHODS.md` section 22) found that the WT TIFFs themselves hold decoded
+JPEG pixels at the same quantization tables. Decoding the new groups' JPEGs
+puts every group through the same path. **Caution: the pixels are JPEG-decoded
+in all four groups**, with the losses of that compression, and no group has an
+uncompressed original. What a first compression does could not be measured,
+for the same reason. The pixel size, 0.13 um/px, is confirmed for the 8 WT images only;
+the 27 new images carry none in their files and are taken to share it, so every
+limit written in micrometres rests on that.
 
 Copy a group's images (the source folder is only read):
 
@@ -101,8 +104,7 @@ Copy a group's images (the source folder is only read):
 python src/diagnostics.py import-group --group Hyp_RD --src "SOURCE_FOLDER"
 ```
 
-One command per group, once its images are in `data/<group>/` (the three stages
-on one line, in order):
+One command per group (the three stages on one line, in order):
 
 ```
 python src/lacunae.py --dir data/WT_HP -o results/WT_HP; python src/canaliculi.py --dir data/WT_HP -o results/WT_HP; python src/quantification.py --dir data/WT_HP -o results/WT_HP
@@ -113,15 +115,19 @@ python src/lacunae.py --dir data/Hyp_HP -o results/Hyp_HP; python src/canaliculi
 WT is made by the command in the folder table above; a run with no `-o` writes
 to `results/<name of the input folder>/`. An image that fails is listed in
 `results/<group>/all_images/failed_images_<stage>.csv` and skipped, and the
-others carry on; a folder with no image writes nothing. Then, over every group:
+others carry on; a folder with no image writes nothing. Run time: the lacuna
+stage takes from seconds to about an hour per image (701_z19 took 58 minutes,
+the images with the most lacuna candidates are the slowest), and canaliculi.py
+runs it again; Hyp_HP took about 3 hours 40 minutes in all. Then, over every
+group:
 
 ```
 python src/diagnostics.py group-overview   # results/group_overview.csv and .xlsx: one row per image, no statistics
 python src/diagnostics.py group-qc         # results/group_qc.csv: lacuna count, rejected candidates by rule, flag outside the WT range
 ```
 
-On 2026-10-20 the overview holds the 8 WT rows and the QC list is empty,
-because no new group has an image.
+The overview holds all 35 images and the QC list the 27 of the new groups. The
+publication figures are made for WT only.
 
 ## The canalicular method
 
@@ -353,9 +359,6 @@ not been chosen.
 5. **The choice between the deterministic method and the AI judge method.**
    Neither has been checked against a manual trace, and a comparison with
    manual counts is what should decide it.
-6. **TIFF files for the new groups.** WT_HP, Hyp_RD and Hyp_HP hold no image:
-   their 27 source files are JPEG (`data/image_inventory.csv`). TIFF exports of
-   the same sections are needed before any of them can be run.
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:
