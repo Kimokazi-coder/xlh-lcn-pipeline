@@ -7086,10 +7086,13 @@ def cmd_group_qc(args) -> int:
 #              and check that each is the same field as its WT TIFF
 #   synthetic  save every WT TIFF as JPEG with Pillow, 4:2:0, at the quality
 #              whose quantization tables equal the real JPEGs'
+#   run        the three stages on the WT TIFFs and on both JPEG sets
+#   report     every pair compared, each measure pooled and read against the
+#              spread between the 8 WT images
 
 FORMAT_DIR = config.PROJECT_ROOT / ".cache" / "format_test"
 FORMAT_REPORT_DIR = config.RESULTS_ROOT / "format_test"
-FORMAT_STEPS = ("twins", "synthetic")
+FORMAT_STEPS = ("twins", "synthetic", "run", "report")
 # The real JPEG twins: four WT fields that were also exported as JPEG, keyed by
 # the name of the WT TIFF, by their path under the folder given with --twins-src.
 FORMAT_REAL_TWINS = {
@@ -7318,12 +7321,196 @@ def format_synthetic(args) -> list:
     return rows
 
 
+# The run. Three sets, each through the three stages with the settings
+# config.py ships, into .cache/format_test/<set>/: "tiff", the WT TIFFs as they
+# are; "synthetic" and "real", each JPEG decoded with Pillow and wrapped in an
+# uncompressed TIFF under the name of its WT TIFF, so it carries the same label.
+# The tiff run must equal results/WT/ before anything is compared.
+FORMAT_SETS = ("tiff", "synthetic", "real")
+FORMAT_JPEG_SETS = (("synthetic", "synthetic_jpeg"), ("real", "real_jpeg"))
+# Two lacunae of a pair are one object when their centroids are mutual nearest
+# neighbours within this distance: the rule and the 25 px of field-summary.
+FORMAT_MATCH_PX = FIELD_MATCH_PX
+# (measure, its column in quantification_all_images.csv, or None when it is read
+# from the image's own files: skeleton and unowned px, as group-overview reads them)
+FORMAT_MEASURES = [
+    ("lacuna count", "lacuna count"),
+    ("roots per interior cell", "roots per cell"),
+    ("ring length 30 px per cell (px)", "ring length 30 px per cell (px)"),
+    ("field length density (px^-1)", "field length density (px^-1)"),
+    ("skeleton px", None),
+    ("unowned px", None),
+    ("canalicular width median (px)", "canalicular width median (px)"),
+    ("loops per cell", "loops per cell"),
+]
+FORMAT_CSV_COLUMNS = ["row", "set", "image", "measure", "tiff", "jpeg", "difference jpeg - tiff",
+                      "lacunae matched within 25 px", "pairs", "mean difference", "largest absolute difference",
+                      "pairs higher", "pairs lower", "pairs equal", "SD across the 8 WT images",
+                      "mean difference / SD"]
+
+
+def format_inputs() -> dict:
+    """{set: [image paths]}. A real twin that step 1 found not to be the same
+    field as its TIFF is left out."""
+    import shutil as _shutil
+
+    import tifffile
+    from PIL import Image
+
+    wt = config.DATA_DIR / config.REFERENCE_GROUP
+    same_field = set()
+    check = FORMAT_REPORT_DIR / "twin_check.csv"
+    if check.is_file():
+        with open(check, newline="", encoding="utf-8") as f:
+            same_field = {Path(r["jpeg"]).stem for r in csv.DictReader(f) if r["same field"] == "True"}
+    inputs = {"tiff": sorted(wt.glob("*.tif"))}
+    for name, folder in FORMAT_JPEG_SETS:
+        dest = FORMAT_DIR / "input" / name
+        if dest.exists():
+            _shutil.rmtree(dest)
+        dest.mkdir(parents=True)
+        paths = []
+        for jpg in sorted((FORMAT_DIR / folder).glob("*.jpg")):
+            if not (wt / (jpg.stem + ".tif")).is_file() or (name == "real" and jpg.stem not in same_field):
+                continue
+            with Image.open(jpg) as im:
+                rgb = np.asarray(im.convert("RGB"))
+            out = dest / (jpg.stem + ".tif")
+            tifffile.imwrite(out, rgb, photometric="rgb")
+            paths.append(out)
+        inputs[name] = paths
+    return inputs
+
+
+def _format_run_one(job: tuple) -> tuple:
+    """The three stages on one image, as the three scripts run them: detection
+    written, then quantification read back from what detection wrote."""
+    set_name, image_path, out_root = job[0], Path(job[1]), Path(job[2])
+    lac = lacunae.analyse_image(image_path)
+    lacunae.write_outputs(lac, out_root)
+    _display, channel = lacunae.load_channel(image_path)
+    canaliculi.write_outputs(canaliculi.analyse_network(image_path, lac, channel), out_root)
+    detection = quantification.load_detection(out_root, lacunae.image_label(image_path))
+    result = quantification.quantify(detection, image_path, None)
+    quantification.write_outputs(result, out_root)
+    return set_name, quantification.summary_row(result)
+
+
+def format_run(args) -> None:
+    import shutil as _shutil
+    import time
+    from concurrent.futures import ProcessPoolExecutor
+
+    inputs = format_inputs()
+    for name in FORMAT_SETS:
+        if (FORMAT_DIR / name).exists():
+            _shutil.rmtree(FORMAT_DIR / name)
+    jobs = [(name, str(path), str(FORMAT_DIR / name)) for name in FORMAT_SETS for path in inputs[name]]
+    print(f"running {len(jobs)} images: " + ", ".join(f"{n} {len(inputs[n])}" for n in FORMAT_SETS))
+    t0 = time.time()
+    with ProcessPoolExecutor(max_workers=max(1, min(args.workers, len(jobs)))) as ex:
+        done = list(ex.map(_format_run_one, jobs))
+    for name in FORMAT_SETS:
+        quantification.write_summary_rows([row for n, row in done if n == name], FORMAT_DIR / name)
+    print(f"done in {time.time() - t0:.0f} s, into {FORMAT_DIR.relative_to(config.PROJECT_ROOT).as_posix()}/<set>/")
+
+
+def format_values(root: Path) -> dict:
+    """{label: {measure: value, "centroids": [(x, y), ...]}} of one set's run."""
+    out = {}
+    path = quantification.summary_path(root, ".csv")
+    with open(path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        label = r["image_label"]
+        skeleton, unowned = unowned_px(root, label)
+        values = {}
+        for measure, column in FORMAT_MEASURES:
+            if column is not None:
+                values[measure] = float(r[column])
+            else:
+                values[measure] = float(skeleton if measure == "skeleton px" else unowned)
+        q = json.loads(result_json(root, label).read_text(encoding="utf-8"))
+        values["centroids"] = [(float(m["centroid_col_px"]), float(m["centroid_row_px"])) for m in q["lacunae"]]
+        out[label] = values
+    return out
+
+
+def format_compare(args) -> dict:
+    """Every pair, TIFF against JPEG, and each measure pooled over the pairs of
+    a set, read against the spread of the measure over the 8 WT images."""
+    same = compare_summary(summary_csv(config.RESULTS_DIR), summary_csv(FORMAT_DIR / "tiff"))
+    tiff_equals_reference = (not same["missing_rows"] and len(same["rows"]) == 8
+                             and all(not d for _n, d in same["rows"].values()))
+    print(f"tiff run against results/{config.REFERENCE_GROUP}/: "
+          f"{'EQUAL, every cell of the cross-image table' if tiff_equals_reference else 'DIFFERENT'}")
+    if not tiff_equals_reference:
+        raise SystemExit("The TIFF run does not reproduce results/WT/; nothing is compared.")
+    values = {name: format_values(FORMAT_DIR / name) for name in FORMAT_SETS}
+    labels = list(values["tiff"])
+    sd = {m: float(np.std([values["tiff"][lab][m] for lab in labels], ddof=1)) for m, _c in FORMAT_MEASURES}
+    rows, pooled = [], {}
+    for name, _folder in FORMAT_JPEG_SETS:
+        diffs = {m: [] for m, _c in FORMAT_MEASURES}
+        matched_total = tiff_total = 0
+        for lab in [lab for lab in labels if lab in values[name]]:
+            t, j = values["tiff"][lab], values[name][lab]
+            matched = len(_mutual_matches(t["centroids"], j["centroids"], FORMAT_MATCH_PX))
+            matched_total += matched
+            tiff_total += len(t["centroids"])
+            for m, _c in FORMAT_MEASURES:
+                d = j[m] - t[m]
+                diffs[m].append(d)
+                rows.append({"row": "pair", "set": name, "image": lab, "measure": m, "tiff": _fmt(t[m]),
+                             "jpeg": _fmt(j[m]), "difference jpeg - tiff": _fmt(d),
+                             "lacunae matched within 25 px":
+                                 f"{matched} of {len(t['centroids'])} (jpeg {len(j['centroids'])})"
+                                 if m == "lacuna count" else ""})
+        for m, _c in FORMAT_MEASURES:
+            d = np.array(diffs[m])
+            if not d.size:
+                continue
+            entry = {"row": "pooled", "set": name, "image": "pooled", "measure": m, "pairs": int(d.size),
+                     "mean difference": _fmt(float(d.mean())), "largest absolute difference": _fmt(float(np.abs(d).max())),
+                     "pairs higher": int((d > 0).sum()), "pairs lower": int((d < 0).sum()),
+                     "pairs equal": int((d == 0).sum()), "SD across the 8 WT images": _fmt(sd[m]),
+                     "mean difference / SD": f"{float(d.mean()) / sd[m]:+.3f}" if sd[m] > 0 else "",
+                     "lacunae matched within 25 px": f"{matched_total} of {tiff_total}" if m == "lacuna count" else ""}
+            rows.append(entry)
+            pooled[(name, m)] = entry
+    write_rows_csv(FORMAT_REPORT_DIR / "format_test.csv", FORMAT_CSV_COLUMNS, rows)
+    for name, _folder in FORMAT_JPEG_SETS:
+        print_table(["measure", "pairs", "mean difference", "largest |difference|", "higher / lower / equal",
+                     "SD over 8 WT", "mean / SD", "lacunae matched"],
+                    [[m, pooled[(name, m)]["pairs"], pooled[(name, m)]["mean difference"],
+                      pooled[(name, m)]["largest absolute difference"],
+                      f"{pooled[(name, m)]['pairs higher']} / {pooled[(name, m)]['pairs lower']} / "
+                      f"{pooled[(name, m)]['pairs equal']}", pooled[(name, m)]["SD across the 8 WT images"],
+                      pooled[(name, m)]["mean difference / SD"], pooled[(name, m)]["lacunae matched within 25 px"]]
+                     for m, _c in FORMAT_MEASURES if (name, m) in pooled],
+                    title=f"\n{name} JPEG against TIFF, pooled over its pairs (difference = jpeg - tiff)\n")
+    print(f"-> {(FORMAT_REPORT_DIR / 'format_test.csv').relative_to(config.PROJECT_ROOT).as_posix()}")
+    return {"values": values, "sd": sd, "rows": rows, "pooled": pooled,
+            "tiff_equals_reference": tiff_equals_reference, "labels": labels}
+
+
+def _fmt(value: float) -> str:
+    """A measured value or a difference, to the precision the tables carry."""
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{value:.6g}"
+
+
 def cmd_format_test(args) -> int:
     steps = FORMAT_STEPS if args.step == "all" else (args.step,)
     if "twins" in steps:
         format_twins(args)
     if "synthetic" in steps:
         format_synthetic(args)
+    if "run" in steps:
+        format_run(args)
+    if "report" in steps:
+        format_compare(args)
     return 0
 
 
