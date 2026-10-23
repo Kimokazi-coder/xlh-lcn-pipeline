@@ -7084,10 +7084,12 @@ def cmd_group_qc(args) -> int:
 #
 #   twins      copy the real JPEG twins of four WT fields (the source is only read)
 #              and check that each is the same field as its WT TIFF
+#   synthetic  save every WT TIFF as JPEG with Pillow, 4:2:0, at the quality
+#              whose quantization tables equal the real JPEGs'
 
 FORMAT_DIR = config.PROJECT_ROOT / ".cache" / "format_test"
 FORMAT_REPORT_DIR = config.RESULTS_ROOT / "format_test"
-FORMAT_STEPS = ("twins",)
+FORMAT_STEPS = ("twins", "synthetic")
 # The real JPEG twins: four WT fields that were also exported as JPEG, keyed by
 # the name of the WT TIFF, by their path under the folder given with --twins-src.
 FORMAT_REAL_TWINS = {
@@ -7236,10 +7238,92 @@ def format_twins(args) -> list:
     return [r for r in rows if r["same field"]]
 
 
+# The synthetic twins: every WT TIFF saved as JPEG with Pillow, with the chroma
+# subsampling every real JPEG of the study uses (Pillow's 2, 4:2:0) and at the
+# Pillow quality whose quantization tables equal the real JPEGs' tables, found by
+# search and never written in by hand.
+FORMAT_SUBSAMPLING = 2
+SYNTHETIC_COLUMNS = ["image", "jpeg", "quality", "subsampling 4:2:0", "tables equal the real JPEGs'",
+                     "luma table first coefficient", "red mean absolute difference (0-255)",
+                     "red mean difference jpeg - tiff (0-255)", "best shift dy,dx (px)",
+                     "red mean absolute difference against the real twin (0-255)"]
+
+
+def jpeg_tables(path: Path) -> dict:
+    """{table id: 64 coefficients} as Pillow reads them from a JPEG."""
+    from PIL import Image
+
+    with Image.open(path) as im:
+        return {int(k): [int(v) for v in t] for k, t in im.quantization.items()}
+
+
+def jpeg_is_420(path: Path) -> bool:
+    from PIL import Image, JpegImagePlugin
+
+    with Image.open(path) as im:
+        return JpegImagePlugin.get_sampling(im) == 2
+
+
+def matching_quality(reference: dict) -> int:
+    """The lowest Pillow quality whose tables, at FORMAT_SUBSAMPLING, equal
+    `reference`, searched over 1 to 100 on a small blank image."""
+    import io
+
+    from PIL import Image
+
+    blank = Image.fromarray(np.zeros((16, 16, 3), np.uint8))
+    for quality in range(1, 101):
+        buffer = io.BytesIO()
+        blank.save(buffer, "JPEG", quality=quality, subsampling=FORMAT_SUBSAMPLING)
+        buffer.seek(0)
+        with Image.open(buffer) as im:
+            if {int(k): [int(v) for v in t] for k, t in im.quantization.items()} == reference:
+                return quality
+    raise SystemExit("No Pillow quality reproduces the quantization tables of the real JPEGs.")
+
+
+def format_synthetic(args) -> list:
+    from PIL import Image
+    from skimage.io import imread
+
+    real = sorted((FORMAT_DIR / "real_jpeg").glob("*.jpg"))
+    if not real:
+        raise SystemExit("No real JPEG twin in .cache/format_test/real_jpeg/: run the twins step first.")
+    reference = jpeg_tables(real[0])
+    same_tables = [jpeg_tables(r) == reference for r in real]
+    quality = matching_quality(reference)
+    print(f"the {len(real)} real twins share one set of tables: {all(same_tables)}; luma table first coefficient "
+          f"{reference[0][0]}; Pillow quality {quality} at 4:2:0 reproduces them")
+    folder = FORMAT_DIR / "synthetic_jpeg"
+    folder.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for tiff in sorted((config.DATA_DIR / config.REFERENCE_GROUP).glob("*.tif")):
+        out = folder / (tiff.stem + ".jpg")
+        rgb = np.asarray(imread(tiff))[..., :3]
+        Image.fromarray(rgb).save(out, "JPEG", quality=quality, subsampling=FORMAT_SUBSAMPLING)
+        twin = FORMAT_DIR / "real_jpeg" / (tiff.stem + ".jpg")
+        row = {"image": lacunae.image_label(tiff), "jpeg": out.name, "quality": quality,
+               "subsampling 4:2:0": jpeg_is_420(out), "tables equal the real JPEGs'": jpeg_tables(out) == reference,
+               "luma table first coefficient": jpeg_tables(out)[0][0]}
+        row.update({k: v for k, v in pixel_comparison(tiff, out).items() if k in SYNTHETIC_COLUMNS})
+        row["red mean absolute difference against the real twin (0-255)"] = (
+            round(float(np.abs(red_uint8(out).astype(float) - red_uint8(twin).astype(float)).mean()), 4)
+            if twin.is_file() else "")
+        rows.append(row)
+    write_rows_csv(FORMAT_REPORT_DIR / "synthetic_check.csv", SYNTHETIC_COLUMNS, rows)
+    print_table(SYNTHETIC_COLUMNS, [[r[c] for c in SYNTHETIC_COLUMNS] for r in rows],
+                title="\nsynthetic JPEG twins of the WT TIFFs -> results/format_test/synthetic_check.csv\n")
+    if not all(r["tables equal the real JPEGs'"] and r["subsampling 4:2:0"] for r in rows):
+        raise SystemExit("A synthetic twin does not carry the real tables at 4:2:0.")
+    return rows
+
+
 def cmd_format_test(args) -> int:
     steps = FORMAT_STEPS if args.step == "all" else (args.step,)
     if "twins" in steps:
         format_twins(args)
+    if "synthetic" in steps:
+        format_synthetic(args)
     return 0
 
 
