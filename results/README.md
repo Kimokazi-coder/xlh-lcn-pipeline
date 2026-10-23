@@ -36,6 +36,8 @@ results/
   README.md                   this guide
   group_overview.csv, .xlsx   every group side by side, one row per image (diagnostics group-overview)
   group_qc.csv                QC list of the groups other than WT (diagnostics group-qc); empty so far
+  format_test/                TIFF against JPEG on the WT images (diagnostics format-test): format_test.md
+                              and .csv, twin_check.csv, tiff_fingerprints.csv, synthetic_check.csv
   WT/                         one folder per group; WT, the reference group, is the only one with images
     all_images/
       quantification/         quantification_all_images.csv, .xlsx and .pdf: one row per image

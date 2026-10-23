@@ -1737,8 +1737,11 @@ Every other file is skipped and listed with the reason in
 `data/image_inventory.csv`. JPEG is excluded on purpose: it is lossy, and it
 stores the colour detail that carries the red channel at half resolution in each
 direction (4:2:0), which changes the pixels a ridge filter of 3 to 4.2 px
-measures. With WT in uncompressed TIFF, a JPEG group would differ from it by
-format as well as by biology.
+measures. **Corrected on 2026-10-23:** this section said WT is uncompressed TIFF,
+so that a JPEG group would differ from it by format. The WT files are TIFF, but
+their pixels are decoded JPEGs at the same quantization tables as the new
+groups' JPEGs (section 22). The rule is unchanged; whether to change it has not
+been decided.
 
 **State on 2026-10-20.** The source folders of the three new groups hold 27 files,
 9 per group, every one a JPEG (1024 x 1024 x 3, uint8, 4:2:0, 300 dpi print
@@ -1769,3 +1772,56 @@ outside the WT range, and a rank of which outlines to look at first. The range i
 the minimum and maximum lacuna count of the WT images, 11 to 19, read from
 `results/WT/` when the command runs. A flag says where to look; nothing is tuned
 from it.
+
+## 22. Format test: TIFF against JPEG on the WT images
+
+**Measurement only, pre-validation. Nothing here is a decision, and no default
+changed.** How much saving an image as JPEG changes what the pipeline measures,
+measured on the WT images before any JPEG group is run:
+
+```
+python src/diagnostics.py format-test --twins-src "SOURCE_FOLDER/22.04.25/wt"
+```
+
+It copies the four real JPEG twins of WT fields into `.cache/format_test/` (the
+source is only read) and checks each against its TIFF; saves a synthetic JPEG
+twin of every WT TIFF with Pillow at 4:2:0 and the quality whose quantization
+tables equal the real JPEGs' (95, found by search); decodes every JPEG and wraps
+it in an uncompressed TIFF; runs the three stages with the shipped settings on
+the TIFFs and both JPEG sets; and compares eight measures per pair, pooled, and
+against the SD of each measure over the 8 WT images. The TIFF run must equal
+`results/WT/` first, and does. The tables are in `results/format_test/`:
+`format_test.md` (the report) and `.csv`, `twin_check.csv`,
+`tiff_fingerprints.csv` and `synthetic_check.csv`. `--step` runs one of
+`twins`, `synthetic`, `run` and `report`.
+
+**What the WT TIFFs are.** The real twins are the same fields (best shift 0,0 px
+on all four), and three of them decode to the WT TIFF pixel for pixel; the fourth,
+542_z06, differs by at most 3 grey levels in 4% of its pixels. Every WT TIFF
+carries two fingerprints of a JPEG compression: 38 to 42% of its pixels hold
+green although the sections are red and blue, and its red channel steps 5 to 14%
+more across 8 px block edges than inside the blocks, against 0 to 4% with the grid
+moved by 4 px. **The WT TIFFs hold decoded JPEG pixels.** No uncompressed original
+of a WT field exists here, so what a first JPEG compression does cannot be
+measured with this data. What is measured is a second compression at the same
+tables (synthetic twins) and a different decode of the same JPEG (real twins).
+
+**What it shows.** A second compression changes the red channel by 0.90 to 1.44
+grey levels on average. Over the 8 pairs the mean change of every measure is
+within 0.05 SD of the spread between WT images, except the width median (+0.27
+SD), which takes only two values over the WT images (8 and 8.2462 px) and moved
+one step on one image. Single pairs move further: up to 0.72 SD for roots per
+interior cell, 0.51 for ring length 30 px, 0.48 for field length density, 0.45
+for skeleton px, 0.78 for unowned px and 0.54 for loops per cell, in both
+directions, so they cancel in the mean. 107 of 108 lacunae match by centroid
+within 25 px; the lacuna count changed by one on two images (542_z06 +1, 682_z29
+-1), and those two pairs carry the largest per-cell changes, because a per-cell
+mean is divided among a different number of cells. The real twins: three pairs
+are identical in every measure, and on 542_z06 a different decode, differing by
+at most 3 grey levels in 4% of the pixels, moved unowned px by 1,840 (1.13 SD),
+loops per cell by -1.13 and roots per interior cell by -0.4.
+
+**Not established.** The effect of a first compression, which is what a JPEG
+group would differ by if its sections had TIFF originals, is not measured here.
+Eight and four pairs, one run each. Nothing here is validated against a manual
+count, and nothing is recommended.

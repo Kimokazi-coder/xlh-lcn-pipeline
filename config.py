@@ -40,9 +40,13 @@ GROUP_DESCRIPTIONS = {
 # reads *.tif and a file named .tif can hold a JPEG. A .tiff is copied as .tif.
 # A JPEG is skipped: its compression is lossy, and the colour detail that
 # carries the red channel is stored at half resolution in each direction
-# (4:2:0), which changes the pixels a ridge filter of 3 to 4 px measures. The
-# reference group is uncompressed TIFF, so a group made of JPEGs would differ
-# from it by file format as well as by biology.
+# (4:2:0), which changes the pixels a ridge filter of 3 to 4 px measures.
+# Corrected 2026-10-23: the WT images are TIFF files, but their pixels are
+# decoded JPEGs at the same tables as the new groups' JPEGs (python
+# src/diagnostics.py format-test, docs/METHODS.md section 22), so the earlier
+# reason, that WT is uncompressed and a JPEG group would differ from it by
+# format, does not hold as written. The rule is unchanged; whether to change
+# it is the user's decision, and format-test is the measurement for it.
 #
 # Shape, channel count and sample type: each must be one the reference group
 # holds, read from data/<REFERENCE_GROUP>/ when the command runs (there:

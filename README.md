@@ -86,6 +86,15 @@ images' shape, channels and sample type and no pixel size that disagrees with
 with its size, shape, channels, metadata and the reason. TIFF exports of the
 same sections are what is needed.
 
+**The WT TIFFs are decoded JPEGs themselves.** Three of the four WT fields that
+also exist as JPEG decode to their WT TIFF pixel for pixel, and every WT TIFF
+carries the fingerprints of a JPEG compression at the same tables.
+`python src/diagnostics.py format-test` measures what a second compression and a
+different decode do to every measure, against the spread between the WT images;
+the report is [`results/format_test/format_test.md`](results/format_test/format_test.md)
+(`docs/METHODS.md` section 22). It decides nothing, and the import rule is
+unchanged.
+
 Copy a group's images (the source folder is only read):
 
 ```
@@ -247,6 +256,7 @@ Check it:
 python src/diagnostics.py reference-check    # must PASS: 161.00 / 21.63 / 8.50 on 543-2
 python src/diagnostics.py regression         # every number against results/WT/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
+python src/diagnostics.py format-test --twins-src "SOURCE_FOLDER/22.04.25/wt"   # TIFF against JPEG on WT
 python src/diagnostics.py --help             # every other diagnostic
 python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image (not tracked)
 python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
