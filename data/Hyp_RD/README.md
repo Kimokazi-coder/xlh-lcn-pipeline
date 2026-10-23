@@ -2,10 +2,11 @@
 
 Hyp, regular diet.
 
-0 image(s) here, 9 file(s) of the source folder skipped. Made by
+9 image(s) here, 9 of them decoded from JPEG and written as lossless
+TIFF, and 0 file(s) of the source folder skipped. Made by
 `python src/diagnostics.py import-group --group Hyp_RD --src SOURCE` from the folder
 `image used for quatification with imageJ/hyp rd`. Every file it looked at, copied or skipped, and why, is in
 `data/image_inventory.csv`; the rule is in `config.py` (image import).
 
-This group has no image the pipeline can read yet, so it has no results folder. When TIFF
-files of these sections are available, put them in a folder and run the command above on it.
+Caution: these pixels are JPEG-decoded, as the WT group's are; no group has an
+uncompressed original (docs/METHODS.md sections 21 and 22).

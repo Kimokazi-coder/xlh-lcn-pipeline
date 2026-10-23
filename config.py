@@ -36,17 +36,24 @@ GROUP_DESCRIPTIONS = {
 # read it the way it reads the reference group; every other file is skipped and
 # listed, with the reason, in data/image_inventory.csv. The source is only read.
 #
-# Format: a TIFF by its CONTENT, not only by its name, because the pipeline
-# reads *.tif and a file named .tif can hold a JPEG. A .tiff is copied as .tif.
-# A JPEG is skipped: its compression is lossy, and the colour detail that
-# carries the red channel is stored at half resolution in each direction
-# (4:2:0), which changes the pixels a ridge filter of 3 to 4 px measures.
-# Corrected 2026-10-23: the WT images are TIFF files, but their pixels are
-# decoded JPEGs at the same tables as the new groups' JPEGs (python
-# src/diagnostics.py format-test, docs/METHODS.md section 22), so the earlier
-# reason, that WT is uncompressed and a JPEG group would differ from it by
-# format, does not hold as written. The rule is unchanged; whether to change
-# it is the user's decision, and format-test is the measurement for it.
+# Format, read from the file's CONTENT and never from its name, because a file
+# named .tif can hold a JPEG. A TIFF is copied byte for byte; a .tiff is copied
+# as .tif. A JPEG is accepted by LOSSLESS DECODING (IMPORT_DECODE_JPEG): it is
+# decoded with Pillow to the uint8 pixels it holds and written as an
+# uncompressed TIFF under its own name with .tif. It is never recompressed,
+# resized or converted in colour, and the TIFF is read back the way the
+# pipeline reads it and must give exactly the decoded pixels, or it is removed
+# and the file is skipped. Any other format is skipped.
+#
+# Why JPEG is accepted (the user's decision of 2026-10-23, after the format
+# test, docs/METHODS.md section 22): the WT TIFFs hold decoded JPEG pixels at
+# the same quantization tables as the new groups' JPEGs (three of four WT
+# fields that also exist as JPEG decode to their TIFF pixel for pixel), so
+# decoding the new groups' JPEGs puts every group through the same path.
+# CAUTION: the pixels of all four groups are therefore JPEG-decoded, with the
+# losses of that compression (lossy, colour detail at half resolution, 4:2:0),
+# and no group has an uncompressed original. Until 2026-10-23 a JPEG was
+# skipped, on the mistaken reason that WT was uncompressed.
 #
 # Shape, channel count and sample type: each must be one the reference group
 # holds, read from data/<REFERENCE_GROUP>/ when the command runs (there:
@@ -63,6 +70,7 @@ GROUP_DESCRIPTIONS = {
 # so it is recorded and not compared. An image with no pixel size in its
 # metadata is accepted, as the reference group's images are.
 IMPORT_TIFF_SUFFIXES = (".tif", ".tiff")
+IMPORT_DECODE_JPEG = True
 IMPORT_PIXEL_SIZE_TOLERANCE_UM = 0.005
 # Git. A copied file over IMPORT_MAX_FILE_MB, or a group whose images total over
 # IMPORT_MAX_GROUP_MB (MB = 10^6 bytes), is still copied, but the group's data

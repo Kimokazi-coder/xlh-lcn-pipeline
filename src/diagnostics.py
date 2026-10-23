@@ -939,13 +939,17 @@ def cmd_unblind(args) -> int:
 
 # import-group -------------------------------------------------------------------
 # Copies the images of one group into data/<group>/ under the import rule of
-# config.py (format by content, shape, channels, sample type, pixel size), and
-# records every file it looked at, copied or skipped, with the reason, in
+# config.py (format by content, shape, channels, sample type, pixel size): a
+# TIFF byte for byte, a JPEG decoded and written as a lossless TIFF that is read
+# back and checked pixel for pixel. Every file it looked at, copied, decoded or
+# skipped, is recorded with the reason and the checksum of its pixels in
 # data/image_inventory.csv. The source folder is only read: nothing in it is
 # modified, moved or renamed. --dry-run reports and writes nothing.
 
 INVENTORY_COLUMNS = ["group", "source_folder", "file", "extension", "size_mb", "format", "shape", "channels",
-                     "dtype", "pixel_size_metadata", "pixel_size_um", "decision", "reason", "copied_as"]
+                     "dtype", "pixel_size_metadata", "pixel_size_um", "decision", "reason", "copied_as",
+                     "written_mb", "decoded_from", "decoder", "lossless_check", "pixel_sha256"]
+ACCEPTED = ("copied", "decoded", "already present")
 FORMAT_MAGIC = ((b"II*\x00", "TIFF"), (b"MM\x00*", "TIFF"), (b"II+\x00", "TIFF"), (b"MM\x00+", "TIFF"),
                 (b"\xff\xd8\xff", "JPEG"), (b"\x89PNG", "PNG"), (b"BM", "BMP"))
 # Length units an ImageJ or OME header may give a pixel size in, as micrometres.
@@ -1057,10 +1061,11 @@ def import_decision(path: Path, props: dict, ref: dict, dest_dir: Path) -> tuple
     suffix = path.suffix.lower()
     if props.get("error"):
         return "skipped", f"could not be read: {props['error']}", ""
-    if props["format"] != "TIFF":
+    jpeg = props["format"] == "JPEG" and config.IMPORT_DECODE_JPEG
+    if props["format"] != "TIFF" and not jpeg:
         named = f", although it is named {path.suffix}" if suffix in config.IMPORT_TIFF_SUFFIXES else ""
-        return "skipped", f"{props['format']} content{named}: the pipeline reads TIFF only", ""
-    if suffix not in config.IMPORT_TIFF_SUFFIXES:
+        return "skipped", f"{props['format']} content{named}: only TIFF and JPEG are read", ""
+    if not jpeg and suffix not in config.IMPORT_TIFF_SUFFIXES:
         return "skipped", f"a {path.suffix} file, not .tif or .tiff", ""
     for key, word in (("shape", "pixel shape"), ("channels", "channel count"), ("dtype", "sample type")):
         if props[key] not in ref[key]:
@@ -1070,11 +1075,70 @@ def import_decision(path: Path, props: dict, ref: dict, dest_dir: Path) -> tuple
     if size is not None and abs(size - config.PIXEL_SIZE_UM_ACQUIRED) > config.IMPORT_PIXEL_SIZE_TOLERANCE_UM:
         return "skipped", f"pixel size {size:.4f} um in the metadata, not {config.PIXEL_SIZE_UM_ACQUIRED}", ""
     target = dest_dir / (path.stem + ".tif")
+    named = f" (named {path.suffix})" if jpeg and suffix in config.IMPORT_TIFF_SUFFIXES else ""
     if target.exists():
-        if filecmp.cmp(path, target, shallow=False):
-            return "already present", "identical file already in the group folder", target.name
+        same = (np.array_equal(decode_jpeg(path), read_pixels(target)) if jpeg
+                else filecmp.cmp(path, target, shallow=False))
+        if same:
+            return ("already present", ("JPEG content" + named + ", its decoded pixels already in the group "
+                                         "folder as a lossless TIFF") if jpeg
+                    else "identical file already in the group folder", target.name)
         return "skipped", f"a different file named {target.name} is already in the group folder", ""
+    if jpeg:
+        return "decoded", "JPEG content" + named + ": decoded and written as a lossless TIFF", target.name
     return "copied", "", target.name
+
+
+def decode_jpeg(path: Path) -> np.ndarray:
+    """The uint8 pixels a JPEG holds, decoded by Pillow as they are: no colour
+    conversion, no resize."""
+    from PIL import Image
+
+    with Image.open(path) as im:
+        if im.format != "JPEG":
+            raise ValueError(f"{path.name} is not a JPEG")
+        return np.array(im)
+
+
+def read_pixels(path: Path) -> np.ndarray:
+    """A TIFF read the way the pipeline reads it."""
+    from skimage.io import imread
+
+    return np.asarray(imread(path))
+
+
+def pixel_sha256(pixels: np.ndarray) -> str:
+    """Checksum of the pixels themselves (C order), whatever file holds them;
+    the shape and sample type are in their own columns of the inventory."""
+    import hashlib
+
+    return hashlib.sha256(np.ascontiguousarray(pixels).tobytes()).hexdigest()
+
+
+def jpeg_decoder() -> str:
+    import PIL
+    from PIL import features
+
+    if features.check_feature("libjpeg_turbo"):
+        return f"Pillow {PIL.__version__}, libjpeg-turbo {features.version('libjpeg_turbo')}"
+    return f"Pillow {PIL.__version__}, libjpeg {features.version_codec('jpg')}"
+
+
+def write_decoded(source: Path, target: Path) -> dict:
+    """Decode a JPEG and write its pixels as an uncompressed TIFF; read the TIFF
+    back and keep it only if it gives exactly the decoded pixels."""
+    import tifffile
+
+    pixels = decode_jpeg(source)
+    photometric = "rgb" if pixels.ndim == 3 else "minisblack"
+    tifffile.imwrite(target, pixels, photometric=photometric, metadata=None)
+    back = read_pixels(target)
+    if back.dtype != pixels.dtype or back.shape != pixels.shape or not np.array_equal(back, pixels):
+        target.unlink()
+        return {"lossless_check": "FAILED: the TIFF read back differs from the decoded pixels; removed"}
+    return {"decoded_from": "JPEG", "decoder": jpeg_decoder(),
+            "lossless_check": "the TIFF read back equals the decoded pixels",
+            "pixel_sha256": pixel_sha256(pixels)}
 
 
 def write_inventory(group: str, rows: list) -> Path:
@@ -1108,21 +1172,25 @@ def ignore_group_folder(group: str) -> bool:
 
 
 def group_readme(group: str, source: str, rows: list) -> str:
-    copied = [r for r in rows if r["decision"] in ("copied", "already present")]
+    copied = [r for r in rows if r["decision"] in ACCEPTED]
     skipped = [r for r in rows if r["decision"] == "skipped"]
+    decoded = [r for r in copied if r.get("decoded_from") == "JPEG"]
     text = f"# {group}\n\n{config.GROUP_DESCRIPTIONS.get(group, group)}.\n\n"
     if source == f"data/{group}":
         text += (f"{len(copied)} image(s), the group's original files. "
                  f"`python src/diagnostics.py import-group --group {group} --src data/{group}`\n"
                  f"records them in `data/{config.IMPORT_INVENTORY_NAME}` beside the other groups.\n")
     else:
-        text += (f"{len(copied)} image(s) here, {len(skipped)} file(s) of the source folder skipped. Made by\n"
+        text += (f"{len(copied)} image(s) here, {len(decoded)} of them decoded from JPEG and written as lossless\n"
+                 f"TIFF, and {len(skipped)} file(s) of the source folder skipped. Made by\n"
                  f"`python src/diagnostics.py import-group --group {group} --src SOURCE` from the folder\n"
                  f"`{source}`. Every file it looked at, copied or skipped, and why, is in\n"
                  f"`data/{config.IMPORT_INVENTORY_NAME}`; the rule is in `config.py` (image import).\n")
     if skipped and not copied:
-        text += ("\nThis group has no image the pipeline can read yet, so it has no results folder. When TIFF\n"
-                 "files of these sections are available, put them in a folder and run the command above on it.\n")
+        text += ("\nThis group has no image the pipeline can read yet, so it has no results folder.\n")
+    if decoded:
+        text += ("\nCaution: these pixels are JPEG-decoded, as the WT group's are; no group has an\n"
+                 "uncompressed original (docs/METHODS.md sections 21 and 22).\n")
     return text
 
 
@@ -1161,19 +1229,40 @@ def cmd_import_group(args) -> int:
                 table, title=f"import-group {group} from {source} (reference: data/{config.REFERENCE_GROUP}/, "
                              f"shapes {sorted(ref['shape'])}, channels {sorted(ref['channels'])}, "
                              f"types {sorted(ref['dtype'])})\n")
-    accepted = [r for r in rows if r["decision"] in ("copied", "already present")]
-    total_mb = sum(float(r["size_mb"]) for r in accepted)
-    largest = max((float(r["size_mb"]) for r in accepted), default=0.0)
-    too_big = largest > config.IMPORT_MAX_FILE_MB or total_mb > config.IMPORT_MAX_GROUP_MB
-    print(f"\n{len(accepted)} accepted ({sum(r['decision'] == 'copied' for r in rows)} to copy), "
-          f"{len(rows) - len(accepted)} skipped; accepted images total {total_mb:.1f} MB, largest {largest:.1f} MB.")
+    accepted = [r for r in rows if r["decision"] in ACCEPTED]
+    print(f"\n{len(accepted)} accepted ({sum(r['decision'] == 'copied' for r in rows)} to copy, "
+          f"{sum(r['decision'] == 'decoded' for r in rows)} to decode), {len(rows) - len(accepted)} skipped.")
     if args.dry_run:
         print("Dry run: nothing copied and nothing written.")
         return 0
     dest.mkdir(parents=True, exist_ok=True)
     for r in rows:
+        target = dest / r["copied_as"] if r["copied_as"] else None
         if r["decision"] == "copied":
-            _shutil.copy2(src / r["file"], dest / r["copied_as"])
+            _shutil.copy2(src / r["file"], target)
+        elif r["decision"] == "decoded":
+            r.update(write_decoded(src / r["file"], target))
+            if not target.exists():
+                r.update({"decision": "skipped", "reason": r["lossless_check"], "copied_as": ""})
+                continue
+        elif r["decision"] == "already present" and r["format"] == "JPEG":
+            r.update({"decoded_from": "JPEG", "decoder": jpeg_decoder(),
+                      "lossless_check": "the TIFF in the group folder equals the decoded pixels"})
+        if r["decision"] in ACCEPTED:
+            pixels = read_pixels(target)
+            r["pixel_sha256"] = r.get("pixel_sha256") or pixel_sha256(pixels)
+            r["written_mb"] = f"{target.stat().st_size / 1e6:.3f}"
+            if r["format"] == "TIFF":
+                r["lossless_check"] = ("copied byte for byte" if r["decision"] == "copied"
+                                       else "the file in the group folder is byte identical to the source")
+    accepted = [r for r in rows if r["decision"] in ACCEPTED]
+    total_mb = sum(float(r["written_mb"]) for r in accepted)
+    largest = max((float(r["written_mb"]) for r in accepted), default=0.0)
+    too_big = largest > config.IMPORT_MAX_FILE_MB or total_mb > config.IMPORT_MAX_GROUP_MB
+    print(f"written: {len(accepted)} images in data/{group}/, {total_mb:.1f} MB in all, largest {largest:.1f} MB")
+    for r in rows:
+        if r.get("lossless_check", "").startswith("FAILED"):
+            print(f"  {r['file']}: {r['lossless_check']}")
     if too_big:
         added = ignore_group_folder(group)
         print(f"Over the size limit (a file over {config.IMPORT_MAX_FILE_MB:g} MB or a group over "
@@ -6980,7 +7069,7 @@ def _group_absence(group: str) -> str:
             rows = [r for r in csv.DictReader(f) if r["group"] == group]
     if not rows:
         return f"data/{group}/ has no recorded import."
-    copied = [r for r in rows if r["decision"] in ("copied", "already present")]
+    copied = [r for r in rows if r["decision"] in ACCEPTED]
     if copied:
         return (f"{len(copied)} image(s) in data/{group}/ but no quantification table: run the three "
                 f"stages on it.")
