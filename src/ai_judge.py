@@ -1920,6 +1920,8 @@ def estimate_case(system: str, user_text: str, png: bytes, segments: int) -> dic
 
 LACUNA_LOG_SCHEMA = "lcn-ai-lacuna-judge-log-1"
 LACUNA_DECISIONS_SCHEMA = "lcn-ai-lacuna-judge-decisions-1"
+LACUNA_STATUS = ("EXPERIMENT, pre-validation, not validated. Which regions are lacunae was "
+                 "decided by an AI judge; every boundary is the lacuna stage's own.")
 
 
 def image_group(image_path: Path) -> str:
@@ -2365,8 +2367,7 @@ def apply_lacuna_verdicts(image_path: Path, channel: np.ndarray, labels: np.ndar
     counts["removed"] = len(removed_labels)
     counts["lacunae_after"] = len(new_kept)
     record = {
-        "status": ("EXPERIMENT, not validated. Which regions are lacunae was decided by an AI "
-                   "judge; every boundary is the lacuna stage's own."),
+        "status": LACUNA_STATUS,
         "decision_file": _relative(path),
         "model": decisions["model"],
         "decisions_written_at": decisions["written_at"],
@@ -2378,3 +2379,241 @@ def apply_lacuna_verdicts(image_path: Path, channel: np.ndarray, labels: np.ndar
         "removed_numbers": removed_n,
     }
     return new_labels, new_kept, new_classes, record
+
+
+# One image, judged or replayed (step 4)
+
+def prepare_lacuna_image(image_path: Path) -> dict:
+    """Everything one call needs, as plain data so it can cross processes: the
+    candidates, the picture, the request text and the estimate. Deterministic,
+    no network. The dry run, the live run and the replay all start here, so the
+    picture a dry run saves is byte for byte the one a run sends."""
+    state = lacuna_state(Path(image_path))
+    candidates = lacuna_candidates(state)
+    png, drawn = lacuna_picture(state, candidates)
+    prompt = load_lacuna_prompt()
+    user_text = lacuna_user_text(candidates, drawn)
+    return {
+        "image_path": str(image_path),
+        "group": state["group"],
+        "label": state["label"],
+        "image_code": candidates["image_code"],
+        "png": png,
+        "drawn": drawn,
+        "user_text": user_text,
+        "estimate": estimate_case(prompt["system"], user_text, png, len(drawn["numbers"])),
+        "candidates": [lacuna_candidate_record(e) for e in candidates["candidates"]],
+        "not_numbered": [lacuna_candidate_record(e) for e in candidates["not_numbered"]],
+        "counts": candidates["counts"],
+        "rule": candidates["rule"],
+        "geometry_sha256": candidates["geometry_sha256"],
+    }
+
+
+def lacuna_quality_gate():
+    """A check over a whole run: once config.AI_MIN_CALLS_BEFORE_QUALITY_GATE
+    images (20) have been answered, if more than config.AI_MAX_UNJUDGED_SHARE
+    (20%) of them have no readable answer after their one retry, it returns the
+    reason and the run stops. It keeps watching after the twentieth."""
+    seen = {"images": 0, "unreadable": 0}
+
+    def check(answer_valid: bool) -> str:
+        seen["images"] += 1
+        seen["unreadable"] += int(not answer_valid)
+        if seen["images"] < config.AI_MIN_CALLS_BEFORE_QUALITY_GATE:
+            return ""
+        share = seen["unreadable"] / seen["images"]
+        if share <= config.AI_MAX_UNJUDGED_SHARE:
+            return ""
+        return (f"{seen['unreadable']} of the first {seen['images']} images had no readable answer "
+                f"after the one retry ({100.0 * share:.0f}%), which is above the "
+                f"{100.0 * config.AI_MAX_UNJUDGED_SHARE:.0f}% this run allows")
+
+    return check
+
+
+def judge_lacuna_image(prepared: dict, mode: str, out_path: Path | None = None,
+                       answerer=None, spent_usd: float = 0.0,
+                       budget_usd: float | None = None) -> dict:
+    """Judge one image, or replay it from the log. Returns its decisions, which
+    are also written to `out_path` (default: the decision file in the log).
+
+    mode "live"      one call, retried once if the answer does not validate,
+                     every attempt logged with the hash of its request
+    mode "self-test" the same with `answerer` in place of the API, which is how
+                     the self-test rehearses the chain with no network and no key
+    mode "replay"    no network at all: each logged attempt is read back, the
+                     request is rebuilt and its hash compared with the logged
+                     one, and the logged answer goes through the same parser, so
+                     the verdicts are reproduced and not copied
+
+    `spent_usd` is what the run has spent before this image and `budget_usd`
+    its ceiling (config.AI_LACUNA_MAX_COST_USD): no call is made once the run
+    has reached it. A billing, credit or authentication error is logged and
+    raised as FatalApiError at once: no decision file is written for the image,
+    because nothing was asked."""
+    group, label = prepared["group"], prepared["label"]
+    prompt = load_lacuna_prompt()
+    budget = float(config.AI_LACUNA_MAX_COST_USD if budget_usd is None else budget_usd)
+    png = prepared["png"]
+    numbers = prepared["drawn"]["numbers"]
+    payload, canonical, request_sha = build_request(prompt["system"], prepared["user_text"], png)
+    picture = lacuna_picture_path(group, label)
+    picture.parent.mkdir(parents=True, exist_ok=True)
+    if mode != "replay":
+        picture.write_bytes(png)
+    totals = {"calls": 0, "attempts": 0, "invalid_attempts": 0, "call_errors": 0, "refusals": 0,
+              "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0,
+              "replay_request_mismatches": 0, "replay_picture_mismatches": 0,
+              "stopped_on_cost": False}
+    invalid_reasons, replay_checks = [], []
+    answer = None
+    for attempt in (1, 2):
+        if not numbers:
+            break
+        if mode != "replay" and spent_usd + totals["cost_usd"] >= budget:
+            totals["stopped_on_cost"] = True
+            break
+        record = {
+            "schema": LACUNA_LOG_SCHEMA,
+            "written_at": utc_now(),
+            "mode": mode,
+            "image_label": label,
+            "group": group,
+            "image_code": prepared["image_code"],
+            "attempt": attempt,
+            "picture": _relative(picture),
+            "picture_sha256": sha256_bytes(png),
+            "prompt_sha256": prompt["prompt_sha256"],
+            "examples_sha256": prompt["examples_sha256"],
+            "geometry_sha256": prepared["geometry_sha256"],
+            "request_sha256": request_sha,
+            "request": canonical,
+        }
+        if mode == "replay":
+            path = lacuna_attempt_path(group, label, attempt)
+            if not path.exists():
+                invalid_reasons.append(f"attempt {attempt}: no log record")
+                break
+            logged = json.loads(path.read_text(encoding="utf-8"))
+            check = {"attempt": attempt, "written_at": logged.get("written_at"),
+                     "request_matches": logged.get("request_sha256") == request_sha,
+                     "picture_matches": logged.get("picture_sha256") == sha256_bytes(png)}
+            replay_checks.append(check)
+            totals["replay_request_mismatches"] += int(not check["request_matches"])
+            totals["replay_picture_mismatches"] += int(not check["picture_matches"])
+            response = logged.get("response")
+            if response is None:
+                # A failed call was logged with no answer; the replay counts it
+                # exactly as the run did.
+                totals["attempts"] += 1
+                totals["invalid_attempts"] += 1
+                invalid_reasons.append(f"attempt {attempt}: {logged.get('invalid_reason')}")
+                continue
+            totals["cost_usd"] = round(totals["cost_usd"] + float(logged.get("cost_usd", 0.0)), 6)
+        else:
+            if answerer is None:
+                allowed, why = external_calls_allowed()
+                if not allowed:
+                    raise RuntimeError(f"a real call was asked for but {why}")
+            try:
+                response = (answerer or call_anthropic)(payload)
+            except Exception as error:  # noqa: BLE001
+                fatal = fatal_api_reason(error)
+                record.update({"response": None, "valid": False, "parsed": None,
+                               "invalid_reason": scrub(str(error))[:500], "cost_usd": 0.0})
+                if fatal:
+                    record["fatal"] = fatal
+                    write_log_to(lacuna_attempt_path(group, label, attempt), record)
+                    raise FatalApiError(
+                        f"{fatal}. Stopped at {group}/{label} after ${spent_usd + totals['cost_usd']} "
+                        f"in this run. No decision file was written for this image.") from error
+                reason = scrub(f"the call failed, {type(error).__name__}: {error}")
+                record["invalid_reason"] = reason
+                write_log_to(lacuna_attempt_path(group, label, attempt), record)
+                totals["attempts"] += 1
+                totals["invalid_attempts"] += 1
+                totals["call_errors"] += 1
+                invalid_reasons.append(f"attempt {attempt}: {reason}")
+                continue
+            record["response"] = response
+            record["cost_usd"] = round(cost_usd(response["usage"]["input_tokens"],
+                                                response["usage"]["output_tokens"]), 6)
+            totals["calls"] += 1
+            totals["refusals"] += int(response.get("stop_reason") == "refusal")
+            totals["input_tokens"] += response["usage"]["input_tokens"]
+            totals["output_tokens"] += response["usage"]["output_tokens"]
+            totals["cost_usd"] = round(totals["cost_usd"] + record["cost_usd"], 6)
+        totals["attempts"] += 1
+        parsed, why_not = parse_lacuna_answer(response.get("text", ""), numbers)
+        record["valid"] = parsed is not None
+        record["invalid_reason"] = why_not or None
+        record["parsed"] = parsed
+        if mode != "replay":
+            write_log_to(lacuna_attempt_path(group, label, attempt), record)
+        if parsed is None:
+            totals["invalid_attempts"] += 1
+            invalid_reasons.append(f"attempt {attempt}: {why_not}")
+            continue
+        answer = parsed
+        break
+
+    by_number = {item["n"]: item for item in (answer or [])}
+    regions = []
+    for entry in prepared["candidates"]:
+        item = by_number.get(entry["n"])
+        regions.append(dict(entry, verdict=item["verdict"] if item else "unjudged",
+                            why=item["why"] if item else ""))
+    verdict_counts = {v: sum(1 for r in regions if r["verdict"] == v)
+                      for v in LACUNA_VERDICTS + ("unjudged",)}
+    decisions = {
+        "schema": LACUNA_DECISIONS_SCHEMA,
+        "status": LACUNA_STATUS + " Applied only when config.AI_LACUNA_JUDGE_ENABLED is True.",
+        "written_at": utc_now(),
+        "mode": mode,
+        "image_label": label,
+        "group": group,
+        "image_code": prepared["image_code"],
+        "provider": config.AI_JUDGE_PROVIDER,
+        "model": config.AI_JUDGE_MODEL,
+        "prompt_sha256": prompt["prompt_sha256"],
+        "examples_sha256": prompt["examples_sha256"],
+        "examples_present": prompt["examples_present"],
+        "request_sha256": request_sha,
+        "picture": _relative(picture),
+        "picture_sha256": sha256_bytes(png),
+        "candidate_rule": prepared["rule"],
+        "candidate_counts": prepared["counts"],
+        "geometry_sha256": prepared["geometry_sha256"],
+        "answer_valid": answer is not None,
+        "invalid_reasons": invalid_reasons,
+        "replay_checks": replay_checks,
+        "totals": totals,
+        "verdicts": verdict_counts,
+        "regions": regions,
+        "not_numbered_keep_the_deterministic_decision": prepared["not_numbered"],
+    }
+    out = Path(out_path) if out_path is not None else lacuna_decisions_path(group, label)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(decisions, indent=2) + "\n", encoding="utf-8")
+    return decisions
+
+
+def write_log_to(path: Path, record: dict) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    return path
+
+
+def same_lacuna_decisions(a: dict, b: dict) -> list:
+    """The differences between two decision files: [] when they hold the same
+    candidates and the same verdict for every number."""
+    if a.get("geometry_sha256") != b.get("geometry_sha256"):
+        return ["the candidates differ"]
+    found = []
+    for ra, rb in zip(a["regions"], b["regions"]):
+        if (ra["n"], ra["verdict"]) != (rb["n"], rb["verdict"]):
+            found.append(f"region {ra['n']}: {ra['verdict']} against {rb['verdict']}")
+    if len(a["regions"]) != len(b["regions"]):
+        found.append("a different number of regions")
+    return found

@@ -7808,6 +7808,296 @@ def lacuna_judge_images(args) -> list:
     return out
 
 
+AI_LACUNA_REPLAY_DIR = config.PROJECT_ROOT / ".cache" / "ai_lacuna_replay"
+AI_LACUNA_SELF_TEST_DIR = config.PROJECT_ROOT / ".cache" / "ai_lacuna_self_test"
+# What the thread judge's real run cost against its own dry run estimate
+# (docs/EXPERIMENT_AI.md, step 7: $1.60 against $1.19, nearly all of it input
+# tokens). Report only: printed beside this judge's estimate so it is read as a
+# floor. It decides nothing, and the cost gate uses the estimate itself.
+THREAD_JUDGE_COST_OVER_ESTIMATE = 1.60 / 1.19
+
+
+def _ai_lacuna_prepare(path_str: str) -> dict:
+    import ai_judge
+
+    return ai_judge.prepare_lacuna_image(Path(path_str))
+
+
+def ai_lacuna_prepare_all(images: list, workers: int) -> list:
+    """Candidates, picture, request text and estimate for every image, in
+    parallel processes, in the order given. Deterministic and offline."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    with ProcessPoolExecutor(max_workers=max(1, min(workers, len(images)))) as ex:
+        return list(ex.map(_ai_lacuna_prepare, [str(p) for p in images]))
+
+
+def ai_lacuna_estimate(prepared: list) -> dict:
+    calls = [p for p in prepared if p["drawn"]["numbers"]]
+    tokens_in = sum(p["estimate"]["input_tokens"] for p in calls)
+    tokens_out = sum(p["estimate"]["output_tokens"] for p in calls)
+    import ai_judge
+
+    cost = round(ai_judge.cost_usd(tokens_in, tokens_out), 4)
+    return {"calls": len(calls), "estimated_input_tokens": int(tokens_in),
+            "estimated_output_tokens": int(tokens_out), "estimated_cost_usd": cost,
+            "estimated_cost_usd_if_every_call_is_retried_once": round(2.0 * cost, 4),
+            "estimated_cost_usd_at_the_thread_judge_overrun":
+                round(cost * THREAD_JUDGE_COST_OVER_ESTIMATE, 4),
+            "max_cost_usd": config.AI_LACUNA_MAX_COST_USD,
+            "within_max_cost_usd": bool(cost <= config.AI_LACUNA_MAX_COST_USD)}
+
+
+def _ai_lacuna_row(p: dict) -> dict:
+    c = p["counts"]
+    return {
+        "group": p["group"], "image": p["label"], "image_code": p["image_code"],
+        "lacunae (deterministic)": c["deterministic_lacunae"],
+        "candidates found": c["candidates_found"], "numbered": c["numbered"],
+        "numbered, kept by the filters": c["numbered_kept_by_the_filters"],
+        "numbered, regions rejected by the filters": c["numbered_rejected_by_the_filters"],
+        "numbered, dim candidates (0.8 of the cut)": c["dim"],
+        "over the cap, not numbered": c["not_numbered_over_the_cap"],
+        "of those, kept lacunae": c["kept_lacunae_not_numbered_over_the_cap"],
+        "numbers not placed clear": len(p["drawn"]["numbers_not_placed_clear"]),
+        "estimated input tokens": p["estimate"]["input_tokens"],
+        "estimated output tokens": p["estimate"]["output_tokens"],
+        "estimated cost USD": round(p["estimate"]["cost_usd"], 4),
+    }
+
+
+def ai_lacuna_dry_run(images: list, out: Path, workers: int) -> int:
+    """What a real run would send and cost, with every picture exactly as the
+    judge would see it. Nothing is sent and no environment variable is read."""
+    import ai_judge
+
+    prepared = ai_lacuna_prepare_all(images, workers)
+    pictures = []
+    for p in prepared:
+        path = out / p["group"] / f"{p['label']}.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(p["png"])
+        pictures.append(path)
+    rows = [_ai_lacuna_row(p) for p in prepared]
+    total = ai_lacuna_estimate(prepared)
+    prompt = ai_judge.load_lacuna_prompt()
+    report = {
+        "status": "EXPERIMENT, pre-validation, estimate only: nothing was sent",
+        "question": "what a real run of the AI lacuna judge would send and cost",
+        "model": config.AI_JUDGE_MODEL,
+        "prices_usd_per_mtok": {"input": config.AI_PRICE_INPUT_USD_PER_MTOK,
+                                "output": config.AI_PRICE_OUTPUT_USD_PER_MTOK},
+        "how_the_estimate_is_made": (
+            f"input text at {config.AI_TOKENS_PER_CHAR} tokens per character and the picture at "
+            f"width x height / {config.AI_IMAGE_PIXELS_PER_TOKEN} px per token; the answer at "
+            f"{config.AI_OUTPUT_TOKENS_PER_SEGMENT} tokens per number plus "
+            f"{config.AI_OUTPUT_TOKENS_FIXED}. Estimates, not measurements. The thread judge's "
+            f"real run cost {THREAD_JUDGE_COST_OVER_ESTIMATE:.2f} times its estimate, so read this "
+            f"as a floor."),
+        "prompt_sha256": prompt["prompt_sha256"],
+        "examples_sha256": prompt["examples_sha256"],
+        "examples_present": prompt["examples_present"],
+        "candidate_rule": prepared[0]["rule"] if prepared else {},
+        "all_images": dict(total, images=len(prepared),
+                           candidates_numbered=sum(r["numbered"] for r in rows),
+                           images_over_the_cap=sum(1 for r in rows
+                                                   if r["over the cap, not numbered"]),
+                           kept_lacunae_over_the_cap=sum(r["of those, kept lacunae"] for r in rows)),
+        "per_image": rows,
+        "per_image_candidates": [{"group": p["group"], "image": p["label"],
+                                  "geometry_sha256": p["geometry_sha256"],
+                                  "candidates": p["candidates"],
+                                  "not_numbered": p["not_numbered"]} for p in prepared],
+        "pictures": [_rel(path) for path in pictures],
+    }
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "dry_run.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    write_rows_csv(out / "dry_run.csv", list(rows[0]) if rows else [], rows)
+    (out / "dry_run.md").write_text(_ai_lacuna_dry_run_markdown(report), encoding="utf-8")
+    header = ["group", "image", "lacunae", "found", "numbered", "kept", "rejected", "dim",
+              "over cap", "in tokens", "out tokens", "USD"]
+    print_table(header, [[r["group"], r["image"], r["lacunae (deterministic)"],
+                          r["candidates found"], r["numbered"],
+                          r["numbered, kept by the filters"],
+                          r["numbered, regions rejected by the filters"],
+                          r["numbered, dim candidates (0.8 of the cut)"],
+                          r["over the cap, not numbered"], r["estimated input tokens"],
+                          r["estimated output tokens"], r["estimated cost USD"]] for r in rows],
+                title=f"AI lacuna judge, dry run for {config.AI_JUDGE_MODEL}: nothing was sent")
+    a = report["all_images"]
+    print(f"\n{a['calls']} calls, {a['candidates_numbered']} numbered regions, "
+          f"{a['estimated_input_tokens']} input and {a['estimated_output_tokens']} output tokens, "
+          f"estimated ${a['estimated_cost_usd']} (with every call retried once "
+          f"${a['estimated_cost_usd_if_every_call_is_retried_once']}; at the thread judge's "
+          f"overrun ${a['estimated_cost_usd_at_the_thread_judge_overrun']}); ceiling "
+          f"${a['max_cost_usd']}: {'within it' if a['within_max_cost_usd'] else 'ABOVE IT'}")
+    print(f"images over the cap of {config.AI_LACUNA_MAX_CANDIDATES}: {a['images_over_the_cap']}, "
+          f"kept lacunae left unnumbered by it: {a['kept_lacunae_over_the_cap']}")
+    print(f"report -> {out / 'dry_run.md'}, {out / 'dry_run.json'}, {out / 'dry_run.csv'}; "
+          f"{len(pictures)} pictures in {out}/<group>/")
+    return 0
+
+
+def _rel(path: Path) -> str:
+    try:
+        return Path(path).resolve().relative_to(config.PROJECT_ROOT).as_posix()
+    except ValueError:
+        return Path(path).as_posix()
+
+
+def _ai_lacuna_dry_run_markdown(report: dict) -> str:
+    a = report["all_images"]
+    rule = report["candidate_rule"]
+    rows = report["per_image"]
+    lines = [
+        "# AI lacuna judge: dry run",
+        "",
+        "**EXPERIMENT, pre-validation. Nothing was sent.** What a real run of the AI lacuna judge "
+        "would send and cost, made by `python src/diagnostics.py ai-lacuna-judge` (the dry run is "
+        "the default). Not validated: nothing here says any verdict would be right.",
+        "",
+        f"- Model `{report['model']}`, ${report['prices_usd_per_mtok']['input']:.2f} / "
+        f"${report['prices_usd_per_mtok']['output']:.2f} per million input / output tokens.",
+        f"- Candidates: every region of the lacuna stage's label image of at least "
+        f"{rule.get('min_candidate_area_px2')} px2, kept and rejected, plus the dim candidates at "
+        f"{rule.get('dim_cut_fraction')} of each image's lacuna cut that overlap none of them; "
+        f"at most {rule.get('max_candidates')} numbered per image, the largest.",
+        f"- One call per image: {a['calls']} calls, {a['candidates_numbered']} numbered regions.",
+        f"- Estimate: {a['estimated_input_tokens']:,} input and {a['estimated_output_tokens']:,} "
+        f"output tokens, **${a['estimated_cost_usd']}**; "
+        f"${a['estimated_cost_usd_if_every_call_is_retried_once']} if every call had to be retried "
+        f"once; ${a['estimated_cost_usd_at_the_thread_judge_overrun']} if it runs over as the thread "
+        f"judge's estimate did. Ceiling `config.AI_LACUNA_MAX_COST_USD` = ${a['max_cost_usd']}.",
+        f"- Images with more candidates than the cap: {a['images_over_the_cap']}; kept lacunae left "
+        f"unnumbered by the cap, which keep the deterministic decision: "
+        f"{a['kept_lacunae_over_the_cap']}.",
+        f"- How the estimate is made: {report['how_the_estimate_is_made']}",
+        f"- Prompt sha256 `{report['prompt_sha256'][:16]}`, examples sha256 "
+        f"`{report['examples_sha256'][:16]}`.",
+        "",
+        "The picture of every image, byte for byte what a run would send, is in "
+        "`<group>/<image>.png` beside this file. The judge sees no file name: the request carries "
+        "only the neutral image code in the table.",
+        "",
+    ]
+    if rows:
+        header = list(rows[0])
+        lines += ["| " + " | ".join(header) + " |", "| " + " | ".join("---" for _ in header) + " |"]
+        for r in rows:
+            lines.append("| " + " | ".join(str(r[h]) for h in header) + " |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def ai_lacuna_live(images: list, out_root: Path, workers: int) -> int:
+    """The real run: one call per image, every request and answer logged. Needs
+    ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY; refused before anything is
+    computed without them, and refused before the first call if the estimate is
+    above the ceiling."""
+    import ai_judge
+
+    allowed, why = ai_judge.external_calls_allowed()
+    if not allowed:
+        print(f"Refused: a real run needs a connection and {why}. Nothing was computed or sent.")
+        print("The dry run is the default: run without --live to see the pictures and the cost.")
+        return 2
+    prepared = ai_lacuna_prepare_all(images, workers)
+    total = ai_lacuna_estimate(prepared)
+    print(f"{total['calls']} calls, estimated ${total['estimated_cost_usd']}, ceiling "
+          f"${total['max_cost_usd']}")
+    if not total["within_max_cost_usd"]:
+        print(f"Refused: the estimate ${total['estimated_cost_usd']} is above "
+              f"config.AI_LACUNA_MAX_COST_USD ${config.AI_LACUNA_MAX_COST_USD}. Nothing was sent.")
+        return 2
+    gate = ai_judge.lacuna_quality_gate()
+    spent, per_image, rc, stopped = 0.0, [], 0, None
+    for p in prepared:
+        try:
+            decisions = ai_judge.judge_lacuna_image(p, "live", spent_usd=spent)
+        except ai_judge.FatalApiError as error:
+            stopped = f"billing, credit or authentication error: {error}"
+            print(f"\nSTOPPED: {error}")
+            print("No further image was run.")
+            rc = 5
+            break
+        t = decisions["totals"]
+        spent = round(spent + t["cost_usd"], 6)
+        v = decisions["verdicts"]
+        per_image.append({"group": p["group"], "image": p["label"], "answer_valid":
+                          decisions["answer_valid"], "verdicts": v, "totals": t})
+        print(f"  {p['group']}/{p['label']}: {v['yes']} yes, {v['no']} no, {v['unsure']} unsure, "
+              f"{v['unjudged']} unjudged, {t['attempts']} attempt(s), ${t['cost_usd']}, "
+              f"running ${spent}")
+        if t["stopped_on_cost"]:
+            stopped = f"the running total reached config.AI_LACUNA_MAX_COST_USD ${config.AI_LACUNA_MAX_COST_USD}"
+            print(f"\nSTOPPED: {stopped}. No further image was run.")
+            rc = 3
+            break
+        reason = gate(decisions["answer_valid"])
+        if reason:
+            stopped = reason
+            print(f"\nSTOPPED: {reason}. No further image was run.")
+            rc = 6
+            break
+    summary = {"status": ai_judge.LACUNA_STATUS, "written_at": ai_judge.utc_now(),
+               "model": config.AI_JUDGE_MODEL, "estimate": total, "spent_usd": spent,
+               "stopped": stopped, "images_run": len(per_image), "images": len(prepared),
+               "per_image": per_image}
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "ai_lacuna_judge_run.json").write_text(json.dumps(summary, indent=2) + "\n",
+                                                       encoding="utf-8")
+    print(f"\n{len(per_image)} of {len(prepared)} images run, ${spent} spent. "
+          f"Summary -> {out_root / 'ai_lacuna_judge_run.json'}")
+    return rc
+
+
+def ai_lacuna_replay(images: list, out_root: Path, workers: int) -> int:
+    """Every image again from the log, with no network and without reading
+    either environment variable: the request and the picture are rebuilt and
+    their hashes compared with the logged ones, and the logged answers go
+    through the same parser. The replay's decision files go to .cache/, so a
+    real run's record is never replaced, and are compared with the logged run."""
+    import ai_judge
+
+    prepared = ai_lacuna_prepare_all(images, workers)
+    rows, ok = [], True
+    for p in prepared:
+        live_path = ai_judge.lacuna_decisions_path(p["group"], p["label"])
+        replay_path = AI_LACUNA_REPLAY_DIR / p["group"] / f"{p['label']}_ai_lacunae.json"
+        decisions = ai_judge.judge_lacuna_image(p, "replay", out_path=replay_path)
+        t = decisions["totals"]
+        if live_path.is_file():
+            diffs = ai_judge.same_lacuna_decisions(
+                json.loads(live_path.read_text(encoding="utf-8")), decisions)
+        else:
+            diffs = ["no logged run"]
+        same = not diffs and not t["replay_request_mismatches"] and not t["replay_picture_mismatches"]
+        ok &= same
+        rows.append([p["group"], p["label"], t["attempts"], t["replay_request_mismatches"],
+                     t["replay_picture_mismatches"], "IDENTICAL" if same else "; ".join(diffs[:3])])
+    print_table(["group", "image", "attempts replayed", "requests differ", "pictures differ",
+                 "verdicts"], rows, title="AI lacuna judge, replay from the log (no network)")
+    summary = {"written_at": ai_judge.utc_now(), "identical": ok,
+               "per_image": [dict(zip(["group", "image", "attempts", "requests_differ",
+                                       "pictures_differ", "verdicts"], r)) for r in rows]}
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "ai_lacuna_replay.json").write_text(json.dumps(summary, indent=2) + "\n",
+                                                    encoding="utf-8")
+    print(f"\n{'IDENTICAL verdicts on every image' if ok else 'DIFFERENT, see above'}; "
+          f"summary -> {out_root / 'ai_lacuna_replay.json'}")
+    return 0 if ok else 4
+
+
+def cmd_ai_lacuna_judge(args) -> int:
+    images = lacuna_judge_images(args)
+    out_root = Path(args.out)
+    if args.live:
+        return ai_lacuna_live(images, out_root, args.workers)
+    if args.replay:
+        return ai_lacuna_replay(images, out_root, args.workers)
+    return ai_lacuna_dry_run(images, out_root / config.AI_LACUNA_DRY_RUN_DIR, args.workers)
+
+
 def _ai_lacuna_run_detect(job: tuple) -> dict:
     """Both detection stages for one image with the lacuna judge switch on,
     written exactly as src/lacunae.py and src/canaliculi.py write them. The
@@ -8232,6 +8522,23 @@ def main() -> None:
                    help="Where a replay writes its decision file (default: beside the log, "
                         "which overwrites it with the same content).")
     p.set_defaults(func=cmd_ai_judge)
+
+    p = sub.add_parser("ai-lacuna-judge",
+                       help="EXPERIMENT: the AI lacuna judge on every group. Default: a dry run, "
+                            "the pictures and the cost, nothing sent. --live calls the API, "
+                            "--replay reruns from the log offline.")
+    add_images_arguments(p)
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--live", action="store_true",
+                      help="Real calls (needs ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY).")
+    mode.add_argument("--replay", action="store_true",
+                      help="No network: rerun from the log and check the verdicts match.")
+    p.add_argument("-o", dest="out", type=Path, default=config.AI_LACUNA_RESULTS_ROOT,
+                   help="Output root (default: results_ai_lacunae; the dry run writes dry_run/ "
+                        "inside it).")
+    p.add_argument("-w", dest="workers", type=int, default=8,
+                   help="Parallel processes for the candidates, one image each (default 8).")
+    p.set_defaults(func=cmd_ai_lacuna_judge)
 
     p = sub.add_parser("ai-lacuna-run",
                        help="EXPERIMENT: detection, canaliculi and quantification with the AI "
