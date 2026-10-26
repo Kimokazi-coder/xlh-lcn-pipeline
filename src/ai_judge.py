@@ -1076,12 +1076,15 @@ def case_user_text(case: dict, drawn: dict) -> str:
 
 # The prompt, the request and its hash
 
-def load_prompt() -> dict:
+def load_prompt(prompt_name: str = "judge_prompt.md",
+                examples_name: str = "judge_examples.md") -> dict:
     """The one fixed prompt, with Karim's examples appended. Both files are
     stripped of their html comments, and both hashes go into every log record,
-    so a changed prompt is visible in the log for ever after."""
-    prompt_path = Path(__file__).resolve().parent / "judge_prompt.md"
-    examples_path = config.PROJECT_ROOT / "docs" / "judge_examples.md"
+    so a changed prompt is visible in the log for ever after. The defaults are
+    the thread judge's two files; the lacuna judge passes its own
+    (LACUNA_PROMPT_FILES)."""
+    prompt_path = Path(__file__).resolve().parent / prompt_name
+    examples_path = config.PROJECT_ROOT / "docs" / examples_name
     prompt = strip_comments(prompt_path.read_text(encoding="utf-8"))
     examples_raw = examples_path.read_text(encoding="utf-8") if examples_path.exists() else ""
     examples = strip_comments(examples_raw)
@@ -2090,3 +2093,153 @@ def lacuna_candidate_record(entry: dict) -> dict:
     return {k: entry[k] for k in ("n", "kind", "area_px2", "centroid_xy", "bbox_rc", "on_border",
                                   "deterministic", "lacuna_id", "lacuna_class", "rejected_by",
                                   "source_label")}
+
+
+# The picture the lacuna judge sees (step 2)
+#
+# One picture per image: the raw signal channel at its own pixels, twice, side
+# by side. LEFT nothing is drawn; RIGHT every numbered candidate is outlined in
+# one colour and carries its number. Every outline is drawn the same way,
+# whatever the pipeline decided for that region, so the picture does not tell
+# the judge what the filters said.
+
+LACUNA_OUTLINE_COLOUR = (255, 255, 0)
+# The gaps, in px, at which a number is tried around its region's bounding box,
+# nearest first: a number never sits on a region or an outline, and never on
+# another number, so it reads as the name of the region it is next to.
+LACUNA_NUMBER_GAPS_PX = (3, 8, 14, 22, 32, 44)
+LACUNA_PROMPT_FILES = ("judge_prompt_lacunae.md", "judge_examples_lacunae.md")
+
+
+def load_lacuna_prompt() -> dict:
+    return load_prompt(*LACUNA_PROMPT_FILES)
+
+
+def _place_lacuna_number(blocked: np.ndarray, taken: list, text: str, bbox: list) -> tuple:
+    """(row, col, clear) for one number: the first place around the region's
+    bounding box, nearest first and in a fixed order, that lies inside the
+    picture, holds no candidate pixel and no outline, and keeps a clear gap to
+    every number already placed. `clear` is False when no such place was found
+    and the first one was used instead; the picture record counts those."""
+    height, width = blocked.shape
+    box_h, box_w = _text_box(text)
+    r0, c0, r1, c1 = bbox
+    mid_r, mid_c = (r0 + r1) // 2, (c0 + c1) // 2
+    pad = DIGIT_SCALE * 2
+    first = None
+    for gap in LACUNA_NUMBER_GAPS_PX:
+        for row, col in ((r0 - gap - box_h, c0), (r0 - gap - box_h, mid_c - box_w // 2),
+                         (mid_r - box_h // 2, c1 + gap), (r1 + gap, c0),
+                         (r1 + gap, mid_c - box_w // 2), (mid_r - box_h // 2, c0 - gap - box_w),
+                         (r0 - gap - box_h, c1 - box_w), (r1 + gap, c1 - box_w)):
+            row = min(max(1, row), height - box_h - 1)
+            col = min(max(1, col), width - box_w - 1)
+            box = (row, col, row + box_h, col + box_w)
+            if first is None:
+                first = box
+            if blocked[row - 1:row + box_h + 1, col - 1:col + box_w + 1].any():
+                continue
+            if any(not (box[2] + pad < o[0] or box[0] - pad > o[2]
+                        or box[3] + pad < o[1] or box[1] - pad > o[3]) for o in taken):
+                continue
+            taken.append(box)
+            return row, col, True
+    taken.append(first)
+    return first[0], first[1], False
+
+
+def lacuna_picture(state: dict, candidates: dict) -> tuple:
+    """The picture as png bytes, and what was drawn on it.
+
+    Left: the raw signal channel, at its own pixels, as grey, nothing drawn and
+    nothing stretched. Right: the same, with every numbered candidate outlined
+    in LACUNA_OUTLINE_COLOUR (the pixels just outside the region, so the
+    outline covers none of it) and its number in white beside it."""
+    raw = raw_uint8(state["channel"])
+    panel = np.stack([raw] * 3, axis=-1)
+    right = panel.copy()
+    numbers = np.zeros(raw.shape, dtype=np.int32)
+    for entry in candidates["candidates"]:
+        numbers[entry["rows"], entry["cols"]] = entry["n"]
+    outline = segmentation.find_boundaries(numbers, mode="outer")
+    right[outline] = LACUNA_OUTLINE_COLOUR
+    blocked = (numbers > 0) | outline
+    taken: list = []
+    not_clear = []
+    for entry in candidates["candidates"]:
+        text = str(entry["n"])
+        row, col, clear = _place_lacuna_number(blocked, taken, text, entry["bbox_rc"])
+        _draw_digits(right, text, row, col)
+        if not clear:
+            not_clear.append(entry["n"])
+    gap = np.full((panel.shape[0], PANEL_GAP_PX, 3), PANEL_GAP_COLOUR, dtype=np.uint8)
+    canvas = np.concatenate([panel, gap, right], axis=1)
+    buffer = io.BytesIO()
+    Image.fromarray(canvas).save(buffer, format="PNG")
+    return buffer.getvalue(), {
+        "panel_px": [int(raw.shape[1]), int(raw.shape[0])],
+        "picture_px": [int(canvas.shape[1]), int(canvas.shape[0])],
+        "numbers": [int(e["n"]) for e in candidates["candidates"]],
+        "outline_colour": list(LACUNA_OUTLINE_COLOUR),
+        "numbers_not_placed_clear": not_clear,
+    }
+
+
+def lacuna_user_text(candidates: dict, drawn: dict) -> str:
+    """The only text that changes from image to image. It carries the neutral
+    image code and nothing else that names the image: no file name, no path,
+    no group and no mouse."""
+    n = len(drawn["numbers"])
+    width, height = drawn["panel_px"]
+    return (f"Image {candidates['image_code']}. The picture is two panels of the same field, "
+            f"{width} x {height} px each, at the image's own pixels: LEFT the image with nothing "
+            f"drawn on it, RIGHT the same image with {n} candidate regions outlined in yellow and "
+            f"numbered 1 to {n}.\n\nFor every number from 1 to {n}, say whether the region inside "
+            f"that outline is an osteocyte lacuna: \"yes\", \"no\" or \"unsure\". Answer in one "
+            f"json object.")
+
+
+LACUNA_VERDICTS = ("yes", "no", "unsure")
+
+
+def parse_lacuna_answer(text: str, numbers: list) -> tuple:
+    """(answer, why it was refused). Strict, as the thread judge's parser is:
+    every number in the picture exactly once, no other number, and a verdict
+    that is exactly one of LACUNA_VERDICTS. Anything else is refused whole,
+    because a half read answer is a judgement nobody made."""
+    if not text or not text.strip():
+        return None, "the answer was empty"
+    body = text.strip()
+    if body.startswith("```"):
+        body = re.sub(r"^```[a-zA-Z]*\s*", "", body)
+        body = re.sub(r"\s*```$", "", body)
+    start, end = body.find("{"), body.rfind("}")
+    if start < 0 or end <= start:
+        return None, "no json object in the answer"
+    try:
+        parsed = json.loads(body[start:end + 1])
+    except json.JSONDecodeError as error:
+        return None, f"the json did not parse: {error.msg}"
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("regions"), list):
+        return None, "no regions list"
+    seen = {}
+    for item in parsed["regions"]:
+        if not isinstance(item, dict):
+            return None, "a region entry is not an object"
+        try:
+            number = int(item.get("n"))
+        except (TypeError, ValueError):
+            return None, "a region entry has no number"
+        if number in seen:
+            return None, f"region {number} answered twice"
+        if number not in numbers:
+            return None, f"region {number} is not in the picture"
+        verdict = str(item.get("verdict", "")).strip().lower()
+        if verdict not in LACUNA_VERDICTS:
+            return None, f"region {number} has verdict {item.get('verdict')!r}"
+        seen[number] = {"n": number, "verdict": verdict,
+                        "why": str(item.get("why", "")).strip()[:300]}
+    missing = [n for n in numbers if n not in seen]
+    if missing:
+        return None, f"no answer for region(s) {missing}"
+    return [seen[n] for n in numbers], ""
