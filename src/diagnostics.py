@@ -7789,6 +7789,131 @@ def cmd_format_test(args) -> int:
     return 0
 
 
+# ai-lacuna-* --------------------------------------------------------------------
+# EXPERIMENT (docs/EXPERIMENT_AI.md, "The lacuna judge"). The AI lacuna judge
+# says which of the regions the lacuna stage outlined are osteocyte lacunae, one
+# call per image, with the same prompt for every group. It never draws or changes
+# a boundary. Everything is run on all four groups unless --image or --dir names
+# fewer images.
+
+
+def lacuna_judge_images(args) -> list:
+    """The images named by --image or --dir, else every image of every group in
+    config.GROUPS, group by group in that order."""
+    if getattr(args, "image", None) is not None or getattr(args, "dir", None) is not None:
+        return lacunae.image_paths(args)
+    out = []
+    for group in config.GROUPS:
+        out += sorted((config.DATA_DIR / group).glob("*.tif"))
+    return out
+
+
+def _ai_lacuna_run_detect(job: tuple) -> dict:
+    """Both detection stages for one image with the lacuna judge switch on,
+    written exactly as src/lacunae.py and src/canaliculi.py write them. The
+    network stage is given the judged lacuna result itself, so the slow lacuna
+    stage runs once."""
+    path_str, out_str = job
+    config.AI_LACUNA_JUDGE_ENABLED = True
+    image_path, out_root = Path(path_str), Path(out_str)
+    lac = lacunae.analyse_image(image_path)
+    lacunae.write_outputs(lac, out_root)
+    _display, channel = lacunae.load_channel(image_path)
+    net = canaliculi.analyse_network(image_path, lac, channel)
+    canaliculi.write_outputs(net, out_root)
+    return {"image_label": lacunae.image_label(image_path), "group": image_path.parent.name,
+            "lacunae": len(lac["kept"]), "skeleton_px": int(net["skeleton"].sum()),
+            "ai_lacuna_judge": lac["ai_lacuna_judge"]["counts"]}
+
+
+def _protected_manifests(out_root: Path) -> dict:
+    """{name: manifest} of everything the switched run must leave as it was: all
+    of results/, all of results_ai_judge/, and this judge's own logs."""
+    import ai_judge
+
+    found = {"results": _tree_manifest(config.RESULTS_ROOT, out_root),
+             "results_ai_judge": _tree_manifest(config.AI_RESULTS_ROOT, out_root)}
+    for group in config.GROUPS:
+        log = ai_judge.lacuna_log_dir(group, "x").parent
+        if log.is_dir():
+            found[f"lacuna judge log {group}"] = _tree_manifest(log, log / "__nothing_excluded__")
+    return found
+
+
+def cmd_ai_lacuna_run(args) -> int:
+    """The pipeline with config.AI_LACUNA_JUDGE_ENABLED on for this process
+    only, from the decision files in the judge's log, into
+    results_ai_lacunae/<group>/ with the usual layout. config.py is not touched
+    and no call is made."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    import ai_judge
+
+    images = lacuna_judge_images(args)
+    out_root = Path(args.out)
+    for image_path in images:
+        group, label = image_path.parent.name, lacunae.image_label(image_path)
+        if not ai_judge.lacuna_decisions_path(group, label).is_file():
+            print(f"Refused: no lacuna judge decision file for {label} at "
+                  f"{ai_judge.lacuna_decisions_path(group, label)}. Run or replay the judge first.")
+            return 2
+    print(f"The pipeline with the AI lacuna judge switch on, for this process only, into "
+          f"{out_root}/<group>/. Reads the judge's decision files only; no call is made.")
+    before = _protected_manifests(out_root)
+    print("hashed before: " + ", ".join(f"{k} {len(v)} files" for k, v in before.items()))
+
+    jobs = [(str(p), str(out_root / p.parent.name)) for p in images]
+    workers = max(1, min(args.workers, len(jobs)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        detected = list(ex.map(_ai_lacuna_run_detect, jobs))
+    for row in detected:
+        c = row["ai_lacuna_judge"]
+        print(f"  {row['group']}/{row['image_label']}: lacunae {c['lacunae_before']} -> "
+              f"{c['lacunae_after']} (+{c['added']} -{c['removed']}), {c['yes']} yes, "
+              f"{c['no']} no, {c['unsure']} unsure, {c['unjudged']} unjudged")
+
+    # Quantification exactly as src/quantification.py runs it: from the files
+    # detection has just written, then one cross-image table per group.
+    config.AI_LACUNA_JUDGE_ENABLED = True
+    by_group: dict = {}
+    for image_path in images:
+        group, label = image_path.parent.name, lacunae.image_label(image_path)
+        detection = quantification.load_detection(out_root / group, label)
+        result = quantification.quantify(detection, image_path, None)
+        quantification.write_outputs(result, out_root / group)
+        by_group.setdefault(group, []).append(result)
+    for group, results in by_group.items():
+        quantification.write_summary_table(results, out_root / group)
+    config.AI_LACUNA_JUDGE_ENABLED = False
+
+    after = _protected_manifests(out_root)
+    changed = {name: sorted(k for k in set(before[name]) | set(after.get(name, {}))
+                            if before[name].get(k) != after.get(name, {}).get(k))
+               for name in before}
+    same = not any(changed.values())
+    report = {
+        "status": ("EXPERIMENT. The pipeline with config.AI_LACUNA_JUDGE_ENABLED on for this run "
+                   "only, from the decision files in results_ai_lacunae/<group>/ai_log/. Not "
+                   "validated. Which regions are lacunae was decided by an AI judge; every "
+                   "boundary is the lacuna stage's own."),
+        "written_at": ai_judge.utc_now(),
+        "images": [f"{p.parent.name}/{lacunae.image_label(p)}" for p in images],
+        "per_image": detected,
+        "left_unchanged": {name: {"files_hashed": len(before[name]),
+                                  "byte_identical_afterwards": not changed[name],
+                                  "changed": changed[name]} for name in before},
+    }
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "ai_lacuna_run.json").write_text(json.dumps(report, indent=2) + "\n",
+                                                 encoding="utf-8")
+    for name in before:
+        print(f"{name}: {len(before[name])} files hashed, "
+              + ("BYTE IDENTICAL afterwards" if not changed[name]
+                 else f"CHANGED: {changed[name][:10]}"))
+    print(f"report -> {out_root / 'ai_lacuna_run.json'}")
+    return 0 if same else 1
+
+
 def _ai_same_decisions(a: dict, b: dict) -> bool:
     """Do two decision files hold the same verdicts for the same candidates?"""
     if a.get("geometry_sha256") != b.get("geometry_sha256"):
@@ -8107,6 +8232,18 @@ def main() -> None:
                    help="Where a replay writes its decision file (default: beside the log, "
                         "which overwrites it with the same content).")
     p.set_defaults(func=cmd_ai_judge)
+
+    p = sub.add_parser("ai-lacuna-run",
+                       help="EXPERIMENT: detection, canaliculi and quantification with the AI "
+                            "lacuna judge switch on for this run only, into "
+                            "results_ai_lacunae/<group>/.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path, default=config.AI_LACUNA_RESULTS_ROOT,
+                   help="Output root; each image goes to <root>/<group>/ (default: "
+                        "results_ai_lacunae).")
+    p.add_argument("-w", dest="workers", type=int, default=8,
+                   help="Parallel processes, one image each (default 8).")
+    p.set_defaults(func=cmd_ai_lacuna_run)
 
     p = sub.add_parser("group-overview",
                        help="One table over every group, one row per image: results/group_overview.csv "

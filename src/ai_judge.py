@@ -2243,3 +2243,138 @@ def parse_lacuna_answer(text: str, numbers: list) -> tuple:
     if missing:
         return None, f"no answer for region(s) {missing}"
     return [seen[n] for n in numbers], ""
+
+
+# The lacuna judge's log. It lives in results_ai_lacunae/<group>/ai_log/<label>/.
+# LACUNA_LOG_ROOT replaces results_ai_lacunae/ for one process, as LOG_ROOT does
+# for the thread judge: the self-test sets it so that a rehearsal with a stub
+# judge can never leave verdicts where the pipeline could pick them up.
+LACUNA_LOG_ROOT = None
+
+
+def lacuna_log_dir(group: str, label: str) -> Path:
+    root = Path(LACUNA_LOG_ROOT) if LACUNA_LOG_ROOT else config.AI_LACUNA_RESULTS_ROOT
+    return root / group / config.AI_LOG_DIR / label
+
+
+def lacuna_attempt_path(group: str, label: str, attempt: int) -> Path:
+    return lacuna_log_dir(group, label) / f"{label}_attempt{attempt}.json"
+
+
+def lacuna_picture_path(group: str, label: str) -> Path:
+    return lacuna_log_dir(group, label) / f"{label}_picture.png"
+
+
+def lacuna_decisions_path(group: str, label: str) -> Path:
+    return lacuna_log_dir(group, label) / f"{label}_ai_lacunae.json"
+
+
+def _relative(path: Path) -> str:
+    """A path for a record: relative to the repository where it lies inside it."""
+    try:
+        return Path(path).resolve().relative_to(config.PROJECT_ROOT).as_posix()
+    except ValueError:
+        return Path(path).as_posix()
+
+
+# The assembly (step 3): what the lacuna stage does with the verdicts
+
+def apply_lacuna_verdicts(image_path: Path, channel: np.ndarray, labels: np.ndarray, kept: list,
+                          t_hi: float, classes: dict) -> tuple:
+    """The switch. Returns (labels, kept, classes, record) for the lacuna stage
+    to carry on with.
+
+    The candidates are rebuilt from the stage's own result and must hash to
+    what the decision file was written for. Then, per numbered region:
+      yes       a lacuna, even if a shape filter rejected it; a region the
+                judge adds is appended after every other lacuna, in the class
+                "judged", with no area or shape measure
+      no        not a lacuna, even if the filters kept it
+      unsure    the deterministic decision stands
+    and a region that was never numbered, or whose image has no valid answer,
+    keeps the deterministic decision too. No boundary is drawn or changed: a
+    region added keeps the pixels the stage outlined (a dim candidate is
+    written into the label image under a new label, over nothing but
+    background and specks under the candidate floor), and a region dropped
+    simply leaves the list."""
+    group, label = image_group(image_path), lacunae.image_label(Path(image_path))
+    path = lacuna_decisions_path(group, label)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"config.AI_LACUNA_JUDGE_ENABLED is on but there is no lacuna judge decision file "
+            f"for {label} at {path}. Run the judge for this image, or turn the switch off. A run "
+            f"with the switch on must not mix judged and unjudged images in one summary.")
+    decisions = json.loads(path.read_text(encoding="utf-8"))
+    state = {"channel": channel, "labels": labels, "kept": kept, "t_hi": float(t_hi),
+             "classes": classes}
+    candidates = lacuna_candidates(state)
+    if decisions["geometry_sha256"] != candidates["geometry_sha256"]:
+        raise ValueError(
+            f"the lacuna judge decision file for {label} was written for different candidates "
+            f"(geometry {decisions['geometry_sha256'][:12]}, now "
+            f"{candidates['geometry_sha256'][:12]}). Rerun the judge for this image.")
+
+    verdict_of = {int(item["n"]): item["verdict"] for item in decisions["regions"]}
+    counts = {"numbered": len(candidates["candidates"]),
+              "not_numbered_over_the_cap": len(candidates["not_numbered"]),
+              "yes": 0, "no": 0, "unsure": 0, "unjudged": 0,
+              "added": 0, "removed": 0, "added_regions": 0, "added_dim_candidates": 0,
+              "yes_kept_by_the_filters": 0, "no_rejected_by_the_filters": 0,
+              "lacunae_before": len(kept), "lacunae_after": 0}
+    added, removed_labels, added_n, removed_n = [], set(), [], []
+    for entry in candidates["candidates"]:
+        verdict = verdict_of.get(int(entry["n"]), "unjudged")
+        counts[verdict] += 1
+        is_lacuna = entry["deterministic"] == "lacuna"
+        if verdict == "yes" and not is_lacuna:
+            added.append(entry)
+            added_n.append(int(entry["n"]))
+        elif verdict == "no" and is_lacuna:
+            removed_labels.add(int(entry["source_label"]))
+            removed_n.append(int(entry["n"]))
+        elif verdict == "yes":
+            counts["yes_kept_by_the_filters"] += 1
+        elif verdict == "no":
+            counts["no_rejected_by_the_filters"] += 1
+
+    class_of = {int(i): name for name, ids in classes.items() for i in ids}
+    new_kept = []
+    new_classes = {name: [] for name in classes}
+    new_classes["judged"] = []
+    for old_id, (region, on_border) in enumerate(kept, start=1):
+        if int(region.label) in removed_labels:
+            continue
+        new_kept.append((region, on_border))
+        if old_id in class_of:
+            new_classes[class_of[old_id]].append(len(new_kept))
+    new_labels = labels.copy()
+    next_label = int(labels.max()) + 1
+    for entry in added:
+        if entry["kind"] == "dim":
+            source = next_label
+            next_label += 1
+            new_labels[entry["rows"], entry["cols"]] = source
+            counts["added_dim_candidates"] += 1
+        else:
+            source = int(entry["source_label"])
+            counts["added_regions"] += 1
+        region = measure.regionprops(np.where(new_labels == source, source, 0))[0]
+        new_kept.append((region, bool(entry["on_border"])))
+        new_classes["judged"].append(len(new_kept))
+    counts["added"] = len(added)
+    counts["removed"] = len(removed_labels)
+    counts["lacunae_after"] = len(new_kept)
+    record = {
+        "status": ("EXPERIMENT, not validated. Which regions are lacunae was decided by an AI "
+                   "judge; every boundary is the lacuna stage's own."),
+        "decision_file": _relative(path),
+        "model": decisions["model"],
+        "decisions_written_at": decisions["written_at"],
+        "prompt_sha256": decisions["prompt_sha256"],
+        "examples_sha256": decisions["examples_sha256"],
+        "geometry_sha256": candidates["geometry_sha256"],
+        "counts": counts,
+        "added_numbers": added_n,
+        "removed_numbers": removed_n,
+    }
+    return new_labels, new_kept, new_classes, record

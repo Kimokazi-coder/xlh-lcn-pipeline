@@ -702,8 +702,20 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
     filters kept, which belongs to detection. Every measured number comes from
     src/quantification.py. t_hi: see segment_image."""
     display, channel, labels, kept, t_hi, classes = segment_image(image_path, t_hi)
+    # The AI lacuna judge (config.AI_LACUNA_JUDGE_ENABLED, docs/EXPERIMENT_AI.md),
+    # off by default. With it on, the judge's verdicts decide which of the
+    # regions this stage outlined are lacunae: yes keeps a region the filters
+    # rejected, no drops one they kept, unsure and unjudged keep the decision
+    # above. No boundary is drawn or changed. With the switch off this costs
+    # nothing, not even an import.
+    judged = None
+    if config.AI_LACUNA_JUDGE_ENABLED:
+        import ai_judge  # noqa: PLC0415 (deliberate: see above)
+        labels, kept, classes, judged = ai_judge.apply_lacuna_verdicts(
+            image_path, channel, labels, kept, t_hi, classes)
     border = sum(1 for _r, on_border in kept if on_border)
-    return {
+    no_shape = set(classes["dim"]) | set(classes["out_of_focus"]) | set(classes.get("judged", ()))
+    result = {
         "image_path": image_path,
         "display": display,
         "labels": labels,
@@ -712,15 +724,19 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
         # Lacunae with no shape measure: counted and owning threads, but excluded
         # from every area and shape measure, because what would be measured is
         # the blur or the frame and not the cell. Two classes, two rules:
-        # "dim" (config section g) and "out_of_focus" (config section f).
+        # "dim" (config section g) and "out_of_focus" (config section f); with
+        # the AI lacuna judge on, a third, "judged", for a region it added.
         "lacuna_classes": {k: list(v) for k, v in classes.items()},
-        "no_shape_ids": sorted(set(classes["dim"]) | set(classes["out_of_focus"])),
+        "no_shape_ids": sorted(no_shape),
         "dim_count": len(classes["dim"]),
         "out_of_focus_count": len(classes["out_of_focus"]),
         "lacuna_count": len(kept),
         "border_lacuna_count": border,
         "interior_lacuna_count": len(kept) - border,
     }
+    if judged is not None:
+        result["ai_lacuna_judge"] = judged
+    return result
 
 
 # Provenance
@@ -867,6 +883,10 @@ def save_detection_json(result: dict, out_path: Path) -> None:
         "no_shape_ids": list(result.get("no_shape_ids") or ()),
         "provenance": provenance(),
     }
+    if result.get("ai_lacuna_judge") is not None:
+        # The AI lacuna judge is switched on. Recorded here so that no result
+        # file can be mistaken for one the pipeline made alone.
+        payload["ai_lacuna_judge"] = result["ai_lacuna_judge"]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2)

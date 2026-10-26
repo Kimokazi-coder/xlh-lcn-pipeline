@@ -1747,6 +1747,12 @@ def parameters(result: dict) -> dict:
         # result file can be mistaken for one the pipeline made alone.
         extra = {"ai_judge": dict(result["ai_judge"],
                                   experiment="branch exp-ai-layer, docs/EXPERIMENT_AI.md")}
+    if result["lacunae"].get("ai_lacuna_judge") is not None:
+        # The AI lacuna judge decided which regions are lacunae (lacunae.py),
+        # recorded for the same reason.
+        extra["ai_lacuna_judge"] = {k: result["lacunae"]["ai_lacuna_judge"][k]
+                                    for k in ("counts", "geometry_sha256", "model",
+                                              "decisions_written_at", "decision_file")}
     return {
         "pixel_size_um": config.PIXEL_SIZE_UM,
         "smooth_sigma_px": SMOOTH_SIGMA_PX,
