@@ -41,7 +41,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from scipy import ndimage as ndi
-from skimage import morphology, segmentation
+from skimage import measure, morphology, segmentation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import config  # noqa: E402
@@ -1896,3 +1896,197 @@ def estimate_case(system: str, user_text: str, png: bytes, segments: int) -> dic
         "output_tokens": out_tokens,
         "cost_usd": round(cost_usd(text_tokens + image_tokens, out_tokens), 6),
     }
+
+
+# The lacuna judge
+#
+# A second judge with the guardrails of the one above. It is shown ONE picture
+# per image with every candidate region outlined and numbered, and it answers
+# per number whether that region is an osteocyte lacuna: yes, no or unsure. It
+# never draws a boundary. Every region it can keep or drop is one the lacuna
+# stage outlined itself, at the lacuna cut or at config.AI_LACUNA_DIM_CUT_FRACTION
+# of it, so a lacuna it keeps has the pipeline's own outline and nothing else.
+#
+# Where the parts live:
+#
+#   src/judge_prompt_lacunae.md       the one fixed prompt, for every group
+#   docs/judge_examples_lacunae.md    worked examples, loaded into the prompt
+#   results_ai_lacunae/<group>/ai_log/<label>/  every request and answer, the
+#                                     picture that was sent, the decision file
+#   config.py                         the switch and the candidate rule
+
+LACUNA_LOG_SCHEMA = "lcn-ai-lacuna-judge-log-1"
+LACUNA_DECISIONS_SCHEMA = "lcn-ai-lacuna-judge-decisions-1"
+
+
+def image_group(image_path: Path) -> str:
+    """The group of an image: the name of the data folder it sits in, which is
+    how data/<group>/ is laid out (config.GROUPS)."""
+    return Path(image_path).resolve().parent.name
+
+
+def lacuna_state(image_path: Path) -> dict:
+    """The lacuna stage of one image exactly as the pipeline runs it, before any
+    verdict: lacunae.segment_image never applies this judge, whatever the
+    switch says, so the judge is never asked about a set it has already
+    changed."""
+    _display, channel, labels, kept, t_hi, classes = lacunae.segment_image(image_path)
+    return {
+        "image_path": Path(image_path),
+        "label": lacunae.image_label(Path(image_path)),
+        "group": image_group(image_path),
+        "channel": channel,
+        "labels": labels,
+        "kept": kept,
+        "t_hi": float(t_hi),
+        "classes": {k: list(v) for k, v in classes.items()},
+    }
+
+
+def raw_uint8(channel: np.ndarray) -> np.ndarray:
+    """The signal channel as the 8 bit values it was read from. The pipeline
+    reads an 8 bit image to [0, 1] by dividing by 255, so this gives the raw
+    values back exactly: nothing is stretched."""
+    return (np.clip(channel, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+
+
+def image_code(channel: np.ndarray) -> str:
+    """A neutral code for an image: the first 8 hex digits of the sha256 of its
+    raw pixels. It names no file, no group and no mouse, and it is the same
+    whichever images a run holds and in whatever order."""
+    return "img_" + sha256_bytes(raw_uint8(channel).tobytes())[:8]
+
+
+def _lacuna_entry(kind: str, coords: np.ndarray, shape: tuple) -> dict:
+    rows, cols = coords[:, 0].astype(np.int64), coords[:, 1].astype(np.int64)
+    r_lo, r_hi, c_lo, c_hi = int(rows.min()), int(rows.max()), int(cols.min()), int(cols.max())
+    return {
+        "kind": kind,
+        "rows": rows,
+        "cols": cols,
+        "area_px2": int(rows.size),
+        "centroid_xy": [round(float(cols.mean()), 1), round(float(rows.mean()), 1)],
+        "bbox_rc": [r_lo, c_lo, r_hi + 1, c_hi + 1],
+        "on_border": bool(r_lo == 0 or c_lo == 0 or r_hi == shape[0] - 1 or c_hi == shape[1] - 1),
+    }
+
+
+def lacuna_candidates(state: dict) -> dict:
+    """Every candidate region of one image, numbered 1..N, with what the lacuna
+    stage decided for each. Deterministic: no network and no judge.
+
+    Two kinds, both outlined by the lacuna stage's own code:
+      region  a region of the label image the stage builds before its filters,
+              at least config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2, kept or rejected
+      dim     a connected region of the same mask made at
+              config.AI_LACUNA_DIM_CUT_FRACTION of this image's lacuna cut, as
+              large, that overlaps no region of the first kind: a body whose
+              core never reached the cut, or reached it only in a piece too
+              small to be a candidate
+    Nothing is merged and nothing is split. Every kept lacuna is a region of the
+    first kind, because the smallest kept class is larger than the floor.
+
+    With more than config.AI_LACUNA_MAX_CANDIDATES the largest are numbered, in
+    reading order, and the rest are listed with no number: they keep the
+    deterministic decision."""
+    labels, channel = state["labels"], state["channel"]
+    shape = labels.shape
+    min_area = int(config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2)
+    kept_at = {region.label: lacuna_id
+               for lacuna_id, (region, _border) in enumerate(state["kept"], start=1)}
+    class_of = {int(i): name for name, ids in state["classes"].items() for i in ids}
+
+    found = []
+    for region in measure.regionprops(labels):
+        if region.area < min_area:
+            continue
+        entry = _lacuna_entry("region", region.coords, shape)
+        entry["source_label"] = int(region.label)
+        lacuna_id = kept_at.get(region.label)
+        if lacuna_id is not None:
+            entry.update(deterministic="lacuna", lacuna_id=int(lacuna_id),
+                         lacuna_class=class_of.get(int(lacuna_id), "ordinary"), rejected_by=None)
+        else:
+            entry.update(deterministic="not a lacuna", lacuna_id=None, lacuna_class=None,
+                         rejected_by=lacunae.region_verdict(region, shape[0], shape[1]))
+        found.append(entry)
+
+    taken = np.zeros(shape, dtype=bool)
+    for entry in found:
+        taken[entry["rows"], entry["cols"]] = True
+    dim_cut = float(config.AI_LACUNA_DIM_CUT_FRACTION) * state["t_hi"]
+    dim_mask, _cut = lacunae.multiotsu_lacuna_mask(channel, dim_cut)
+    for region in measure.regionprops(measure.label(dim_mask, connectivity=2)):
+        if region.area < min_area:
+            continue
+        coords = region.coords
+        if taken[coords[:, 0], coords[:, 1]].any():
+            continue
+        entry = _lacuna_entry("dim", coords, shape)
+        entry.update(source_label=None, deterministic="not a lacuna", lacuna_id=None,
+                     lacuna_class=None, rejected_by="under the lacuna cut")
+        found.append(entry)
+
+    # The cap: the largest are numbered, ties broken by position so the choice
+    # never depends on the order regionprops happens to return.
+    by_size = sorted(found, key=lambda e: (-e["area_px2"], e["centroid_xy"][1], e["centroid_xy"][0]))
+    cap = int(config.AI_LACUNA_MAX_CANDIDATES)
+    numbered, left = by_size[:cap], by_size[cap:]
+    # Reading order, so the numbers run down the picture.
+    numbered.sort(key=lambda e: (e["centroid_xy"][1], e["centroid_xy"][0]))
+    for n, entry in enumerate(numbered, start=1):
+        entry["n"] = n
+    for entry in left:
+        entry["n"] = None
+
+    n_kept = len(state["kept"])
+    counts = {
+        "candidates_found": len(found),
+        "numbered": len(numbered),
+        "not_numbered_over_the_cap": len(left),
+        "kept_lacunae_not_numbered_over_the_cap":
+            sum(1 for e in left if e["deterministic"] == "lacuna"),
+        "regions": sum(1 for e in numbered if e["kind"] == "region"),
+        "dim": sum(1 for e in numbered if e["kind"] == "dim"),
+        "numbered_kept_by_the_filters": sum(1 for e in numbered if e["deterministic"] == "lacuna"),
+        "numbered_rejected_by_the_filters":
+            sum(1 for e in numbered if e["kind"] == "region" and e["deterministic"] != "lacuna"),
+        "deterministic_lacunae": n_kept,
+        # A guard, 0 by construction: a kept lacuna that is no candidate at all
+        # could never be judged, whatever the cap.
+        "kept_lacunae_that_are_no_candidate":
+            n_kept - sum(1 for e in found if e["deterministic"] == "lacuna"),
+    }
+    return {
+        "image_code": image_code(channel),
+        "shape": tuple(int(s) for s in shape),
+        "candidates": numbered,
+        "not_numbered": left,
+        "counts": counts,
+        "rule": {
+            "lacuna_cut_t_hi": round(state["t_hi"], 8),
+            "dim_cut_fraction": float(config.AI_LACUNA_DIM_CUT_FRACTION),
+            "dim_cut": round(dim_cut, 8),
+            "min_candidate_area_px2": min_area,
+            "max_candidates": cap,
+        },
+        "geometry_sha256": lacuna_geometry_hash(numbered, shape),
+    }
+
+
+def lacuna_geometry_hash(numbered: list, shape: tuple) -> str:
+    """A hash of what the judge is asked about: every number, its kind, what the
+    pipeline decided for it and its pixels. The decision file carries it, and the
+    switch refuses a decision file whose candidates are not the ones it has just
+    computed, so a verdict can never land on a region it was not given for."""
+    parts = [[e["n"], e["kind"], e["deterministic"], e["lacuna_id"],
+              np.sort(e["rows"] * int(shape[1]) + e["cols"]).tolist()] for e in numbered]
+    return sha256_text(canonical_json([list(shape), parts]))
+
+
+def lacuna_candidate_record(entry: dict) -> dict:
+    """One candidate as it is written to the log and the decision file: no pixel
+    list, which the geometry hash pins down instead."""
+    return {k: entry[k] for k in ("n", "kind", "area_px2", "centroid_xy", "bbox_rc", "on_border",
+                                  "deterministic", "lacuna_id", "lacuna_class", "rejected_by",
+                                  "source_label")}

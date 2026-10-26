@@ -757,3 +757,59 @@ AI_TOKENS_PER_CHAR = 0.25
 AI_IMAGE_PIXELS_PER_TOKEN = 750.0
 AI_OUTPUT_TOKENS_PER_SEGMENT = 35
 AI_OUTPUT_TOKENS_FIXED = 20
+
+# The AI lacuna judge (docs/EXPERIMENT_AI.md)
+# A second judge, separate from the thread judge above. The lacuna stage was
+# shaped on the 8 WT images, and on the other groups it outlines saturated
+# bands, soft tissue patches and small fragments as lacunae and misses dim or
+# out-of-focus bodies. This judge is shown every candidate region of an image,
+# numbered, and says which of them are osteocyte lacunae. It never draws or
+# changes a boundary: every region it can keep or drop is one the lacuna stage
+# outlined. One fixed prompt, src/judge_prompt_lacunae.md, for every group, so
+# the rule is the same everywhere. The model, the prices, the thinking and
+# temperature settings, the answer length and the quality gate are the thread
+# judge's own, above.
+#
+# Nothing below changes any pipeline number while AI_LACUNA_JUDGE_ENABLED is
+# False, which is how it ships.
+
+# The switch. When True, src/lacunae.py reads the judge's decision file for the
+# image it is analysing (results_ai_lacunae/<group>/ai_log/<label>/
+# <label>_ai_lacunae.json): a region judged yes is a lacuna even if a shape
+# filter rejected it, a region judged no is not one even if the filters kept it,
+# and a region judged unsure, or not judged, keeps the deterministic decision.
+# A region the judge adds is the class "judged": counted and owning threads,
+# with no area or shape measure, like the class "dim". Every later stage runs
+# unchanged. An image with no decision file is an error and not a silent pass.
+AI_LACUNA_JUDGE_ENABLED = False
+
+# Where this judge writes: results_ai_lacunae/<group>/, with the same layout as
+# results/<group>/, its log in <group>/ai_log/, the pictures a run would send
+# in dry_run/ and the contact sheets in review/.
+AI_LACUNA_RESULTS_ROOT = PROJECT_ROOT / "results_ai_lacunae"
+AI_LACUNA_DRY_RUN_DIR = "dry_run"
+AI_LACUNA_REVIEW_DIR = "review"
+
+# The candidates (deterministic, permissive). Every region of the lacuna stage's
+# label image before its filters decide, kept and rejected alike, plus the dim
+# candidates: the connected regions of the same mask (hole fill and despeckle
+# included) at AI_LACUNA_DIM_CUT_FRACTION of the image's own lacuna cut that
+# overlap no region of the first kind. Nothing is merged or split.
+# 0.8 is the user's value (brief of 2026-10-26), the low end of the 0.8 to 1.2
+# cut scaling of the sensitivity diagnostics. Chosen on no image.
+AI_LACUNA_DIM_CUT_FRACTION = 0.8
+# 100 px2 is the user's value; it is also the floor the lacuna-candidates feature
+# table and the dark band merge already call a candidate, below the smallest
+# kept class (out_of_focus, 148 px2).
+AI_LACUNA_MIN_CANDIDATE_AREA_PX2 = 100
+# At most this many numbered regions per image; with more, the largest are
+# numbered and the rest keep the deterministic decision and are counted. The
+# user's value, a property of the picture (sixty numbers stay legible) and not of
+# the biology.
+AI_LACUNA_MAX_CANDIDATES = 60
+
+# The cost ceiling of one run of this judge over every image, in dollars (the
+# user's value, 2026-10-26). A run estimates its cost before the first call and
+# refuses above this, and stops if what the answers actually cost passes it.
+# The thread judge keeps its own MAX_COST_USD above.
+AI_LACUNA_MAX_COST_USD = 3.0
