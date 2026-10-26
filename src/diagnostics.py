@@ -7825,11 +7825,23 @@ def _ai_lacuna_prepare(path_str: str) -> dict:
 
 def ai_lacuna_prepare_all(images: list, workers: int) -> list:
     """Candidates, picture, request text and estimate for every image, in
-    parallel processes, in the order given. Deterministic and offline."""
-    from concurrent.futures import ProcessPoolExecutor
+    parallel processes, returned in the order given. Deterministic and offline.
+    A line is printed as each image finishes, because the lacuna stage takes up
+    to an hour on the largest Hyp images and a run with no output looks stuck."""
+    import time
+    from concurrent.futures import ProcessPoolExecutor, as_completed
 
+    start = time.time()
     with ProcessPoolExecutor(max_workers=max(1, min(workers, len(images)))) as ex:
-        return list(ex.map(_ai_lacuna_prepare, [str(p) for p in images]))
+        futures = {ex.submit(_ai_lacuna_prepare, str(p)): i for i, p in enumerate(images)}
+        done = [None] * len(images)
+        for count, future in enumerate(as_completed(futures), start=1):
+            prepared = future.result()
+            done[futures[future]] = prepared
+            print(f"  candidates {count} of {len(images)}: {prepared['group']}/{prepared['label']}, "
+                  f"{prepared['counts']['numbered']} numbered, {time.time() - start:.0f} s",
+                  flush=True)
+    return done
 
 
 def ai_lacuna_estimate(prepared: list) -> dict:
