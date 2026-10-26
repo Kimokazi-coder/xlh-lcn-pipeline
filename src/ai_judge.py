@@ -2599,6 +2599,39 @@ def judge_lacuna_image(prepared: dict, mode: str, out_path: Path | None = None,
     return decisions
 
 
+def stub_lacuna_answerer(break_first: bool = True):
+    """A stand-in lacuna judge for the self-test: no network, no key, no cost.
+
+    It reads how many numbers the picture holds from the request text and
+    answers by a fixed rule that means nothing biologically and is meant to:
+    a multiple of 5 is unsure, any other odd number yes, any other even number
+    no. Over a few dozen candidates that says yes to some region the filters
+    rejected and no to some region they kept, which is what the switch has to
+    be shown to act on. With `break_first` its first answer to a request is
+    prose, so the retry is exercised too.
+
+    Returns a fresh callable with its own counter, so a self-test is the same
+    every time."""
+    tries: dict = {}
+
+    def answer(payload: dict) -> dict:
+        text = payload["messages"][0]["content"][1]["text"]
+        count = int(re.search(r"numbered 1 to (\d+)", text).group(1))
+        tries[text] = tries.get(text, 0) + 1
+        if break_first and tries[text] == 1:
+            body = "I looked at the picture and here is what I think, in prose."
+        else:
+            body = json.dumps({"regions": [
+                {"n": n, "verdict": "unsure" if n % 5 == 0 else ("yes" if n % 2 else "no"),
+                 "why": "self-test, no judgement was made"} for n in range(1, count + 1)]})
+        return {"text": body, "id": f"self-test-{tries[text]}",
+                "model": f"{config.AI_JUDGE_MODEL} (NOT CALLED: self-test stub)",
+                "stop_reason": "end_turn", "thinking_fallback": False,
+                "usage": {"input_tokens": 0, "output_tokens": 0}}
+
+    return answer
+
+
 def write_log_to(path: Path, record: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(record, indent=2, sort_keys=False) + "\n", encoding="utf-8")

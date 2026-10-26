@@ -8088,9 +8088,287 @@ def ai_lacuna_replay(images: list, out_root: Path, workers: int) -> int:
     return 0 if ok else 4
 
 
+def _pixel_key(rows: np.ndarray, cols: np.ndarray, width: int) -> str:
+    import hashlib
+
+    flat = np.sort(rows.astype(np.int64) * int(width) + cols.astype(np.int64))
+    return hashlib.sha256(flat.tobytes()).hexdigest()
+
+
+def _lacuna_set(labels: np.ndarray, kept: list, candidates: list) -> tuple:
+    """(the lacuna id map of a lacuna result, and per candidate in the order
+    given whether it is a lacuna there)."""
+    _mask, id_map = canaliculi.build_lacuna_maps(labels, kept)
+    return id_map, [bool((id_map[e["rows"], e["cols"]] > 0).all()) for e in candidates]
+
+
+def _ai_lacuna_self_test(images: list) -> int:
+    """The whole chain of the lacuna judge with no network and no key: a picture
+    becomes a request, a stub answer becomes verdicts, the log replays to the
+    same verdicts, and the switch then decides the lacunae and runs every later
+    stage on them. The stub's rule means nothing biologically
+    (ai_judge.stub_lacuna_answerer), so this checks the machinery and never the
+    judgement. Everything it writes goes to .cache/ai_lacuna_self_test, which
+    is git-ignored, and never to results_ai_lacunae/."""
+    import os
+    import re
+
+    import ai_judge
+
+    image_path = Path(images[0])
+    label, group = lacunae.image_label(image_path), image_path.parent.name
+    if AI_LACUNA_SELF_TEST_DIR.exists():
+        shutil.rmtree(AI_LACUNA_SELF_TEST_DIR)
+    saved_root, saved_switch = ai_judge.LACUNA_LOG_ROOT, config.AI_LACUNA_JUDGE_ENABLED
+    saved_ceiling = config.AI_LACUNA_MAX_COST_USD
+    checks = []
+
+    def use_log(name: str) -> None:
+        ai_judge.LACUNA_LOG_ROOT = AI_LACUNA_SELF_TEST_DIR / name
+
+    def switched() -> dict:
+        config.AI_LACUNA_JUDGE_ENABLED = True
+        try:
+            return lacunae.analyse_image(image_path)
+        finally:
+            config.AI_LACUNA_JUDGE_ENABLED = saved_switch
+
+    try:
+        print(f"AI lacuna judge self-test on {group}/{label} (stub judge, nothing is sent)")
+        use_log("log")
+        prepared = ai_judge.prepare_lacuna_image(image_path)
+        state = ai_judge.lacuna_state(image_path)
+        cand = ai_judge.lacuna_candidates(state)
+        everything = cand["candidates"] + cand["not_numbered"]
+        c0 = prepared["counts"]
+        print(f"  {c0['numbered']} numbered candidates: {c0['numbered_kept_by_the_filters']} kept by "
+              f"the filters, {c0['numbered_rejected_by_the_filters']} regions they rejected, "
+              f"{c0['dim']} dim candidates; geometry {prepared['geometry_sha256'][:12]}")
+
+        prompt = ai_judge.load_lacuna_prompt()
+        sent = prompt["system"] + "\n" + prepared["user_text"]
+        names = [label, image_path.stem, lacunae.clean_name(image_path), *config.GROUPS]
+        leaked = [n for n in names
+                  if re.search(rf"(?<![A-Za-z0-9_]){re.escape(n)}(?![A-Za-z0-9_])", sent)]
+        checks.append(("the request names no file, no image and no group, only "
+                       f"{prepared['image_code']}", not leaked))
+
+        run = ai_judge.judge_lacuna_image(prepared, "self-test",
+                                          answerer=ai_judge.stub_lacuna_answerer())
+        v, t = run["verdicts"], run["totals"]
+        print(f"  judged: {v['yes']} yes, {v['no']} no, {v['unsure']} unsure, "
+              f"{v['unjudged']} unjudged; {t['invalid_attempts']} of {t['attempts']} attempts "
+              f"were bad json")
+        checks.append(("the stub answered and the answer validated", run["answer_valid"]))
+        checks.append(("a bad answer was retried once", t["attempts"] == 2
+                       and t["invalid_attempts"] == 1))
+        logged = [json.loads(ai_judge.lacuna_attempt_path(group, label, a).read_text(
+            encoding="utf-8")) for a in (1, 2)]
+        checks.append(("every request is logged with its hash",
+                       all(r.get("request_sha256") == run["request_sha256"] for r in logged)))
+        checks.append(("no key and no image bytes are in the log",
+                       all("ANTHROPIC_API_KEY" not in json.dumps(r)
+                           and "data" not in r["request"]["image"] for r in logged)))
+        checks.append(("the picture sent is in the log, byte for byte",
+                       ai_judge.lacuna_picture_path(group, label).read_bytes() == prepared["png"]))
+
+        replay = ai_judge.judge_lacuna_image(
+            prepared, "replay", out_path=AI_LACUNA_SELF_TEST_DIR / "replay" / f"{label}.json")
+        diffs = ai_judge.same_lacuna_decisions(run, replay)
+        rt = replay["totals"]
+        print(f"  replay from the log: {rt['attempts']} attempts, "
+              f"{rt['replay_request_mismatches']} requests and {rt['replay_picture_mismatches']} "
+              f"pictures differ, verdicts {'IDENTICAL' if not diffs else diffs[:3]}")
+        checks.append(("replay offline gives identical verdicts",
+                       not diffs and rt["attempts"] == 2 and not rt["replay_request_mismatches"]
+                       and not rt["replay_picture_mismatches"]))
+
+        # The switch.
+        before = lacunae.analyse_image(image_path)
+        after = switched()
+        rec = after["ai_lacuna_judge"]
+        c = rec["counts"]
+        verdict_of = {r["n"]: r for r in run["regions"]}
+        added_rejected = [n for n in rec["added_numbers"] if verdict_of[n]["kind"] == "region"]
+        print(f"  the switch: lacunae {c['lacunae_before']} -> {c['lacunae_after']}, "
+              f"{c['added_regions']} rejected region(s) added (numbers {added_rejected}), "
+              f"{c['added_dim_candidates']} dim candidate(s) added, {c['removed']} kept "
+              f"lacuna(e) removed (numbers {rec['removed_numbers']})")
+        checks.append(("a yes adds a region the filters rejected", bool(added_rejected)))
+        checks.append(("a no removes a region the filters kept", c["removed"] > 0))
+        id_before, was = _lacuna_set(before["labels"], before["kept"], everything)
+        id_after, now = _lacuna_set(after["labels"], after["kept"], everything)
+        wanted = []
+        for index, e in enumerate(everything):
+            verdict = verdict_of[e["n"]]["verdict"] if e["n"] in verdict_of else "unjudged"
+            wanted.append({"yes": True, "no": False}.get(verdict, was[index]))
+        checks.append(("every yes is a lacuna, every no is not, and unsure keeps the "
+                       "deterministic decision", now == wanted
+                       and any(verdict_of[n]["verdict"] == "unsure" for n in verdict_of)))
+        width = before["labels"].shape[1]
+        drawn = {_pixel_key(e["rows"], e["cols"], width) for e in everything}
+        own = all(_pixel_key(*np.nonzero(id_after == i), width) in drawn
+                  for i in range(1, len(after["kept"]) + 1))
+        checks.append(("every lacuna's boundary is one the lacuna stage drew", own))
+
+        # Every later stage, on files, exactly as ai-lacuna-run writes them.
+        run_dir = AI_LACUNA_SELF_TEST_DIR / "run" / group
+        config.AI_LACUNA_JUDGE_ENABLED = True
+        try:
+            lac = lacunae.analyse_image(image_path)
+            lacunae.write_outputs(lac, run_dir)
+            _display, channel = lacunae.load_channel(image_path)
+            net = canaliculi.analyse_network(image_path, lac, channel)
+            canaliculi.write_outputs(net, run_dir)
+            detection = quantification.load_detection(run_dir, label)
+            q = quantification.quantify(detection, image_path, None)
+            quantification.write_outputs(q, run_dir)
+        finally:
+            config.AI_LACUNA_JUDGE_ENABLED = saved_switch
+        judged_ids = set(lac["lacuna_classes"]["judged"])
+        judged_rows = [r for r in q["rows"] if r["lacuna_id"] in judged_ids]
+        # The fields the dim class leaves empty, read from the rule itself: the
+        # area and shape. The perimeter and the measures built on it are
+        # reported for the dim and out_of_focus classes in main as well, and a
+        # judged region is held to exactly what the dim class is.
+        probe = quantification.region_to_measurement(
+            1, measure.regionprops(np.ones((3, 3), dtype=np.int32))[0], False, 4, True, "dim")
+        shape_fields = [k for k, value in probe.items() if value is None]
+        print(f"  quantified with the switch on: {q['lacuna_count']} lacunae, of them "
+              f"{len(judged_rows)} judged, owning "
+              f"{sum(r['owned_length_px'] for r in judged_rows):.0f} px of tracing and "
+              f"{sum(r['roots_count'] for r in judged_rows)} roots")
+        checks.append(("a region the judge added is class judged, with no area or shape",
+                       bool(judged_rows) and all(r["lacuna_class"] == "judged"
+                                                 and all(r[f] is None for f in shape_fields)
+                                                 for r in judged_rows)))
+        checks.append(("a region the judge added is counted and owns threads",
+                       q["lacuna_count"] == c["lacunae_after"]
+                       and any(r["owned_length_px"] > 0 for r in judged_rows)))
+        checks.append(("the thread stages run to the end with the switch on, and every record "
+                       "says so", "ai_lacuna_judge" in q["parameters"]["canaliculi"]
+                       and "ai_lacuna_judge" in detection["lacunae_detection"]))
+
+        # An image whose answer never validates: every region unjudged, and the
+        # lacunae exactly the deterministic ones.
+        use_log("unreadable")
+        never = ai_judge.judge_lacuna_image(prepared, "self-test",
+                                            answerer=ai_judge.unreadable_answerer())
+        none_after = switched()
+        id_none, _ = _lacuna_set(none_after["labels"], none_after["kept"], everything)
+        checks.append(("with no valid answer the switch changes nothing",
+                       not never["answer_valid"] and never["verdicts"]["unjudged"] == c0["numbered"]
+                       and bool((id_none == id_before).all())
+                       and none_after["lacuna_classes"]["judged"] == []))
+
+        use_log("empty")
+        try:
+            switched()
+            refused = False
+        except FileNotFoundError:
+            refused = True
+        checks.append(("an image with no decision file is refused, not passed over", refused))
+        use_log("other")
+        other = dict(run, geometry_sha256="0" * 64)
+        path = ai_judge.lacuna_decisions_path(group, label)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(other), encoding="utf-8")
+        try:
+            switched()
+            refused = False
+        except ValueError:
+            refused = True
+        checks.append(("a decision file written for other candidates is refused", refused))
+
+        # The guards of a run, rehearsed with no network.
+        use_log("gate")
+        gate = ai_judge.lacuna_quality_gate()
+        stopped_at, reason = None, ""
+        for index in range(1, 26):
+            d = ai_judge.judge_lacuna_image(prepared, "self-test",
+                                            answerer=ai_judge.unreadable_answerer())
+            reason = gate(d["answer_valid"])
+            if reason:
+                stopped_at = index
+                break
+        print(f"  the quality gate: every answer unreadable, stopped after image {stopped_at}: "
+              f"{reason}")
+        checks.append(("a run whose answers cannot be read stops after the first 20 images",
+                       stopped_at == config.AI_MIN_CALLS_BEFORE_QUALITY_GATE))
+
+        class BadRequestError(Exception):
+            pass
+
+        def broke(payload):
+            raise BadRequestError("Your credit balance is too low to access the Anthropic API.")
+
+        use_log("fatal")
+        try:
+            ai_judge.judge_lacuna_image(prepared, "self-test", answerer=broke)
+            raised, what = False, "it carried on, which it must not"
+        except ai_judge.FatalApiError as error:
+            raised, what = True, str(error)
+        fatal_log = ai_judge.lacuna_attempt_path(group, label, 1)
+        print(f"  a billing error: {what}")
+        checks.append(("a billing, credit or authentication error stops at once, with no "
+                       "decision file", raised
+                       and not ai_judge.lacuna_decisions_path(group, label).exists()
+                       and json.loads(fatal_log.read_text(encoding="utf-8")).get("fatal")
+                       and not ai_judge.lacuna_attempt_path(group, label, 2).exists()))
+
+        use_log("cost")
+        spent = ai_judge.judge_lacuna_image(prepared, "self-test",
+                                            answerer=ai_judge.stub_lacuna_answerer(),
+                                            spent_usd=config.AI_LACUNA_MAX_COST_USD)
+        config.AI_LACUNA_MAX_COST_USD = prepared["estimate"]["cost_usd"] / 2.0
+        over = ai_lacuna_estimate([prepared])
+        config.AI_LACUNA_MAX_COST_USD = saved_ceiling
+        checks.append(("the cost gate refuses an estimate above the ceiling, and no call is "
+                       "made once a run has spent it", not over["within_max_cost_usd"]
+                       and spent["totals"]["stopped_on_cost"] and spent["totals"]["attempts"] == 0))
+
+        # A live run without the approval flag is refused before anything is
+        # computed. Only the flag is set aside for this; the key is not read.
+        flag = os.environ.get("ALLOW_EXTERNAL_API")
+        os.environ["ALLOW_EXTERNAL_API"] = "0"
+        try:
+            rc = ai_lacuna_live([image_path], AI_LACUNA_SELF_TEST_DIR / "live", 1)
+        finally:
+            if flag is None:
+                os.environ.pop("ALLOW_EXTERNAL_API", None)
+            else:
+                os.environ["ALLOW_EXTERNAL_API"] = flag
+        checks.append(("a live run without ALLOW_EXTERNAL_API=1 is refused", rc == 2))
+
+        # The thread judge is untouched: its prompt hashes are still the ones its
+        # real run logged.
+        thread = ai_judge.load_prompt()
+        logged_thread = config.AI_RESULTS_DIR / config.AI_LOG_DIR / "543-2" / "case_0001_attempt1.json"
+        if logged_thread.is_file():
+            entry = json.loads(logged_thread.read_text(encoding="utf-8"))
+            checks.append(("the thread judge's prompt is unchanged",
+                           entry["prompt_sha256"] == thread["prompt_sha256"]
+                           and entry["examples_sha256"] == thread["examples_sha256"]))
+    finally:
+        ai_judge.LACUNA_LOG_ROOT = saved_root
+        config.AI_LACUNA_JUDGE_ENABLED = saved_switch
+        config.AI_LACUNA_MAX_COST_USD = saved_ceiling
+
+    print()
+    print_table(["check", "result"], [[name, "PASS" if ok else "FAIL"] for name, ok in checks])
+    failed = [name for name, ok in checks if not ok]
+    print(f"\n{len(checks) - len(failed)} of {len(checks)} checks pass"
+          + (f"; FAILED: {failed}" if failed else ""))
+    print(f"everything written went to {AI_LACUNA_SELF_TEST_DIR}, nothing to results_ai_lacunae/")
+    return 1 if failed else 0
+
+
 def cmd_ai_lacuna_judge(args) -> int:
     images = lacuna_judge_images(args)
     out_root = Path(args.out)
+    if args.self_test:
+        return _ai_lacuna_self_test(images[:1] if (args.image or args.dir)
+                                    else [DEFAULT_IMAGE_DIR / "543-2.tif"])
     if args.live:
         return ai_lacuna_live(images, out_root, args.workers)
     if args.replay:
@@ -8526,13 +8804,17 @@ def main() -> None:
     p = sub.add_parser("ai-lacuna-judge",
                        help="EXPERIMENT: the AI lacuna judge on every group. Default: a dry run, "
                             "the pictures and the cost, nothing sent. --live calls the API, "
-                            "--replay reruns from the log offline.")
+                            "--replay reruns from the log offline, -s rehearses with a stub.")
     add_images_arguments(p)
     mode = p.add_mutually_exclusive_group()
     mode.add_argument("--live", action="store_true",
                       help="Real calls (needs ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY).")
     mode.add_argument("--replay", action="store_true",
                       help="No network: rerun from the log and check the verdicts match.")
+    mode.add_argument("-s", "--self-test", dest="self_test", action="store_true",
+                      help="Rehearse the whole chain on one image (default WT 543-2) with a stub "
+                           "judge, no network and no key, writing only to "
+                           ".cache/ai_lacuna_self_test.")
     p.add_argument("-o", dest="out", type=Path, default=config.AI_LACUNA_RESULTS_ROOT,
                    help="Output root (default: results_ai_lacunae; the dry run writes dry_run/ "
                         "inside it).")
