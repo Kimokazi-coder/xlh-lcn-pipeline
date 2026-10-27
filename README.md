@@ -33,6 +33,21 @@ all 8 images: 143 calls to the pinned `claude-sonnet-5-5`, **$1.60** (the dry
 run had estimated $1.19). Everything since replays from its log with no network.
 External API use approved on 2026-10-15, approver: Karim.
 
+**An experiment beside them: the AI lacuna judge** (`docs/EXPERIMENT_AI.md`, "The
+lacuna judge", and METHODS section 23). The lacuna stage was shaped on WT and, on
+the other groups, outlines saturated bands, soft tissue and fragments and misses
+dim bodies. The lacuna judge is shown every candidate region the lacuna stage
+outlined, numbered, once per image, and says yes, no or unsure per region; behind
+`config.AI_LACUNA_JUDGE_ENABLED` (**off by default**), a yes keeps a region and a
+no removes it. **It never draws or changes a boundary**, sees no file name or
+group, and uses one prompt for every image of all four groups. It was run once,
+on 2026-10-27, on all 35 images: 35 calls to the pinned `claude-sonnet-5-5`,
+**$0.83** (estimate $0.93, ceiling $3), every answer valid; the replay gives
+identical verdicts offline. It said no to 352 of the 793 lacunae the filters
+kept and added 7 regions. **Not validated: no verdict has been checked against
+a manual count**, and its output, `results_ai_lacunae/`, is not a result of the
+study. External API use approved on 2026-10-15, approver: Karim.
+
 ## What each folder is
 
 | folder | what it is | the one command that makes it |
@@ -41,7 +56,8 @@ External API use approved on 2026-10-15, approver: Karim.
 | `results_ai_judge/` | **set 2, the AI judge method**, WT only, in `results_ai_judge/WT/`: the same per-image layout, the judge log with the case pictures that were sent, and `compare/`; see [`results_ai_judge/README.md`](results_ai_judge/README.md) | `python src/diagnostics.py ai-run --dir data/WT` (offline, from the decision files in `results_ai_judge/WT/ai_log/`) |
 | `results_ai_judge/WT/compare/` | the two sets side by side: pictures, `REPORT.md`, and `compare_methods.csv` and `.xlsx` | `python src/diagnostics.py ai-compare --dir data/WT`, then `python src/diagnostics.py compare-methods --dir data/WT` |
 | `results_ai_judge/WT/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
-| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (the judge), `diagnostics.py` (every check, as subcommands) | |
+| `results_ai_lacunae/` | **the AI lacuna judge, an experiment, not validated**: the judge log with the pictures that were sent (`<group>/ai_log/`), the pipeline with its verdicts applied (`<group>/`, the same per-image layout), `dry_run/`, and `review/` with a contact sheet per group and a table per image; see [`results_ai_lacunae/README.md`](results_ai_lacunae/README.md) | `python src/diagnostics.py ai-lacuna-run -w 20` (offline, from the log); the log itself from `ai-lacuna-judge --live`, see `docs/EXPERIMENT_AI.md` |
+| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
 | `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group --group GROUP --src SOURCE_FOLDER` |
 | `results/group_overview.csv`, `.xlsx`, `results/group_qc.csv` | every group side by side, one row per image, and the QC list of the new groups (see Groups) | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc` |
@@ -277,6 +293,20 @@ python src/diagnostics.py ai-compare --dir data/WT        # judge off against ju
 python src/diagnostics.py compare-methods --dir data/WT   # both sets side by side, csv and xlsx
 ```
 
+The AI lacuna judge, offline from its log (all four groups unless `--dir` or
+`--image` names fewer):
+
+```
+python src/diagnostics.py ai-lacuna-judge -w 20            # dry run: the pictures and the cost, sends nothing
+python src/diagnostics.py ai-lacuna-judge -s               # self-test with a stub judge: 27 checks
+python src/diagnostics.py ai-lacuna-judge --replay -w 20   # the log replays to the same verdicts
+python src/diagnostics.py ai-lacuna-review -w 20           # contact sheets and the table, results_ai_lacunae/review/
+python src/diagnostics.py ai-lacuna-run -w 20              # the pipeline with its verdicts, results_ai_lacunae/<group>/
+```
+
+The lacuna stage these need is cached in `.cache/ai_lacuna_candidates/` once per
+image, so only the first of them waits for it.
+
 The switches in `config.py` (`NARROW_CRUMB_RULE`, `FILL_ENCLOSED_HOLES_MAX_PX2`,
 `BAND_FILTER_MIN_OPENING_SHARE`, `FAST_LACUNA_STAGE`) act on the lacuna stage and
 are all off, so the default output is unchanged.
@@ -359,6 +389,10 @@ not been chosen.
 5. **The choice between the deterministic method and the AI judge method.**
    Neither has been checked against a manual trace, and a comparison with
    manual counts is what should decide it.
+6. **The AI lacuna judge's verdicts.** It says no to 352 of the 793 lacunae the
+   filters kept over the four groups, including both objects of item 4, and
+   some of the regions it removes look like lacunae on its contact sheets. None
+   of its verdicts has been checked against a manual count.
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:

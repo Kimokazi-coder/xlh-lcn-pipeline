@@ -13,6 +13,10 @@ pipeline output is byte for byte what `main` produces: `reference-check` PASS at
 
 External API use approved on 2026-10-15, approver: Karim
 
+This file holds two experiments. The first, from here to "What is established, and what is not",
+is the **thread judge**: who owns a thread. The second, at the end under **"The lacuna judge"**, is
+a judge of which regions are osteocyte lacunae, run on all four groups on 2026-10-27.
+
 ## The question  
 
 Ownership goes by the shortest path through the skeleton. That is the right rule for a thread whose
@@ -555,3 +559,202 @@ right, and the cost of a wrong answer is not symmetric, because a thread given t
 moves that cell's whole measured network. **Nothing here is validated**, nothing here has produced a
 result, and none of it may be used for one until it has been checked against ground truth and that
 check is written down.
+
+# The lacuna judge
+
+**Status: EXPERIMENT, pre-validation. NOT VALIDATED: no verdict has been checked against a manual
+count, and nothing here is a result of the study.** It is behind `config.AI_LACUNA_JUDGE_ENABLED`,
+which is off by default, and it writes only to `results_ai_lacunae/`. With the switch off every
+number is `main`'s: `regression` PASS over 6,800 numbers at tolerance 0 in both of its runs and
+`reference-check` PASS at 161.00 / 21.63 / 8.50, on 2026-10-27. METHODS section 23 is the short
+version, with every decision taken where the brief left a choice open.
+
+External API use approved on 2026-10-15, approver: Karim
+
+## What it is for, and what it does and does not do
+
+The lacuna stage was shaped on the 8 WT images. On the other groups it outlines saturated bands,
+soft tissue and small fragments as lacunae and misses dim or out-of-focus bodies. The lacuna judge
+is shown, once per image, every candidate region the lacuna stage outlined, numbered, and answers
+per number whether the region inside the outline is an osteocyte lacuna: **yes, no or unsure**, with
+a one line why.
+
+What it does **not** do:
+
+- **It never draws or changes a boundary.** Every region it can keep or drop is one the lacuna
+  stage outlined itself, so a lacuna it keeps has the pipeline's own outline and nothing else.
+- It never sees a file name, a group or a mouse: the request carries a neutral image code, the first
+  8 hex digits of the sha256 of the image's pixels.
+- It changes no parameter and tunes nothing. The prompt (`src/judge_prompt_lacunae.md`) is the same
+  for every image of every group, so the rule is the same everywhere. `docs/judge_examples_lacunae.md`
+  holds the rules in words and no worked example.
+- It does not touch the thread stages. With the switch on, the lacunae it decided go into the
+  canalicular stage and the quantification exactly as the deterministic lacunae do.
+- It does not touch the thread judge (its prompt hashes are still those its real run logged), and it
+  writes nothing under `results/` or `results_ai_judge/`.
+
+## The candidates and the numbers
+
+The candidates are every region of the lacuna stage's label image of at least
+`config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2` = 100 px², kept and rejected by the filters, plus the
+**dim candidates**: the regions of the same mask at `config.AI_LACUNA_DIM_CUT_FRACTION` = 0.8 of the
+image's own lacuna cut that overlap none of them. Nothing is merged or split.
+
+At most `config.AI_LACUNA_MAX_NUMBERED` = 60 are numbered per image. With more, which get a number
+goes by an order of priority and the cap drops from its end, each tier largest first: **every region
+the filters kept**, then every region they rejected of at least
+`config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2` = 300 px², then the dim candidates, then the
+rejected regions under 300 px². The numbers themselves run in reading order down the picture, so a
+number does not say what the filters decided. A kept lacuna is left unnumbered only on an image with
+more than 60 kept lacunae; every report would print it, and there is none. A region with no number
+keeps the deterministic decision.
+
+The picture is two panels of the raw signal channel at its own pixels, unstretched: left nothing
+drawn, right every numbered candidate outlined in yellow, all in the same colour whatever the filters
+decided, with its number in white beside it.
+
+## How a verdict is used
+
+With `config.AI_LACUNA_JUDGE_ENABLED` on, the lacuna stage rebuilds the candidates from its own
+result, checks their geometry hash against the decision file and then, per numbered region:
+
+| verdict | what happens |
+| --- | --- |
+| yes | a lacuna, even if a shape filter rejected it; a region added this way is the class `judged`, counted and owning threads, with no area or shape measure, like the class `dim` |
+| no | not a lacuna, even if the filters kept it |
+| unsure | the deterministic decision stands |
+| unjudged, or no number | the deterministic decision stands |
+
+An image with no decision file, or one written for other candidates, is refused rather than passed
+over, so a run never mixes judged and unjudged images.
+
+## Guardrails, all kept from the thread judge
+
+- The model is pinned (`claude-sonnet-5-5`), no temperature is sent (the model rejects one), and
+  thinking is off.
+- Every request and answer is logged with the sha256 of the request, the picture, the prompt and the
+  examples, in `results_ai_lacunae/<group>/ai_log/<image>/`, with the picture that was sent.
+- The dry run is the default and sends nothing. A real call needs `ALLOW_EXTERNAL_API=1` and
+  `ANTHROPIC_API_KEY` in the environment of that one process. The key is never printed, logged or
+  written to a file.
+- A cost estimate is made before the first call and the run refuses to start above
+  `config.AI_LACUNA_MAX_COST_USD` = $3 (its own ceiling; the thread judge keeps $5). The run stops
+  once what the answers actually cost passes it.
+- A billing, credit or authentication error stops the run at once, and the run stops if more than
+  20% of the first 20 answers are unreadable after one retry.
+- The replay reruns the log offline and must give identical verdicts.
+
+**Speed.** The lacuna stage takes up to about an hour on the largest Hyp image. Its result is kept
+in `.cache/ai_lacuna_candidates/`, keyed by the sha256 of the image's pixels, every non-path, non-AI
+setting of `config.py`, `src/lacunae.py` and the library versions; the dry run, the live run and the
+replay read it, so the stage runs once per image. Built once for the 35 images on 20 processes: 34
+within 30 minutes and the last, 701_z19, at 68 minutes, its lacuna stage alone; read back, about a
+second per image.
+
+## The self-test
+
+`python src/diagnostics.py ai-lacuna-judge -s` rehearses the whole chain on WT 543-2 with a stub judge
+whose answers mean nothing biologically, no network and no key, into `.cache/ai_lacuna_self_test/`.
+**27 checks, all passing on 2026-10-27**, among them: the cached lacuna stage gives byte for byte the
+candidates and the picture a fresh one gives; over the cap every kept lacuna is numbered and the cap
+drops from the end of the order, on the self-test image with the cap lowered and on **all 23 real
+images over the cap**, up to 163 candidates; with more kept lacunae than the cap those left out are
+counted and reported; a yes adds a region the filters rejected and a no removes one they kept, unsure
+keeps the deterministic decision; every lacuna's boundary is one the lacuna stage drew; a region
+added is class `judged`, counted and owning threads; the review's table is what the switch does in
+the pipeline; and the guards (no decision file, wrong candidates, unreadable answers, a billing
+error, the cost ceiling, a live run without the flag) all hold.
+
+## The dry run
+
+`python src/diagnostics.py ai-lacuna-judge -w 20`, in `results_ai_lacunae/dry_run/` with every picture
+exactly as the judge would see it: **35 calls, 1,882 numbered regions** (793 kept by the filters,
+all of the 793 kept lacunae; 196 regions they rejected; 893 dim candidates), estimated 133,455 input
+and 66,570 output tokens, **$0.93**. 23 images are over the cap, and no kept lacuna is left
+unnumbered.
+
+## The real run, 2026-10-27
+
+**Made on 2026-10-27, 16:29 to 16:35 UTC, on all 35 images of the four groups**, one call per image,
+with the two environment variables set for that one process only.
+
+- 35 calls to the pinned `claude-sonnet-5-5`, thinking off and accepted (no fallback).
+- **No answer was unreadable, none was retried, none was refused**, and the run was not stopped.
+- 147,968 input and 52,935 output tokens: **$0.83** ($0.8253), against the estimate of $0.93 and the
+  ceiling of $3. Input ran 11% over the estimate and output 20% under it.
+- 1,882 verdicts: **304 yes, 1,408 no, 170 unsure, 0 unjudged.**
+
+The run's summary is `results_ai_lacunae/ai_lacuna_judge_run.json`.
+
+**The replay reproduces it offline**, with neither environment variable set: every request and every
+picture rebuilt hashes to what the log says was sent (35 attempts, 0 differ), and the verdicts are
+IDENTICAL on all 35 images (`results_ai_lacunae/ai_lacuna_replay.json`).
+
+## What the verdicts do
+
+Over the 35 images (per image in `results_ai_lacunae/review/review.md`, with a contact sheet per
+group; every region's verdict and why in `review_regions.csv`):
+
+| | yes | no | unsure |
+| --- | --- | --- | --- |
+| regions the filters kept (793) | 297 | 352 | 144 |
+| regions the filters rejected (196) | 1 | 185 | 10 |
+| dim candidates (893) | 6 | 871 | 16 |
+
+So **7 regions are added** (6 of them dim candidates) and **352 kept lacunae are removed**, on 29 of
+the 35 images; the lacuna count over the 35 images goes from 793 to 448. The judge says no far more
+often than yes. On the contact sheets what it removes includes the saturated bands, the bright frame
+edges, soft tissue patches and small fragments it was built for, and also some large bright bodies
+that look like lacunae at thumbnail size. Whether each of those calls is right is exactly what has
+not been checked.
+
+Two objects the README lists as probably not lacunae (open question 4) were both judged **no**:
+542_z06 at (555,149), "thin elongated strand along line", and 682_z23 at (363,7), "thin fragment at
+top edge". That agrees with the suspicion; it does not validate the judge.
+
+**The pipeline with the verdicts** was run by `python src/diagnostics.py ai-lacuna-run -w 20`,
+which turns the switch on for that process only and runs detection, canaliculi and quantification
+from the decision files into `results_ai_lacunae/<group>/`, the same per-image layout as
+`results/<group>/`. Its per-image counts equal the review's on all 35 images, and every quantified
+lacuna count equals the review's count after. It hashed `results/` (601 files), `results_ai_judge/`
+(438 files) and the judge's own log before and after, and **all were byte identical afterwards**
+(`results_ai_lacunae/ai_lacuna_run.json`). The numbers it writes are those of an unvalidated
+experiment and are not compared here with the deterministic ones, group by group or otherwise.
+
+## How to run it
+
+```
+# What a real run would send and cost, with every picture. Sends nothing.
+python src/diagnostics.py ai-lacuna-judge -w 20
+
+# The whole chain with a stub judge, no network and no key: 27 checks.
+python src/diagnostics.py ai-lacuna-judge -s
+
+# A real run: needs ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY in the environment of this process.
+python src/diagnostics.py ai-lacuna-judge --live
+
+# The same run again, offline, from the log.
+python src/diagnostics.py ai-lacuna-judge --replay -w 20
+
+# The contact sheets and the per-image table, from the log, into results_ai_lacunae/review/.
+python src/diagnostics.py ai-lacuna-review -w 20
+
+# The pipeline with the switch on for that run only, into results_ai_lacunae/<group>/.
+python src/diagnostics.py ai-lacuna-run -w 20
+```
+
+Set the two variables for one process only, and never with `setx`, which writes them into the
+registry. The key is never read back, printed, logged or written to a file by anything here.
+
+## Established, and not
+
+Established, each one measured: the candidates, the numbering order and the picture are
+deterministic and come byte for byte from the cache as from a fresh lacuna stage; every kept lacuna
+was numbered on every image; the real run left no region unjudged, cost $0.83 and replays offline to
+identical verdicts; the switch applies exactly the verdicts and nothing else, and with it off every
+number is `main`'s.
+
+**Not established.** No verdict has been checked against a manual count, so nothing here says a yes
+or a no is right. The judge removes 352 of 793 kept lacunae; if it is wrong about them, every per
+cell measure of those images moves with it. **Nothing here is validated**, and none of it may be used
+for a result until it has been checked against a manual count and that check is written down.

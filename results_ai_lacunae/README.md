@@ -19,23 +19,30 @@ sees a file name, a group or a mouse, only a neutral image code.
 The candidates are every region of the lacuna stage's label image of at least
 100 px2, kept and rejected by the filters, plus the dim candidates: the regions
 of the same mask at 0.8 of each image's lacuna cut that overlap none of them.
-Nothing is merged or split. At most 60 per image are numbered, the largest.
+Nothing is merged or split. At most 60 per image are numbered. With more, the
+cap drops from the end of this order, each tier largest first: every region the
+filters kept, every region they rejected of at least 300 px2, the dim
+candidates, the rejected regions under 300 px2. So every kept lacuna is
+numbered unless an image has more than 60, and none has. The numbers run in
+reading order, so a number does not tell the judge what the filters decided.
 
 | path | what it is |
 | --- | --- |
 | `dry_run/` | what a real run would send and cost, with **every picture exactly as the judge would see it**, made by `python src/diagnostics.py ai-lacuna-judge` (the dry run is the default and sends nothing): `dry_run.md` (the report), `.json`, `.csv`, and `<group>/<image>.png` |
-| `<group>/ai_log/<image>/` | after a real run: every request and answer, one json per attempt with its hashes, the picture that was sent, and the decision file |
-| `<group>/<image>/`, `<group>/all_images/` | after a real run: the pipeline with the judge's verdicts applied, the same layout as `results/<group>/`, made by `python src/diagnostics.py ai-lacuna-run` |
-| `review/` | after a real run: a contact sheet per group with the verdicts drawn, and a table per image |
+| `<group>/ai_log/<image>/` | every request and answer of the real run, one json per attempt with its hashes, the picture that was sent, and the decision file, made by `python src/diagnostics.py ai-lacuna-judge --live` |
+| `ai_lacuna_judge_run.json` | the real run's summary: per image the verdicts, tokens and cost |
+| `ai_lacuna_replay.json` | the replay of the log, offline: identical verdicts on every image, made by `python src/diagnostics.py ai-lacuna-judge --replay` |
+| `<group>/<image>/`, `<group>/all_images/`, `ai_lacuna_run.json` | the pipeline with the judge's verdicts applied, the same layout as `results/<group>/`, made offline by `python src/diagnostics.py ai-lacuna-run`; the json says what it did and that `results/` and `results_ai_judge/` were byte identical afterwards |
+| `review/` | a contact sheet per group with the verdicts drawn (green yes, red no, yellow unsure, grey unjudged or not numbered), and a table per image (`review.md`, `.csv`, `.json`), every region's verdict and why in `review_regions.csv`, made by `python src/diagnostics.py ai-lacuna-review` |
 
-**State on 2026-10-26.** Only `dry_run/` exists. No real call has been made:
-the two environment variables a real run needs were not set when the dry run
-was made. The dry run: 35 calls, one per image, 1,882 numbered regions,
-estimated $0.93 ($1.87 if every call were retried once), against a ceiling of
-$3. 23 images have more than 60 candidates, and on four of them 15 kept lacunae
-in all are left unnumbered by the cap and keep the deterministic decision
-(701_z19c1-2 8, 701_z26c1-2 4, I534_z11c1-2 2, 535_z27c1-2 1). 24 of the 1,882
-numbers could not be placed clear of every outline.
+**State on 2026-10-27.** The dry run: 35 calls, 1,882 numbered regions, every
+one of the 793 kept lacunae among them, estimated $0.93 against a ceiling of $3.
+**The real run, on 2026-10-27**: 35 calls to the pinned `claude-sonnet-5-5`,
+**$0.83** (147,968 input and 52,935 output tokens), no answer unreadable, retried
+or refused. Verdicts: 304 yes, 1,408 no, 170 unsure, 0 unjudged. The replay
+gives identical verdicts offline. With them, 7 regions are added (6 of them dim
+candidates) and 352 kept lacunae are removed; the lacunae over the 35 images go
+from 793 to 448. External API use approved on 2026-10-15, approver: Karim.
 
 How a verdict is used, behind `config.AI_LACUNA_JUDGE_ENABLED` (off by
 default): yes keeps a region as a lacuna even if a shape filter rejected it; no

@@ -14,7 +14,10 @@ inspection of the WT images. No parameter may be tuned on the other groups.
 `results/`, one folder per group. Section 20 describes the **AI judge method**, the same pipeline
 with `config.AI_JUDGE_ENABLED` on, whose output is `results_ai_judge/WT/`. Which
 the study uses has not been decided, and **neither has been validated against a
-manual trace**.
+manual trace**. Section 23 describes an experiment beside them, the **AI lacuna
+judge**, which decides which candidate regions are lacunae on all four groups,
+behind `config.AI_LACUNA_JUDGE_ENABLED` (off), into `results_ai_lacunae/`; it is
+not validated either.
 
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
 confirmed for all 8 images and rounded to two decimals. The pipeline reports
@@ -1897,3 +1900,40 @@ conservative reading found, and each can be changed.
 | The picture | the raw signal channel at its own pixels, unstretched, twice: left nothing drawn, right every numbered candidate outlined in one colour with its number | one outline colour for every region, whatever the filters decided, so the picture does not tell the judge the deterministic answer |
 | Dim candidates that overlap a region | not offered | the region is already a candidate, so a body is never offered twice |
 | What a region the judge adds reports | the class `judged`, held to exactly what the `dim` class reports: no area or shape, but the perimeter and the measures built on it, as main reports them for `dim` and `out_of_focus` | "no area or shape, like dim" is read as the dim class's own rule, not a stricter one |
+
+**What it does not do.** It never draws or changes a boundary: a lacuna it keeps
+has the outline the lacuna stage drew. It never sees a file name, a group or a
+mouse, only a neutral image code. It changes no parameter and tunes nothing: one
+prompt, `src/judge_prompt_lacunae.md`, for every image of every group. The thread
+stages run unchanged on the lacunae it decided. With the switch off, every
+number is the deterministic method's: `regression` PASS over 6,800 numbers at
+tolerance 0 in both runs and `reference-check` PASS, on 2026-10-27.
+
+**How a verdict is used.** Yes keeps a region as a lacuna even if a shape filter
+rejected it, as the class `judged` (counted and owning threads, no area or
+shape); no removes it even if the filters kept it; unsure, unjudged and a region
+with no number keep the deterministic decision.
+
+**The run.** One real run, on 2026-10-27, on all 35 images, one call per image to
+the pinned `claude-sonnet-5-5`, no temperature sent, thinking off: **35 calls,
+$0.83** (147,968 input and 52,935 output tokens), against a dry run estimate of
+$0.93 and a ceiling of `config.AI_LACUNA_MAX_COST_USD` = $3. No answer was
+unreadable, retried or refused. Every request and answer is logged with its hash
+in `results_ai_lacunae/<group>/ai_log/`, with the picture sent, and the replay
+reruns the log offline to identical verdicts on all 35 images.
+**External API use approved on 2026-10-15, approver: Karim.**
+
+**What it said.** 1,882 numbered regions, every kept lacuna among them: 304 yes,
+1,408 no, 170 unsure. Of the 793 regions the filters kept, 297 yes, 352 no and
+144 unsure; of the 1,089 they rejected or that lie under the cut, 7 yes. So 7
+regions are added and 352 removed, and the lacunae over the 35 images go from
+793 to 448. Per image, with a contact sheet per group, in
+`results_ai_lacunae/review/`. The two objects open question 4 of the README
+calls probably not lacunae, 542_z06 at (555,149) and 682_z23 at (363,7), were
+both judged no.
+
+**Not established.** No verdict has been checked against a manual count. The
+judge removes 352 of 793 kept lacunae, and some of them look like lacunae on the
+contact sheets; if it is wrong about them, every per cell measure of those images
+moves with it. Nothing here is validated, and none of it is a result of the
+study.
