@@ -7827,7 +7827,9 @@ def ai_lacuna_prepare_all(images: list, workers: int) -> list:
     """Candidates, picture, request text and estimate for every image, in
     parallel processes, returned in the order given. Deterministic and offline.
     A line is printed as each image finishes, because the lacuna stage takes up
-    to an hour on the largest Hyp images and a run with no output looks stuck."""
+    to an hour on the largest Hyp images and a run with no output looks stuck.
+    The lacuna stage itself is read from its cache where it is held
+    (ai_judge.cached_lacuna_state), so it runs once per image."""
     import time
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -7838,9 +7840,13 @@ def ai_lacuna_prepare_all(images: list, workers: int) -> list:
         for count, future in enumerate(as_completed(futures), start=1):
             prepared = future.result()
             done[futures[future]] = prepared
+            stage = "from the cache" if prepared["lacuna_stage"] == "hit" else "built and cached"
             print(f"  candidates {count} of {len(images)}: {prepared['group']}/{prepared['label']}, "
-                  f"{prepared['counts']['numbered']} numbered, {time.time() - start:.0f} s",
-                  flush=True)
+                  f"{prepared['counts']['numbered']} numbered, lacuna stage {stage}, "
+                  f"{time.time() - start:.0f} s", flush=True)
+    hits = sum(1 for p in done if p["lacuna_stage"] == "hit")
+    print(f"  lacuna stage: {hits} of {len(done)} from the cache, {len(done) - hits} built",
+          flush=True)
     return done
 
 
@@ -8156,6 +8162,18 @@ def _ai_lacuna_self_test(images: list) -> int:
         print(f"  {c0['numbered']} numbered candidates: {c0['numbered_kept_by_the_filters']} kept by "
               f"the filters, {c0['numbered_rejected_by_the_filters']} regions they rejected, "
               f"{c0['dim']} dim candidates; geometry {prepared['geometry_sha256'][:12]}")
+
+        # The cache: what is prepared from it is what a fresh lacuna stage gives.
+        cached = ai_judge.cached_lacuna_state(image_path, build=False)
+        fresh_png, _drawn = ai_judge.lacuna_picture(state, cand)
+        checks.append(("the cached lacuna stage gives the candidates and the picture a fresh "
+                       "one gives, byte for byte", cached is not None
+                       and cand["geometry_sha256"] == prepared["geometry_sha256"]
+                       and fresh_png == prepared["png"]
+                       and bool((cached["labels"] == state["labels"]).all())
+                       and cached["t_hi"] == state["t_hi"]
+                       and cached["classes"] == state["classes"]
+                       and cached["kept_labels"] == ai_judge.kept_labels(state)))
 
         prompt = ai_judge.load_lacuna_prompt()
         sent = prompt["system"] + "\n" + prepared["user_text"]

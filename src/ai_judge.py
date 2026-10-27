@@ -1948,6 +1948,105 @@ def lacuna_state(image_path: Path) -> dict:
     }
 
 
+def kept_labels(state: dict) -> list:
+    """The label, in the stage's label image, of every kept lacuna in lacuna id
+    order: all the candidates need to know of what the filters kept."""
+    if "kept_labels" in state:
+        return [int(v) for v in state["kept_labels"]]
+    return [int(region.label) for region, _border in state["kept"]]
+
+
+# The lacuna stage's result, kept so that it runs once per image (speed)
+#
+# Preparing an image is the lacuna stage, up to about an hour on the largest Hyp
+# image, and then about a second of candidates and drawing. The judge needs only
+# what the stage returns, so that is kept in
+# .cache/ai_lacuna_candidates/<group>/<label>_<key>.npz and the candidates are
+# built from it: the dry run, the live run and the replay all read it, so the
+# stage runs once per image and not once per command. The key is the sha256 of
+#   the image's pixels, as read from the file;
+#   every upper-case setting of config.py except the paths and the AI_ ones,
+#     which the lacuna stage never reads (lacunae.config_values);
+#   src/lacunae.py itself, the code of the stage;
+#   the versions of numpy, scipy and scikit-image, which compute it;
+# so a change to any of them misses the cache and the stage runs again. What is
+# built from it is everything this judge adds (the candidates, the numbers and
+# the picture), so a change to those needs no new stage run. The cache decides
+# nothing a fresh stage would not: the self-test checks that the candidates and
+# the picture made from it are byte for byte the ones made from a fresh run.
+LACUNA_CACHE_DIR = config.PROJECT_ROOT / ".cache" / "ai_lacuna_candidates"
+LACUNA_CACHE_SCHEMA = "lcn-ai-lacuna-stage-cache-1"
+LACUNA_CACHE_PACKAGES = ("numpy", "scipy", "scikit-image")
+
+
+def lacuna_cache_key(image_path: Path) -> dict:
+    """What the cache entry of one image is keyed on, and the key itself."""
+    from importlib import metadata
+
+    from skimage.io import imread
+
+    pixels = np.ascontiguousarray(imread(Path(image_path)))
+    settings = {k: v for k, v in lacunae.config_values().items() if not k.startswith("AI_")}
+    parts = {
+        "schema": LACUNA_CACHE_SCHEMA,
+        "pixels_sha256": sha256_bytes(pixels.tobytes()),
+        "pixels_shape": [int(s) for s in pixels.shape],
+        "pixels_dtype": str(pixels.dtype),
+        "config_sha256": sha256_text(json.dumps(settings, sort_keys=True, default=repr)),
+        "lacunae_py_sha256": sha256_bytes(Path(lacunae.__file__).read_bytes()),
+        "versions": {package: metadata.version(package) for package in LACUNA_CACHE_PACKAGES},
+    }
+    return dict(parts, key=sha256_text(canonical_json(parts)))
+
+
+def lacuna_cache_path(image_path: Path, key: str) -> Path:
+    return (LACUNA_CACHE_DIR / image_group(image_path)
+            / f"{lacunae.image_label(Path(image_path))}_{key[:16]}.npz")
+
+
+def cached_lacuna_state(image_path: Path, build: bool = True) -> dict | None:
+    """lacuna_state(image_path), read from the cache when it holds this image
+    under the current key, else computed and written there. With build=False a
+    miss returns None instead of running the stage. The state says which it was
+    in "cache": "hit" or "built"."""
+    image_path = Path(image_path)
+    key = lacuna_cache_key(image_path)
+    path = lacuna_cache_path(image_path, key["key"])
+    if path.is_file():
+        with np.load(path, allow_pickle=False) as held:
+            meta = json.loads(str(held["meta"]))
+            if meta.get("key") == key["key"]:
+                _display, channel = lacunae.load_channel(image_path)
+                return {
+                    "image_path": image_path,
+                    "label": lacunae.image_label(image_path),
+                    "group": image_group(image_path),
+                    "channel": channel,
+                    "labels": np.array(held["labels"]),
+                    "kept_labels": [int(v) for v in held["kept_labels"]],
+                    "kept_on_border": [bool(v) for v in held["kept_on_border"]],
+                    "t_hi": float(meta["t_hi"]),
+                    "classes": {k: [int(i) for i in v] for k, v in meta["classes"].items()},
+                    "cache": "hit",
+                }
+    if not build:
+        return None
+    state = lacuna_state(image_path)
+    meta = dict(key, t_hi=state["t_hi"], classes=state["classes"], image_label=state["label"],
+                group=state["group"], built_at=utc_now())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Written beside the entry and moved into place, so an interrupted write
+    # never leaves a half file under a valid name.
+    part = path.with_name(f"{path.stem}.{os.getpid()}.part.npz")
+    np.savez_compressed(part, labels=state["labels"],
+                        kept_labels=np.array(kept_labels(state), dtype=np.int64),
+                        kept_on_border=np.array([b for _r, b in state["kept"]], dtype=bool),
+                        meta=np.array(json.dumps(meta)))
+    os.replace(part, path)
+    state["cache"] = "built"
+    return state
+
+
 def raw_uint8(channel: np.ndarray) -> np.ndarray:
     """The signal channel as the 8 bit values it was read from. The pipeline
     reads an 8 bit image to [0, 1] by dividing by 255, so this gives the raw
@@ -1997,8 +2096,7 @@ def lacuna_candidates(state: dict) -> dict:
     labels, channel = state["labels"], state["channel"]
     shape = labels.shape
     min_area = int(config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2)
-    kept_at = {region.label: lacuna_id
-               for lacuna_id, (region, _border) in enumerate(state["kept"], start=1)}
+    kept_at = {label: lacuna_id for lacuna_id, label in enumerate(kept_labels(state), start=1)}
     class_of = {int(i): name for name, ids in state["classes"].items() for i in ids}
 
     found = []
@@ -2044,7 +2142,7 @@ def lacuna_candidates(state: dict) -> dict:
     for entry in left:
         entry["n"] = None
 
-    n_kept = len(state["kept"])
+    n_kept = len(kept_at)
     counts = {
         "candidates_found": len(found),
         "numbered": len(numbered),
@@ -2387,8 +2485,9 @@ def prepare_lacuna_image(image_path: Path) -> dict:
     """Everything one call needs, as plain data so it can cross processes: the
     candidates, the picture, the request text and the estimate. Deterministic,
     no network. The dry run, the live run and the replay all start here, so the
-    picture a dry run saves is byte for byte the one a run sends."""
-    state = lacuna_state(Path(image_path))
+    picture a dry run saves is byte for byte the one a run sends. The lacuna
+    stage is read from its cache when it holds this image (cached_lacuna_state)."""
+    state = cached_lacuna_state(Path(image_path))
     candidates = lacuna_candidates(state)
     png, drawn = lacuna_picture(state, candidates)
     prompt = load_lacuna_prompt()
@@ -2397,6 +2496,7 @@ def prepare_lacuna_image(image_path: Path) -> dict:
         "image_path": str(image_path),
         "group": state["group"],
         "label": state["label"],
+        "lacuna_stage": state["cache"],
         "image_code": candidates["image_code"],
         "png": png,
         "drawn": drawn,
