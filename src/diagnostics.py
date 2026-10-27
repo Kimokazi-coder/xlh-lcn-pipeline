@@ -7877,6 +7877,8 @@ def _ai_lacuna_row(p: dict) -> dict:
         "numbered, dim candidates (0.8 of the cut)": c["dim"],
         "over the cap, not numbered": c["not_numbered_over_the_cap"],
         "of those, kept lacunae": c["kept_lacunae_not_numbered_over_the_cap"],
+        "of those, rejected regions": c["rejected_regions_not_numbered_over_the_cap"],
+        "of those, dim candidates": c["dim_not_numbered_over_the_cap"],
         "numbers not placed clear": len(p["drawn"]["numbers_not_placed_clear"]),
         "estimated input tokens": p["estimate"]["input_tokens"],
         "estimated output tokens": p["estimate"]["output_tokens"],
@@ -7920,7 +7922,10 @@ def ai_lacuna_dry_run(images: list, out: Path, workers: int) -> int:
                            candidates_numbered=sum(r["numbered"] for r in rows),
                            images_over_the_cap=sum(1 for r in rows
                                                    if r["over the cap, not numbered"]),
-                           kept_lacunae_over_the_cap=sum(r["of those, kept lacunae"] for r in rows)),
+                           kept_lacunae_over_the_cap=sum(r["of those, kept lacunae"] for r in rows),
+                           images_with_more_kept_lacunae_than_the_cap=sum(
+                               1 for p in prepared
+                               if p["counts"]["more_kept_lacunae_than_the_cap"])),
         "per_image": rows,
         "per_image_candidates": [{"group": p["group"], "image": p["label"],
                                   "geometry_sha256": p["geometry_sha256"],
@@ -7949,11 +7954,24 @@ def ai_lacuna_dry_run(images: list, out: Path, workers: int) -> int:
           f"${a['estimated_cost_usd_if_every_call_is_retried_once']}; at the thread judge's "
           f"overrun ${a['estimated_cost_usd_at_the_thread_judge_overrun']}); ceiling "
           f"${a['max_cost_usd']}: {'within it' if a['within_max_cost_usd'] else 'ABOVE IT'}")
-    print(f"images over the cap of {config.AI_LACUNA_MAX_CANDIDATES}: {a['images_over_the_cap']}, "
+    print(f"images over the cap of {config.AI_LACUNA_MAX_NUMBERED}: {a['images_over_the_cap']}, "
           f"kept lacunae left unnumbered by it: {a['kept_lacunae_over_the_cap']}")
+    _warn_more_kept_than_the_cap(prepared)
     print(f"report -> {out / 'dry_run.md'}, {out / 'dry_run.json'}, {out / 'dry_run.csv'}; "
           f"{len(pictures)} pictures in {out}/<group>/")
     return 0
+
+
+def _warn_more_kept_than_the_cap(prepared: list) -> list:
+    """Print, and return, every image with more kept lacunae than the cap: the
+    one case in which the numbering order leaves a kept lacuna unnumbered."""
+    over = [p for p in prepared if p["counts"]["more_kept_lacunae_than_the_cap"]]
+    for p in over:
+        print(f"WARNING: {p['group']}/{p['label']} has {p['counts']['deterministic_lacunae']} kept "
+              f"lacunae, more than the cap of {config.AI_LACUNA_MAX_NUMBERED}: "
+              f"{p['counts']['kept_lacunae_not_numbered_over_the_cap']} of them are not numbered "
+              f"and keep the deterministic decision.")
+    return over
 
 
 def _rel(path: Path) -> str:
@@ -7979,7 +7997,11 @@ def _ai_lacuna_dry_run_markdown(report: dict) -> str:
         f"- Candidates: every region of the lacuna stage's label image of at least "
         f"{rule.get('min_candidate_area_px2')} px2, kept and rejected, plus the dim candidates at "
         f"{rule.get('dim_cut_fraction')} of each image's lacuna cut that overlap none of them; "
-        f"at most {rule.get('max_candidates')} numbered per image, the largest.",
+        f"at most {rule.get('max_numbered')} numbered per image. With more, the cap drops from the "
+        f"end of this order, each tier largest first: every region the filters kept, every region "
+        f"they rejected of at least {rule.get('priority_rejected_min_area_px2')} px2, the dim "
+        f"candidates, the rejected regions under that area. The numbers run in reading order "
+        f"whatever the tier.",
         f"- One call per image: {a['calls']} calls, {a['candidates_numbered']} numbered regions.",
         f"- Estimate: {a['estimated_input_tokens']:,} input and {a['estimated_output_tokens']:,} "
         f"output tokens, **${a['estimated_cost_usd']}**; "
@@ -7988,7 +8010,8 @@ def _ai_lacuna_dry_run_markdown(report: dict) -> str:
         f"judge's estimate did. Ceiling `config.AI_LACUNA_MAX_COST_USD` = ${a['max_cost_usd']}.",
         f"- Images with more candidates than the cap: {a['images_over_the_cap']}; kept lacunae left "
         f"unnumbered by the cap, which keep the deterministic decision: "
-        f"{a['kept_lacunae_over_the_cap']}.",
+        f"{a['kept_lacunae_over_the_cap']}; images with more kept lacunae than the cap: "
+        f"{a['images_with_more_kept_lacunae_than_the_cap']}.",
         f"- How the estimate is made: {report['how_the_estimate_is_made']}",
         f"- Prompt sha256 `{report['prompt_sha256'][:16]}`, examples sha256 "
         f"`{report['examples_sha256'][:16]}`.",
@@ -8020,6 +8043,7 @@ def ai_lacuna_live(images: list, out_root: Path, workers: int) -> int:
         print("The dry run is the default: run without --live to see the pictures and the cost.")
         return 2
     prepared = ai_lacuna_prepare_all(images, workers)
+    _warn_more_kept_than_the_cap(prepared)
     total = ai_lacuna_estimate(prepared)
     print(f"{total['calls']} calls, estimated ${total['estimated_cost_usd']}, ceiling "
           f"${total['max_cost_usd']}")

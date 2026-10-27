@@ -802,11 +802,19 @@ AI_LACUNA_DIM_CUT_FRACTION = 0.8
 # table and the dark band merge already call a candidate, below the smallest
 # kept class (out_of_focus, 148 px2).
 AI_LACUNA_MIN_CANDIDATE_AREA_PX2 = 100
-# At most this many numbered regions per image; with more, the largest are
-# numbered and the rest keep the deterministic decision and are counted. The
-# user's value, a property of the picture (sixty numbers stay legible) and not of
-# the biology.
-AI_LACUNA_MAX_CANDIDATES = 60
+# At most this many numbered regions per image; the rest keep the deterministic
+# decision and are counted. The user's value, a property of the picture (sixty
+# numbers stay legible) and not of the biology. Named AI_LACUNA_MAX_CANDIDATES
+# until 2026-10-27, when the user's brief named it this; the value is unchanged.
+AI_LACUNA_MAX_NUMBERED = 60
+# With more candidates than that, which are numbered goes by an order of
+# priority and the cap drops from its end (src/ai_judge.py,
+# LACUNA_NUMBERING_TIERS): every region the filters kept, then every region they
+# rejected of at least this area, then the dim candidates, then the rejected
+# regions under it, each largest first. So a kept lacuna is left unnumbered
+# only on an image with more kept lacunae than the cap, which is reported.
+# 300 px2 is the user's value (brief of 2026-10-27), chosen on no image.
+AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2 = 300
 
 # The cost ceiling of one run of this judge over every image, in dollars (the
 # user's value, 2026-10-26). A run estimates its cost before the first call and

@@ -2090,9 +2090,10 @@ def lacuna_candidates(state: dict) -> dict:
     Nothing is merged and nothing is split. Every kept lacuna is a region of the
     first kind, because the smallest kept class is larger than the floor.
 
-    With more than config.AI_LACUNA_MAX_CANDIDATES the largest are numbered, in
-    reading order, and the rest are listed with no number: they keep the
-    deterministic decision."""
+    With more than config.AI_LACUNA_MAX_NUMBERED, which are numbered goes by
+    lacuna_numbering_tier and the cap drops from the end of that order; the
+    rest are listed with no number and keep the deterministic decision. The
+    numbers run in reading order whatever the tier."""
     labels, channel = state["labels"], state["channel"]
     shape = labels.shape
     min_area = int(config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2)
@@ -2130,12 +2131,15 @@ def lacuna_candidates(state: dict) -> dict:
                      lacuna_class=None, rejected_by="under the lacuna cut")
         found.append(entry)
 
-    # The cap: the largest are numbered, ties broken by position so the choice
-    # never depends on the order regionprops happens to return.
-    by_size = sorted(found, key=lambda e: (-e["area_px2"], e["centroid_xy"][1], e["centroid_xy"][0]))
-    cap = int(config.AI_LACUNA_MAX_CANDIDATES)
-    numbered, left = by_size[:cap], by_size[cap:]
-    # Reading order, so the numbers run down the picture.
+    # The cap drops from the end of the order of priority, within a tier the
+    # largest first, ties broken by position so the choice never depends on the
+    # order regionprops happens to return.
+    order = sorted(found, key=lambda e: (lacuna_numbering_tier(e), -e["area_px2"],
+                                         e["centroid_xy"][1], e["centroid_xy"][0]))
+    cap = int(config.AI_LACUNA_MAX_NUMBERED)
+    numbered, left = order[:cap], order[cap:]
+    # The numbers run in reading order down the picture, whatever the tier, so
+    # a number does not tell the judge what the filters decided.
     numbered.sort(key=lambda e: (e["centroid_xy"][1], e["centroid_xy"][0]))
     for n, entry in enumerate(numbered, start=1):
         entry["n"] = n
@@ -2147,8 +2151,14 @@ def lacuna_candidates(state: dict) -> dict:
         "candidates_found": len(found),
         "numbered": len(numbered),
         "not_numbered_over_the_cap": len(left),
+        # 0 unless the image has more kept lacunae than the cap, which the
+        # next line says and every report prints.
         "kept_lacunae_not_numbered_over_the_cap":
             sum(1 for e in left if e["deterministic"] == "lacuna"),
+        "more_kept_lacunae_than_the_cap": bool(n_kept > cap),
+        "rejected_regions_not_numbered_over_the_cap":
+            sum(1 for e in left if e["kind"] == "region" and e["deterministic"] != "lacuna"),
+        "dim_not_numbered_over_the_cap": sum(1 for e in left if e["kind"] == "dim"),
         "regions": sum(1 for e in numbered if e["kind"] == "region"),
         "dim": sum(1 for e in numbered if e["kind"] == "dim"),
         "numbered_kept_by_the_filters": sum(1 for e in numbered if e["deterministic"] == "lacuna"),
@@ -2171,10 +2181,35 @@ def lacuna_candidates(state: dict) -> dict:
             "dim_cut_fraction": float(config.AI_LACUNA_DIM_CUT_FRACTION),
             "dim_cut": round(dim_cut, 8),
             "min_candidate_area_px2": min_area,
-            "max_candidates": cap,
+            "max_numbered": cap,
+            "numbering_order": list(LACUNA_NUMBERING_TIERS),
+            "priority_rejected_min_area_px2": int(config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2),
         },
         "geometry_sha256": lacuna_geometry_hash(numbered, shape),
     }
+
+
+# Which candidates get a number when there are more than the cap, in order of
+# priority (the user's brief of 2026-10-27). The brief names the first three;
+# the regions the filters rejected under the area of the second tier come last,
+# because they are candidates (config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2) and are
+# numbered on every image under the cap, so they keep a number wherever there
+# is room for one (docs/METHODS.md section 23).
+LACUNA_NUMBERING_TIERS = (
+    "every region the filters kept",
+    "every region they rejected of at least config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2",
+    "the dim candidates",
+    "the regions they rejected under that area",
+)
+
+
+def lacuna_numbering_tier(entry: dict) -> int:
+    """The place of a candidate in LACUNA_NUMBERING_TIERS, 0 first."""
+    if entry["deterministic"] == "lacuna":
+        return 0
+    if entry["kind"] == "dim":
+        return 2
+    return 1 if entry["area_px2"] >= int(config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2) else 3
 
 
 def lacuna_geometry_hash(numbered: list, shape: tuple) -> str:

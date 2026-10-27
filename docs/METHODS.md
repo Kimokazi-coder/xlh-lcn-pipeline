@@ -1844,3 +1844,56 @@ content by lossless decoding, and the three new groups were imported and run
 group would differ by if its sections had TIFF originals, is not measured here.
 Eight and four pairs, one run each. Nothing here is validated against a manual
 count, and nothing is recommended.
+
+## 23. The AI lacuna judge
+
+**Status: EXPERIMENT, pre-validation, NOT VALIDATED.** No verdict has been
+checked against a manual count. Behind `config.AI_LACUNA_JUDGE_ENABLED`, off by
+default, so `results/` and `results_ai_judge/` are untouched by it; its output is
+`results_ai_lacunae/`. The full write-up is in
+[docs/EXPERIMENT_AI.md](EXPERIMENT_AI.md), "The lacuna judge".
+
+**What it is for.** The lacuna stage (sections 2 to 4) was shaped on the 8 WT
+images. On the other groups it outlines saturated bands, soft tissue and
+fragments as lacunae and misses dim or out-of-focus bodies. The judge is shown,
+once per image, every candidate region the lacuna stage outlined, numbered, and
+says per number yes, no or unsure. **It never draws or changes a boundary.**
+
+**Candidates.** Every region of the lacuna stage's label image of at least
+`config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2` = 100 px², kept and rejected by the
+filters, plus the dim candidates: the regions of the same mask at
+`config.AI_LACUNA_DIM_CUT_FRACTION` = 0.8 of the image's own lacuna cut that
+overlap none of them. Nothing is merged or split. At most
+`config.AI_LACUNA_MAX_NUMBERED` = 60 are numbered per image.
+
+**Which are numbered when there are more than 60.** In this order, and the cap
+drops from its end, each tier largest first: (1) every region the filters kept,
+(2) every region they rejected of at least
+`config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2` = 300 px², (3) the dim
+candidates, (4) the regions they rejected under 300 px². A kept lacuna is left
+unnumbered only on an image with more than 60 kept lacunae, which every report
+prints as a warning.
+
+**The cache.** The lacuna stage is the slow part, up to about an hour on the
+largest Hyp image. Its result (label image, kept labels, cut, classes) is kept
+in `.cache/ai_lacuna_candidates/<group>/<label>_<key>.npz`, keyed by the sha256
+of the image's pixels, every upper-case setting of `config.py` except the paths
+and the `AI_` ones (which the stage never reads), `src/lacunae.py` itself and
+the numpy, scipy and scikit-image versions. The dry run, the live run and the
+replay read it; the candidates, the numbers and the picture are rebuilt from it
+in about a second. The self-test checks that what is built from the cache is
+byte for byte what a fresh lacuna stage gives.
+
+**Decisions taken where the briefs left a choice open.** Each is the most
+conservative reading found, and each can be changed.
+
+| Decision | What was chosen | Why |
+| --- | --- | --- |
+| Where the rejected regions under 300 px² go in the numbering order | last, after the dim candidates | the brief's order names three tiers and these regions fit none; they are candidates by the 100 px² rule and are numbered on every image under the cap, so they keep a number wherever there is room rather than being dropped outright |
+| What "number in this order" sets | which candidates get a number; the numbers themselves still run in reading order, down the picture | numbering the kept regions 1, 2, 3... would tell the judge which regions the filters kept, which the picture is drawn to hide (every outline is drawn the same way), and would give images over the cap a different rule from images under it |
+| What the cache holds | the lacuna stage's result, not the candidate list | the stage is the slow part; caching it means a change to the numbering or the picture needs no new stage run, and the key covers everything the stage reads |
+| Worker counts | the commands keep their default `-w 8`; every command of the 2026-10-27 run was given `-w 20`, the machine's 20 logical cores, except the live run, which was run exactly as the user wrote it and read every image from the cache | changing a default needs the user's word; the brief asks for every core, which a command line gives without changing one |
+| The cost ceiling | its own constant, `config.AI_LACUNA_MAX_COST_USD` = 3 | the thread judge keeps `config.MAX_COST_USD` = 5, so neither run can loosen the other's ceiling |
+| The picture | the raw signal channel at its own pixels, unstretched, twice: left nothing drawn, right every numbered candidate outlined in one colour with its number | one outline colour for every region, whatever the filters decided, so the picture does not tell the judge the deterministic answer |
+| Dim candidates that overlap a region | not offered | the region is already a candidate, so a body is never offered twice |
+| What a region the judge adds reports | the class `judged`, held to exactly what the `dim` class reports: no area or shape, but the perimeter and the measures built on it, as main reports them for `dim` and `out_of_focus` | "no area or shape, like dim" is read as the dim class's own rule, not a stricter one |
