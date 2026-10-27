@@ -2134,8 +2134,7 @@ def lacuna_candidates(state: dict) -> dict:
     # The cap drops from the end of the order of priority, within a tier the
     # largest first, ties broken by position so the choice never depends on the
     # order regionprops happens to return.
-    order = sorted(found, key=lambda e: (lacuna_numbering_tier(e), -e["area_px2"],
-                                         e["centroid_xy"][1], e["centroid_xy"][0]))
+    order = sorted(found, key=lacuna_priority_key)
     cap = int(config.AI_LACUNA_MAX_NUMBERED)
     numbered, left = order[:cap], order[cap:]
     # The numbers run in reading order down the picture, whatever the tier, so
@@ -2156,6 +2155,7 @@ def lacuna_candidates(state: dict) -> dict:
         "kept_lacunae_not_numbered_over_the_cap":
             sum(1 for e in left if e["deterministic"] == "lacuna"),
         "more_kept_lacunae_than_the_cap": bool(n_kept > cap),
+        "max_numbered": cap,
         "rejected_regions_not_numbered_over_the_cap":
             sum(1 for e in left if e["kind"] == "region" and e["deterministic"] != "lacuna"),
         "dim_not_numbered_over_the_cap": sum(1 for e in left if e["kind"] == "dim"),
@@ -2210,6 +2210,13 @@ def lacuna_numbering_tier(entry: dict) -> int:
     if entry["kind"] == "dim":
         return 2
     return 1 if entry["area_px2"] >= int(config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2) else 3
+
+
+def lacuna_priority_key(entry: dict) -> tuple:
+    """The sort key of the order of priority: the tier, then the largest
+    first, then the position (row, column of the centroid)."""
+    return (lacuna_numbering_tier(entry), -entry["area_px2"],
+            entry["centroid_xy"][1], entry["centroid_xy"][0])
 
 
 def lacuna_geometry_hash(numbered: list, shape: tuple) -> str:

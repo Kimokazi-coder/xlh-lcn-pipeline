@@ -7968,7 +7968,7 @@ def _warn_more_kept_than_the_cap(prepared: list) -> list:
     over = [p for p in prepared if p["counts"]["more_kept_lacunae_than_the_cap"]]
     for p in over:
         print(f"WARNING: {p['group']}/{p['label']} has {p['counts']['deterministic_lacunae']} kept "
-              f"lacunae, more than the cap of {config.AI_LACUNA_MAX_NUMBERED}: "
+              f"lacunae, more than the cap of {p['counts']['max_numbered']}: "
               f"{p['counts']['kept_lacunae_not_numbered_over_the_cap']} of them are not numbered "
               f"and keep the deterministic decision.")
     return over
@@ -8163,6 +8163,7 @@ def _ai_lacuna_self_test(images: list) -> int:
         shutil.rmtree(AI_LACUNA_SELF_TEST_DIR)
     saved_root, saved_switch = ai_judge.LACUNA_LOG_ROOT, config.AI_LACUNA_JUDGE_ENABLED
     saved_ceiling = config.AI_LACUNA_MAX_COST_USD
+    saved_cap = config.AI_LACUNA_MAX_NUMBERED
     checks = []
 
     def use_log(name: str) -> None:
@@ -8198,6 +8199,62 @@ def _ai_lacuna_self_test(images: list) -> int:
                        and cached["t_hi"] == state["t_hi"]
                        and cached["classes"] == state["classes"]
                        and cached["kept_labels"] == ai_judge.kept_labels(state)))
+
+        # The numbering order. On this image with the cap lowered below its
+        # candidate count but above its kept count: every kept lacuna is
+        # numbered, the numbered set is the head of the order of priority, and
+        # the numbers run in reading order. With the cap below its kept count:
+        # the kept lacunae left out are counted and reported.
+        width = state["labels"].shape[1]
+        n_kept, n_found = c0["deterministic_lacunae"], c0["candidates_found"]
+        order = [_pixel_key(e["rows"], e["cols"], width)
+                 for e in sorted(everything, key=ai_judge.lacuna_priority_key)]
+        cap = min(n_found - 1, n_kept + max(1, (n_found - n_kept) // 2))
+        config.AI_LACUNA_MAX_NUMBERED = cap
+        low = ai_judge.lacuna_candidates(state)
+        config.AI_LACUNA_MAX_NUMBERED = cap = n_kept - 1
+        lower = ai_judge.lacuna_candidates(state)
+        config.AI_LACUNA_MAX_NUMBERED = saved_cap
+        got = {_pixel_key(e["rows"], e["cols"], width) for e in low["candidates"]}
+        rows_in_order = [(e["centroid_xy"][1], e["centroid_xy"][0]) for e in low["candidates"]]
+        lc, lw = low["counts"], lower["counts"]
+        print(f"  the numbering order with the cap lowered: {lc['numbered']} of {n_found} numbered, "
+              f"{lc['kept_lacunae_not_numbered_over_the_cap']} of {n_kept} kept lacunae left out; "
+              f"with a cap of {cap}, {lw['kept_lacunae_not_numbered_over_the_cap']} left out and "
+              f"reported")
+        checks.append(("over the cap, every kept lacuna is numbered and the cap drops from the end "
+                       "of the order, the numbers in reading order",
+                       n_found > lc["numbered"] and lc["kept_lacunae_not_numbered_over_the_cap"] == 0
+                       and lc["numbered_kept_by_the_filters"] == n_kept
+                       and got == set(order[:lc["numbered"]])
+                       and rows_in_order == sorted(rows_in_order)
+                       and not lc["more_kept_lacunae_than_the_cap"]))
+        checks.append(("with more kept lacunae than the cap, those left out are counted and reported",
+                       lw["kept_lacunae_not_numbered_over_the_cap"] == 1
+                       and lw["more_kept_lacunae_than_the_cap"]
+                       and len(_warn_more_kept_than_the_cap(
+                           [{"group": group, "label": label, "counts": lw}])) == 1))
+
+        # The same on every real image with more candidates than the cap, read
+        # from the cache only, so the slow stage is not run here.
+        every_image = lacuna_judge_images(argparse.Namespace())
+        cached_count, over_cap = 0, []
+        for other in every_image:
+            held = ai_judge.cached_lacuna_state(other, build=False)
+            if held is None:
+                continue
+            cached_count += 1
+            oc = ai_judge.lacuna_candidates(held)["counts"]
+            if oc["candidates_found"] > config.AI_LACUNA_MAX_NUMBERED:
+                over_cap.append((f"{held['group']}/{held['label']}", oc))
+        left_out = [(name, oc["kept_lacunae_not_numbered_over_the_cap"]) for name, oc in over_cap
+                    if oc["kept_lacunae_not_numbered_over_the_cap"]]
+        print(f"  real images over the cap, from the cache ({cached_count} of {len(every_image)} "
+              f"cached): {len(over_cap)} over the cap of {config.AI_LACUNA_MAX_NUMBERED}, up to "
+              f"{max((oc['candidates_found'] for _n, oc in over_cap), default=0)} candidates; kept "
+              f"lacunae left unnumbered: {left_out or 'none'}")
+        checks.append((f"on every real image over the cap ({len(over_cap)}), every kept lacuna is "
+                       "numbered", bool(over_cap) and not left_out))
 
         prompt = ai_judge.load_lacuna_prompt()
         sent = prompt["system"] + "\n" + prepared["user_text"]
@@ -8303,6 +8360,18 @@ def _ai_lacuna_self_test(images: list) -> int:
                        "says so", "ai_lacuna_judge" in q["parameters"]["canaliculi"]
                        and "ai_lacuna_judge" in detection["lacunae_detection"]))
 
+        # The review counts from the decision file alone; they must be what the
+        # switch did in the pipeline.
+        review = _ai_lacuna_review_image(str(image_path))["row"]
+        print(f"  the review: {review['yes']} yes, {review['no']} no, {review['unsure']} unsure, "
+              f"lacunae {review['lacunae before']} -> {review['lacunae after']} "
+              f"(+{review['regions added']} -{review['regions removed']})")
+        checks.append(("the review's table is what the switch did",
+                       [review[k] for k in ("yes", "no", "unsure", "unjudged", "regions added",
+                                            "regions removed", "lacunae before", "lacunae after")]
+                       == [c[k] for k in ("yes", "no", "unsure", "unjudged", "added", "removed",
+                                          "lacunae_before", "lacunae_after")]))
+
         # An image whose answer never validates: every region unjudged, and the
         # lacunae exactly the deterministic ones.
         use_log("unreadable")
@@ -8407,6 +8476,7 @@ def _ai_lacuna_self_test(images: list) -> int:
         ai_judge.LACUNA_LOG_ROOT = saved_root
         config.AI_LACUNA_JUDGE_ENABLED = saved_switch
         config.AI_LACUNA_MAX_COST_USD = saved_ceiling
+        config.AI_LACUNA_MAX_NUMBERED = saved_cap
 
     print()
     print_table(["check", "result"], [[name, "PASS" if ok else "FAIL"] for name, ok in checks])
@@ -8428,6 +8498,205 @@ def cmd_ai_lacuna_judge(args) -> int:
     if args.replay:
         return ai_lacuna_replay(images, out_root, args.workers)
     return ai_lacuna_dry_run(images, out_root / config.AI_LACUNA_DRY_RUN_DIR, args.workers)
+
+
+# The review: what the judge said, drawn and tabled, from the decision files in
+# the log and the candidates rebuilt from the cached lacuna stage. No call is
+# made and no environment variable is read. Per image only: no comparison
+# between groups and no statistics.
+AI_LACUNA_VERDICT_COLOURS = {"yes": (0, 220, 0), "no": (255, 40, 40), "unsure": (255, 220, 0),
+                             "unjudged": (150, 150, 150)}
+# A thumbnail is the image at every second pixel, so a 1024 px field is 512 px
+# and nothing is interpolated; three to a row.
+AI_LACUNA_THUMB_STEP = 2
+AI_LACUNA_SHEET_COLUMNS = 3
+
+
+def _ai_lacuna_review_image(path_str: str) -> dict:
+    """One image of the review: its thumbnail with every candidate outlined in
+    the colour of its verdict, its row of the table and its regions."""
+    import ai_judge
+
+    image_path = Path(path_str)
+    state = ai_judge.cached_lacuna_state(image_path)
+    cand = ai_judge.lacuna_candidates(state)
+    group, label = state["group"], state["label"]
+    path = ai_judge.lacuna_decisions_path(group, label)
+    decisions = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    if decisions is not None and decisions["geometry_sha256"] != cand["geometry_sha256"]:
+        raise ValueError(f"the decision file of {group}/{label} was written for other candidates "
+                         f"than the lacuna stage gives now; the review refuses to draw it")
+    verdict_of = {int(r["n"]): r for r in decisions["regions"]} if decisions else {}
+
+    entries = cand["candidates"] + cand["not_numbered"]
+    shape = state["labels"].shape
+    index = np.zeros(shape, dtype=np.int32)
+    colours = np.zeros((len(entries) + 1, 3), dtype=np.uint8)
+    regions, counts = [], {"yes": 0, "no": 0, "unsure": 0, "unjudged": 0, "added": 0,
+                           "added_dim_candidates": 0, "removed": 0}
+    for i, e in enumerate(entries, start=1):
+        item = verdict_of.get(e["n"]) if e["n"] is not None else None
+        verdict = item["verdict"] if item else "unjudged"
+        index[e["rows"], e["cols"]] = i
+        colours[i] = AI_LACUNA_VERDICT_COLOURS[verdict]
+        is_lacuna = e["deterministic"] == "lacuna"
+        if e["n"] is not None:
+            counts[verdict] += 1
+        if verdict == "yes" and not is_lacuna:
+            counts["added"] += 1
+            counts["added_dim_candidates"] += int(e["kind"] == "dim")
+        elif verdict == "no" and is_lacuna:
+            counts["removed"] += 1
+        regions.append({"group": group, "image": label, "n": e["n"], "kind": e["kind"],
+                        "area_px2": e["area_px2"], "centroid_x": e["centroid_xy"][0],
+                        "centroid_y": e["centroid_xy"][1], "deterministic": e["deterministic"],
+                        "rejected_by": e["rejected_by"], "verdict": verdict,
+                        "why": item["why"] if item else "",
+                        "result": ("lacuna" if verdict == "yes" else "not a lacuna"
+                                   if verdict == "no" else e["deterministic"])})
+
+    step = AI_LACUNA_THUMB_STEP
+    thumb = np.stack([ai_judge.raw_uint8(state["channel"])[::step, ::step]] * 3, axis=-1)
+    small = index[::step, ::step]
+    # A ring 2 px wide just outside each region, so it covers none of it and a
+    # grey ring still shows against the grey image.
+    inside = small > 0
+    outline = ndi.binary_dilation(inside, structure=np.ones((3, 3), bool), iterations=2) & ~inside
+    near = ndi.grey_dilation(small, size=(5, 5))
+    thumb[outline] = colours[near[outline]]
+
+    before = int(cand["counts"]["deterministic_lacunae"])
+    totals = (decisions or {}).get("totals", {})
+    row = {
+        "group": group, "image": label, "image_code": cand["image_code"],
+        "status": ("judged" if decisions and decisions["answer_valid"] else
+                   "no valid answer" if decisions else "no decision file"),
+        "candidates": cand["counts"]["candidates_found"], "numbered": cand["counts"]["numbered"],
+        "not numbered (over the cap)": cand["counts"]["not_numbered_over_the_cap"],
+        "yes": counts["yes"], "no": counts["no"], "unsure": counts["unsure"],
+        "unjudged": counts["unjudged"], "regions added": counts["added"],
+        "of those, dim candidates": counts["added_dim_candidates"],
+        "regions removed": counts["removed"], "lacunae before": before,
+        "lacunae after": before + counts["added"] - counts["removed"],
+        "attempts": totals.get("attempts", 0), "cost USD": totals.get("cost_usd", 0.0),
+    }
+    return {"group": group, "label": label, "thumb": thumb, "row": row, "regions": regions}
+
+
+def _ai_lacuna_contact_sheet(group: str, items: list):
+    """One group's contact sheet: a legend, then every image's thumbnail with
+    its name and its counts under it."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    font = ImageFont.load_default(size=15)
+    small = ImageFont.load_default(size=13)
+    cell_w = max(it["thumb"].shape[1] for it in items)
+    cell_h = max(it["thumb"].shape[0] for it in items)
+    pad, caption, head = 12, 44, 70
+    cols = min(AI_LACUNA_SHEET_COLUMNS, len(items))
+    rows = (len(items) + cols - 1) // cols
+    sheet = Image.new("RGB", (pad + cols * (cell_w + pad), head + rows * (cell_h + caption + pad)),
+                      (28, 28, 28))
+    draw = ImageDraw.Draw(sheet)
+    draw.text((pad, 10), f"{group}: the AI lacuna judge's verdicts. EXPERIMENT, not validated.",
+              fill=(255, 255, 255), font=font)
+    x = pad
+    for verdict, text in (("yes", "yes"), ("no", "no"), ("unsure", "unsure"),
+                          ("unjudged", "unjudged or not numbered")):
+        draw.rectangle([x, 40, x + 14, 54], fill=AI_LACUNA_VERDICT_COLOURS[verdict])
+        draw.text((x + 20, 39), text, fill=(230, 230, 230), font=small)
+        x += 40 + int(draw.textlength(text, font=small))
+    for i, it in enumerate(items):
+        r, c = divmod(i, cols)
+        left, top = pad + c * (cell_w + pad), head + r * (cell_h + caption + pad)
+        sheet.paste(Image.fromarray(it["thumb"]), (left, top))
+        w = it["row"]
+        draw.text((left, top + it["thumb"].shape[0] + 4), f"{it['label']}  ({w['status']})",
+                  fill=(255, 255, 255), font=small)
+        draw.text((left, top + it["thumb"].shape[0] + 22),
+                  f"{w['candidates']} candidates: {w['yes']} yes, {w['no']} no, {w['unsure']} "
+                  f"unsure, {w['unjudged']} unjudged; lacunae {w['lacunae before']} -> "
+                  f"{w['lacunae after']} (+{w['regions added']} -{w['regions removed']})",
+                  fill=(210, 210, 210), font=small)
+    return sheet
+
+
+def cmd_ai_lacuna_review(args) -> int:
+    """The contact sheets and the per-image table in results_ai_lacunae/review/."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    images = lacuna_judge_images(args)
+    out = Path(args.out) / config.AI_LACUNA_REVIEW_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    workers = max(1, min(args.workers, len(images)))
+    with ProcessPoolExecutor(max_workers=workers) as ex:
+        items = list(ex.map(_ai_lacuna_review_image, [str(p) for p in images]))
+    by_group: dict = {}
+    for it in items:
+        by_group.setdefault(it["group"], []).append(it)
+    sheets = {}
+    for group, members in by_group.items():
+        path = out / f"{group}_contact_sheet.png"
+        _ai_lacuna_contact_sheet(group, members).save(path, format="PNG")
+        sheets[group] = path
+    rows = [it["row"] for it in items]
+    regions = [r for it in items for r in it["regions"]]
+    write_rows_csv(out / "review.csv", list(rows[0]), rows)
+    write_rows_csv(out / "review_regions.csv", list(regions[0]), regions)
+    run_path = Path(args.out) / "ai_lacuna_judge_run.json"
+    run = json.loads(run_path.read_text(encoding="utf-8")) if run_path.is_file() else None
+    (out / "review.json").write_text(json.dumps(
+        {"status": "EXPERIMENT, pre-validation, not validated",
+         "colours": {k: list(v) for k, v in AI_LACUNA_VERDICT_COLOURS.items()},
+         "per_image": rows, "contact_sheets": {g: _rel(p) for g, p in sheets.items()}},
+        indent=2) + "\n", encoding="utf-8")
+    (out / "review.md").write_text(_ai_lacuna_review_markdown(by_group, sheets, run),
+                                   encoding="utf-8")
+    header = ["group", "image", "status", "candidates", "numbered", "yes", "no", "unsure",
+              "unjudged", "added", "removed", "before", "after"]
+    print_table(header, [[r["group"], r["image"], r["status"], r["candidates"], r["numbered"],
+                          r["yes"], r["no"], r["unsure"], r["unjudged"], r["regions added"],
+                          r["regions removed"], r["lacunae before"], r["lacunae after"]]
+                         for r in rows], title="AI lacuna judge, review (from the log, no network)")
+    print(f"review -> {out / 'review.md'}, review.csv, review_regions.csv, review.json; "
+          f"{len(sheets)} contact sheets in {out}")
+    return 0
+
+
+def _ai_lacuna_review_markdown(by_group: dict, sheets: dict, run: dict | None) -> str:
+    lines = [
+        "# AI lacuna judge: review",
+        "",
+        "**EXPERIMENT, pre-validation. NOT VALIDATED: no verdict here has been checked against a "
+        "manual count.** What the AI lacuna judge said about every candidate region, made by "
+        "`python src/diagnostics.py ai-lacuna-review` from the decision files in "
+        "`results_ai_lacunae/<group>/ai_log/` and the candidates rebuilt from the cached lacuna "
+        "stage. No call was made to make it.",
+        "",
+        "On every thumbnail each candidate region is outlined in the colour of its verdict: "
+        "**green yes, red no, yellow unsure, grey unjudged** (a region the judge did not answer, or "
+        "one the cap left without a number, which keeps the deterministic decision). The "
+        "thumbnail is the raw signal channel at every second pixel. A region added is a yes on a "
+        "region the filters rejected or on a dim candidate; a region removed is a no on a region "
+        "the filters kept; unsure and unjudged keep the deterministic decision. The boundaries are "
+        "the lacuna stage's own: the judge draws none.",
+        "",
+        "Per image only: nothing here compares groups, and no statistic is computed. Every "
+        "region's verdict and the judge's one line why are in `review_regions.csv`.",
+        "",
+    ]
+    if run:
+        lines += [f"The run: {run['images_run']} of {run['images']} images, model "
+                  f"`{run['model']}`, ${run['spent_usd']} spent"
+                  + (f", stopped: {run['stopped']}" if run.get("stopped") else "") + ".", ""]
+    for group, members in by_group.items():
+        lines += [f"## {group}", "", f"![{group}]({sheets[group].name})", ""]
+        header = [h for h in members[0]["row"] if h != "group"]
+        lines += ["| " + " | ".join(header) + " |", "| " + " | ".join("---" for _ in header) + " |"]
+        for it in members:
+            lines.append("| " + " | ".join(str(it["row"][h]) for h in header) + " |")
+        lines.append("")
+    return "\n".join(lines)
 
 
 def _ai_lacuna_run_detect(job: tuple) -> dict:
@@ -8887,6 +9156,17 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=8,
                    help="Parallel processes, one image each (default 8).")
     p.set_defaults(func=cmd_ai_lacuna_run)
+
+    p = sub.add_parser("ai-lacuna-review",
+                       help="EXPERIMENT: contact sheets of the AI lacuna judge's verdicts and a "
+                            "table per image, from the log, into results_ai_lacunae/review/.")
+    add_images_arguments(p)
+    p.add_argument("-o", dest="out", type=Path, default=config.AI_LACUNA_RESULTS_ROOT,
+                   help="Output root; the review goes to <root>/review/ (default: "
+                        "results_ai_lacunae).")
+    p.add_argument("-w", dest="workers", type=int, default=8,
+                   help="Parallel processes, one image each (default 8).")
+    p.set_defaults(func=cmd_ai_lacuna_review)
 
     p = sub.add_parser("group-overview",
                        help="One table over every group, one row per image: results/group_overview.csv "
