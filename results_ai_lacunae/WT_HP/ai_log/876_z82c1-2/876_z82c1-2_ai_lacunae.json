@@ -1,0 +1,1769 @@
+{
+  "schema": "lcn-ai-lacuna-judge-decisions-1",
+  "status": "EXPERIMENT, pre-validation, not validated. Which regions are lacunae was decided by an AI judge; every boundary is the lacuna stage's own. Applied only when config.AI_LACUNA_JUDGE_ENABLED is True.",
+  "written_at": "2026-10-27T16:31:30Z",
+  "mode": "live",
+  "image_label": "876_z82c1-2",
+  "group": "WT_HP",
+  "image_code": "img_2183dbdf",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "prompt_sha256": "5a639cf96a54670ecc69090fad4befd585b2b2c72a9474123bd737ff4751a20c",
+  "examples_sha256": "46ec9b817506a78e49034ad203f7c4e69d950a9ae38853b5342a28fec3e7ec89",
+  "examples_present": true,
+  "request_sha256": "d0c6a9dafa0c2ca61ea5e835b09a93967716cbc6655b4d23becc8ff851b057f3",
+  "picture": "results_ai_lacunae/WT_HP/ai_log/876_z82c1-2/876_z82c1-2_picture.png",
+  "picture_sha256": "739d857beaa60018ecedf2e28e8054c147742d373f58e560f7e1df31bd13d66a",
+  "candidate_rule": {
+    "lacuna_cut_t_hi": 0.32067249,
+    "dim_cut_fraction": 0.8,
+    "dim_cut": 0.25653799,
+    "min_candidate_area_px2": 100,
+    "max_numbered": 60,
+    "numbering_order": [
+      "every region the filters kept",
+      "every region they rejected of at least config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2",
+      "the dim candidates",
+      "the regions they rejected under that area"
+    ],
+    "priority_rejected_min_area_px2": 300
+  },
+  "candidate_counts": {
+    "candidates_found": 75,
+    "numbered": 60,
+    "not_numbered_over_the_cap": 15,
+    "kept_lacunae_not_numbered_over_the_cap": 0,
+    "more_kept_lacunae_than_the_cap": false,
+    "max_numbered": 60,
+    "rejected_regions_not_numbered_over_the_cap": 5,
+    "dim_not_numbered_over_the_cap": 10,
+    "regions": 10,
+    "dim": 50,
+    "numbered_kept_by_the_filters": 10,
+    "numbered_rejected_by_the_filters": 0,
+    "deterministic_lacunae": 10,
+    "kept_lacunae_that_are_no_candidate": 0
+  },
+  "geometry_sha256": "616133dda59285f4b21fa1bbeb1c393eaba27e2e56a904ad7b6f866372901f3f",
+  "answer_valid": true,
+  "invalid_reasons": [],
+  "replay_checks": [],
+  "totals": {
+    "calls": 1,
+    "attempts": 1,
+    "invalid_attempts": 0,
+    "call_errors": 0,
+    "refusals": 0,
+    "input_tokens": 4228,
+    "output_tokens": 1570,
+    "cost_usd": 0.024156,
+    "replay_request_mismatches": 0,
+    "replay_picture_mismatches": 0,
+    "stopped_on_cost": false
+  },
+  "verdicts": {
+    "yes": 8,
+    "no": 49,
+    "unsure": 3,
+    "unjudged": 0
+  },
+  "regions": [
+    {
+      "n": 1,
+      "kind": "dim",
+      "area_px2": 831,
+      "centroid_xy": [
+        101.6,
+        4.7
+      ],
+      "bbox_rc": [
+        0,
+        50,
+        22,
+        151
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canalicular fragment at top edge"
+    },
+    {
+      "n": 2,
+      "kind": "dim",
+      "area_px2": 136,
+      "centroid_xy": [
+        539.7,
+        4.8
+      ],
+      "bbox_rc": [
+        0,
+        531,
+        14,
+        547
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process fragment"
+    },
+    {
+      "n": 3,
+      "kind": "dim",
+      "area_px2": 130,
+      "centroid_xy": [
+        161.5,
+        5.4
+      ],
+      "bbox_rc": [
+        0,
+        155,
+        13,
+        169
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canaliculi fragment"
+    },
+    {
+      "n": 4,
+      "kind": "dim",
+      "area_px2": 728,
+      "centroid_xy": [
+        651.2,
+        7.8
+      ],
+      "bbox_rc": [
+        0,
+        611,
+        35,
+        693
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process line"
+    },
+    {
+      "n": 5,
+      "kind": "dim",
+      "area_px2": 489,
+      "centroid_xy": [
+        33.7,
+        9.2
+      ],
+      "bbox_rc": [
+        0,
+        11,
+        27,
+        55
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "faint fragment at edge"
+    },
+    {
+      "n": 6,
+      "kind": "dim",
+      "area_px2": 153,
+      "centroid_xy": [
+        199.0,
+        9.5
+      ],
+      "bbox_rc": [
+        0,
+        189,
+        20,
+        208
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canalicular piece"
+    },
+    {
+      "n": 7,
+      "kind": "dim",
+      "area_px2": 489,
+      "centroid_xy": [
+        707.5,
+        12.3
+      ],
+      "bbox_rc": [
+        0,
+        690,
+        28,
+        726
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canaliculi network"
+    },
+    {
+      "n": 8,
+      "kind": "region",
+      "area_px2": 4013,
+      "centroid_xy": [
+        878.1,
+        16.4
+      ],
+      "bbox_rc": [
+        0,
+        738,
+        43,
+        990
+      ],
+      "on_border": true,
+      "deterministic": "lacuna",
+      "lacuna_id": 1,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 25,
+      "verdict": "yes",
+      "why": "bright compact body with processes at top right"
+    },
+    {
+      "n": 9,
+      "kind": "dim",
+      "area_px2": 132,
+      "centroid_xy": [
+        114.6,
+        26.1
+      ],
+      "bbox_rc": [
+        18,
+        108,
+        33,
+        122
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small speck"
+    },
+    {
+      "n": 10,
+      "kind": "region",
+      "area_px2": 176,
+      "centroid_xy": [
+        798.3,
+        34.5
+      ],
+      "bbox_rc": [
+        27,
+        787,
+        42,
+        810
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 9,
+      "lacuna_class": "dim",
+      "rejected_by": null,
+      "source_label": 48,
+      "verdict": "no",
+      "why": "thin process fragment"
+    },
+    {
+      "n": 11,
+      "kind": "dim",
+      "area_px2": 195,
+      "centroid_xy": [
+        197.6,
+        36.0
+      ],
+      "bbox_rc": [
+        22,
+        183,
+        51,
+        211
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canaliculus"
+    },
+    {
+      "n": 12,
+      "kind": "dim",
+      "area_px2": 274,
+      "centroid_xy": [
+        574.7,
+        40.7
+      ],
+      "bbox_rc": [
+        30,
+        559,
+        53,
+        597
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process line"
+    },
+    {
+      "n": 13,
+      "kind": "dim",
+      "area_px2": 578,
+      "centroid_xy": [
+        738.1,
+        57.3
+      ],
+      "bbox_rc": [
+        32,
+        719,
+        79,
+        763
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "branching canaliculi network"
+    },
+    {
+      "n": 14,
+      "kind": "dim",
+      "area_px2": 184,
+      "centroid_xy": [
+        76.7,
+        62.7
+      ],
+      "bbox_rc": [
+        56,
+        64,
+        72,
+        91
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small speck"
+    },
+    {
+      "n": 15,
+      "kind": "dim",
+      "area_px2": 156,
+      "centroid_xy": [
+        174.8,
+        67.8
+      ],
+      "bbox_rc": [
+        52,
+        170,
+        82,
+        181
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small fragment"
+    },
+    {
+      "n": 16,
+      "kind": "dim",
+      "area_px2": 200,
+      "centroid_xy": [
+        847.6,
+        71.3
+      ],
+      "bbox_rc": [
+        55,
+        837,
+        92,
+        860
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 17,
+      "kind": "dim",
+      "area_px2": 146,
+      "centroid_xy": [
+        130.3,
+        73.9
+      ],
+      "bbox_rc": [
+        66,
+        123,
+        85,
+        137
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small fragment"
+    },
+    {
+      "n": 18,
+      "kind": "dim",
+      "area_px2": 205,
+      "centroid_xy": [
+        913.9,
+        75.5
+      ],
+      "bbox_rc": [
+        59,
+        908,
+        89,
+        922
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 19,
+      "kind": "dim",
+      "area_px2": 1808,
+      "centroid_xy": [
+        274.9,
+        89.3
+      ],
+      "bbox_rc": [
+        38,
+        230,
+        125,
+        319
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "branching canaliculi"
+    },
+    {
+      "n": 20,
+      "kind": "dim",
+      "area_px2": 199,
+      "centroid_xy": [
+        136.2,
+        93.3
+      ],
+      "bbox_rc": [
+        86,
+        124,
+        101,
+        150
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "tiny speck"
+    },
+    {
+      "n": 21,
+      "kind": "dim",
+      "area_px2": 589,
+      "centroid_xy": [
+        584.2,
+        98.1
+      ],
+      "bbox_rc": [
+        87,
+        546,
+        112,
+        616
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 22,
+      "kind": "dim",
+      "area_px2": 1970,
+      "centroid_xy": [
+        707.2,
+        99.8
+      ],
+      "bbox_rc": [
+        72,
+        629,
+        129,
+        790
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 23,
+      "kind": "dim",
+      "area_px2": 127,
+      "centroid_xy": [
+        186.2,
+        101.4
+      ],
+      "bbox_rc": [
+        92,
+        176,
+        112,
+        194
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "tiny fragment"
+    },
+    {
+      "n": 24,
+      "kind": "dim",
+      "area_px2": 222,
+      "centroid_xy": [
+        86.4,
+        103.9
+      ],
+      "bbox_rc": [
+        89,
+        79,
+        117,
+        100
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small fragment"
+    },
+    {
+      "n": 25,
+      "kind": "dim",
+      "area_px2": 127,
+      "centroid_xy": [
+        371.9,
+        109.9
+      ],
+      "bbox_rc": [
+        98,
+        367,
+        123,
+        378
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin fragment"
+    },
+    {
+      "n": 26,
+      "kind": "dim",
+      "area_px2": 602,
+      "centroid_xy": [
+        919.2,
+        125.1
+      ],
+      "bbox_rc": [
+        94,
+        909,
+        160,
+        935
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 27,
+      "kind": "dim",
+      "area_px2": 524,
+      "centroid_xy": [
+        523.4,
+        130.1
+      ],
+      "bbox_rc": [
+        104,
+        513,
+        167,
+        537
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 28,
+      "kind": "dim",
+      "area_px2": 163,
+      "centroid_xy": [
+        250.5,
+        134.4
+      ],
+      "bbox_rc": [
+        124,
+        244,
+        145,
+        258
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small fragment"
+    },
+    {
+      "n": 29,
+      "kind": "dim",
+      "area_px2": 832,
+      "centroid_xy": [
+        831.6,
+        135.2
+      ],
+      "bbox_rc": [
+        73,
+        811,
+        212,
+        851
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 30,
+      "kind": "dim",
+      "area_px2": 149,
+      "centroid_xy": [
+        963.1,
+        138.2
+      ],
+      "bbox_rc": [
+        124,
+        955,
+        154,
+        975
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 31,
+      "kind": "region",
+      "area_px2": 2473,
+      "centroid_xy": [
+        378.8,
+        149.5
+      ],
+      "bbox_rc": [
+        131,
+        326,
+        173,
+        433
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 2,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 116,
+      "verdict": "yes",
+      "why": "bright elongated osteocyte body with processes"
+    },
+    {
+      "n": 32,
+      "kind": "dim",
+      "area_px2": 138,
+      "centroid_xy": [
+        302.8,
+        162.1
+      ],
+      "bbox_rc": [
+        156,
+        292,
+        170,
+        314
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "tiny fragment"
+    },
+    {
+      "n": 33,
+      "kind": "region",
+      "area_px2": 165,
+      "centroid_xy": [
+        106.1,
+        163.6
+      ],
+      "bbox_rc": [
+        157,
+        97,
+        172,
+        115
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 10,
+      "lacuna_class": "dim",
+      "rejected_by": null,
+      "source_label": 130,
+      "verdict": "no",
+      "why": "tiny speck"
+    },
+    {
+      "n": 34,
+      "kind": "dim",
+      "area_px2": 226,
+      "centroid_xy": [
+        792.6,
+        171.5
+      ],
+      "bbox_rc": [
+        152,
+        786,
+        192,
+        805
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 35,
+      "kind": "dim",
+      "area_px2": 137,
+      "centroid_xy": [
+        11.0,
+        174.0
+      ],
+      "bbox_rc": [
+        167,
+        0,
+        186,
+        24
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "edge fragment"
+    },
+    {
+      "n": 36,
+      "kind": "dim",
+      "area_px2": 2338,
+      "centroid_xy": [
+        951.6,
+        188.4
+      ],
+      "bbox_rc": [
+        113,
+        901,
+        254,
+        1024
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "yes",
+      "why": "bright compact body with processes"
+    },
+    {
+      "n": 37,
+      "kind": "dim",
+      "area_px2": 159,
+      "centroid_xy": [
+        465.3,
+        212.0
+      ],
+      "bbox_rc": [
+        200,
+        457,
+        228,
+        474
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin fragment"
+    },
+    {
+      "n": 38,
+      "kind": "dim",
+      "area_px2": 570,
+      "centroid_xy": [
+        860.8,
+        227.9
+      ],
+      "bbox_rc": [
+        212,
+        821,
+        246,
+        887
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 39,
+      "kind": "dim",
+      "area_px2": 187,
+      "centroid_xy": [
+        142.7,
+        233.2
+      ],
+      "bbox_rc": [
+        215,
+        138,
+        250,
+        149
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canaliculus"
+    },
+    {
+      "n": 40,
+      "kind": "dim",
+      "area_px2": 329,
+      "centroid_xy": [
+        998.0,
+        236.0
+      ],
+      "bbox_rc": [
+        209,
+        992,
+        267,
+        1005
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 41,
+      "kind": "dim",
+      "area_px2": 216,
+      "centroid_xy": [
+        721.3,
+        241.0
+      ],
+      "bbox_rc": [
+        231,
+        712,
+        258,
+        741
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small thin fragment"
+    },
+    {
+      "n": 42,
+      "kind": "dim",
+      "area_px2": 212,
+      "centroid_xy": [
+        962.4,
+        248.7
+      ],
+      "bbox_rc": [
+        235,
+        956,
+        265,
+        971
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 43,
+      "kind": "dim",
+      "area_px2": 162,
+      "centroid_xy": [
+        230.0,
+        270.4
+      ],
+      "bbox_rc": [
+        263,
+        220,
+        280,
+        240
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small fragment"
+    },
+    {
+      "n": 44,
+      "kind": "dim",
+      "area_px2": 318,
+      "centroid_xy": [
+        139.7,
+        290.7
+      ],
+      "bbox_rc": [
+        267,
+        131,
+        310,
+        150
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canaliculus"
+    },
+    {
+      "n": 45,
+      "kind": "region",
+      "area_px2": 2634,
+      "centroid_xy": [
+        911.9,
+        300.8
+      ],
+      "bbox_rc": [
+        281,
+        856,
+        327,
+        965
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 3,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 161,
+      "verdict": "no",
+      "why": "thin process fragment"
+    },
+    {
+      "n": 46,
+      "kind": "dim",
+      "area_px2": 167,
+      "centroid_xy": [
+        387.4,
+        302.6
+      ],
+      "bbox_rc": [
+        295,
+        375,
+        308,
+        399
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small fragment on process line"
+    },
+    {
+      "n": 47,
+      "kind": "dim",
+      "area_px2": 458,
+      "centroid_xy": [
+        432.9,
+        303.1
+      ],
+      "bbox_rc": [
+        296,
+        405,
+        311,
+        467
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin process"
+    },
+    {
+      "n": 48,
+      "kind": "region",
+      "area_px2": 2169,
+      "centroid_xy": [
+        321.7,
+        303.7
+      ],
+      "bbox_rc": [
+        283,
+        277,
+        322,
+        365
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 4,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 162,
+      "verdict": "yes",
+      "why": "bright compact osteocyte body"
+    },
+    {
+      "n": 49,
+      "kind": "dim",
+      "area_px2": 213,
+      "centroid_xy": [
+        968.6,
+        362.5
+      ],
+      "bbox_rc": [
+        350,
+        961,
+        375,
+        978
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small speck"
+    },
+    {
+      "n": 50,
+      "kind": "dim",
+      "area_px2": 234,
+      "centroid_xy": [
+        359.1,
+        383.2
+      ],
+      "bbox_rc": [
+        377,
+        346,
+        391,
+        373
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "tiny speck"
+    },
+    {
+      "n": 51,
+      "kind": "dim",
+      "area_px2": 152,
+      "centroid_xy": [
+        434.1,
+        444.1
+      ],
+      "bbox_rc": [
+        432,
+        430,
+        460,
+        440
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "tiny fragment"
+    },
+    {
+      "n": 52,
+      "kind": "dim",
+      "area_px2": 898,
+      "centroid_xy": [
+        69.4,
+        454.1
+      ],
+      "bbox_rc": [
+        441,
+        28,
+        469,
+        119
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "thin canalicular strand"
+    },
+    {
+      "n": 53,
+      "kind": "dim",
+      "area_px2": 273,
+      "centroid_xy": [
+        998.4,
+        459.2
+      ],
+      "bbox_rc": [
+        450,
+        984,
+        467,
+        1013
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "no",
+      "why": "small edge speck"
+    },
+    {
+      "n": 54,
+      "kind": "region",
+      "area_px2": 1583,
+      "centroid_xy": [
+        196.8,
+        531.8
+      ],
+      "bbox_rc": [
+        516,
+        159,
+        550,
+        235
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 5,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 182,
+      "verdict": "yes",
+      "why": "bright compact body"
+    },
+    {
+      "n": 55,
+      "kind": "region",
+      "area_px2": 1826,
+      "centroid_xy": [
+        443.0,
+        541.5
+      ],
+      "bbox_rc": [
+        520,
+        412,
+        561,
+        478
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 6,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 183,
+      "verdict": "yes",
+      "why": "bright compact body"
+    },
+    {
+      "n": 56,
+      "kind": "dim",
+      "area_px2": 1304,
+      "centroid_xy": [
+        102.4,
+        651.7
+      ],
+      "bbox_rc": [
+        629,
+        77,
+        672,
+        136
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "unsure",
+      "why": "dim diffuse irregular patch"
+    },
+    {
+      "n": 57,
+      "kind": "dim",
+      "area_px2": 229,
+      "centroid_xy": [
+        795.3,
+        652.3
+      ],
+      "bbox_rc": [
+        645,
+        784,
+        660,
+        808
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "unsure",
+      "why": "small dim spot"
+    },
+    {
+      "n": 58,
+      "kind": "region",
+      "area_px2": 1908,
+      "centroid_xy": [
+        607.2,
+        691.0
+      ],
+      "bbox_rc": [
+        676,
+        562,
+        709,
+        653
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 7,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 187,
+      "verdict": "yes",
+      "why": "bright elongated body"
+    },
+    {
+      "n": 59,
+      "kind": "region",
+      "area_px2": 670,
+      "centroid_xy": [
+        49.2,
+        908.6
+      ],
+      "bbox_rc": [
+        897,
+        26,
+        922,
+        74
+      ],
+      "on_border": false,
+      "deterministic": "lacuna",
+      "lacuna_id": 8,
+      "lacuna_class": "ordinary",
+      "rejected_by": null,
+      "source_label": 188,
+      "verdict": "yes",
+      "why": "dim body with process at lower left"
+    },
+    {
+      "n": 60,
+      "kind": "dim",
+      "area_px2": 868,
+      "centroid_xy": [
+        461.6,
+        969.8
+      ],
+      "bbox_rc": [
+        955,
+        424,
+        987,
+        489
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null,
+      "verdict": "unsure",
+      "why": "dim irregular body at bottom"
+    }
+  ],
+  "not_numbered_keep_the_deterministic_decision": [
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 126,
+      "centroid_xy": [
+        808.9,
+        116.1
+      ],
+      "bbox_rc": [
+        111,
+        798,
+        122,
+        819
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 125,
+      "centroid_xy": [
+        128.7,
+        515.8
+      ],
+      "bbox_rc": [
+        510,
+        116,
+        523,
+        141
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 115,
+      "centroid_xy": [
+        152.3,
+        29.1
+      ],
+      "bbox_rc": [
+        19,
+        145,
+        38,
+        160
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 115,
+      "centroid_xy": [
+        240.9,
+        457.7
+      ],
+      "bbox_rc": [
+        451,
+        235,
+        465,
+        248
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 111,
+      "centroid_xy": [
+        544.4,
+        264.2
+      ],
+      "bbox_rc": [
+        258,
+        533,
+        269,
+        558
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 111,
+      "centroid_xy": [
+        384.5,
+        540.0
+      ],
+      "bbox_rc": [
+        532,
+        379,
+        549,
+        392
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 109,
+      "centroid_xy": [
+        304.0,
+        177.0
+      ],
+      "bbox_rc": [
+        169,
+        298,
+        186,
+        310
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 105,
+      "centroid_xy": [
+        553.6,
+        148.6
+      ],
+      "bbox_rc": [
+        140,
+        548,
+        158,
+        558
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 104,
+      "centroid_xy": [
+        175.4,
+        608.5
+      ],
+      "bbox_rc": [
+        601,
+        172,
+        620,
+        181
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "dim",
+      "area_px2": 103,
+      "centroid_xy": [
+        128.6,
+        185.8
+      ],
+      "bbox_rc": [
+        179,
+        122,
+        195,
+        139
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "under the lacuna cut",
+      "source_label": null
+    },
+    {
+      "n": null,
+      "kind": "region",
+      "area_px2": 270,
+      "centroid_xy": [
+        769.2,
+        32.9
+      ],
+      "bbox_rc": [
+        26,
+        748,
+        41,
+        788
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "area",
+      "source_label": 47
+    },
+    {
+      "n": null,
+      "kind": "region",
+      "area_px2": 241,
+      "centroid_xy": [
+        966.2,
+        926.1
+      ],
+      "bbox_rc": [
+        920,
+        949,
+        933,
+        983
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "area",
+      "source_label": 191
+    },
+    {
+      "n": null,
+      "kind": "region",
+      "area_px2": 223,
+      "centroid_xy": [
+        428.1,
+        4.9
+      ],
+      "bbox_rc": [
+        0,
+        416,
+        18,
+        450
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "area",
+      "source_label": 15
+    },
+    {
+      "n": null,
+      "kind": "region",
+      "area_px2": 158,
+      "centroid_xy": [
+        358.4,
+        7.4
+      ],
+      "bbox_rc": [
+        0,
+        352,
+        21,
+        370
+      ],
+      "on_border": true,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "area",
+      "source_label": 9
+    },
+    {
+      "n": null,
+      "kind": "region",
+      "area_px2": 102,
+      "centroid_xy": [
+        82.7,
+        159.8
+      ],
+      "bbox_rc": [
+        154,
+        73,
+        165,
+        94
+      ],
+      "on_border": false,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "area",
+      "source_label": 125
+    }
+  ]
+}
