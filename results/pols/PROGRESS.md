@@ -11,7 +11,7 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
 ## Phases
 
 - [x] Phase 0, LOOK: crops in results/pols/phase0_look/, results/pols/FINDINGS.md
-- [ ] Phase 1, DEFINE: results/pols/DEFINITION.md
+- [x] Phase 1, DEFINE: results/pols/DEFINITION.md
 - [ ] Phase 2, BUILD: src/pols.py, switch for CSV export, overlays
 - [ ] Phase 3, RUN: results/<group>/pols/ for WT, WT_HP, Hyp_RD, Hyp_HP;
       results/pols/summary_by_group.csv, results/pols/SUMMARY.md
@@ -25,4 +25,11 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
   no distinct halo, no step inside the body; WT surround about 2.3 um of glow). Made
   by a scratch script (no code change allowed in phase 0); phase 2 moves it into the
   repository. Regression before push: PASS, 2 runs, 6800 numbers each.
-- Resume at: phase 1 (DEFINITION.md drafted, not yet committed).
+- Phase 1 done: DEFINITION.md, a POL proxy (body plus the surround above the bone
+  background): 8 sectors of 45 degrees, 3 band slab median, level background + 0.10 x
+  (surface minus background), cap 8 um from the body edge, territories so two
+  surrounds never share a pixel; flags edge, vessel, neighbour, incomplete, no
+  contrast. Every value reused from the glow zone or chosen on no image. Regression
+  before push: PASS, 2 runs.
+- Resume at: phase 2 (src/pols.py written and tried on all groups, not yet committed;
+  next: move the phase 0 look into src/diagnostics.py pol-look).
