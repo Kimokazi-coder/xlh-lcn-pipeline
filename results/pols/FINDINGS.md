@@ -22,8 +22,14 @@ All files are in [`phase0_look/`](phase0_look/).
   to 90 px from the body, bodies and vascular mask left out) and the distance at which the
   profile has fallen to 50, 25 and 10% of its height above that background.
 
-These were made by a scratch script outside the repository, because this phase allowed no
-code change. Phase 2 moves the same code into the repository so that they can be remade.
+- `phase0_body_core_rim.csv`: inside every body with a shape measure, whether it is
+  saturated (more than 5% of its pixels at 254 or 255), and if not, the median of its core
+  over the median of its rim (item 4 below).
+
+These were first made by a scratch script outside the repository, because this phase
+allowed no code change. Phase 2 moved the same code into
+`python src/diagnostics.py pol-look`, which remakes every file here; the remade files are
+byte for byte the ones committed in phase 0.
 
 ## What is there
 

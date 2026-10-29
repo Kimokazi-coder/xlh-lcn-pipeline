@@ -12,7 +12,7 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
 
 - [x] Phase 0, LOOK: crops in results/pols/phase0_look/, results/pols/FINDINGS.md
 - [x] Phase 1, DEFINE: results/pols/DEFINITION.md
-- [ ] Phase 2, BUILD: src/pols.py, switch for CSV export, overlays
+- [x] Phase 2, BUILD: src/pols.py, switch for CSV export, overlays
 - [ ] Phase 3, RUN: results/<group>/pols/ for WT, WT_HP, Hyp_RD, Hyp_HP;
       results/pols/summary_by_group.csv, results/pols/SUMMARY.md
 - [ ] Phase 4, REPORT: results/pols/REPORT.md, push, git log
@@ -31,5 +31,13 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
   surrounds never share a pixel; flags edge, vessel, neighbour, incomplete, no
   contrast. Every value reused from the glow zone or chosen on no image. Regression
   before push: PASS, 2 runs.
-- Resume at: phase 2 (src/pols.py written and tried on all groups, not yet committed;
-  next: move the phase 0 look into src/diagnostics.py pol-look).
+- Phase 2 done: src/pols.py with measure (overlays always, the switch --csv for the
+  two tables), summary (summary_by_group.csv, SUMMARY.md with a neighbour flag
+  sensitivity table) and selftest (10 of 10 synthetic checks pass). It reads the saved
+  detection only and writes only results/<group>/pols/. The phase 0 look moved into
+  python src/diagnostics.py pol-look; its 16 committed files are remade byte for byte,
+  plus phase0_body_core_rim.csv for FINDINGS item 4. A trial run showed the "no
+  contrast" flag firing when the surface band was walled in by the vascular mask; that
+  case is now "no level" (incomplete) and no contrast means surface at or below
+  background. DEFINITION.md updated to match.
+- Resume at: phase 3 (run measure with the switch on for the four groups, then summary).

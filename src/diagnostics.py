@@ -92,6 +92,10 @@ Subcommands:
     compare-methods   both result sets side by side, results/WT/ and
                       results_ai_judge/WT/: csv and xlsx per lacuna, per image and
                       overall, and the cell pairs whose segments changed hands
+    pol-look          the phase 0 look of the POL section: contact sheets of
+                      every field, 4x crop sheets with the radial profile
+                      from the body edge, and profile tables, in
+                      results/pols/phase0_look/ (results/pols/FINDINGS.md)
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -122,6 +126,7 @@ Usage (from the repo root):
     python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures 543-2,543_3
     python src/diagnostics.py ai-judge --image "data/WT/543-2.tif"
     python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --replay -o .cache/ai_replay
+    python src/diagnostics.py pol-look
 """
 
 from __future__ import annotations
@@ -8821,6 +8826,298 @@ def _ai_same_decisions(a: dict, b: dict) -> bool:
     return same
 
 
+# pol-look
+# The phase 0 look of the POL section (results/pols/FINDINGS.md): contact sheets
+# of every field, crop sheets at 4x zoom with the radial profile from the body
+# edge, the same profile for every interior lacuna with a shape measure, and the
+# core against the rim inside each body. It reads the saved lacuna and network
+# outputs and writes only into its output folder. Pre-validation, a look only:
+# nothing here is a rule, and src/pols.py does not use it.
+
+POL_LOOK_DIR = config.RESULTS_ROOT / "pols" / "phase0_look"
+# Which fields get crop sheets: two WT for comparison, four of each Hyp group,
+# one per animal and one more. Chosen before looking at any crop.
+POL_LOOK_CROP_FIELDS = {
+    "WT": ["543-2.tif", "542 WT  2_z18c1-2.tif"],
+    "Hyp_RD": ["535_z13c1-2.tif", "536-63x Hyp RD_z08c1-2.tif", "I534_z19c1-2.tif", "I534_z11c1-2.tif"],
+    "Hyp_HP": ["548 hyp HP_z14c1-2.tif", "699 HYP HP_z20c1-2.tif", "701_z19c1-2.tif", "701_z36c1-2.tif"],
+}
+POL_LOOK_CROP_PX = 128
+POL_LOOK_ZOOM = 4
+SATURATED = 254 / 255
+
+
+def _pol_look_load(group: str, path: Path) -> tuple:
+    root = config.RESULTS_ROOT / group
+    label = lacunae.image_label(path)
+    display, channel = lacunae.load_channel(path)
+    from skimage.io import imread  # noqa: PLC0415
+    lab = imread(lacunae.result_path(root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNA_LABELS))
+    det = json.load(open(lacunae.result_path(root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_DETECTION)))
+    vasc = imread(lacunae.result_path(root, label, config.SECTION_CANALICULI, config.SUFFIX_CANALICULI_VASCULAR)) > 0
+    return label, display, channel, lab.astype(np.int32), set(det["no_shape_ids"]), vasc
+
+
+def _pol_look_contact(group: str, out: Path) -> None:
+    import matplotlib  # noqa: PLC0415
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+    from skimage.transform import resize  # noqa: PLC0415
+
+    paths = sorted((config.DATA_DIR / group).glob("*.tif"))
+    tile, cols = 400, 3
+    rows = int(np.ceil(len(paths) / cols))
+    sheet = np.full((rows * (tile + 20), cols * tile, 3), 255, np.uint8)
+    for i, p in enumerate(paths):
+        _label, _display, channel, lab, _ns, vasc = _pol_look_load(group, p)
+        rgb = (np.clip(np.stack([channel] * 3, -1), 0, 1) * 255).astype(np.uint8)
+        rgb[segmentation.find_boundaries(lab > 0, mode="outer")] = [0, 255, 0]
+        rgb[segmentation.find_boundaries(vasc, mode="outer")] = [255, 0, 255]
+        small = resize(rgb, (tile, tile), order=1, anti_aliasing=True, preserve_range=True).astype(np.uint8)
+        r, c = divmod(i, cols)
+        sheet[r * (tile + 20) + 20: r * (tile + 20) + 20 + tile, c * tile:(c + 1) * tile] = small
+    fig = plt.figure(figsize=(sheet.shape[1] / 100, sheet.shape[0] / 100), dpi=100)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.imshow(sheet)
+    ax.axis("off")
+    for i, p in enumerate(paths):
+        r, c = divmod(i, cols)
+        ax.text(c * tile + 4, r * (tile + 20) + 15, f"{i + 1}. {lacunae.image_label(p)}", fontsize=8)
+    fig.savefig(out / f"contact_{group}.png", dpi=100)
+    plt.close(fig)
+
+
+def _signed_distance(body: np.ndarray) -> np.ndarray:
+    return ndi.distance_transform_edt(~body) - ndi.distance_transform_edt(body)
+
+
+def _pol_look_profile(channel, lab, lid, r0, c0) -> tuple:
+    """Median and quartiles of the raw red by signed distance from the body
+    edge, in 1 px bins, in a window of 200 px; other bodies left out."""
+    h, w = channel.shape
+    half = 100
+    r1, r2 = max(0, r0 - half), min(h, r0 + half)
+    c1, c2 = max(0, c0 - half), min(w, c0 + half)
+    sub = lab[r1:r2, c1:c2]
+    ch = channel[r1:r2, c1:c2]
+    body = sub == lid
+    sd = _signed_distance(body)
+    other = (sub > 0) & ~body
+    bins = np.arange(-12, 81)
+    med, q1, q3 = [], [], []
+    for b0 in bins:
+        m = (sd >= b0) & (sd < b0 + 1) & ~other
+        if m.sum() < 10:
+            med.append(np.nan)
+            q1.append(np.nan)
+            q3.append(np.nan)
+            continue
+        v = ch[m]
+        med.append(np.median(v))
+        q1.append(np.percentile(v, 25))
+        q3.append(np.percentile(v, 75))
+    return bins + 0.5, np.array(med), np.array(q1), np.array(q3)
+
+
+def _pol_look_pick(lab: np.ndarray, no_shape: set, k: int = 5) -> list:
+    """Interior lacunae with a shape measure at the 10th, 30th, 50th, 70th and
+    90th percentile of area."""
+    ids = []
+    h, w = lab.shape
+    for lid, sl in enumerate(ndi.find_objects(lab), start=1):
+        if sl is None or lid in no_shape:
+            continue
+        if sl[0].start == 0 or sl[1].start == 0 or sl[0].stop == h or sl[1].stop == w:
+            continue
+        ids.append((int((lab[sl] == lid).sum()), lid))
+    ids.sort()
+    if not ids:
+        return []
+    chosen = []
+    for q in [0.1, 0.3, 0.5, 0.7, 0.9][:k]:
+        lid = ids[min(len(ids) - 1, int(q * len(ids)))][1]
+        if lid not in chosen:
+            chosen.append(lid)
+    return chosen
+
+
+def _pol_look_crops(group: str, path: Path, out: Path, rows_out: list) -> None:
+    import matplotlib  # noqa: PLC0415
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+
+    crop, zoom = POL_LOOK_CROP_PX, POL_LOOK_ZOOM
+    label, _display, channel, lab, no_shape, _vasc = _pol_look_load(group, path)
+    chosen = _pol_look_pick(lab, no_shape)
+    h, w = channel.shape
+    fig, axes = plt.subplots(len(chosen), 4, figsize=(17, 4.2 * len(chosen)),
+                             gridspec_kw={"width_ratios": [1, 1, 1, 1.5]})
+    if len(chosen) == 1:
+        axes = axes[None, :]
+    for row, lid in enumerate(chosen):
+        rr, cc = np.nonzero(lab == lid)
+        r0, c0 = int(rr.mean()), int(cc.mean())
+        r1 = int(np.clip(r0 - crop // 2, 0, h - crop))
+        c1 = int(np.clip(c0 - crop // 2, 0, w - crop))
+        ch = channel[r1:r1 + crop, c1:c1 + crop]
+        sub = lab[r1:r1 + crop, c1:c1 + crop]
+        big = np.kron(ch, np.ones((zoom, zoom)))
+        # Panel 1: fixed window 0 to 1, the same for every image.
+        axes[row, 0].imshow(big, cmap="gray", vmin=0, vmax=1, interpolation="nearest")
+        axes[row, 0].set_title(f"{label} #{lid}  fixed 0..1", fontsize=9)
+        # Panel 2: stretched on the non-body pixels, 1 to 99 percentile.
+        nb = ch[sub == 0]
+        lo, hi = np.percentile(nb, 1), np.percentile(nb, 99)
+        axes[row, 1].imshow(big, cmap="gray", vmin=lo, vmax=hi, interpolation="nearest")
+        axes[row, 1].set_title(f"stretched {lo:.2f}..{hi:.2f} (non-body)", fontsize=9)
+        # Panel 3: the same stretch with the body outline and rings at 1, 2, 4, 6 um.
+        axes[row, 2].imshow(big, cmap="gray", vmin=lo, vmax=hi, interpolation="nearest")
+        bigsub = np.kron(sub, np.ones((zoom, zoom), dtype=sub.dtype))
+        axes[row, 2].contour(bigsub == lid, levels=[0.5], colors="lime", linewidths=0.8)
+        bigsd = np.kron(_signed_distance(sub == lid), np.ones((zoom, zoom)))
+        axes[row, 2].contour(bigsd, levels=[config.px(1), config.px(2), config.px(4), config.px(6)],
+                             colors=["yellow", "orange", "red", "magenta"], linewidths=0.6)
+        axes[row, 2].set_title("body (lime), +1/2/4/6 um rings", fontsize=9)
+        for a in axes[row, :3]:
+            a.axis("off")
+        x, med, q1, q3 = _pol_look_profile(channel, lab, lid, r0, c0)
+        ax = axes[row, 3]
+        xum = x * config.PIXEL_SIZE_UM_ACQUIRED
+        ax.fill_between(xum, q1, q3, color="0.8")
+        ax.plot(xum, med, "k-")
+        ax.axvline(0, color="lime")
+        for d, col in zip((1, 2, 4, 6), ("yellow", "orange", "red", "magenta")):
+            ax.axvline(d, color=col, lw=0.6)
+        far = med[(x > 60) & (x < 80)]
+        bg = float(np.nanmedian(far)) if np.isfinite(far).any() else np.nan
+        ax.axhline(bg, color="b", ls="dashed", lw=0.8)
+        ax.set_xlabel("signed distance from body edge (um)")
+        ax.set_ylabel("raw red, median per 1 px annulus")
+        ax.set_ylim(0, 1)
+        area = int((lab == lid).sum())
+        ax.set_title(f"body {area * 0.0169:.1f} um2; bg (7.8-10.4 um) {bg:.3f}", fontsize=9)
+        inside = med[x < 0]
+
+        def at(um):
+            return float(med[int(np.argmin(np.abs(xum - um)))])
+        zone = (xum > 0) & (xum <= 4)
+        imin = np.nanargmin(np.where(zone, med, np.nan))
+        rows_out.append({
+            "group": group, "image": label, "lacuna_id": lid, "body_area_um2": round(area * 0.0169, 2),
+            "body_median": round(float(np.nanmedian(inside)), 3),
+            "at_0.5um": round(at(0.5), 3), "at_1um": round(at(1), 3), "at_2um": round(at(2), 3),
+            "at_4um": round(at(4), 3), "at_6um": round(at(6), 3), "bg_7.8_10.4um": round(bg, 3),
+            "min_0_4um": round(float(med[imin]), 3), "min_at_um": round(float(xum[imin]), 2),
+        })
+    fig.suptitle(f"{group} / {label}: PRE-VALIDATION look, 4x nearest-neighbour zoom of 128 px crops", fontsize=11)
+    fig.tight_layout()
+    fig.savefig(out / f"crops_{group}_{label}.png", dpi=70)
+    plt.close(fig)
+
+
+def _pol_look_groupwide() -> tuple[list, list]:
+    """(profile rows, core against rim rows) for every lacuna with a shape
+    measure in every group."""
+    p = config.PIXEL_SIZE_UM_ACQUIRED
+    profiles, inner = [], []
+    for group in config.GROUPS:
+        for path in sorted((config.DATA_DIR / group).glob("*.tif")):
+            label, _display, ch, lab, no_shape, vasc = _pol_look_load(group, path)
+            h, w = ch.shape
+            sat_field = float((ch >= SATURATED).mean())
+            for lid, sl in enumerate(ndi.find_objects(lab), start=1):
+                if sl is None or lid in no_shape:
+                    continue
+                inner.append(_pol_look_core_rim(group, label, lid, ch[sl], lab[sl] == lid))
+                if sl[0].start == 0 or sl[1].start == 0 or sl[0].stop == h or sl[1].stop == w:
+                    continue
+                m = 100
+                r1, r2 = max(0, sl[0].start - m), min(h, sl[0].stop + m)
+                c1, c2 = max(0, sl[1].start - m), min(w, sl[1].stop + m)
+                sub, v, vs = lab[r1:r2, c1:c2], ch[r1:r2, c1:c2], vasc[r1:r2, c1:c2]
+                body = sub == lid
+                d = ndi.distance_transform_edt(~body)
+                ok = (sub == 0) & ~vs
+                ring = ok & (d >= 70) & (d <= 90)
+                if ring.sum() < 50:
+                    continue
+                bg = float(np.median(v[ring]))
+                prof = []
+                for k in range(1, 63):
+                    mk = ok & (d > k - 1) & (d <= k)
+                    prof.append(float(np.median(v[mk])) if mk.sum() >= 10 else np.nan)
+                prof = np.array(prof)
+                s = prof[0]
+                ex = s - bg
+                norm = (prof - bg) / ex if ex > 0 else np.full_like(prof, np.nan)
+
+                def cross(f):
+                    idx = np.nonzero(norm <= f)[0]
+                    return float(idx[0] * p) if idx.size else np.nan  # width in um: bands before the crossing
+                with np.errstate(all="ignore"):
+                    first4 = prof[: int(round(4 / p))]
+                    dip = float(np.nanmin(first4) - bg) if np.isfinite(first4).any() else np.nan
+                profiles.append({
+                    "group": group, "image": label, "lacuna_id": lid,
+                    "body_um2": round(int(body.sum()) * p * p, 2),
+                    "body_sat_frac": round(float((v[body] >= SATURATED).mean()), 3),
+                    "body_median": round(float(np.median(v[body])), 3),
+                    "surface": round(s, 3), "bg": round(bg, 3), "excess": round(ex, 3),
+                    "w50_um": cross(0.5), "w25_um": cross(0.25), "w10_um": cross(0.10),
+                    "dip_below_bg_0_4um": round(dip, 3), "dip_rel": round(dip / ex, 3) if ex > 0 else np.nan,
+                    "vessel_within_8um": bool((vs & (d <= 62)).any()), "field_sat_frac": round(sat_field, 4),
+                })
+    return profiles, inner
+
+
+def _pol_look_core_rim(group: str, label: str, lid: int, ch: np.ndarray, body: np.ndarray) -> dict:
+    """Inside one body: is it saturated (more than 5% of its pixels), and if
+    not, the median of its core (inward distance at least 0.6 of the deepest)
+    over the median of its rim (2 px in, to 0.3 of the deepest)."""
+    v = ch[body]
+    row = {"group": group, "image": label, "lacuna_id": lid, "saturated": bool((v >= SATURATED).mean() > 0.05),
+           "core_over_rim": ""}
+    if row["saturated"]:
+        return row
+    din = ndi.distance_transform_edt(np.pad(body, 1))[1:-1, 1:-1][body]
+    dmax = din.max()
+    core = v[din >= 0.6 * dmax]
+    rim = v[(din >= 2) & (din <= max(3, 0.3 * dmax))]
+    if core.size >= 5 and rim.size >= 5:
+        row["core_over_rim"] = round(float(np.median(core) / np.median(rim)), 4)
+    return row
+
+
+def _write_rows(path: Path, rows: list[dict]) -> None:
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]), lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def cmd_pol_look(args) -> int:
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    for group in config.GROUPS:
+        _pol_look_contact(group, out)
+    rows = []
+    for group, names in POL_LOOK_CROP_FIELDS.items():
+        for name in names:
+            _pol_look_crops(group, config.DATA_DIR / group / name, out, rows)
+    _write_rows(out / "phase0_profiles.csv", rows)
+    profiles, inner = _pol_look_groupwide()
+    _write_rows(out / "phase0_groupwide_profiles.csv", profiles)
+    _write_rows(out / "phase0_body_core_rim.csv", inner)
+    for group in config.GROUPS:
+        g_inner = [r for r in inner if r["group"] == group]
+        ratios = [r["core_over_rim"] for r in g_inner if r["core_over_rim"] != ""]
+        print(f"{group}: {len(g_inner)} bodies, {sum(r['saturated'] for r in g_inner)} saturated; "
+              f"core over rim {min(ratios):.3f} to {max(ratios):.3f} over {len(ratios)}, "
+              f"{sum(1 for x in ratios if x < 0.9)} below 0.9")
+    print(f"PRE-VALIDATION look -> {out}")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -9193,6 +9490,13 @@ def main() -> None:
                         "already in .cache/format_test/real_jpeg/ are used.")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_format_test)
+
+    p = sub.add_parser("pol-look",
+                       help="The phase 0 look of the POL section: contact sheets, 4x crop sheets with "
+                            "radial profiles, and profile tables (results/pols/phase0_look/).")
+    p.add_argument("-o", dest="out", type=Path, default=POL_LOOK_DIR,
+                   help="Output folder (default: results/pols/phase0_look).")
+    p.set_defaults(func=cmd_pol_look)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

@@ -92,7 +92,9 @@ A lacuna is unreliable if any of these holds; the reasons are listed per lacuna.
   the two surrounds meet with no bone background between them. Territories keep two outer
   regions from overlapping, so touching is what an overlap becomes here.
 - **incomplete**: fewer than half of the 8 sectors answered, so the median width is not
-  measured (also when the background ring holds no usable pixel).
+  measured. This includes a lacuna with no level at all, because the band within 1.5 px of
+  its body or the background ring holds fewer than 5 usable pixels (the body is walled in by
+  the vascular mask, the frame or its neighbours).
 - **no contrast**: the surface is not above the background, so there is no surround to
   measure.
 
