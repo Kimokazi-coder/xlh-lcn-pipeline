@@ -57,7 +57,8 @@ study. External API use approved on 2026-10-15, approver: Karim.
 | `results_ai_judge/WT/compare/` | the two sets side by side: pictures, `REPORT.md`, and `compare_methods.csv` and `.xlsx` | `python src/diagnostics.py ai-compare --dir data/WT`, then `python src/diagnostics.py compare-methods --dir data/WT` |
 | `results_ai_judge/WT/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
 | `results_ai_lacunae/` | **the AI lacuna judge, an experiment, not validated**: the judge log with the pictures that were sent (`<group>/ai_log/`), the pipeline with its verdicts applied (`<group>/`, the same per-image layout), `dry_run/`, and `review/` with a contact sheet per group and a table per image; see [`results_ai_lacunae/README.md`](results_ai_lacunae/README.md) | `python src/diagnostics.py ai-lacuna-run -w 20` (offline, from the log); the log itself from `ai-lacuna-judge --live`, see `docs/EXPERIMENT_AI.md` |
-| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
+| `results/pols/`, `results/<group>/pols/` | **the POL section, pre-validation**: the look (`FINDINGS.md`: POLs cannot be told apart in these images), the proxy measured instead (`DEFINITION.md`), overlays and tables per group, `SUMMARY.md` and `REPORT.md`; see [`results/README.md`](results/README.md), POL proxy | `python src/pols.py measure --dir data/WT --csv` per group, then `python src/pols.py summary` |
+| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (the POL proxy, read from the saved detection), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
 | `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group --group GROUP --src SOURCE_FOLDER` |
 | `results/group_overview.csv`, `.xlsx`, `results/group_qc.csv` | every group side by side, one row per image, and the QC list of the new groups (see Groups) | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc` |
@@ -393,6 +394,10 @@ not been chosen.
    filters kept over the four groups, including both objects of item 4, and
    some of the regions it removes look like lacunae on its contact sheets. None
    of its verdicts has been checked against a manual count.
+7. **POLs.** The images show no separate lesion zone (`results/pols/FINDINGS.md`),
+   so `src/pols.py` measures a proxy, the body plus the surround above the bone
+   background, which in WT is optical glow. Whether to keep it, and which fields
+   leave the study, are open (`results/pols/REPORT.md`).
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:

@@ -15,7 +15,7 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
 - [x] Phase 2, BUILD: src/pols.py, switch for CSV export, overlays
 - [x] Phase 3, RUN: results/<group>/pols/ for WT, WT_HP, Hyp_RD, Hyp_HP;
       results/pols/summary_by_group.csv, results/pols/SUMMARY.md
-- [ ] Phase 4, REPORT: results/pols/REPORT.md, push, git log
+- [x] Phase 4, REPORT: results/pols/REPORT.md, push, git log
 
 ## Log
 
@@ -45,5 +45,7 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
   tables, summary_by_group.csv, SUMMARY.md. Measured lacunae: WT 71 of 100 with a
   shape measure, WT_HP 55 of 113, Hyp_RD 86 of 251, Hyp_HP 27 of 250 (two Hyp_HP
   images have none). A rerun of WT gives all 11 files byte for byte.
-- Resume at: phase 4 (REPORT.md drafted; README, METHODS section 24 and the results
-  README edited, not yet committed).
+- Phase 4 done: REPORT.md (one page; every number checked against the phase 3
+  outputs), README (folder table, Still open item 7), docs/METHODS.md section 24 and
+  the sentence on POLs in its introduction, results/README.md (POL proxy section).
+- All phases done. Nothing to resume; the open decisions are in REPORT.md.

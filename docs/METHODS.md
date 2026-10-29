@@ -32,7 +32,8 @@ micrometres throughout.
 the reference group (`data/WT/`, red channel, 1024 x 1024 px), and WT_HP,
 Hyp_RD and Hyp_HP with 9 sections each. **The pixels of all four groups are
 JPEG-decoded** (sections 21 and 22). No Hyp;Enpp1 image has been processed, and
-periosteocytic lesions (POLs) are not measured.
+periosteocytic lesions (POLs) are not measured: these images show no separate
+lesion zone, and section 24 describes the proxy measured instead.
 
 ## 1. Pipeline steps
 
@@ -1937,3 +1938,31 @@ judge removes 352 of 793 kept lacunae, and some of them look like lacunae on the
 contact sheets; if it is wrong about them, every per cell measure of those images
 moves with it. Nothing here is validated, and none of it is a result of the
 study.
+
+## 24. The POL proxy
+
+**Pre-validation, and not a measurement of periosteocytic lesions.** Added
+2026-10-29 (`src/pols.py`, `results/pols/`). The look first
+(`results/pols/FINDINGS.md`, `python src/diagnostics.py pol-look`): in these
+images a POL cannot be told apart as a separate zone. There is no dark ring
+around the body, no distinct halo and no step inside the body; around every body,
+in every group, the red channel falls smoothly to the bone background over about
+2.3 um in WT, which has no lesions, so that zone is optical glow. A lesion that
+takes up the stain would sit inside the body mask.
+
+**What is measured instead** (`results/pols/DEFINITION.md`): per lacuna with a
+shape measure, the body as the lacuna stage outlined it, and in its own territory
+(the pixels nearest to it), in 8 sectors of 45 degrees about the centroid, the
+median red over a 3 band slab at each 0.13 um band from the body edge, until it
+falls to the bone background (median 70 to 90 px out) plus 0.10 of the surround's
+height, at most 8 um out. Body, outer and POL area in um2, POL ratio outer over
+body, and the halo width per sector. Flags: edge, vessel (vascular mask within
+8 um), neighbour (two outer regions touch), incomplete (fewer than half the
+sectors answered), no contrast. Every value is the glow zone's own (section 18)
+or chosen on no image. It reads the saved detection and changes nothing in it;
+`python src/pols.py selftest` checks it on synthetic images.
+
+**Not established.** The halo width follows the glow extent of the network stage
+(Spearman 0.88), the neighbour flag removes most Hyp lacunae, and nothing separates
+a lesion from glow, staining or focus. The results and the open decisions are in
+`results/pols/REPORT.md`; none of it is a result of the study.

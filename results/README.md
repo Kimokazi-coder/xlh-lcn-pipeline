@@ -38,6 +38,8 @@ results/
   group_qc.csv                QC list of the groups other than WT (diagnostics group-qc)
   format_test/                TIFF against JPEG on the WT images (diagnostics format-test): format_test.md
                               and .csv, twin_check.csv, tiff_fingerprints.csv, synthetic_check.csv
+  pols/                       the POL section, pre-validation: FINDINGS.md, DEFINITION.md, SUMMARY.md,
+                              REPORT.md, PROGRESS.md, summary_by_group.csv, phase0_look/ (see POL proxy)
   WT/, WT_HP/, Hyp_RD/, Hyp_HP/   one folder per group, the same layout in each; WT, the reference
                               group, is shown below, and only WT has publication figures
     all_images/
@@ -190,6 +192,31 @@ In `WT/all_images/figures/` (fixed display window for the dataset):
 - S02_contact_sheet_with_rejected_candidates: The contact sheet with the rejected lacuna-scale candidates. [png](WT/all_images/figures/supplement/S02_contact_sheet_with_rejected_candidates.png) [pdf](WT/all_images/figures/supplement/S02_contact_sheet_with_rejected_candidates.pdf)
 
 Captions: [figures/captions.md](../figures/captions.md).
+
+## POL proxy
+
+**Pre-validation, and not a measurement of periosteocytic lesions.** The look of
+[`pols/FINDINGS.md`](pols/FINDINGS.md) found no separate lesion zone in these images, so
+[`src/pols.py`](../src/pols.py) measures a proxy ([`pols/DEFINITION.md`](pols/DEFINITION.md)): the
+lacuna body as detected plus the surround that stays above the bone background, in um. It reads the
+saved `1_lacunae/` and `2_canaliculi/` files and writes only `results/<group>/pols/`:
+
+```
+results/<group>/pols/
+  overlays/<label>_pols_overlay.png   body green, outer boundary magenta, ids cyan (measured) or yellow (flagged)
+  <group>_pols_per_lacuna.csv         one row per lacuna (written with the switch --csv)
+  <group>_pols_per_image.csv          one row per image (written with the switch --csv)
+  <group>_pols_run.json               parameters, counts, provenance
+```
+
+```
+python src/pols.py selftest                    # 10 synthetic checks of the geometry and the flags
+python src/pols.py measure --dir data/WT --csv # one group; likewise WT_HP, Hyp_RD, Hyp_HP
+python src/pols.py summary                     # pols/summary_by_group.csv and pols/SUMMARY.md
+python src/diagnostics.py pol-look             # pols/phase0_look/, the look of FINDINGS.md
+```
+
+The report, with what needs a decision: [`pols/REPORT.md`](pols/REPORT.md).
 
 ## How to regenerate
 
