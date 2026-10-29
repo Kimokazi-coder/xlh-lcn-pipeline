@@ -13,7 +13,7 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
 - [x] Phase 0, LOOK: crops in results/pols/phase0_look/, results/pols/FINDINGS.md
 - [x] Phase 1, DEFINE: results/pols/DEFINITION.md
 - [x] Phase 2, BUILD: src/pols.py, switch for CSV export, overlays
-- [ ] Phase 3, RUN: results/<group>/pols/ for WT, WT_HP, Hyp_RD, Hyp_HP;
+- [x] Phase 3, RUN: results/<group>/pols/ for WT, WT_HP, Hyp_RD, Hyp_HP;
       results/pols/summary_by_group.csv, results/pols/SUMMARY.md
 - [ ] Phase 4, REPORT: results/pols/REPORT.md, push, git log
 
@@ -40,4 +40,10 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
   contrast" flag firing when the surface band was walled in by the vascular mask; that
   case is now "no level" (incomplete) and no contrast means surface at or below
   background. DEFINITION.md updated to match.
-- Resume at: phase 3 (run measure with the switch on for the four groups, then summary).
+- Phase 3 done: measure with the switch --csv on all four groups from commit d18414a
+  (run records: git_dirty False, no failed image), then summary. 35 overlays, 4 x 2
+  tables, summary_by_group.csv, SUMMARY.md. Measured lacunae: WT 71 of 100 with a
+  shape measure, WT_HP 55 of 113, Hyp_RD 86 of 251, Hyp_HP 27 of 250 (two Hyp_HP
+  images have none). A rerun of WT gives all 11 files byte for byte.
+- Resume at: phase 4 (REPORT.md drafted; README, METHODS section 24 and the results
+  README edited, not yet committed).
