@@ -1962,6 +1962,18 @@ sectors answered), no contrast. Every value is the glow zone's own (section 18)
 or chosen on no image. It reads the saved detection and changes nothing in it;
 `python src/pols.py selftest` checks it on synthetic images.
 
+**QC overlay** (added 2026-11-02, visualization only). For checking by eye,
+`measure`, or `python src/pols.py qc-overlay` alone, draws on the original image
+at its own resolution each lacuna's body edge (cyan) and its POL proxy outline
+(yellow, flagged lacunae included) in 1 px lines, nothing filled, the lacuna id of
+the tables beside each, and a legend with a 10 um scale bar at
+`config.PIXEL_SIZE_UM_ACQUIRED`. The file, `overlays/<code>_pol_overlay.png`, is
+named by the coded specimen ID only, the specimen and the z plane (`548_z14`), and
+the command refuses a name that would keep a genotype, diet or group word. Each
+overlay is read back and must equal the image on every pixel nothing was drawn on;
+`qc-overlay` also checks the ids, centroids and outer areas against the per-lacuna
+table.
+
 **Not established.** The halo width follows the glow extent of the network stage
 (Spearman 0.88), the neighbour flag removes most Hyp lacunae, and nothing separates
 a lesion from glow, staining or focus. The results and the open decisions are in
