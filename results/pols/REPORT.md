@@ -4,6 +4,10 @@
 Hyp_RD, Hyp_HP; no Hyp;Enpp1 images exist. Nothing existing changed: the regression passed
 before every push.
 
+*Since 2026-11-03 the files named under Built are in `results/<group>/<image>/4_pols/` and
+`results/<group>/all_images/pols/`, with new pictures and the same values:
+[REPORT_LAYOUT.md](REPORT_LAYOUT.md).*
+
 **Built.** `src/pols.py`: `measure` reads the saved lacuna label image and vascular mask (no
 detection is rerun) and writes only `results/<group>/pols/`: an overlay per field (body green,
 outer boundary magenta) and, with the switch `--csv`, a per-lacuna and a per-image table.

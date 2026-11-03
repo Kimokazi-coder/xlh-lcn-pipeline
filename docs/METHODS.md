@@ -1962,17 +1962,25 @@ sectors answered), no contrast. Every value is the glow zone's own (section 18)
 or chosen on no image. It reads the saved detection and changes nothing in it;
 `python src/pols.py selftest` checks it on synthetic images.
 
-**QC overlay** (added 2026-11-02, visualization only). For checking by eye,
-`measure`, or `python src/pols.py qc-overlay` alone, draws on the original image
-at its own resolution each lacuna's body edge (cyan) and its POL proxy outline
-(yellow, flagged lacunae included) in 1 px lines, nothing filled, the lacuna id of
-the tables beside each, and a legend with a 10 um scale bar at
-`config.PIXEL_SIZE_UM_ACQUIRED`. The file, `overlays/<code>_pol_overlay.png`, is
-named by the coded specimen ID only, the specimen and the z plane (`548_z14`), and
-the command refuses a name that would keep a genotype, diet or group word. Each
-overlay is read back and must equal the image on every pixel nothing was drawn on;
-`qc-overlay` also checks the ids, centroids and outer areas against the per-lacuna
-table.
+**Layout and pictures** (2026-11-03, visualization and file layout only; no
+measure, flag or value changed). POL is a section of each image like the lacunae
+and the canaliculi: `results/<group>/<label>/4_pols/` holds the QC overlay (body
+edge cyan, outer boundary yellow, 1 px, on the original), the measured picture
+(the review picture: the POL band of each measured lacuna tinted yellow at 30%,
+each flagged lacuna outlined orange with its flag letters and not tinted), the
+outlines picture (body edge and outer boundary on the original dimmed), the
+per-lacuna csv and a record; `results/<group>/all_images/pols/` holds
+`pols_all_images.csv` and `.xlsx` and a contact sheet. Every picture is drawn at
+the image's own resolution with a 10 um scale bar at
+`config.PIXEL_SIZE_UM_ACQUIRED`, says "POL proxy, pre-validation", and is read
+back and must equal the image on every pixel nothing was drawn on.
+`python src/pols.py check` draws each picture again from the csv read back and
+requires it to equal the file, so the flags drawn are the flags in the table. The
+yellow zone is the proxy, mostly optical glow, never a lesion call.
+`python src/pols.py blind-review` copies the measured pictures under shuffled
+codes into `results/blind_review/pols/` and writes the key outside the repository;
+the set is blind only for a reviewer given that folder alone, since the same
+pictures sit under their image names in `4_pols/`.
 
 **Not established.** The halo width follows the glow extent of the network stage
 (Spearman 0.88), the neighbour flag removes most Hyp lacunae, and nothing separates

@@ -72,7 +72,7 @@ no AI judge or API, everything "POL proxy, pre-validation".
       (F:/lcn-quant-keys/pols_blind_review_key.csv), never committed
 - [x] L4, REMOVE: results/<group>/pols/ deleted in its own commit, after L2 verified
       the new files equal; check run again
-- [ ] L5, DOCS: results/README.md, docs/METHODS.md, README.md, results/pols/
+- [x] L5, DOCS: results/README.md, docs/METHODS.md, README.md, results/pols/
       REPORT_LAYOUT.md; push, git log
 
 ## Log
@@ -105,4 +105,9 @@ no AI judge or API, everything "POL proxy, pre-validation".
   untracked test overlays deleted. check again: PASS, 35 of 35, old tables not
   present; layout_check.csv kept as written in L2 (the run with the old tables).
   Regression before push: PASS.
-  Resume: L5 (results/README.md, docs/METHODS.md, README.md, REPORT_LAYOUT.md).
+- L5: results/README.md (4_pols and all_images/pols and blind_review/pols in Layout, a
+  4_pols column in the Per image table, the POL table under the cross-image table, the
+  POL proxy section on the new layout; 48 POL links, none broken), docs/METHODS.md
+  section 24, README.md folder table, a dated pointer in REPORT.md, and
+  REPORT_LAYOUT.md. Regression before push: PASS.
+- All phases done. Nothing to resume; what is not done is in REPORT_LAYOUT.md.
