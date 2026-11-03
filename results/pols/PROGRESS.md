@@ -68,7 +68,7 @@ no AI judge or API, everything "POL proxy, pre-validation".
       blind-review; selftest with checks of the tint and the flag letters
 - [x] L2, RUN: measure with the switch --csv on all four groups, summary, check
       against the old tables (results/pols/layout_check.csv)
-- [ ] L3, BLIND: results/blind_review/pols/P001.png ..., key outside the repository
+- [x] L3, BLIND: results/blind_review/pols/P001.png ..., key outside the repository
       (F:/lcn-quant-keys/pols_blind_review_key.csv), never committed
 - [ ] L4, REMOVE: results/<group>/pols/ deleted in its own commit, after L2 verified
       the new files equal; check run again
@@ -91,4 +91,13 @@ no AI judge or API, everything "POL proxy, pre-validation".
   equal to the old table's rows, every pols_all_images.csv equal byte for byte to the
   old per-image table, all three pictures equal to the pictures the csv gives),
   results/pols/layout_check.csv. 105 pictures, 140 MB. Regression before push: PASS.
-  Resume: L3 (blind-review -k F:/lcn-quant-keys/pols_blind_review_key.csv).
+- L3: blind-review wrote P001.png to P035.png into results/blind_review/pols/, byte
+  copies of the measured pictures in a shuffled order from the system's random
+  source, no PNG metadata; key at F:/lcn-quant-keys/pols_blind_review_key.csv,
+  outside the repository, not committed. A first set was made and deleted before
+  any commit, because its check printed four code to image pairs into the session;
+  the committed set is a fresh draw whose pairs were never printed. Refusals checked:
+  a key inside the repository, an existing key, a non-empty output folder.
+  Regression before push: PASS.
+  Resume: L4 (git rm results/<group>/pols/, delete the two untracked test overlays,
+  run check again).
