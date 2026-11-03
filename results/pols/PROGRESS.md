@@ -70,7 +70,7 @@ no AI judge or API, everything "POL proxy, pre-validation".
       against the old tables (results/pols/layout_check.csv)
 - [x] L3, BLIND: results/blind_review/pols/P001.png ..., key outside the repository
       (F:/lcn-quant-keys/pols_blind_review_key.csv), never committed
-- [ ] L4, REMOVE: results/<group>/pols/ deleted in its own commit, after L2 verified
+- [x] L4, REMOVE: results/<group>/pols/ deleted in its own commit, after L2 verified
       the new files equal; check run again
 - [ ] L5, DOCS: results/README.md, docs/METHODS.md, README.md, results/pols/
       REPORT_LAYOUT.md; push, git log
@@ -99,5 +99,10 @@ no AI judge or API, everything "POL proxy, pre-validation".
   the committed set is a fresh draw whose pairs were never printed. Refusals checked:
   a key inside the repository, an existing key, a non-empty output folder.
   Regression before push: PASS.
-  Resume: L4 (git rm results/<group>/pols/, delete the two untracked test overlays,
-  run check again).
+- L4: git rm of results/WT/pols, WT_HP/pols, Hyp_RD/pols, Hyp_HP/pols (47 tracked
+  files: per group the two old tables, the run record and the old grey overlays,
+  which the measured pictures replace; still in the history, last at 59d5d43), and the two
+  untracked test overlays deleted. check again: PASS, 35 of 35, old tables not
+  present; layout_check.csv kept as written in L2 (the run with the old tables).
+  Regression before push: PASS.
+  Resume: L5 (results/README.md, docs/METHODS.md, README.md, REPORT_LAYOUT.md).
