@@ -49,3 +49,39 @@ everything labelled pre-validation, no Hyp;Enpp1 images (none exist).
   outputs), README (folder table, Still open item 7), docs/METHODS.md section 24 and
   the sentence on POLs in its introduction, results/README.md (POL proxy section).
 - All phases done. Nothing to resume; the open decisions are in REPORT.md.
+- 2026-11-02: QC overlay on the original image (commit 8e201df), named by coded ID;
+  superseded by the layout below.
+
+# POL as a section: progress
+
+User brief of 2026-11-03 ("make POL a section like lacunae and canaliculi"). Rules:
+main only, commit and push after each phase with the outputs, regression before
+each push (PASS or FAIL in the commit message), no em dash or double hyphen, no
+measurement, segmentation, flag or existing value changed, logic in src/pols.py,
+no AI judge or API, everything "POL proxy, pre-validation".
+
+## Phases
+
+- [x] L1, CODE: src/pols.py writes results/<group>/<image>/4_pols/ (overlay,
+      outlines, measured, per-lacuna csv, json) and results/<group>/all_images/pols/
+      (pols_all_images.csv and .xlsx, contact_sheet.png); commands check and
+      blind-review; selftest with checks of the tint and the flag letters
+- [ ] L2, RUN: measure with the switch --csv on all four groups, summary, check
+      against the old tables (results/pols/layout_check.csv)
+- [ ] L3, BLIND: results/blind_review/pols/P001.png ..., key outside the repository
+      (F:/lcn-quant-keys/pols_blind_review_key.csv), never committed
+- [ ] L4, REMOVE: results/<group>/pols/ deleted in its own commit, after L2 verified
+      the new files equal; check run again
+- [ ] L5, DOCS: results/README.md, docs/METHODS.md, README.md, results/pols/
+      REPORT_LAYOUT.md; push, git log
+
+## Log
+
+- 2026-11-03: started from main 8e201df (git pull: up to date). Two untracked test
+  files of 2026-11-02 sit in results/<group>/pols/overlays/ (*_pol_overlay.png); they
+  go with that folder in L4.
+- L1: code written; selftest 18 of 18; a trial on a copy of WT outside the repository
+  gave all five files per image, pols_all_images.csv equal byte for byte to the old
+  WT_pols_per_image.csv, and every picture redrawn from its csv equal to the file.
+  Regression before push: PASS, 2 runs. Committed and pushed.
+  Resume: L2 (measure --csv on WT, WT_HP, Hyp_RD, Hyp_HP, then summary, then check).

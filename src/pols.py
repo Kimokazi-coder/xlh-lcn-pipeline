@@ -17,7 +17,7 @@ reads what the lacuna and network stages saved in results/<group>/<label>/
 (quantification.load_detection): the lacuna label image, the classes with no
 shape measure and the vascular mask; and, from 5_quantification, each lacuna's
 area (checked against the label image) and roots_count (copied, for reference).
-It never writes into those folders.
+It never writes into those folders; it writes its own, 4_pols, beside them.
 
 Per lacuna (DEFINITION.md has the reasons):
     1. territory: the pixels whose nearest body is this lacuna's;
@@ -35,30 +35,34 @@ Flags, any of which makes a lacuna unreliable: edge, vessel, neighbour,
 incomplete, no_contrast. Lacunae of the classes dim and out_of_focus carry no
 area measure anywhere in the pipeline and get no POL measure; they are counted.
 
-Outputs, in results/<group>/pols/ (config.RESULTS_ROOT/<group>/POL_DIR):
-    overlays/<label>_pols_overlay.png  body outlined green, outer boundary
-                                       magenta, ids cyan (measured), yellow
-                                       (flagged) or grey (no shape measure)
-    overlays/<code>_pol_overlay.png    QC overlay on the original image at its
-                                       own resolution: lacunae cyan, POL proxy
-                                       outlines yellow, 1 px, the ids of the
-                                       csv tables, a legend; named by the coded
-                                       specimen ID (coded_id), never by
-                                       genotype, diet or group
-    <group>_pols_run.json              parameters, counts, provenance
+Outputs. Every picture is on the image at its own resolution and says "POL
+proxy, pre-validation"; the yellow zone is a proxy, mostly optical glow, never a
+lesion call. Per image, in results/<group>/<label>/4_pols/ (SECTION_POLS):
+    <label>_pols_overlay.png      QC overlay on the original: body edge cyan,
+                                  outer boundary yellow, 1 px, ids, legend,
+                                  10 um scale bar
+    <label>_pols_outlines.png     body edge and outer boundary only, on the
+                                  original dimmed (the 1_lacunae outlines style)
+    <label>_pols_measured.png     the review picture: measured lacunae with the
+                                  POL band tinted yellow, flagged ones outlined
+                                  orange with their flag letters, ids, legend
+    <label>_pols.json             parameters, counts, flags, provenance
     with the switch --csv (off by default):
-    <group>_pols_per_lacuna.csv        one row per lacuna
-    <group>_pols_per_image.csv         one row per image
-and with the command summary, from the per-image files of every group:
+    <label>_pols_per_lacuna.csv   one row per lacuna of this image
+Per group, in results/<group>/all_images/pols/:
+    contact_sheet.png             every measured picture, small, by image
+    with the switch --csv: pols_all_images.csv and .xlsx, one row per image
+Across groups, with the command summary, from the all_images tables:
     results/pols/summary_by_group.csv and results/pols/SUMMARY.md
-The command qc-overlay writes the QC overlays alone, for a group or some of its
-images, checks each against the image and the per-lacuna table, and writes
-nothing else.
+The command check verifies every 4_pols folder (results/pols/layout_check.csv),
+and blind-review copies the measured pictures under shuffled codes into
+results/blind_review/pols/, with the key outside the repository.
 
 Usage (from the repo root):
     python src/pols.py measure --dir data/WT --csv
     python src/pols.py summary
-    python src/pols.py qc-overlay --dir data/Hyp_HP --image 548_z14
+    python src/pols.py check
+    python src/pols.py blind-review -k ../lcn-quant-keys/pols_blind_review_key.csv
 """
 
 from __future__ import annotations
@@ -66,7 +70,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -123,11 +126,22 @@ MIN_SLAB_PIXELS = 5
 # because its median width needs half of them.
 MIN_ANSWERED_SHARE = 0.5
 
-# Layout and names.
-POL_DIR = "pols"
-OVERLAY_DIR = "overlays"
+# Layout and names. The POL section of an image sits beside 1_lacunae and
+# 2_canaliculi in results/<group>/<label>/, and the group's table and contact
+# sheet in results/<group>/all_images/pols/. Defined here and not in config.py,
+# because every upper-case setting of config.py enters the config hash that the
+# detection outputs record, and this section must leave those unchanged.
+SECTION_POLS = "4_pols"
 SUFFIX_OVERLAY = "pols_overlay.png"
+SUFFIX_OUTLINES = "pols_outlines.png"
+SUFFIX_MEASURED = "pols_measured.png"
+SUFFIX_PER_LACUNA = "pols_per_lacuna.csv"
+SUFFIX_RECORD = "pols.json"
+ALL_IMAGES_POLS_DIR = "pols"
+ALL_IMAGES_TABLE = "pols_all_images"  # .csv and .xlsx
+CONTACT_SHEET = "contact_sheet.png"
 SUMMARY_DIR = config.RESULTS_ROOT / "pols"
+BLIND_REVIEW_DIR = config.RESULTS_ROOT / "blind_review" / "pols"
 STATUS = "pre-validation"
 NOTE = ("PRE-VALIDATION. POL proxy, not a measurement of periosteocytic lesions: the "
         "bright lacuna body plus the surround that stays above the bone background. In WT, "
@@ -389,205 +403,267 @@ IMAGE_COLUMNS = (["status", "group", "image", "n_lacunae", "n_no_shape", "n_shap
                  + [f"{m}_{stat}" for m in MEASURES for stat in ("mean", "median")])
 
 
-# Overlay
+# Pictures
+# Each picture is drawn on the original image (the outlines picture on the
+# original dimmed) at its own resolution, read back after saving, and must equal
+# that base on every pixel nothing was drawn on. Visualization only: every line,
+# band and id comes from the label image, the outer label image and the rows of
+# the per-lacuna table as measured.
 
-def save_overlay(channel: np.ndarray, labels: np.ndarray, outer: np.ndarray, rows: list[dict],
-                 path: Path, title: str) -> None:
-    """The field in grey, the body outlined green on its own edge pixels, the
-    outer boundary of each lacuna with a POL measure magenta just outside its
-    outer region, and each lacuna's id: cyan measured, yellow flagged with the
-    flag letters, grey for a lacuna with no shape measure."""
-    import matplotlib  # noqa: PLC0415
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt  # noqa: PLC0415
-
-    grey = (np.clip(channel, 0.0, 1.0) * 255).astype(np.uint8)
-    rgb = np.stack([grey] * 3, axis=-1)
-    shape_ids = [r["lacuna_id"] for r in rows if "flagged" in r]
-    outer_shape = np.where(np.isin(outer, shape_ids), outer, 0)
-    rgb[segmentation.find_boundaries(outer_shape, mode="outer")] = (255, 0, 255)
-    rgb[segmentation.find_boundaries(labels, mode="inner")] = (0, 255, 0)
-    h, w = grey.shape
-    fig = plt.figure(figsize=(w / 100, h / 100), dpi=100)
-    ax = fig.add_axes([0, 0, 1, 1])
-    ax.imshow(rgb, interpolation="nearest")
-    ax.set_axis_off()
-    for r in rows:
-        if "flagged" not in r:
-            text, colour = f"{r['lacuna_id']} {r['lacuna_class']}", "0.7"
-        elif r["flagged"]:
-            letters = "".join(FLAG_LETTERS[name] for name in FLAGS if r[f"flag_{name}"])
-            text, colour = f"{r['lacuna_id']} {letters}", "yellow"
-        else:
-            text, colour = str(r["lacuna_id"]), "cyan"
-        ax.text(float(r["centroid_col_px"]), float(r["centroid_row_px"]), text, color=colour, fontsize=7,
-                ha="center", va="center")
-    ax.text(4, 4, title, color="white", fontsize=7, va="top", ha="left",
-            bbox={"facecolor": "black", "alpha": 0.6, "pad": 2, "edgecolor": "none"})
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=100)
-    plt.close(fig)
-
-
-OVERLAY_TITLE = ("PRE-VALIDATION. POL proxy (not a lesion measure): body green, outer boundary magenta.\n"
-                 "Ids: cyan measured, yellow flagged (E edge, V vessel, N neighbour, I incomplete, "
-                 "C no contrast), grey no shape measure.")
-
-
-# QC overlay on the original image
-# For checking by eye: the image as read, at its own size, with nothing on it but
-# 1 px outlines, the ids and a small legend. Visualization only; every outline is
-# drawn from the label image and the outer label image as measured.
-
-QC_SUFFIX = "pol_overlay.png"
 # Cyan and yellow stand out on the red stain and on black, and from each other,
-# also to a red green colour blind reader.
-QC_LACUNA_RGB = (0, 255, 255)
-QC_POL_RGB = (255, 255, 0)
-QC_TEXT_RGB = (255, 255, 255)
-QC_FONT_PX = 11
-QC_SCALE_BAR_UM = 10.0
-# The legend box keeps this share of the image's brightness, so the tissue under
-# it stays visible.
-QC_LEGEND_DIM = 0.4
-# Words that name a genotype, a diet or a group: those of config.GROUPS, and
-# Enpp1 for the Hyp;Enpp1 group still to come. A coded ID holds none of them.
-BLIND_WORDS = frozenset({w.lower() for g in config.GROUPS for w in re.findall(r"[A-Za-z]+", g)} | {"enpp1"})
+# also to a red green colour blind reader; orange marks a flagged lacuna.
+LACUNA_RGB = (0, 255, 255)
+POL_RGB = (255, 255, 0)
+FLAGGED_RGB = (255, 140, 0)
+TEXT_RGB = (255, 255, 255)
+FONT_PX = 11
+SCALE_BAR_UM = 10.0
+# The POL band of a measured lacuna (outer region minus body) is tinted POL_RGB
+# at this opacity, so the tissue under it stays visible.
+BAND_OPACITY = 0.3
+# The legend box keeps this share of the image's brightness; the outlines
+# picture is drawn on the original kept at this share.
+LEGEND_DIM = 0.4
+OUTLINES_DIM = 0.5
+PICTURE_NOTE = "POL proxy, pre-validation"
+LETTER_KEY = ("E edge, V vessel, N neighbour,", "I incomplete, C no contrast")
+# The contact sheet: the measured pictures this many to a row, each fitted into a
+# square of this many pixels.
+CONTACT_COLUMNS = 3
+CONTACT_TILE_PX = 340
 
 
-def coded_id(label: str) -> str:
-    """The coded specimen ID of an image, the only name a QC overlay carries: the
-    specimen code and the z plane of its label ("548_hyp_HP_z14c1-2" becomes
-    "548_z14", "I534_z11c1-2" becomes "I534_z11"), or, for a label with no z
-    plane, the label without its genotype, diet and group words ("543-2" stays).
-    Raises if a word of BLIND_WORDS would be left."""
-    specimen = re.match(r"[A-Za-z]?\d+", label)
-    plane = re.search(r"(?:^|[_\s-])z(\d+)", label, flags=re.IGNORECASE)
-    if specimen and plane:
-        code = f"{specimen.group(0)}_z{plane.group(1)}"
-    else:
-        code = "_".join(t for t in label.split("_") if t.lower() not in BLIND_WORDS)
-    if not code or set(re.findall(r"[a-z]+", code.lower())) & BLIND_WORDS:
-        raise ValueError(f"no coded ID free of genotype, diet and group words for the image {label!r}")
-    return code
+def marks(rows: list[dict]) -> list[tuple]:
+    """(lacuna_id, state, letters) per row of the per-lacuna table, from the rows
+    in memory or read back from the csv: state "measured" (POL measure, no flag),
+    "flagged" (POL measure and a flag; letters, the flags' letters) or "none" (no
+    POL measure: dim or out of focus)."""
+    out = []
+    for r in rows:
+        flagged = str(r.get("flagged", ""))
+        if flagged == "":
+            out.append((int(r["lacuna_id"]), "none", ""))
+        elif flagged == "True":
+            letters = "".join(FLAG_LETTERS[name] for name in FLAGS if str(r[f"flag_{name}"]) == "True")
+            out.append((int(r["lacuna_id"]), "flagged", letters))
+        else:
+            out.append((int(r["lacuna_id"]), "measured", ""))
+    return out
 
 
-def coded_ids(paths) -> dict:
-    """{label: coded ID} for the images of one group; raises if two share a code."""
-    codes = {lacunae.image_label(p): coded_id(lacunae.image_label(p)) for p in paths}
-    shared = sorted({c for c in codes.values() if list(codes.values()).count(c) > 1})
-    if shared:
-        raise ValueError(f"two images of the group would share the coded ID {', '.join(shared)}")
-    return codes
+def id_labels(rows: list[dict]) -> list[tuple]:
+    """(lacuna_id, text, colour) of each id drawn on the measured picture: the id
+    of the tables, and for a flagged lacuna its flags' letters after it, in orange."""
+    return [(i, f"{i} {letters}", FLAGGED_RGB) if state == "flagged" else (i, str(i), TEXT_RGB)
+            for i, state, letters in marks(rows)]
 
 
-def qc_overlay(display: np.ndarray, labels: np.ndarray, outer: np.ndarray, pol_ids) -> tuple:
-    """(overlay, touched). The original RGB image with, at its own pixels, each
-    lacuna outlined QC_LACUNA_RGB on its body's edge pixels, each POL proxy
-    outline QC_POL_RGB just outside its outer region (pol_ids: the lacunae with
-    a POL measure, flagged or not), each lacuna's id (the lacuna_id of the csv
-    tables) just beside its outer region, and a legend with a scale bar in the
-    corner holding the fewest outer region pixels. With no POL outline the
-    lacunae are drawn alone. touched: every pixel that may differ from the image."""
+def _tint(pixels: np.ndarray, colour: tuple) -> np.ndarray:
+    return np.rint((1.0 - BAND_OPACITY) * pixels + BAND_OPACITY * np.array(colour, float)).astype(np.uint8)
+
+
+def _boundary(outer: np.ndarray, ids) -> np.ndarray:
+    """The pixels just outside the outer regions of ids (and where two of them meet)."""
+    return segmentation.find_boundaries(np.where(np.isin(outer, sorted(ids)), outer, 0), mode="outer")
+
+
+def _draw(rgb: np.ndarray, touched: np.ndarray, labels: np.ndarray, outer: np.ndarray, entries: list,
+          ids: list) -> np.ndarray:
+    """Add a legend and the ids to rgb, a picture whose lines are drawn, and mark
+    what they cover in touched. entries: (kind, colour, text) per legend row, kind
+    "text", "line" (2 px sample), "band" (tinted swatch) or "bar" (the scale bar);
+    the legend goes in the corner holding the fewest outer region pixels. ids:
+    (lacuna_id, text, colour), white or coloured with a black edge, right of the
+    outer region (left of it at the right frame), level with the body centroid."""
     from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
 
+    font = ImageFont.load_default(size=FONT_PX)
     h, w = labels.shape
-    rgb = np.array(display[..., :3], dtype=np.uint8)
-    pol = np.where(np.isin(outer, sorted(pol_ids)), outer, 0)
-    pol_line = segmentation.find_boundaries(pol, mode="outer")
-    body_line = segmentation.find_boundaries(labels, mode="inner")
-    rgb[pol_line] = QC_POL_RGB
-    rgb[body_line] = QC_LACUNA_RGB
-    touched = pol_line | body_line
-
-    # The legend: a dimmed box, one row per entry, a 2 px sample line or the
-    # scale bar, then the text.
-    font = ImageFont.load_default(size=QC_FONT_PX)
-    bar_px = config.px_int(QC_SCALE_BAR_UM)
-    sample_px, pad, row_px, margin = 18, 4, QC_FONT_PX + 5, 4
-    entries = [(QC_LACUNA_RGB, sample_px, "lacuna"),
-               (QC_POL_RGB, sample_px, "POL proxy, pre-validation") if pol_ids
-               else (None, 0, "no POL proxy in this image"),
-               (QC_TEXT_RGB, bar_px, f"{QC_SCALE_BAR_UM:g} um")]
-    box_w = 2 * pad + max(n + (4 if n else 0) + int(np.ceil(font.getlength(t))) for _c, n, t in entries)
+    sample = {"text": 0, "line": 18, "band": 18, "bar": config.px_int(SCALE_BAR_UM)}
+    pad, row_px, margin = 4, FONT_PX + 5, 4
+    box_w = 2 * pad + max(sample[k] + (4 if sample[k] else 0) + int(np.ceil(font.getlength(t))) for k, _c, t in entries)
     box_h = 2 * pad + row_px * len(entries)
     corners = [(margin, margin), (margin, w - margin - box_w), (h - margin - box_h, margin),
                (h - margin - box_h, w - margin - box_w)]
     y0, x0 = min(corners, key=lambda yx: int((outer[yx[0]:yx[0] + box_h, yx[1]:yx[1] + box_w] > 0).sum()))
-    legend = (slice(y0, y0 + box_h), slice(x0, x0 + box_w))
-    rgb[legend] = (rgb[legend] * QC_LEGEND_DIM).astype(np.uint8)
-    touched[legend] = True
-    for k, (colour, n, _text) in enumerate(entries):
-        if colour is not None:
-            y = y0 + pad + k * row_px + row_px // 2
-            rgb[y - 1:y + 1, x0 + pad:x0 + pad + n] = colour
+    box = (slice(y0, y0 + box_h), slice(x0, x0 + box_w))
+    rgb[box] = (rgb[box] * LEGEND_DIM).astype(np.uint8)
+    touched[box] = True
+    rows_y = [y0 + pad + k * row_px + row_px // 2 for k in range(len(entries))]
+    for (kind, colour, _text), y in zip(entries, rows_y):
+        x, n = x0 + pad, sample[kind]
+        if kind in ("line", "bar"):
+            rgb[y - 1:y + 1, x:x + n] = colour
+        elif kind == "band":
+            rgb[y - 5:y + 5, x:x + n] = _tint(rgb[y - 5:y + 5, x:x + n], colour)
+            rgb[y - 5, x:x + n] = rgb[y + 4, x:x + n] = colour
+            rgb[y - 5:y + 5, x] = rgb[y - 5:y + 5, x + n - 1] = colour
 
     image = Image.fromarray(rgb)
     draw = ImageDraw.Draw(image)
-    for k, (_colour, n, text) in enumerate(entries):
-        y = y0 + pad + k * row_px + row_px // 2
-        draw.text((x0 + pad + n + (4 if n else 0), y), text, font=font, fill=QC_TEXT_RGB, anchor="lm")
-
-    # The ids, white with a black edge, right of each outer region (left of it at
-    # the right frame), level with the body centroid.
+    for (kind, _colour, text), y in zip(entries, rows_y):
+        n = sample[kind]
+        draw.text((x0 + pad + n + (4 if n else 0), y), text, font=font, fill=TEXT_RGB, anchor="lm")
     n_ids = int(labels.max())
-    centroids = ndi.center_of_mass(labels > 0, labels, range(1, n_ids + 1))
-    for i, (box, (cy, _cx)) in enumerate(zip(ndi.find_objects(outer.astype(np.int32), n_ids), centroids), start=1):
-        if box is None:
+    boxes = ndi.find_objects(outer.astype(np.int32), n_ids)
+    centroids = ndi.center_of_mass(labels > 0, labels, range(1, n_ids + 1)) if n_ids else []
+    for i, text, colour in ids:
+        obox, cy = boxes[i - 1], centroids[i - 1][0]
+        if obox is None:
             continue
-        text = str(i)
-        x, anchor = box[1].stop + 2, "lm"
+        x, anchor = obox[1].stop + 2, "lm"
         if x + font.getlength(text) + 2 > w:
-            x, anchor = box[1].start - 3, "rm"
+            x, anchor = obox[1].start - 3, "rm"
         y = float(np.clip(cy, row_px / 2, h - row_px / 2))
-        draw.text((x, y), text, font=font, fill=QC_TEXT_RGB, anchor=anchor, stroke_width=1, stroke_fill=(0, 0, 0))
+        draw.text((x, y), text, font=font, fill=colour, anchor=anchor, stroke_width=1, stroke_fill=(0, 0, 0))
         left, top, right, bottom = draw.textbbox((x, y), text, font=font, anchor=anchor, stroke_width=1)
         touched[max(0, int(top) - 1):int(np.ceil(bottom)) + 1, max(0, int(left) - 1):int(np.ceil(right)) + 1] = True
-    return np.asarray(image), touched
+    return np.array(image)
 
 
-def save_qc_overlay(display: np.ndarray, labels: np.ndarray, outer: np.ndarray, pol_ids, path: Path) -> None:
-    """Draw the QC overlay (qc_overlay), save it as a PNG, read the file back and
-    raise unless it has the image's size and equals the image on every pixel
-    nothing was drawn on: it lies on the image pixel for pixel."""
+def overlay_picture(display: np.ndarray, labels: np.ndarray, outer: np.ndarray, rows: list[dict]) -> tuple:
+    """(picture, touched, base). The QC overlay, on the original: each lacuna
+    body's edge pixels cyan, each POL proxy outer boundary (every lacuna with a
+    POL measure, flagged or not) yellow just outside its outer region, 1 px,
+    nothing filled; the ids of the tables, a legend and a scale bar. With no POL
+    measure in the image the lacunae are drawn alone. touched: every pixel that
+    may differ from base."""
+    base = np.array(display[..., :3], dtype=np.uint8)
+    rgb = base.copy()
+    pol_ids = [i for i, state, _letters in marks(rows) if state != "none"]
+    pol_line, body_line = _boundary(outer, pol_ids), segmentation.find_boundaries(labels, mode="inner")
+    rgb[pol_line] = POL_RGB
+    rgb[body_line] = LACUNA_RGB
+    touched = pol_line | body_line
+    entries = [("text", None, PICTURE_NOTE), ("line", LACUNA_RGB, "lacuna body"),
+               ("line", POL_RGB, "POL proxy outer boundary") if pol_ids
+               else ("text", None, "no POL proxy outline in this image"),
+               ("bar", TEXT_RGB, f"{SCALE_BAR_UM:g} um")]
+    ids = [(i, str(i), TEXT_RGB) for i, _state, _letters in marks(rows)]
+    return _draw(rgb, touched, labels, outer, entries, ids), touched, base
+
+
+def outlines_picture(display: np.ndarray, labels: np.ndarray, outer: np.ndarray, rows: list[dict]) -> tuple:
+    """(picture, touched, base). In the style of the 1_lacunae outlines, on the
+    original dimmed to OUTLINES_DIM (base): each body's edge cyan and each POL
+    proxy outer boundary yellow, 1 px; no ids, only the note POL proxy,
+    pre-validation in a corner."""
+    base = (np.asarray(display[..., :3], dtype=np.float64) * OUTLINES_DIM).astype(np.uint8)
+    rgb = base.copy()
+    pol_ids = [i for i, state, _letters in marks(rows) if state != "none"]
+    pol_line, body_line = _boundary(outer, pol_ids), segmentation.find_boundaries(labels, mode="inner")
+    rgb[pol_line] = POL_RGB
+    rgb[body_line] = LACUNA_RGB
+    touched = pol_line | body_line
+    return _draw(rgb, touched, labels, outer, [("text", None, PICTURE_NOTE)], []), touched, base
+
+
+def measured_picture(display: np.ndarray, labels: np.ndarray, outer: np.ndarray, rows: list[dict]) -> tuple:
+    """(picture, touched, base). The review picture, on the original: every
+    lacuna body's edge cyan; for a measured lacuna (POL measure, no flag) its POL
+    band (outer region minus body) tinted yellow at BAND_OPACITY and its outer
+    boundary yellow; for a flagged lacuna its outer boundary orange, no tint, and
+    its flags' letters after its id (id_labels); 1 px lines; a legend with the
+    letter key and a scale bar."""
+    base = np.array(display[..., :3], dtype=np.uint8)
+    rgb = base.copy()
+    m = marks(rows)
+    measured = [i for i, state, _letters in m if state == "measured"]
+    flagged = [i for i, state, _letters in m if state == "flagged"]
+    band = np.isin(outer, measured) & (labels == 0)
+    rgb[band] = _tint(rgb[band], POL_RGB)
+    yellow, orange = _boundary(outer, measured), _boundary(outer, flagged)
+    body_line = segmentation.find_boundaries(labels, mode="inner")
+    rgb[yellow] = POL_RGB
+    rgb[orange] = FLAGGED_RGB
+    rgb[body_line] = LACUNA_RGB
+    touched = band | yellow | orange | body_line
+    entries = [("text", None, PICTURE_NOTE),
+               ("line", LACUNA_RGB, "lacuna body (alone: no POL measure)"),
+               ("band", POL_RGB, "POL proxy band, pre-validation"),
+               ("line", FLAGGED_RGB, "flagged, not in the means"),
+               ("text", None, LETTER_KEY[0]), ("text", None, LETTER_KEY[1]),
+               ("bar", TEXT_RGB, f"{SCALE_BAR_UM:g} um")]
+    return _draw(rgb, touched, labels, outer, entries, id_labels(rows)), touched, base
+
+
+PICTURES = ((SUFFIX_OVERLAY, overlay_picture), (SUFFIX_OUTLINES, outlines_picture),
+            (SUFFIX_MEASURED, measured_picture))
+
+
+def _read_png(path: Path) -> np.ndarray:
     from PIL import Image  # noqa: PLC0415
 
-    overlay, touched = qc_overlay(display, labels, outer, pol_ids)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(overlay).save(path)
     with Image.open(path) as im:
-        saved = np.asarray(im.convert("RGB"))
-    original = display[..., :3]
-    if saved.shape != original.shape:
-        raise ValueError(f"{path.name}: the overlay is {saved.shape} and the image {original.shape}")
-    if not np.array_equal(saved[~touched], original[~touched]):
-        raise ValueError(f"{path.name}: the overlay differs from the image off its lines, ids and legend")
+        return np.asarray(im.convert("RGB"))
 
 
-def check_against_table(table: Path, label: str, labels: np.ndarray, outer: np.ndarray, pol_ids) -> int:
-    """Compare a QC overlay's lacunae with the image's rows of the per-lacuna
-    table: the same ids in the same order, each row's centroid on its body's
-    centroid, and a POL outline drawn exactly where the row has an outer area,
-    around a region of that area. Raises on a mismatch; returns the rows checked."""
+def save_picture(picture: np.ndarray, touched: np.ndarray, base: np.ndarray, path: Path) -> None:
+    """Save a picture as PNG, read the file back and raise unless it equals the
+    picture, has the base's size and equals the base on every pixel nothing was
+    drawn on: it lies on the image pixel for pixel."""
+    from PIL import Image  # noqa: PLC0415
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(picture).save(path)
+    saved = _read_png(path)
+    if saved.shape != base.shape or not np.array_equal(saved, picture):
+        raise ValueError(f"{path.name}: the file read back is not the picture drawn")
+    if not np.array_equal(saved[~touched], base[~touched]):
+        raise ValueError(f"{path.name}: the picture differs from the image off its lines, band, ids and legend")
+
+
+def check_against_table(table: Path, label: str, labels: np.ndarray, outer: np.ndarray, rows: list[dict]) -> int:
+    """Compare the lacunae drawn with the image's rows of a per-lacuna table: the
+    same ids in the same order, each row's centroid on its body's centroid, and a
+    POL outline exactly where the row has an outer area, around a region of that
+    area. Raises on a mismatch; returns the rows checked."""
     with open(table, newline="", encoding="utf-8") as f:
-        rows = [r for r in csv.DictReader(f) if r["image"] == label]
+        table_rows = [r for r in csv.DictReader(f) if r["image"] == label]
     n = int(labels.max())
-    if [int(r["lacuna_id"]) for r in rows] != list(range(1, n + 1)):
-        raise ValueError(f"the table has {len(rows)} rows for the image and the label image ids 1 to {n}")
+    if [int(r["lacuna_id"]) for r in table_rows] != list(range(1, n + 1)):
+        raise ValueError(f"the table has {len(table_rows)} rows for the image and the label image ids 1 to {n}")
+    pol_ids = {i for i, state, _letters in marks(rows) if state != "none"}
     centroids = ndi.center_of_mass(labels > 0, labels, range(1, n + 1))
     areas = ndi.sum(outer > 0, outer, range(1, n + 1))
     tolerance = 10.0 ** -config.CSV_FLOAT_PRECISION
-    for r, (cy, cx), area in zip(rows, centroids, areas):
+    for r, (cy, cx), area in zip(table_rows, centroids, areas):
         i = int(r["lacuna_id"])
         if abs(float(r["centroid_row_px"]) - cy) > 0.006 or abs(float(r["centroid_col_px"]) - cx) > 0.006:
             raise ValueError(f"lacuna {i}: the table's centroid is not the label image's")
         has_pol = r.get("outer_area_um2", "") != ""
         if has_pol != (i in pol_ids):
-            raise ValueError(f"lacuna {i}: a POL measure in {'the table only' if has_pol else 'the overlay only'}")
+            raise ValueError(f"lacuna {i}: a POL measure in {'the table only' if has_pol else 'the pictures only'}")
         if has_pol and abs(float(r["outer_area_um2"]) - area * UM2_PER_PX) > tolerance:
             raise ValueError(f"lacuna {i}: outer area {r['outer_area_um2']} um2 in the table, "
                              f"{area * UM2_PER_PX:.4f} um2 inside the drawn outline")
-    return len(rows)
+    return len(table_rows)
+
+
+def save_contact_sheet(group: str, results_root: Path, image_labels: list, path: Path) -> None:
+    """Every image's measured picture, small, CONTACT_COLUMNS to a row, each
+    labelled by image, under a title that says POL proxy, pre-validation."""
+    from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
+
+    font = ImageFont.load_default(size=FONT_PX)
+    tile, gap, label_h, title_h = CONTACT_TILE_PX, 6, 18, 24
+    n_rows = max(1, -(-len(image_labels) // CONTACT_COLUMNS))
+    width = CONTACT_COLUMNS * tile + (CONTACT_COLUMNS + 1) * gap
+    sheet = Image.new("RGB", (width, title_h + n_rows * (tile + label_h + gap) + gap), (0, 0, 0))
+    draw = ImageDraw.Draw(sheet)
+    draw.text((gap, title_h // 2), f"{group}: the measured pictures, {PICTURE_NOTE}. Yellow band: measured; "
+                                   f"orange: flagged, not in the means. Full size: <image>/4_pols/.",
+              font=font, fill=TEXT_RGB, anchor="lm")
+    for k, label in enumerate(image_labels):
+        with Image.open(lacunae.result_path(results_root, label, SECTION_POLS, SUFFIX_MEASURED)) as im:
+            scale = tile / max(im.width, im.height)
+            thumb = im.convert("RGB").resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
+        row, col = divmod(k, CONTACT_COLUMNS)
+        x, y = gap + col * (tile + gap), title_h + row * (tile + label_h + gap)
+        sheet.paste(thumb, (x, y))
+        draw.text((x + tile / 2, y + tile + label_h / 2), label, font=font, fill=TEXT_RGB, anchor="mm")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(path)
 
 
 # Files
@@ -598,6 +674,21 @@ def write_csv(path: Path, columns: list, rows: list[dict]) -> None:
         writer = csv.DictWriter(f, fieldnames=columns, restval="", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def write_xlsx(path: Path, columns: list, rows: list[dict]) -> None:
+    """The same table as sheet per_image, and the note as sheet notes."""
+    from openpyxl import Workbook  # noqa: PLC0415
+
+    wb = Workbook()
+    sheet = wb.active
+    sheet.title = "per_image"
+    sheet.append(list(columns))
+    for r in rows:
+        sheet.append([None if r.get(c, "") == "" else r[c] for c in columns])
+    wb.create_sheet("notes").append([NOTE])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(path)
 
 
 def parameters() -> dict:
@@ -616,17 +707,59 @@ def parameters() -> dict:
     }
 
 
+def pols_path(results_root: Path, label: str, suffix: str) -> Path:
+    """<results_root>/<label>/4_pols/<label>_<suffix>."""
+    return lacunae.result_path(results_root, label, SECTION_POLS, suffix)
+
+
+def all_images_pols_path(results_root: Path, name: str) -> Path:
+    """<results_root>/all_images/pols/<name>."""
+    return lacunae.all_images_path(results_root, name, ALL_IMAGES_POLS_DIR)
+
+
+def write_image_section(results_root: Path, group: str, label: str, display: np.ndarray, labels: np.ndarray,
+                        outer: np.ndarray, rows: list[dict], img: dict, export_csv: bool) -> None:
+    """The 4_pols folder of one image: the three pictures, each checked
+    (save_picture), the record, and with the switch the per-lacuna csv."""
+    for suffix, draw in PICTURES:
+        save_picture(*draw(display, labels, outer, rows), pols_path(results_root, label, suffix))
+    if export_csv:
+        write_csv(pols_path(results_root, label, SUFFIX_PER_LACUNA), LACUNA_COLUMNS, rows)
+    record = {
+        "status": STATUS,
+        "units": "um",
+        "stage": "POL proxy",
+        "group": group,
+        "image": label,
+        "note": NOTE,
+        "csv_exported": bool(export_csv),
+        "counts": {"lacunae": img["n_lacunae"], "with_shape_measure": img["n_shape"], "flagged": img["n_flagged"],
+                   "measured": img["n_measured"], **{f"flag_{name}": img[f"n_flag_{name}"] for name in FLAGS}},
+        "measured_ids": [i for i, state, _letters in marks(rows) if state == "measured"],
+        "flagged_ids": [i for i, state, _letters in marks(rows) if state == "flagged"],
+        "no_shape_ids": [i for i, state, _letters in marks(rows) if state == "none"],
+        "flags": {name: [r["lacuna_id"] for r in rows if r.get(f"flag_{name}") is True] for name in FLAGS},
+        "files": [pols_path(results_root, label, s).name
+                  for s in (SUFFIX_OVERLAY, SUFFIX_OUTLINES, SUFFIX_MEASURED)
+                  + ((SUFFIX_PER_LACUNA,) if export_csv else ()) + (SUFFIX_RECORD,)],
+        "parameters": parameters(),
+        "provenance": lacunae.provenance(),
+    }
+    with open(pols_path(results_root, label, SUFFIX_RECORD), "w", encoding="utf-8") as f:
+        json.dump(record, f, indent=2)
+
+
 def measure_group(data_dir: Path, results_root: Path, export_csv: bool) -> int:
-    """Measure every image of one group folder. An image that fails is listed
-    and skipped; the others carry on. Returns the number of failures."""
+    """Measure every image of one group folder and write its 4_pols folder, then
+    the group's contact sheet and, with the switch, its table in
+    all_images/pols/. An image that fails is listed and skipped; the others carry
+    on. Returns the number of failures."""
     group = Path(data_dir).resolve().name
     paths = sorted(Path(data_dir).glob("*.tif"))
     if not paths:
         print(f"No .tif image in {data_dir}: nothing to do, nothing written.")
         return 0
-    out_dir = Path(results_root) / POL_DIR
-    codes = coded_ids(paths)
-    lacuna_table, image_table, failures = [], [], []
+    image_table, failures = [], []
     for path in paths:
         label = lacunae.image_label(path)
         try:
@@ -641,90 +774,146 @@ def measure_group(data_dir: Path, results_root: Path, export_csv: bool) -> int:
             results, outer = measure_image(channel, labels, detection["vascular"], detection["no_shape_ids"])
             glow = canaliculi.glow_extent_px(channel, labels, int(labels.max()))
             rows = lacuna_rows(group, label, results, quant["lacunae"], glow, labels)
+            img = image_row(group, label, rows)
+            write_image_section(results_root, group, label, display, labels, outer, rows, img, export_csv)
         except Exception as exc:  # an image that fails is listed and the others carry on
-            failures.append({"image": label, "error": f"{type(exc).__name__}: {exc}"})
+            failures.append((label, f"{type(exc).__name__}: {exc}"))
             print(f"{label}: FAILED, skipped ({type(exc).__name__}: {exc})")
             continue
-        save_overlay(channel, labels, outer, rows, out_dir / OVERLAY_DIR / f"{label}_{SUFFIX_OVERLAY}",
-                     f"{group} / {label}. {OVERLAY_TITLE}")
-        save_qc_overlay(display, labels, outer, {i for i, res in enumerate(results, start=1) if res is not None},
-                        out_dir / OVERLAY_DIR / f"{codes[label]}_{QC_SUFFIX}")
-        img = image_row(group, label, rows)
-        lacuna_table += rows
         image_table.append(img)
         print(f"{label}: {img['n_lacunae']} lacunae, {img['n_shape']} with a shape measure, "
               f"{img['n_flagged']} flagged, {img['n_measured']} measured; "
               f"outer area mean {img['outer_area_um2_mean']} um2, POL ratio mean {img['pol_ratio_mean']}")
     if export_csv:
-        write_csv(out_dir / f"{group}_pols_per_lacuna.csv", LACUNA_COLUMNS, lacuna_table)
-        write_csv(out_dir / f"{group}_pols_per_image.csv", IMAGE_COLUMNS, image_table)
-    record = {
-        "status": STATUS,
-        "units": "um",
-        "stage": "POL proxy",
-        "group": group,
-        "note": NOTE,
-        "csv_exported": bool(export_csv),
-        "images": [r["image"] for r in image_table],
-        "failed_images": failures,
-        "counts": {"lacunae": len(lacuna_table),
-                   "with_shape_measure": sum(1 for r in lacuna_table if "flagged" in r),
-                   "flagged": sum(1 for r in lacuna_table if r.get("flagged") is True),
-                   "measured": sum(1 for r in lacuna_table if r.get("measured") is True)},
-        "parameters": parameters(),
-        "provenance": lacunae.provenance(),
-    }
-    out_dir.mkdir(parents=True, exist_ok=True)
-    with open(out_dir / f"{group}_pols_run.json", "w", encoding="utf-8") as f:
-        json.dump(record, f, indent=2)
-    print(f"-> {out_dir}" + ("" if export_csv else "  (no csv: run with --csv to export the tables)"))
+        write_csv(all_images_pols_path(results_root, f"{ALL_IMAGES_TABLE}.csv"), IMAGE_COLUMNS, image_table)
+        write_xlsx(all_images_pols_path(results_root, f"{ALL_IMAGES_TABLE}.xlsx"), IMAGE_COLUMNS, image_table)
+    save_contact_sheet(group, results_root, [r["image"] for r in image_table],
+                       all_images_pols_path(results_root, CONTACT_SHEET))
+    lacunae.report_failures(results_root, "pols", failures)
+    print(f"-> {results_root}/<image>/{SECTION_POLS}/ and {all_images_pols_path(results_root, '')}"
+          + ("" if export_csv else "  (no csv: run with --csv to export the tables)"))
     return len(failures)
 
 
-def qc_overlay_group(data_dir: Path, results_root: Path, only=None) -> int:
-    """Write the QC overlay on the original image of every image of one group
-    folder, or of the images named in only (labels or coded IDs), from the saved
-    detection; no table, no other overlay and no run record is written. Each is
-    checked against the image (save_qc_overlay) and, when the group's per-lacuna
-    table exists, against its rows (check_against_table). Prints coded IDs only.
-    Returns the number of failures."""
+# Layout check
+
+CHECK_COLUMNS = ("group", "image", "lacunae", "measured", "flagged", "files_present", "csv_equals_old_table",
+                 "pictures_equal_csv")
+
+
+def check_group(data_dir: Path, results_root: Path) -> list[dict]:
+    """One row per image of a group folder: the five files of 4_pols exist; its
+    per-lacuna csv equals, value for value, the image's rows of the old group
+    table results/<group>/pols/<group>_pols_per_lacuna.csv while that exists (and
+    the all_images table equals the old per-image table); and each of the three
+    pictures, drawn again from the csv read back (so from its flags), equals the
+    saved file pixel for pixel, with the ids, centroids and outer areas matching
+    the csv (check_against_table). A failed check is a row with the error."""
     group = Path(data_dir).resolve().name
-    paths = sorted(Path(data_dir).glob("*.tif"))
-    codes = coded_ids(paths)
-    if only:
-        unknown = set(only) - set(codes) - set(codes.values())
-        if unknown:
-            raise SystemExit(f"Not an image of {data_dir}: {', '.join(sorted(unknown))}")
-        paths = [p for p in paths if {lacunae.image_label(p), codes[lacunae.image_label(p)]} & set(only)]
-    if not paths:
-        print(f"No .tif image in {data_dir}: nothing to do, nothing written.")
-        return 0
-    out_dir = Path(results_root) / POL_DIR
-    table = out_dir / f"{group}_pols_per_lacuna.csv"
-    failures = 0
-    for path in paths:
+    old_dir = Path(results_root) / "pols"
+    old_lacunae, old_images = old_dir / f"{group}_pols_per_lacuna.csv", old_dir / f"{group}_pols_per_image.csv"
+    old_rows = {}
+    if old_lacunae.is_file():
+        with open(old_lacunae, newline="", encoding="utf-8") as f:
+            old_header = csv.DictReader(f).fieldnames
+        with open(old_lacunae, newline="", encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                old_rows.setdefault(r["image"], []).append(r)
+    table = all_images_pols_path(results_root, f"{ALL_IMAGES_TABLE}.csv")
+    if old_images.is_file() and table.is_file() and old_images.read_bytes() != table.read_bytes():
+        raise ValueError(f"{group}: {table.name} is not the old {old_images.name}")
+    out = []
+    for path in sorted(Path(data_dir).glob("*.tif")):
         label = lacunae.image_label(path)
-        code = codes[label]
-        target = out_dir / OVERLAY_DIR / f"{code}_{QC_SUFFIX}"
+        row = {"group": group, "image": label}
         try:
+            files = [pols_path(results_root, label, s) for s in
+                     (SUFFIX_OVERLAY, SUFFIX_OUTLINES, SUFFIX_MEASURED, SUFFIX_PER_LACUNA, SUFFIX_RECORD)]
+            missing = [p.name for p in files if not p.is_file()]
+            row["files_present"] = not missing
+            if missing:
+                raise FileNotFoundError(", ".join(missing))
+            with open(files[3], newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                header, rows = reader.fieldnames, list(reader)
+            if header != list(LACUNA_COLUMNS):
+                raise ValueError("the per-lacuna csv does not have the columns of the old table")
+            m = marks(rows)
+            row.update({"lacunae": len(rows), "measured": sum(1 for _i, s, _l in m if s == "measured"),
+                        "flagged": sum(1 for _i, s, _l in m if s == "flagged")})
+            if old_rows:
+                row["csv_equals_old_table"] = header == old_header and rows == old_rows.get(label)
+                if not row["csv_equals_old_table"]:
+                    raise ValueError("the per-lacuna csv differs from the old table's rows")
             detection = quantification.load_detection(results_root, label)
             display, channel = lacunae.load_channel(path)
             labels = detection["lacuna_id_map"]
-            if labels.shape != channel.shape:
-                raise ValueError(f"label image {labels.shape} and image {channel.shape} differ in size")
-            results, outer = measure_image(channel, labels, detection["vascular"], detection["no_shape_ids"])
-            pol_ids = {i for i, res in enumerate(results, start=1) if res is not None}
-            save_qc_overlay(display, labels, outer, pol_ids, target)
-            checked = check_against_table(table, label, labels, outer, pol_ids) if table.exists() else None
-        except Exception as exc:  # an image that fails is listed and the others carry on
-            failures += 1
-            print(f"{code}: FAILED ({type(exc).__name__}: {exc})")
-            continue
-        print(f"{code}: {int(labels.max())} lacunae, {len(pol_ids)} POL outlines; the image's size, and equal to "
-              f"it off the drawing; " + (f"ids, centroids and outer areas match the table's {checked} rows"
-                                         if checked is not None else "no per-lacuna table to check against")
-              + f" -> {target}")
-    return failures
+            _results, outer = measure_image(channel, labels, detection["vascular"], detection["no_shape_ids"])
+            check_against_table(files[3], label, labels, outer, rows)
+            for (suffix, draw), file in zip(PICTURES, files[:3]):
+                if not np.array_equal(_read_png(file), draw(display, labels, outer, rows)[0]):
+                    raise ValueError(f"{file.name} is not the picture the csv gives")
+            row["pictures_equal_csv"] = True
+        except Exception as exc:  # reported per image
+            row["error"] = f"{type(exc).__name__}: {exc}"
+        out.append(row)
+    return out
+
+
+# Blinded review set
+
+def _inside(path: Path, root: Path) -> bool:
+    try:
+        Path(path).resolve().relative_to(Path(root).resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def blind_review(groups, key: Path, out_dir: Path) -> int:
+    """Copy every image's measured picture into one flat folder under shuffled
+    codes P001, P002, ... and write the key (code, group, image) to key, which
+    must lie outside the repository and must not exist yet; the output folder
+    must be empty. The order comes from the system's random source, so the key is
+    the only way back. The pictures carry no image name, group or genotype."""
+    import random  # noqa: PLC0415
+    import shutil  # noqa: PLC0415
+
+    if _inside(key, config.PROJECT_ROOT):
+        print("Refused: the key path is inside the repository. Put the key outside it, so it can never be committed.")
+        return 2
+    if key.exists():
+        print("Refused: the key file already exists. Choose a new path; an existing key is never overwritten.")
+        return 2
+    sources = []
+    for group in groups:
+        for path in sorted((config.DATA_DIR / group).glob("*.tif")):
+            label = lacunae.image_label(path)
+            sources.append((group, label, pols_path(config.RESULTS_ROOT / group, label, SUFFIX_MEASURED)))
+    missing = [str(p) for _g, _l, p in sources if not p.is_file()]
+    if missing:
+        print(f"Refused: {len(missing)} measured picture(s) missing, e.g. {missing[0]}. Run measure first.")
+        return 1
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if any(out_dir.iterdir()):
+        print("Refused: the output folder is not empty.")
+        return 2
+    seed = random.SystemRandom().randrange(2 ** 32)
+    order = list(range(len(sources)))
+    random.Random(seed).shuffle(order)
+    key_rows = []
+    for k, index in enumerate(order, start=1):
+        group, label, source = sources[index]
+        code = f"P{k:03d}"
+        shutil.copyfile(source, out_dir / f"{code}.png")
+        key_rows.append([code, group, label, str(source.relative_to(config.PROJECT_ROOT)), seed])
+    key.parent.mkdir(parents=True, exist_ok=True)
+    with open(key, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, lineterminator="\n")
+        writer.writerow(["code", "group", "image", "source", "seed"])
+        writer.writerows(key_rows)
+    print(f"{len(sources)} measured pictures coded P001 to P{len(sources):03d} into {out_dir}. Key written to {key}.")
+    return 0
 
 
 # Group summary
@@ -734,16 +923,21 @@ SUMMARY_COLUMNS = (["status", "group", "n_images", "n_images_measured", "n_lacun
                    + [f"{m}_{stat}" for m in MEASURES for stat in ("mean_of_image_means", "sd_of_image_means")])
 
 
+def group_images(group: str) -> list[dict]:
+    """The rows of a group's all_images table, in the order measure wrote them."""
+    path = all_images_pols_path(config.RESULTS_ROOT / group, f"{ALL_IMAGES_TABLE}.csv")
+    if not path.is_file():
+        raise FileNotFoundError(f"{path} is missing: run python src/pols.py measure --dir data/{group} --csv")
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
 def summarize_groups(groups, out_dir: Path) -> list[dict]:
     """results/pols/summary_by_group.csv and SUMMARY.md: per group, the mean
     and SD over images of each per-image mean, with the counts."""
     rows = []
     for group in groups:
-        path = config.RESULTS_ROOT / group / POL_DIR / f"{group}_pols_per_image.csv"
-        if not path.is_file():
-            raise FileNotFoundError(f"{path} is missing: run python src/pols.py measure --dir data/{group} --csv")
-        with open(path, newline="", encoding="utf-8") as f:
-            images = list(csv.DictReader(f))
+        images = group_images(group)
 
         def numbers(col):
             return [float(r[col]) for r in images if r[col] != ""]
@@ -774,9 +968,11 @@ def neighbour_sensitivity(groups) -> list[dict]:
     which lacunae are measured. A sensitivity line, not the result."""
     out = []
     for group in groups:
-        path = config.RESULTS_ROOT / group / POL_DIR / f"{group}_pols_per_lacuna.csv"
-        with open(path, newline="", encoding="utf-8") as f:
-            lacunae_rows = [r for r in csv.DictReader(f) if r["flagged"] != ""]
+        lacunae_rows = []
+        for image in group_images(group):
+            with open(pols_path(config.RESULTS_ROOT / group, image["image"], SUFFIX_PER_LACUNA), newline="",
+                      encoding="utf-8") as f:
+                lacunae_rows += [r for r in csv.DictReader(f) if r["flagged"] != ""]
         kept = [r for r in lacunae_rows
                 if not any(r[f"flag_{name}"] == "True" for name in FLAGS if name != "neighbour")]
         by_image = {}
@@ -808,7 +1004,7 @@ def write_summary_md(rows: list[dict], sensitivity: list[dict], path: Path) -> N
         "",
         "Each value is the mean over the group's images of the per-image mean over its measured lacunae",
         "(shape measure and no flag), with the SD between images in brackets. Made by",
-        "`python src/pols.py summary` from `results/<group>/pols/<group>_pols_per_image.csv`.",
+        "`python src/pols.py summary` from `results/<group>/all_images/pols/pols_all_images.csv`.",
         "",
         "| group | images | lacunae | with shape measure | flagged | measured | body area | outer area | POL area | POL ratio | halo width, median of sectors |",
         "| - | - | - | - | - | - | - | - | - | - | - |",
@@ -917,35 +1113,72 @@ def selftest() -> int:
     check("no shape measure: not measured, outer region is the body", res[0] is None
           and np.array_equal(outer > 0, labels > 0))
 
-    # Coded IDs: the specimen and the z plane, never a genotype, diet or group word.
-    names = {"548_hyp_HP_z14c1-2": "548_z14", "536-63x_Hyp_RD_z08c1-2": "536_z08", "872_wt_hp_z03": "872_z03",
-             "877_wt_z073c1-2": "877_z073", "I534_z11c1-2": "I534_z11", "542_z06": "542_z06", "543-2": "543-2"}
-    got = {name: coded_id(name) for name in names}
-    check("coded IDs: specimen and z plane, no group word", got == names, f"{got}")
-    try:
-        coded_id("WT_HP")
-        refused = False
-    except ValueError:
-        refused = True
-    check("coded IDs: a name of group words only is refused", refused)
+    def rows_of(results):
+        """The id and flag columns of the per-lacuna rows of synthetic results."""
+        rows = []
+        for i, res in enumerate(results, start=1):
+            row = {"lacuna_id": i}
+            if res is not None:
+                row["flagged"] = any(res["flags"].values())
+                row.update({f"flag_{name}": res["flags"][name] for name in FLAGS})
+            rows.append(row)
+        return rows
 
-    # The QC overlay: the image's size, unchanged off what is drawn, the body edge
-    # cyan and the POL outline yellow; with no POL measure, the lacunae alone.
+    def edge(labels):
+        return segmentation.find_boundaries(labels, mode="inner")
+
+    # The overlay picture: the image's size, unchanged off what is drawn, the body
+    # edge cyan and the POL outline yellow; with no POL measure, the lacunae alone.
     channel, labels = _synthetic((400, 400), [(200, 200)], 20, 20)
     display = np.stack([(channel * 255).astype(np.uint8)] * 3, axis=-1)
-    _res, outer = measure_image(channel, labels, no_vessel, [])
-    overlay, touched = qc_overlay(display, labels, outer, {1})
-    check("QC overlay: the image's size, and equal to the image off the lines, ids and legend",
-          overlay.shape == display.shape and np.array_equal(overlay[~touched], display[~touched]))
-    body_share = (overlay[segmentation.find_boundaries(labels, mode="inner")] == QC_LACUNA_RGB).all(axis=-1).mean()
-    pol_share = (overlay[segmentation.find_boundaries(outer, mode="outer")] == QC_POL_RGB).all(axis=-1).mean()
-    check("QC overlay: body edge cyan and POL outline yellow on at least 90% of their pixels",
+    res, outer = measure_image(channel, labels, no_vessel, [])
+    picture, touched, _base = overlay_picture(display, labels, outer, rows_of(res))
+    check("overlay picture: the image's size, and equal to the image off the lines, ids and legend",
+          picture.shape == display.shape and np.array_equal(picture[~touched], display[~touched]))
+    body_share = (picture[edge(labels)] == LACUNA_RGB).all(axis=-1).mean()
+    pol_share = (picture[_boundary(outer, [1])] == POL_RGB).all(axis=-1).mean()
+    check("overlay picture: body edge cyan and POL outline yellow on at least 90% of their pixels",
           body_share >= 0.9 and pol_share >= 0.9, f"{body_share:.2f}, {pol_share:.2f}")
-    _res, outer = measure_image(channel, labels, no_vessel, [1])
-    overlay, _touched = qc_overlay(display, labels, outer, set())
-    body_share = (overlay[segmentation.find_boundaries(labels, mode="inner")] == QC_LACUNA_RGB).all(axis=-1).mean()
-    check("QC overlay with no POL measure: lacunae only, no pixel of the POL colour",
-          not (overlay == QC_POL_RGB).all(axis=-1).any() and body_share >= 0.9, f"{body_share:.2f}")
+    res, outer = measure_image(channel, labels, no_vessel, [1])
+    picture, _touched, _base = overlay_picture(display, labels, outer, rows_of(res))
+    body_share = (picture[edge(labels)] == LACUNA_RGB).all(axis=-1).mean()
+    check("overlay picture with no POL measure: lacunae only, no pixel of the POL colour",
+          not (picture == POL_RGB).all(axis=-1).any() and body_share >= 0.9, f"{body_share:.2f}")
+
+    # The measured picture: lacuna 1 measured, lacuna 2 flagged (5 px from the frame).
+    channel, labels = _synthetic((400, 600), [(200, 300), (200, 25)], 20, 20)
+    display = np.stack([(channel * 255).astype(np.uint8)] * 3, axis=-1)
+    res, outer = measure_image(channel, labels, np.zeros((400, 600), bool), [])
+    rows = rows_of(res)
+    picture, touched, _base = measured_picture(display, labels, outer, rows)
+    lines = edge(labels) | _boundary(outer, [1, 2])
+    band1, band2 = ((outer == i) & (labels == 0) & ~lines for i in (1, 2))
+    bodies = (labels > 0) & ~lines
+    check("measured picture: the tint on the measured lacuna's band only, not on the flagged one's or a body",
+          [state for _i, state, _letters in marks(rows)] == ["measured", "flagged"] and band1.any() and band2.any()
+          and np.array_equal(picture[band1], _tint(display[band1], POL_RGB))
+          and np.array_equal(picture[band2], display[band2]) and np.array_equal(picture[bodies], display[bodies])
+          and np.array_equal(picture[~touched], display[~touched]))
+    yellow = (picture[_boundary(outer, [1])] == POL_RGB).all(axis=-1).mean()
+    orange = (picture[_boundary(outer, [2])] == FLAGGED_RGB).all(axis=-1).mean()
+    check("measured picture: the measured lacuna's outline yellow, the flagged one's orange",
+          yellow >= 0.9 and orange >= 0.9, f"{yellow:.2f}, {orange:.2f}")
+    letters = "".join(FLAG_LETTERS[name] for name in FLAGS if res[1]["flags"][name])
+    check("flag letters: the flagged id carries its flags' letters in orange, the measured id none",
+          id_labels(rows) == [(1, "1", TEXT_RGB), (2, f"2 {letters}", FLAGGED_RGB)] and letters.startswith("E"),
+          f"{id_labels(rows)}")
+    # The same rows as the csv holds them, every value a string: the same marks,
+    # so a picture drawn from the csv read back is the picture drawn from memory.
+    as_csv = [{k: str(v) for k, v in r.items()} for r in rows]
+    check("pictures drawn from the csv strings equal those drawn from memory",
+          all(np.array_equal(draw(display, labels, outer, as_csv)[0], draw(display, labels, outer, rows)[0])
+              for _suffix, draw in PICTURES))
+
+    # The outlines picture: the image dimmed, unchanged off its lines and note, no tint.
+    picture, touched, base = outlines_picture(display, labels, outer, rows)
+    check("outlines picture: the dimmed image, unchanged off its lines and note, no tint",
+          np.array_equal(base, (display * OUTLINES_DIM).astype(np.uint8))
+          and np.array_equal(picture[~touched], base[~touched]) and np.array_equal(picture[band1], base[band1]))
 
     ok = all(checks)
     print(f"\n{'PASS' if ok else 'FAIL'}: {sum(checks)} of {len(checks)} checks.")
@@ -958,30 +1191,51 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="POL proxy (pre-validation, um): body and the surround above "
                                                  "the bone background. results/pols/DEFINITION.md.")
     sub = parser.add_subparsers(dest="command", required=True)
-    p = sub.add_parser("measure", help="Measure every image of one group folder.")
+    p = sub.add_parser("measure", help="Measure every image of one group folder: results/<group>/<image>/4_pols/ "
+                                       "and results/<group>/all_images/pols/.")
     p.add_argument("--dir", type=Path, required=True, help="A group folder of .tif images, e.g. data/Hyp_RD.")
     p.add_argument("-r", "--results", type=Path, default=None,
                    help="The group's results folder, read for the detection output and written under "
-                        "pols/ (default: results/<name of the input folder>).")
+                        "<image>/4_pols/ and all_images/pols/ (default: results/<name of the input folder>).")
     p.add_argument("--csv", action="store_true",
-                   help="Switch, off by default: also export the per-lacuna and per-image csv tables.")
-    p = sub.add_parser("summary", help="Summarise the per-image tables of every group.")
+                   help="Switch, off by default: also export the tables, <image>_pols_per_lacuna.csv per image "
+                        "and pols_all_images.csv and .xlsx per group.")
+    p = sub.add_parser("summary", help="Summarise the all_images tables of every group: results/pols/.")
     p.add_argument("--groups", nargs="+", default=list(config.GROUPS), help="Groups (default: config.GROUPS).")
     p.add_argument("-o", "--out", type=Path, default=SUMMARY_DIR, help="Output folder (default: results/pols).")
-    sub.add_parser("selftest", help="Checks of the geometry and the flags on synthetic images.")
-    p = sub.add_parser("qc-overlay", help="Write only the QC overlays on the original images, named by coded ID.")
-    p.add_argument("--dir", type=Path, required=True, help="A group folder of .tif images, e.g. data/Hyp_RD.")
-    p.add_argument("-r", "--results", type=Path, default=None,
-                   help="The group's results folder (default: results/<name of the input folder>).")
-    p.add_argument("--image", action="append", default=None,
-                   help="Only this image, by label or coded ID; may be given more than once (default: all).")
+    p = sub.add_parser("check", help="Check the 4_pols folder of every image: files, csv, pictures against the csv.")
+    p.add_argument("--groups", nargs="+", default=list(config.GROUPS), help="Groups (default: config.GROUPS).")
+    p.add_argument("-o", "--out", type=Path, default=SUMMARY_DIR / "layout_check.csv",
+                   help="The table of the check (default: results/pols/layout_check.csv).")
+    p = sub.add_parser("blind-review", help="Copy every measured picture into results/blind_review/pols/ under "
+                                            "shuffled codes; the key is written outside the repository.")
+    p.add_argument("-k", "--key", type=Path, required=True,
+                   help="The key to write, a csv outside the repository that does not exist yet, "
+                        "e.g. ../lcn-quant-keys/pols_blind_review_key.csv.")
+    p.add_argument("--groups", nargs="+", default=list(config.GROUPS), help="Groups (default: config.GROUPS).")
+    p.add_argument("-o", "--out", type=Path, default=BLIND_REVIEW_DIR,
+                   help="The flat output folder, empty (default: results/blind_review/pols).")
+    sub.add_parser("selftest", help="Checks of the geometry, the flags and the pictures on synthetic images.")
     args = parser.parse_args()
 
     if args.command == "selftest":
         sys.exit(selftest())
-    if args.command == "qc-overlay":
-        results_root = args.results or config.RESULTS_ROOT / Path(args.dir).resolve().name
-        sys.exit(1 if qc_overlay_group(args.dir, results_root, args.image) else 0)
+    if args.command == "blind-review":
+        sys.exit(blind_review(args.groups, args.key, args.out))
+    if args.command == "check":
+        rows = []
+        for group in args.groups:
+            rows += check_group(config.DATA_DIR / group, config.RESULTS_ROOT / group)
+        write_csv(args.out, list(CHECK_COLUMNS) + ["error"], rows)
+        print(f"{'group':<8} {'image':<26} {'lacunae':>7} {'measured':>8} {'flagged':>7}  check")
+        for r in rows:
+            print(f"{r['group']:<8} {r['image']:<26} {r.get('lacunae', ''):>7} {r.get('measured', ''):>8} "
+                  f"{r.get('flagged', ''):>7}  {r.get('error', 'PASS')}")
+        failed = [r for r in rows if "error" in r]
+        print(f"\n{'FAIL' if failed else 'PASS'}: {len(rows) - len(failed)} of {len(rows)} images; "
+              f"old tables {'compared' if any(r.get('csv_equals_old_table') for r in rows) else 'not present'}. "
+              f"-> {args.out}")
+        sys.exit(1 if failed else 0)
     if args.command == "measure":
         results_root = args.results or config.RESULTS_ROOT / Path(args.dir).resolve().name
         failed = measure_group(args.dir, results_root, args.csv)
