@@ -7,7 +7,7 @@ was run and no difference is claimed. Units um and um2 (0.13 um/px).
 
 Each value is the mean over the group's images of the per-image mean over its measured lacunae
 (shape measure and no flag), with the SD between images in brackets. Made by
-`python src/pols.py summary` from `results/<group>/pols/<group>_pols_per_image.csv`.
+`python src/pols.py summary` from `results/<group>/all_images/pols/pols_all_images.csv`.
 
 | group | images | lacunae | with shape measure | flagged | measured | body area | outer area | POL area | POL ratio | halo width, median of sectors |
 | - | - | - | - | - | - | - | - | - | - | - |

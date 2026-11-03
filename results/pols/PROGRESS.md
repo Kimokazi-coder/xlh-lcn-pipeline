@@ -66,7 +66,7 @@ no AI judge or API, everything "POL proxy, pre-validation".
       outlines, measured, per-lacuna csv, json) and results/<group>/all_images/pols/
       (pols_all_images.csv and .xlsx, contact_sheet.png); commands check and
       blind-review; selftest with checks of the tint and the flag letters
-- [ ] L2, RUN: measure with the switch --csv on all four groups, summary, check
+- [x] L2, RUN: measure with the switch --csv on all four groups, summary, check
       against the old tables (results/pols/layout_check.csv)
 - [ ] L3, BLIND: results/blind_review/pols/P001.png ..., key outside the repository
       (F:/lcn-quant-keys/pols_blind_review_key.csv), never committed
@@ -84,4 +84,11 @@ no AI judge or API, everything "POL proxy, pre-validation".
   gave all five files per image, pols_all_images.csv equal byte for byte to the old
   WT_pols_per_image.csv, and every picture redrawn from its csv equal to the file.
   Regression before push: PASS, 2 runs. Committed and pushed.
-  Resume: L2 (measure --csv on WT, WT_HP, Hyp_RD, Hyp_HP, then summary, then check).
+- L2: measure with the switch --csv on WT, WT_HP, Hyp_RD, Hyp_HP from commit dd72608
+  (35 records, git_dirty False, no failed image); summary: summary_by_group.csv
+  unchanged byte for byte, SUMMARY.md changed only in the line naming its source
+  table; check: PASS, 35 of 35 images, old tables compared (every per-lacuna csv
+  equal to the old table's rows, every pols_all_images.csv equal byte for byte to the
+  old per-image table, all three pictures equal to the pictures the csv gives),
+  results/pols/layout_check.csv. 105 pictures, 140 MB. Regression before push: PASS.
+  Resume: L3 (blind-review -k F:/lcn-quant-keys/pols_blind_review_key.csv).
