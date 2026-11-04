@@ -1,8 +1,15 @@
-"""POL proxy: each lacuna's bright body and the surround that stays above the
-bone background (results/pols/DEFINITION.md).
+"""RETIRED. The POL ring proxy: each lacuna's bright body and the surround that
+stays above the bone background (results/archive/pols/DEFINITION.md).
+
+Retired on 2026-11-04: the ring it measures is the dye glow around every lacuna,
+the same width in WT, which has no lesions, and not a lesion. The POL section,
+results/<group>/3_pols/, now shows the candidate measure, lacunar size
+(src/pols.py). This module is kept so the archived outputs can be remade: every
+command writes into results/<group>/5_archive/pol_ring_proxy/ and
+results/archive/, never into 3_pols.
 
 PRE-VALIDATION. This is NOT a measurement of periosteocytic lesions (POLs). The
-phase 0 look (results/pols/FINDINGS.md) found no separate lesion zone in these
+phase 0 look (results/archive/pols/FINDINGS.md) found no separate lesion zone in these
 images: no dark ring, no distinct halo and no step inside the body, only a smooth
 fall from the body to the bone background, about 2.3 um wide in WT, which has no
 lesions. What is measured here is that surround, a proxy, and every output says
@@ -15,9 +22,9 @@ has no earlier output to match, so it reports physical units.
 Nothing is detected again and no existing stage is changed or run. Per image it
 reads what the lacuna and network stages saved in results/<group>/<label>/
 (quantification.load_detection): the lacuna label image, the classes with no
-shape measure and the vascular mask; and, from 5_quantification, each lacuna's
+shape measure and the vascular mask; and, from 4_quantification, each lacuna's
 area (checked against the label image) and roots_count (copied, for reference).
-It never writes into those folders; it writes its own, 4_pols, beside them.
+It never writes into those folders; it writes its own, 5_archive/pol_ring_proxy/.
 
 Per lacuna (DEFINITION.md has the reasons):
     1. territory: the pixels whose nearest body is this lacuna's;
@@ -37,7 +44,7 @@ area measure anywhere in the pipeline and get no POL measure; they are counted.
 
 Outputs. Every picture is on the image at its own resolution and says "POL
 proxy, pre-validation"; the yellow zone is a proxy, mostly optical glow, never a
-lesion call. Per image, in results/<group>/<label>/4_pols/ (SECTION_POLS):
+lesion call. Per image, in results/<group>/5_archive/pol_ring_proxy/:
     <label>_pols_overlay.png      QC overlay on the original: body edge cyan,
                                   outer boundary yellow, 1 px, ids, legend,
                                   10 um scale bar
@@ -49,20 +56,20 @@ lesion call. Per image, in results/<group>/<label>/4_pols/ (SECTION_POLS):
     <label>_pols.json             parameters, counts, flags, provenance
     with the switch --csv (off by default):
     <label>_pols_per_lacuna.csv   one row per lacuna of this image
-Per group, in results/<group>/all_images/pols/:
+Per group, in the same folder:
     contact_sheet.png             every measured picture, small, by image
     with the switch --csv: pols_all_images.csv and .xlsx, one row per image
-Across groups, with the command summary, from the all_images tables:
-    results/pols/summary_by_group.csv and results/pols/SUMMARY.md
-The command check verifies every 4_pols folder (results/pols/layout_check.csv),
+Across groups, with the command summary, from the group tables:
+    results/archive/pols/summary_by_group.csv and results/archive/pols/SUMMARY.md
+The command check verifies every image's files (results/archive/pols/layout_check.csv),
 and blind-review copies the measured pictures under shuffled codes into
-results/blind_review/pols/, with the key outside the repository.
+results/archive/blind_review/pols/, with the key outside the repository.
 
 Usage (from the repo root):
-    python src/pols.py measure --dir data/WT --csv
-    python src/pols.py summary
-    python src/pols.py check
-    python src/pols.py blind-review -k ../lcn-quant-keys/pols_blind_review_key.csv
+    python src/pol_ring_proxy.py measure -d data/WT --csv
+    python src/pol_ring_proxy.py summary
+    python src/pol_ring_proxy.py check
+    python src/pol_ring_proxy.py blind-review -k ../lcn-quant-keys/pols_blind_review_key.csv
 """
 
 from __future__ import annotations
@@ -128,10 +135,11 @@ MIN_ANSWERED_SHARE = 0.5
 
 # Layout and names. The POL section of an image sits beside 1_lacunae and
 # 2_canaliculi in results/<group>/<label>/, and the group's table and contact
-# sheet in results/<group>/all_images/pols/. Defined here and not in config.py,
+# sheet, in results/<group>/5_archive/pol_ring_proxy/. Defined here and not in config.py,
 # because every upper-case setting of config.py enters the config hash that the
 # detection outputs record, and this section must leave those unchanged.
-SECTION_POLS = "4_pols"
+SECTION_POLS = config.SECTION_ARCHIVE
+RING_PROXY_DIR = config.ARCHIVE_POL_RING_PROXY_DIR
 SUFFIX_OVERLAY = "pols_overlay.png"
 SUFFIX_OUTLINES = "pols_outlines.png"
 SUFFIX_MEASURED = "pols_measured.png"
@@ -140,13 +148,13 @@ SUFFIX_RECORD = "pols.json"
 ALL_IMAGES_POLS_DIR = "pols"
 ALL_IMAGES_TABLE = "pols_all_images"  # .csv and .xlsx
 CONTACT_SHEET = "contact_sheet.png"
-SUMMARY_DIR = config.RESULTS_ROOT / "pols"
-BLIND_REVIEW_DIR = config.RESULTS_ROOT / "blind_review" / "pols"
+SUMMARY_DIR = config.ARCHIVE_ROOT / "pols"
+BLIND_REVIEW_DIR = config.ARCHIVE_ROOT / "blind_review" / "pols"
 STATUS = "pre-validation"
 NOTE = ("PRE-VALIDATION. POL proxy, not a measurement of periosteocytic lesions: the "
         "bright lacuna body plus the surround that stays above the bone background. In WT, "
-        "which has no lesions, the surround is optical glow (results/pols/FINDINGS.md). "
-        "Units um, 0.13 um/px. Definition: results/pols/DEFINITION.md.")
+        "which has no lesions, the surround is optical glow (results/archive/pols/FINDINGS.md). "
+        "Units um, 0.13 um/px. Definition: results/archive/pols/DEFINITION.md.")
 
 # The window around a body: far enough for the background ring.
 PAD = int(np.ceil(BACKGROUND_BAND_PX[1])) + 2
@@ -332,7 +340,7 @@ def lacuna_rows(group: str, label: str, results: list, quant_rows: list, glow_px
             continue
         if q.get("area_px2") is not None and int(q["area_px2"]) != res["body_px"]:
             raise ValueError(f"{label}: lacuna {i} has {res['body_px']} px in the label image and "
-                             f"{q['area_px2']} px in 5_quantification; the outputs are out of step")
+                             f"{q['area_px2']} px in 4_quantification; the outputs are out of step")
         states = [state for state, _w in res["sectors"]]
         widths = res["widths_um"]
         body_um2 = res["body_px"] * UM2_PER_PX
@@ -652,10 +660,10 @@ def save_contact_sheet(group: str, results_root: Path, image_labels: list, path:
     sheet = Image.new("RGB", (width, title_h + n_rows * (tile + label_h + gap) + gap), (0, 0, 0))
     draw = ImageDraw.Draw(sheet)
     draw.text((gap, title_h // 2), f"{group}: the measured pictures, {PICTURE_NOTE}. Yellow band: measured; "
-                                   f"orange: flagged, not in the means. Full size: <image>/4_pols/.",
+                                   f"orange: flagged, not in the means. Full size: 5_archive/pol_ring_proxy/.",
               font=font, fill=TEXT_RGB, anchor="lm")
     for k, label in enumerate(image_labels):
-        with Image.open(lacunae.result_path(results_root, label, SECTION_POLS, SUFFIX_MEASURED)) as im:
+        with Image.open(pols_path(results_root, label, SUFFIX_MEASURED)) as im:
             scale = tile / max(im.width, im.height)
             thumb = im.convert("RGB").resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
         row, col = divmod(k, CONTACT_COLUMNS)
@@ -708,18 +716,18 @@ def parameters() -> dict:
 
 
 def pols_path(results_root: Path, label: str, suffix: str) -> Path:
-    """<results_root>/<label>/4_pols/<label>_<suffix>."""
-    return lacunae.result_path(results_root, label, SECTION_POLS, suffix)
+    """<results_root>/5_archive/pol_ring_proxy/<label>_<suffix>."""
+    return lacunae.result_path(results_root, label, SECTION_POLS, suffix, RING_PROXY_DIR)
 
 
 def all_images_pols_path(results_root: Path, name: str) -> Path:
-    """<results_root>/all_images/pols/<name>."""
-    return lacunae.all_images_path(results_root, name, ALL_IMAGES_POLS_DIR)
+    """<results_root>/5_archive/pol_ring_proxy/<name>."""
+    return lacunae.group_path(results_root, SECTION_POLS, name, RING_PROXY_DIR)
 
 
 def write_image_section(results_root: Path, group: str, label: str, display: np.ndarray, labels: np.ndarray,
                         outer: np.ndarray, rows: list[dict], img: dict, export_csv: bool) -> None:
-    """The 4_pols folder of one image: the three pictures, each checked
+    """The ring proxy files of one image: the three pictures, each checked
     (save_picture), the record, and with the switch the per-lacuna csv."""
     for suffix, draw in PICTURES:
         save_picture(*draw(display, labels, outer, rows), pols_path(results_root, label, suffix))
@@ -750,9 +758,9 @@ def write_image_section(results_root: Path, group: str, label: str, display: np.
 
 
 def measure_group(data_dir: Path, results_root: Path, export_csv: bool) -> int:
-    """Measure every image of one group folder and write its 4_pols folder, then
+    """Measure every image of one group folder and write its ring proxy files, then
     the group's contact sheet and, with the switch, its table in
-    all_images/pols/. An image that fails is listed and skipped; the others carry
+    5_archive/pol_ring_proxy/. An image that fails is listed and skipped; the others carry
     on. Returns the number of failures."""
     group = Path(data_dir).resolve().name
     paths = sorted(Path(data_dir).glob("*.tif"))
@@ -770,7 +778,7 @@ def measure_group(data_dir: Path, results_root: Path, export_csv: bool) -> int:
             if labels.shape != channel.shape:
                 raise ValueError(f"label image {labels.shape} and image {channel.shape} differ in size")
             if len(quant["lacunae"]) != int(labels.max()):
-                raise ValueError("5_quantification and the label image hold different lacuna counts")
+                raise ValueError("4_quantification and the label image hold different lacuna counts")
             results, outer = measure_image(channel, labels, detection["vascular"], detection["no_shape_ids"])
             glow = canaliculi.glow_extent_px(channel, labels, int(labels.max()))
             rows = lacuna_rows(group, label, results, quant["lacunae"], glow, labels)
@@ -790,7 +798,7 @@ def measure_group(data_dir: Path, results_root: Path, export_csv: bool) -> int:
     save_contact_sheet(group, results_root, [r["image"] for r in image_table],
                        all_images_pols_path(results_root, CONTACT_SHEET))
     lacunae.report_failures(results_root, "pols", failures)
-    print(f"-> {results_root}/<image>/{SECTION_POLS}/ and {all_images_pols_path(results_root, '')}"
+    print(f"-> {all_images_pols_path(results_root, '')}"
           + ("" if export_csv else "  (no csv: run with --csv to export the tables)"))
     return len(failures)
 
@@ -802,10 +810,10 @@ CHECK_COLUMNS = ("group", "image", "lacunae", "measured", "flagged", "files_pres
 
 
 def check_group(data_dir: Path, results_root: Path) -> list[dict]:
-    """One row per image of a group folder: the five files of 4_pols exist; its
+    """One row per image of a group folder: the five ring proxy files exist; its
     per-lacuna csv equals, value for value, the image's rows of the old group
     table results/<group>/pols/<group>_pols_per_lacuna.csv while that exists (and
-    the all_images table equals the old per-image table); and each of the three
+    the group table equals the old per-image table); and each of the three
     pictures, drawn again from the csv read back (so from its flags), equals the
     saved file pixel for pixel, with the ids, centroids and outer areas matching
     the csv (check_against_table). A failed check is a row with the error."""
@@ -924,16 +932,16 @@ SUMMARY_COLUMNS = (["status", "group", "n_images", "n_images_measured", "n_lacun
 
 
 def group_images(group: str) -> list[dict]:
-    """The rows of a group's all_images table, in the order measure wrote them."""
+    """The rows of a group's ring proxy table, in the order measure wrote them."""
     path = all_images_pols_path(config.RESULTS_ROOT / group, f"{ALL_IMAGES_TABLE}.csv")
     if not path.is_file():
-        raise FileNotFoundError(f"{path} is missing: run python src/pols.py measure --dir data/{group} --csv")
+        raise FileNotFoundError(f"{path} is missing: run python src/pol_ring_proxy.py measure -d data/{group} --csv")
     with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
 def summarize_groups(groups, out_dir: Path) -> list[dict]:
-    """results/pols/summary_by_group.csv and SUMMARY.md: per group, the mean
+    """results/archive/pols/summary_by_group.csv and SUMMARY.md: per group, the mean
     and SD over images of each per-image mean, with the counts."""
     rows = []
     for group in groups:
@@ -1004,7 +1012,7 @@ def write_summary_md(rows: list[dict], sensitivity: list[dict], path: Path) -> N
         "",
         "Each value is the mean over the group's images of the per-image mean over its measured lacunae",
         "(shape measure and no flag), with the SD between images in brackets. Made by",
-        "`python src/pols.py summary` from `results/<group>/all_images/pols/pols_all_images.csv`.",
+        "`python src/pol_ring_proxy.py summary` from `results/<group>/5_archive/pol_ring_proxy/pols_all_images.csv`.",
         "",
         "| group | images | lacunae | with shape measure | flagged | measured | body area | outer area | POL area | POL ratio | halo width, median of sectors |",
         "| - | - | - | - | - | - | - | - | - | - | - |",
@@ -1189,32 +1197,32 @@ def selftest() -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="POL proxy (pre-validation, um): body and the surround above "
-                                                 "the bone background. results/pols/DEFINITION.md.")
+                                                 "the bone background. results/archive/pols/DEFINITION.md.")
     sub = parser.add_subparsers(dest="command", required=True)
-    p = sub.add_parser("measure", help="Measure every image of one group folder: results/<group>/<image>/4_pols/ "
-                                       "and results/<group>/all_images/pols/.")
-    p.add_argument("--dir", type=Path, required=True, help="A group folder of .tif images, e.g. data/Hyp_RD.")
+    p = sub.add_parser("measure", help="Measure every image of one group folder into "
+                                       "results/<group>/5_archive/pol_ring_proxy/.")
+    p.add_argument("-d", "--dir", type=Path, required=True, help="A group folder of .tif images, e.g. data/Hyp_RD.")
     p.add_argument("-r", "--results", type=Path, default=None,
                    help="The group's results folder, read for the detection output and written under "
-                        "<image>/4_pols/ and all_images/pols/ (default: results/<name of the input folder>).")
+                        "5_archive/pol_ring_proxy/ (default: results/<name of the input folder>).")
     p.add_argument("--csv", action="store_true",
                    help="Switch, off by default: also export the tables, <image>_pols_per_lacuna.csv per image "
                         "and pols_all_images.csv and .xlsx per group.")
-    p = sub.add_parser("summary", help="Summarise the all_images tables of every group: results/pols/.")
+    p = sub.add_parser("summary", help="Summarise the ring proxy tables of every group: results/archive/pols/.")
     p.add_argument("--groups", nargs="+", default=list(config.GROUPS), help="Groups (default: config.GROUPS).")
-    p.add_argument("-o", "--out", type=Path, default=SUMMARY_DIR, help="Output folder (default: results/pols).")
-    p = sub.add_parser("check", help="Check the 4_pols folder of every image: files, csv, pictures against the csv.")
+    p.add_argument("-o", "--out", type=Path, default=SUMMARY_DIR, help="Output folder (default: results/archive/pols).")
+    p = sub.add_parser("check", help="Check the ring proxy files of every image: files, csv, pictures against the csv.")
     p.add_argument("--groups", nargs="+", default=list(config.GROUPS), help="Groups (default: config.GROUPS).")
     p.add_argument("-o", "--out", type=Path, default=SUMMARY_DIR / "layout_check.csv",
-                   help="The table of the check (default: results/pols/layout_check.csv).")
-    p = sub.add_parser("blind-review", help="Copy every measured picture into results/blind_review/pols/ under "
+                   help="The table of the check (default: results/archive/pols/layout_check.csv).")
+    p = sub.add_parser("blind-review", help="Copy every measured picture into results/archive/blind_review/pols/ under "
                                             "shuffled codes; the key is written outside the repository.")
     p.add_argument("-k", "--key", type=Path, required=True,
                    help="The key to write, a csv outside the repository that does not exist yet, "
                         "e.g. ../lcn-quant-keys/pols_blind_review_key.csv.")
     p.add_argument("--groups", nargs="+", default=list(config.GROUPS), help="Groups (default: config.GROUPS).")
     p.add_argument("-o", "--out", type=Path, default=BLIND_REVIEW_DIR,
-                   help="The flat output folder, empty (default: results/blind_review/pols).")
+                   help="The flat output folder, empty (default: results/archive/blind_review/pols).")
     sub.add_parser("selftest", help="Checks of the geometry, the flags and the pictures on synthetic images.")
     args = parser.parse_args()
 

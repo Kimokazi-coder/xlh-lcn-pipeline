@@ -22,19 +22,19 @@ src/canaliculi.py have already written:
     2_canaliculi/<label>_canaliculi_detection.json      parameters, the network
                                                  cut
 
-What it writes:
-    5_quantification/<label>_quantification.json   every number, the parameters
+What it writes, in the same results folder:
+    4_quantification/<label>_quantification.json   every number, the parameters
                                                    of both stages and provenance
-    5_quantification/<label>_quantification.xlsx   the same as sheets
-    5_quantification/<label>_quantification.pdf    the same to read
-    all_images/quantification/quantification_all_images.csv, .xlsx and .pdf
+    4_quantification/<label>_quantification.xlsx   the same as sheets
+    4_quantification/<label>_quantification.pdf    the same to read
+    4_quantification/quantification_all_images.csv, .xlsx and .pdf
                                                    one row per image
 
 Usage, from the repository root:
-    python src/quantification.py --dir data/WT
-    python src/quantification.py --image "data/WT/543-2.tif"
-    python src/quantification.py --dir data/WT -o OTHER_FOLDER
-    python src/quantification.py --dir data/WT -m ROI_MASK_FOLDER
+    python src/quantification.py -d data/WT
+    python src/quantification.py -i "data/WT/543-2.tif"
+    python src/quantification.py -d data/WT -o OTHER_FOLDER
+    python src/quantification.py -d data/WT -m ROI_MASK_FOLDER
 
 Pre-validation: no number here has been checked against manual (ImageJ) counts.
 Pixel units: the images carry no micron calibration, so lengths are px, areas
@@ -926,15 +926,14 @@ NOTE = (
 # Reading what detection saved
 
 def quant_path(out_root: Path, label: str, extension: str) -> Path:
-    """results/<group>/<label>/5_quantification/<label>_quantification.<extension>."""
+    """results/<group>/4_quantification/<label>_quantification.<extension>."""
     return lacunae.result_path(out_root, label, config.SECTION_QUANTIFICATION,
                                config.SUFFIX_QUANTIFICATION + extension)
 
 
 def summary_path(out_root: Path, extension: str) -> Path:
-    """results/<group>/all_images/quantification/quantification_all_images.<extension>."""
-    return lacunae.all_images_path(out_root, config.QUANT_SUMMARY_NAME + extension,
-                                   config.ALL_IMAGES_QUANT_DIR)
+    """results/<group>/4_quantification/quantification_all_images.<extension>."""
+    return lacunae.group_path(out_root, config.SECTION_QUANTIFICATION, config.QUANT_SUMMARY_NAME + extension)
 
 
 def _read_mask(path: Path) -> np.ndarray:

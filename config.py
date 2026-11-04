@@ -85,21 +85,51 @@ IMPORT_MAX_GROUP_MB = 100.0
 IMPORT_SOURCE_PATH_PARTS = 2
 IMPORT_INVENTORY_NAME = "image_inventory.csv"  # in DATA_DIR
 
-# Outputs: one folder per group, results/<group>/, each holding one folder per
-# image and the cross-image files (results/README.md). RESULTS_DIR is the
-# reference group's folder, results/WT/: the deterministic method on the 8 WT
-# sections, and what python src/diagnostics.py regression compares a fresh run
-# with. A run given no output folder writes to RESULTS_ROOT/<name of its input
-# folder>, so a run on data/WT writes results/WT/ (lacunae.output_root).
+# Outputs: one folder per group, results/<group>/, holding these five section
+# folders and nothing else (results/README.md). Inside a section the files of
+# every image of the group sit side by side, each named <label>_<suffix>; there
+# is no folder per image.
+#   1_lacunae         the lacuna stage's files, and the group's contact sheet
+#   2_canaliculi      the network stage's files, and the network figures
+#   3_pols            the candidate POL measure, lacunar size (src/pols.py)
+#   4_quantification  every measured number per image, the group table, the
+#                     cell gallery and overview figures, the group figures
+#   5_archive         everything no longer used, in named subfolders
+SECTION_LACUNAE = "1_lacunae"
+SECTION_CANALICULI = "2_canaliculi"
+SECTION_POLS = "3_pols"
+SECTION_QUANTIFICATION = "4_quantification"
+SECTION_ARCHIVE = "5_archive"
+SECTIONS = (SECTION_LACUNAE, SECTION_CANALICULI, SECTION_POLS, SECTION_QUANTIFICATION, SECTION_ARCHIVE)
+# Where the figures of the figures script go: the network figure beside the
+# network it draws, the overview and the cell gallery beside the numbers, and
+# the group figures (Fig01 to Fig04, S01, S02) with the group table.
+SECTION_NETWORK_FIGURES = SECTION_CANALICULI
+SECTION_FIGURES = SECTION_QUANTIFICATION
+SECTION_GROUP_FIGURES = SECTION_QUANTIFICATION
+# Named subfolders of 5_archive.
+ARCHIVE_NOT_USED_DIR = "not_used"
+ARCHIVE_POL_RING_PROXY_DIR = "pol_ring_proxy"
+ARCHIVE_AI_JUDGE_DIR = "ai_judge"
+
+# RESULTS_DIR is the reference group's folder, results/WT/: the deterministic
+# method on the 8 WT sections, and what python src/diagnostics.py regression
+# compares a fresh run with. A run given no output folder writes to
+# RESULTS_ROOT/<name of its input folder>, so a run on data/WT writes
+# results/WT/ (lacunae.output_root).
 RESULTS_ROOT = PROJECT_ROOT / "results"
 RESULTS_DIR = RESULTS_ROOT / REFERENCE_GROUP
-# The second, labelled set: the same pipeline with the AI judge switch on
-# (docs/EXPERIMENT_AI.md), for the WT group only, in results_ai_judge/WT/ with
-# the same per-image layout, the comparison against results/WT/, and the judge
-# log with the case pictures that were sent. results/ stays the deterministic
-# method and is never written by the judge.
-AI_RESULTS_ROOT = PROJECT_ROOT / "results_ai_judge"
-AI_RESULTS_DIR = AI_RESULTS_ROOT / REFERENCE_GROUP
+# Every table and figure that sets the groups side by side.
+SUMMARY_ROOT = RESULTS_ROOT / "summary"
+# Old material that belongs to no one group.
+ARCHIVE_ROOT = RESULTS_ROOT / "archive"
+# The AI thread judge (docs/EXPERIMENT_AI.md), archived: the same pipeline with
+# the judge switch on, WT only, with the same section layout, the comparison
+# against results/WT/ in compare/, and the judge log with the case pictures
+# that were sent in ai_log/. The deterministic sections of results/WT/ are
+# never written by the judge.
+AI_RESULTS_DIR = RESULTS_DIR / SECTION_ARCHIVE / ARCHIVE_AI_JUDGE_DIR / "canaliculi_judge"
+AI_RESULTS_ROOT = AI_RESULTS_DIR
 
 # Result layout. Every result file is named after its image. The label of an
 # image is its short name, from this table (key: the cleaned file name made by
@@ -117,20 +147,8 @@ IMAGE_LABELS = {
     "682_z29c1-3": "682_z29",
 }
 
-# Folders inside results/<group>/<label>/. Detection writes 1_lacunae and
-# 2_canaliculi, src/quantification.py writes 5_quantification, and every
-# measured number lives in 5_quantification alone.
-SECTION_LACUNAE = "1_lacunae"
-SECTION_CANALICULI = "2_canaliculi"
-SECTION_FIGURES = "3_publication_figures"
-SECTION_ARCHIVE = "4_archive_not_used"
-SECTION_QUANTIFICATION = "5_quantification"
-
-# Cross-image folders inside results/<group>/.
-ALL_IMAGES_DIR = "all_images"
-ALL_IMAGES_ARCHIVE_DIR = "archive_not_used"
-ALL_IMAGES_FIGURES_DIR = "figures"
-ALL_IMAGES_QUANT_DIR = "quantification"
+# Detection writes 1_lacunae and 2_canaliculi, src/quantification.py writes
+# 4_quantification, and every measured number lives in 4_quantification alone.
 
 # File names. A per-image file is <label>_<suffix>; a suffix without an
 # extension is written with each extension given in its comment.
@@ -162,15 +180,15 @@ SUFFIX_FIGURE_INSET = "figure_inset_choice.json"
 VARIANTS_DIR = "variants_per_image_brightness"  # in SECTION_ARCHIVE
 SUFFIX_VARIANT = "_per_image_brightness"  # appended to a figure suffix, .png
 VARIANT_WINDOW_FILE = "display_window_this_image.json"
-SUMMARY_NAME = "summary_all_images"  # .csv and .xlsx in ALL_IMAGES_DIR
-# One row per image, in ALL_IMAGES_DIR/ALL_IMAGES_QUANT_DIR. This becomes the
-# only cross-image table; it replaces summary_all_images with the same columns.
+# One row per image, in SECTION_QUANTIFICATION: the only cross-image table.
 QUANT_SUMMARY_NAME = "quantification_all_images"  # .csv, .xlsx and .pdf
-# A run lists every image it could not process, one file per stage, in
-# ALL_IMAGES_DIR, and the other images carry on. The file is written only when
-# an image fails, and a later run in which none fails removes it.
+# A run lists every image it could not process, one file per stage, in the
+# section that stage writes, and the other images carry on. The file is written
+# only when an image fails, and a later run in which none fails removes it.
 FAILED_IMAGES_NAME = "failed_images_{stage}.csv"
-DISPLAY_WINDOW_FILE = "display_window.json"  # in ALL_IMAGES_DIR/ALL_IMAGES_FIGURES_DIR
+DISPLAY_WINDOW_FILE = "display_window.json"  # in SECTION_GROUP_FIGURES
+# The group's contact sheet of lacuna outlines, in SECTION_LACUNAE.
+LACUNAE_CONTACT_SHEET = "contact_sheet.png"
 
 # Image and channel selection
 
@@ -633,7 +651,7 @@ FAST_LACUNA_STAGE = False
 # (python src/diagnostics.py regression).
 
 # The switch. When True, src/canaliculi.py reads the judge's decision file for
-# the image it is analysing (results_ai_judge/WT/ai_log/<label>/<label>_ai_segments.json),
+# the image it is analysing (AI_RESULTS_DIR/ai_log/<label>_ai_segments.json),
 # joins the segments judged real to the skeleton, drops the segments judged
 # artifact, and then runs the existing ownership, 50 um cap and quantification
 # unchanged. An image with no decision file is an error and not a silent pass,
@@ -691,7 +709,8 @@ AI_MIN_CALLS_BEFORE_QUALITY_GATE = 20
 AI_MAX_UNJUDGED_SHARE = 0.20
 
 # Where the requests, the answers, the pictures that were sent and the decision
-# files are written, inside AI_RESULTS_DIR. One folder per image.
+# files are written, inside AI_RESULTS_DIR. One folder, every file named after
+# its image (<label>_...), the pictures in its pictures/ subfolder.
 AI_LOG_DIR = "ai_log"
 # Where the dry run writes its report and its pictures, inside RESULTS_ROOT
 # (results/ai_dry_run/, not tracked).
@@ -774,8 +793,8 @@ AI_OUTPUT_TOKENS_FIXED = 20
 # False, which is how it ships.
 
 # The switch. When True, src/lacunae.py reads the judge's decision file for the
-# image it is analysing (results_ai_lacunae/<group>/ai_log/<label>/
-# <label>_ai_lacunae.json): a region judged yes is a lacuna even if a shape
+# image it is analysing (ai_lacuna_group_dir(group)/ai_log/<label>_ai_lacunae.json):
+# a region judged yes is a lacuna even if a shape
 # filter rejected it, a region judged no is not one even if the filters kept it,
 # and a region judged unsure, or not judged, keeps the deterministic decision.
 # A region the judge adds is the class "judged": counted and owning threads,
@@ -783,12 +802,19 @@ AI_OUTPUT_TOKENS_FIXED = 20
 # unchanged. An image with no decision file is an error and not a silent pass.
 AI_LACUNA_JUDGE_ENABLED = False
 
-# Where this judge writes: results_ai_lacunae/<group>/, with the same layout as
-# results/<group>/, its log in <group>/ai_log/, the pictures a run would send
-# in dry_run/ and the contact sheets in review/.
-AI_LACUNA_RESULTS_ROOT = PROJECT_ROOT / "results_ai_lacunae"
+# Where this judge writes, archived. Per group, ai_lacuna_group_dir(group):
+# results/<group>/5_archive/ai_judge/lacuna_judge/, with the same section
+# layout as results/<group>/ and its log in ai_log/. What belongs to no one
+# group, in AI_LACUNA_RESULTS_ROOT (results/archive/ai_judge/): the run records,
+# the pictures a run would send in dry_run/ and the contact sheets in review/.
+AI_LACUNA_RESULTS_ROOT = ARCHIVE_ROOT / ARCHIVE_AI_JUDGE_DIR
 AI_LACUNA_DRY_RUN_DIR = "dry_run"
 AI_LACUNA_REVIEW_DIR = "review"
+
+
+def ai_lacuna_group_dir(group: str) -> Path:
+    """results/<group>/5_archive/ai_judge/lacuna_judge/."""
+    return RESULTS_ROOT / group / SECTION_ARCHIVE / ARCHIVE_AI_JUDGE_DIR / "lacuna_judge"
 
 # The candidates (deterministic, permissive). Every region of the lacuna stage's
 # label image before its filters decide, kept and rejected alike, plus the dim

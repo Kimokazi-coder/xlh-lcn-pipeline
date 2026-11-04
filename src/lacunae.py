@@ -19,17 +19,18 @@ Method, per image:
        lacuna_count but every summary statistic uses interior objects only,
        because their size and shape are truncated by the field of view.
 
-Outputs, per image, in results/<group>/<label>/1_lacunae/ (the label is the short
-image name of config.IMAGE_LABELS; see image_label and result_path):
-    <label>_lacunae_outlines.png  the image with kept lacunae outlined in green
-    <label>_lacunae_results.xlsx  "summary" (counts and interior mean, median,
-                                  SD) and "per_lacuna" sheets
-    <label>_lacunae_results.json  the same numbers plus the parameters used
+Outputs, per image, in results/<group>/1_lacunae/, beside the files of every
+other image of the group (the label is the short image name of
+config.IMAGE_LABELS; see image_label and result_path):
+    <label>_lacunae_outlines.png    the image with kept lacunae outlined
+    <label>_lacuna_labels.png       the label image the later stages read
+    <label>_lacunae_detection.json  what the stage did, with its parameters
+Per group, after a folder run: contact_sheet.png, every outlines picture small.
 
 Usage (from the repo root):
-    python src/lacunae.py --dir data/WT
-    python src/lacunae.py --image "data/WT/543-2.tif"
-    python src/lacunae.py --dir data/WT -o OTHER_FOLDER
+    python src/lacunae.py -d data/WT
+    python src/lacunae.py -i "data/WT/543-2.tif"
+    python src/lacunae.py -d data/WT -o OTHER_FOLDER
 (default output: results/<name of the input folder>, so data/WT writes results/WT)
 """
 
@@ -169,20 +170,55 @@ def image_label(image) -> str:
     return config.IMAGE_LABELS.get(name, name)
 
 
-def result_path(out_root: Path, label: str, section: str, suffix: str, subfolder: str | None = None,
-                prefixed: bool = True) -> Path:
-    """Path of one result file: <out_root>/<label>/<section>/[<subfolder>/]
-    <label>_<suffix>, or <suffix> alone when prefixed is False."""
-    folder = Path(out_root) / label / section
+def result_path(out_root: Path, label: str, section: str, suffix: str, subfolder: str | None = None) -> Path:
+    """Path of one result file of one image: <out_root>/<section>/[<subfolder>/]
+    <label>_<suffix>. There is no folder per image: the files of every image of
+    a group sit side by side in each section, told apart by their label."""
+    folder = Path(out_root) / section
     if subfolder:
         folder = folder / subfolder
-    return folder / (f"{label}_{suffix}" if prefixed else suffix)
+    return folder / f"{label}_{suffix}"
 
 
-def all_images_path(out_root: Path, name: str, subfolder: str | None = None) -> Path:
-    """Path of one cross-image file: <out_root>/all_images/[<subfolder>/]<name>."""
-    folder = Path(out_root) / config.ALL_IMAGES_DIR
+def group_path(out_root: Path, section: str, name: str, subfolder: str | None = None) -> Path:
+    """Path of one file of the whole group: <out_root>/<section>/[<subfolder>/]<name>."""
+    folder = Path(out_root) / section
     return (folder / subfolder / name) if subfolder else folder / name
+
+
+def save_contact_sheet(tiles: list, title: str, path: Path, columns: int = 3, tile_px: int = 340) -> None:
+    """Every picture of `tiles` ([(label, png path)]), small, `columns` to a
+    row, each labelled, under one title line. Display only."""
+    from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
+
+    font = ImageFont.load_default(size=11)
+    gap, label_h, title_h = 6, 18, 24
+    n_rows = max(1, -(-len(tiles) // columns))
+    width = columns * tile_px + (columns + 1) * gap
+    sheet = Image.new("RGB", (width, title_h + n_rows * (tile_px + label_h + gap) + gap), (0, 0, 0))
+    draw = ImageDraw.Draw(sheet)
+    draw.text((gap, title_h // 2), title, font=font, fill=(255, 255, 255), anchor="lm")
+    for k, (label, picture) in enumerate(tiles):
+        with Image.open(picture) as im:
+            scale = tile_px / max(im.width, im.height)
+            thumb = im.convert("RGB").resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
+        row, col = divmod(k, columns)
+        x, y = gap + col * (tile_px + gap), title_h + row * (tile_px + label_h + gap)
+        sheet.paste(thumb, (x, y))
+        draw.text((x + tile_px / 2, y + tile_px + label_h / 2), label, font=font, fill=(255, 255, 255), anchor="mm")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(path)
+
+
+def save_lacunae_contact_sheet(out_root: Path, labels: list) -> Path:
+    """The group's contact sheet of lacuna outlines, in 1_lacunae/."""
+    tiles = [(label, result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_OUTLINES))
+             for label in labels]
+    tiles = [(label, p) for label, p in tiles if p.is_file()]
+    path = group_path(out_root, config.SECTION_LACUNAE, config.LACUNAE_CONTACT_SHEET)
+    save_contact_sheet(tiles, f"{Path(out_root).name}: kept lacunae outlined, every image. "
+                              f"Full size: 1_lacunae/<image>_lacunae_outlines.png.", path)
+    return path
 
 
 # Segmentation
@@ -854,7 +890,7 @@ def parameters() -> dict:
 DETECTION_NOTE = (
     "Detection record: what feature 1 did, with no measured value in it. The "
     "lacunae it found are the 1..N labels of the label image, and every number "
-    "measured from them is in this image's 5_quantification folder "
+    "measured from them is in the group's 4_quantification folder "
     "(src/quantification.py)."
 )
 
@@ -904,7 +940,7 @@ def write_outputs(result: dict, out_root: Path) -> None:
 
 
 def image_paths(args) -> list[Path]:
-    """The images named by --image or --dir (sorted *.tif)."""
+    """The images named by -i or -d (sorted *.tif)."""
     if args.image:
         if not args.image.is_file():
             raise FileNotFoundError(f"No such file: {args.image}")
@@ -916,13 +952,13 @@ def image_paths(args) -> list[Path]:
 
 def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--image", type=Path, help="One .tif image.")
-    group.add_argument("--dir", type=Path, help="A folder of .tif images.")
+    group.add_argument("-i", "--image", type=Path, help="One .tif image.")
+    group.add_argument("-d", "--dir", type=Path, help="A folder of .tif images.")
     parser.add_argument(
         "-o", "--out", type=Path, default=None,
         help="Results folder (default: results/<name of the input folder>, so data/WT writes results/WT). "
-             "Each image gets its own subfolder, named by its label; a folder run of "
-             "src/quantification.py also writes the cross-image table in all_images/.",
+             "Each stage writes its section folder there, every file named by its image label; a folder "
+             "run of src/quantification.py also writes the cross-image table in 4_quantification/.",
     )
 
 
@@ -939,9 +975,11 @@ def output_root(args) -> Path:
 
 def report_failures(out_root: Path, stage: str, failures: list) -> None:
     """List the images a run could not process, with the error, in
-    <out_root>/all_images/failed_images_<stage>.csv, and print them. With no
-    failure, a list an earlier run left is removed."""
-    path = all_images_path(out_root, config.FAILED_IMAGES_NAME.format(stage=stage))
+    <out_root>/<the stage's section>/failed_images_<stage>.csv, and print them.
+    With no failure, a list an earlier run left is removed."""
+    section = {"lacunae": config.SECTION_LACUNAE, "canaliculi": config.SECTION_CANALICULI,
+               "pols": config.SECTION_POLS}.get(stage, config.SECTION_QUANTIFICATION)
+    path = group_path(out_root, section, config.FAILED_IMAGES_NAME.format(stage=stage))
     if not failures:
         if path.is_file():
             path.unlink()
@@ -986,13 +1024,15 @@ def main() -> None:
             failures.append([image_path.name, f"{type(exc).__name__}: {exc}"])
             print(f"{image_path.name}: FAILED, skipped ({type(exc).__name__}: {exc})")
             continue
-        out_dir = args.out / image_label(image_path) / config.SECTION_LACUNAE
+        out_dir = args.out / config.SECTION_LACUNAE
         print(
             f"{image_path.name}: lacunae={result['lacuna_count']} "
             f"(interior {result['interior_lacuna_count']}, border {result['border_lacuna_count']})  "
             f"t_hi={result['t_hi']:.6f}  -> {out_dir}"
         )
     report_failures(args.out, "lacunae", failures)
+    if args.dir is not None:
+        print(f"contact sheet -> {save_lacunae_contact_sheet(args.out, [image_label(p) for p in paths])}")
     if failures:
         sys.exit(1)
 

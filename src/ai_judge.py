@@ -18,8 +18,9 @@ Where the parts live:
 
   src/judge_prompt.md      the one fixed prompt, used for every image
   docs/judge_examples.md   Karim's worked examples, loaded into the prompt
-  results_ai_judge/WT/ai_log/<label>/  every request and answer, the pictures that were
-                           sent, the decision file and the run report
+  results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/
+                           every request and answer, the pictures that were
+                           sent, the decision files, each named <label>_...
   config.py                the switch, the pinned model, the prices, the cost
                            ceiling and every number the candidate rule uses
 
@@ -1427,7 +1428,9 @@ def parse_answer(text: str, numbers: list, colours: dict, questions: dict) -> tu
 
 # The log, and the replay that reads it back
 
-# The log lives in results_ai_judge/WT/ai_log/. LOG_ROOT replaces that for one process, the
+# The log lives in config.AI_RESULTS_DIR/ai_log/ (results/WT/5_archive/ai_judge/
+# canaliculi_judge/ai_log/), one folder for every image, each file named after its
+# image. LOG_ROOT replaces that for one process, the
 # module-override idiom the sweep diagnostics use: the self-test sets it so that
 # a rehearsal with a stub judge can never leave verdicts in results/ for the
 # pipeline to pick up.
@@ -1439,15 +1442,17 @@ def log_root() -> Path:
 
 
 def log_dir(label: str) -> Path:
-    return log_root() / label
+    """The folder of one image's log: the log folder itself, shared by every
+    image; the files are told apart by their label prefix."""
+    return log_root()
 
 
 def log_path(label: str, case_id: str, attempt: int) -> Path:
-    return log_dir(label) / f"{case_id}_attempt{attempt}.json"
+    return log_dir(label) / f"{label}_{case_id}_attempt{attempt}.json"
 
 
 def picture_path(label: str, case_id: str) -> Path:
-    return log_dir(label) / "pictures" / f"{case_id}.png"
+    return log_dir(label) / "pictures" / f"{label}_{case_id}.png"
 
 
 def decisions_path(label: str) -> Path:
@@ -1914,8 +1919,9 @@ def estimate_case(system: str, user_text: str, png: bytes, segments: int) -> dic
 #
 #   src/judge_prompt_lacunae.md       the one fixed prompt, for every group
 #   docs/judge_examples_lacunae.md    worked examples, loaded into the prompt
-#   results_ai_lacunae/<group>/ai_log/<label>/  every request and answer, the
-#                                     picture that was sent, the decision file
+#   results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/  every request and
+#                                     answer, the picture that was sent, the
+#                                     decision file, each named <label>_...
 #   config.py                         the switch and the candidate rule
 
 LACUNA_LOG_SCHEMA = "lcn-ai-lacuna-judge-log-1"
@@ -2387,16 +2393,19 @@ def parse_lacuna_answer(text: str, numbers: list) -> tuple:
     return [seen[n] for n in numbers], ""
 
 
-# The lacuna judge's log. It lives in results_ai_lacunae/<group>/ai_log/<label>/.
-# LACUNA_LOG_ROOT replaces results_ai_lacunae/ for one process, as LOG_ROOT does
+# The lacuna judge's log. It lives in config.ai_lacuna_group_dir(group)/ai_log/,
+# every file named after its image. LACUNA_LOG_ROOT replaces that with
+# LACUNA_LOG_ROOT/<group>/ai_log/ for one process, as LOG_ROOT does
 # for the thread judge: the self-test sets it so that a rehearsal with a stub
 # judge can never leave verdicts where the pipeline could pick them up.
 LACUNA_LOG_ROOT = None
 
 
-def lacuna_log_dir(group: str, label: str) -> Path:
-    root = Path(LACUNA_LOG_ROOT) if LACUNA_LOG_ROOT else config.AI_LACUNA_RESULTS_ROOT
-    return root / group / config.AI_LOG_DIR / label
+def lacuna_log_dir(group: str, label: str = "") -> Path:
+    """The lacuna judge's log folder of a group, shared by every image of it."""
+    if LACUNA_LOG_ROOT:
+        return Path(LACUNA_LOG_ROOT) / group / config.AI_LOG_DIR
+    return config.ai_lacuna_group_dir(group) / config.AI_LOG_DIR
 
 
 def lacuna_attempt_path(group: str, label: str, attempt: int) -> Path:

@@ -2,40 +2,47 @@
 
 PRE-VALIDATION, PIXEL units. Every figure shows the default pipeline output as
 it is (src/ with every switch off), unless its caption says otherwise. The
-figures go into the results layout of the WT group, results/WT/ (results/README.md) as PNG (300 dpi) and
-PDF (fonts embedded); no pipeline result file is written here. Coordinates
-are (x, y) = (column, row).
+figures of one group go into that group's results folder, results/<group>/
+(results/README.md), as PNG (300 dpi) and PDF (fonts embedded); no pipeline
+result file is written here. Coordinates are (x, y) = (column, row).
 
-Usage (from the repo root):
-    python -u figures/make_figures.py all                 # every figure in results/, with a summary
-    python -u figures/make_figures.py window              # the fixed display window
-    python -u figures/make_figures.py check               # drawing data against results/, all images
-    python -u figures/make_figures.py image -i 543-2      # per-image overview
-    python -u figures/make_figures.py image -i 543-2 -c 6 # the same, inset on lacuna 6
-    python -u figures/make_figures.py image -i 543_3 -r   # with objects kept only at 0.8 t_hi
-    python -u figures/make_figures.py network -a          # network overlay per image (and Fig02)
-    python -u figures/make_figures.py gallery -a          # cell gallery per image
-    python -u figures/make_figures.py variants -a         # per-image display window variants
-    python -u figures/make_figures.py contact             # contact sheet (Fig01)
-    python -u figures/make_figures.py contact -r          # with rejected candidates (S02)
-    python -u figures/make_figures.py contact -b -k KEY   # labelled with blinding codes (S03)
-    python -u figures/make_figures.py thresholds          # lacuna cut sensitivity (Fig03)
-    python -u figures/make_figures.py fields -f FIELD_DIR # per-field plot (Fig04; -m merged)
-    python -u figures/make_figures.py switches            # crumb rule and hole fill (S01)
+Usage (from the repo root; -g GROUP picks the group, WT by default):
+    python -u src/make_figures.py -g WT_HP all          # every figure of the group, with a summary
+    python -u src/make_figures.py window                # the fixed display window
+    python -u src/make_figures.py check                 # drawing data against results/, all images
+    python -u src/make_figures.py image -i 543-2        # per-image overview
+    python -u src/make_figures.py image -i 543-2 -c 6   # the same, inset on lacuna 6
+    python -u src/make_figures.py image -i 543_3 -r     # with objects kept only at 0.8 t_hi
+    python -u src/make_figures.py network -a            # network overlay per image (and Fig02)
+    python -u src/make_figures.py gallery -a            # cell gallery per image
+    python -u src/make_figures.py variants -a           # per-image display window variants
+    python -u src/make_figures.py contact               # contact sheet (Fig01)
+    python -u src/make_figures.py contact -r            # with rejected candidates (S02)
+    python -u src/make_figures.py contact -b -k KEY     # labelled with blinding codes (S03)
+    python -u src/make_figures.py thresholds            # lacuna cut sensitivity (Fig03)
+    python -u src/make_figures.py fields -f FIELD_DIR   # per-field plot (Fig04; -m merged, WT only)
+    python -u src/make_figures.py switches              # crumb rule and hole fill (S01)
 
-Where the figures go (names from config.py): results/WT/<label>/3_publication_figures/
-(overview, network, cell gallery and their logs), results/WT/<label>/4_archive_not_used/
-(the per-image brightness variants and the low-cut overview layer, kept for
-history), results/WT/all_images/figures/main/ (Fig01 to Fig04),
-results/WT/all_images/figures/supplement/ (S01, S02), results/WT/all_images/
-archive_not_used/ (S03, the coded contact sheet) and results/WT/all_images/figures/
-display_window.json.
+Where the figures go (names from config.py), in results/<group>/:
+    2_canaliculi/      <label>_figure_network.png and .pdf, and its checks
+    4_quantification/  <label>_figure_overview and _figure_cell_gallery (.png,
+                       .pdf), their checks and inset choice; the group figures
+                       Fig01 to Fig04, S01 and S02 with their value files; and
+                       display_window.json
+    5_archive/         not_used/ (S03, the coded contact sheet, and the low cut
+                       overview layer) and variants_per_image_brightness/, kept
+                       for history and not tracked
 Each output is skipped if its PNG and PDF exist; delete them to redraw.
+
+The groups other than WT are drawn with the same code and settings, the WT
+display window (one window for every group, so the pictures compare), and the
+images each figure needs chosen by a rule written beside it (FIG02_IMAGE,
+THRESHOLD_IMAGES, SWITCH_CASES), never by eye. WT keeps its own choices.
 
 Shared style (one place, used by every figure):
     display window   fixed for the whole dataset: the 1st and 99.8th percentile
                      of the pooled red channel of all images, the same for every
-                     image and panel (results/WT/all_images/figures/display_window.json)
+                     image and panel (results/<group>/4_quantification/display_window.json)
     fonts            Arial (Helvetica if present, else DejaVu Sans), 7 to 9 pt
                      at 180 mm figure width; PDF fonts embedded (TrueType)
     colours          one colour, one meaning (PALETTE): interior lacuna
@@ -79,10 +86,12 @@ import quantification  # noqa: E402
 # the figures use it for speed. Every other setting is the default.
 config.FAST_LACUNA_STAGE = True
 
+# The group drawn: WT unless -g names another (set_group).
+GROUP = config.REFERENCE_GROUP
 RESULTS = config.RESULTS_DIR
 CACHE = ROOT / ".cache" / "figures"
 LOG_DIR = ROOT / ".cache" / "logs"
-DATA_DIR = config.DATA_DIR / "WT"
+DATA_DIR = config.DATA_DIR / GROUP
 
 # Short image labels, as in the overnight report: config.IMAGE_LABELS, the
 # one naming table.
@@ -196,25 +205,29 @@ def scale_bar(ax, image_width_px: int, length_px: int = SCALE_BAR_PX, colour: st
 
 
 def fig_stem(name: str) -> Path:
-    """Where a numbered figure lives: main figures (Fig01, ...) in
-    results/WT/all_images/figures/main/, supplementary figures (S01, ...) in
-    results/WT/all_images/figures/supplement/, and the coded contact sheet (S03,
-    kept for history) in results/WT/all_images/archive_not_used/."""
-    figures = config.ALL_IMAGES_FIGURES_DIR
+    """Where a numbered figure of the group lives: the main figures (Fig01, ...)
+    and the supplementary ones (S01, S02) in results/<group>/4_quantification/,
+    and the coded contact sheet (S03, kept for history) in
+    results/<group>/5_archive/not_used/."""
     if name.startswith("S03_contact_sheet_coded"):
-        return lacunae.all_images_path(RESULTS, name, config.ALL_IMAGES_ARCHIVE_DIR)
-    if name.startswith("Fig"):
-        return lacunae.all_images_path(RESULTS, name, f"{figures}/main")
-    if name[:1] == "S" and name[1:3].isdigit():
-        return lacunae.all_images_path(RESULTS, name, f"{figures}/supplement")
-    return lacunae.all_images_path(RESULTS, name, figures)
+        return lacunae.group_path(RESULTS, config.SECTION_ARCHIVE, name, config.ARCHIVE_NOT_USED_DIR)
+    return lacunae.group_path(RESULTS, config.SECTION_GROUP_FIGURES, name)
 
 
-def fig_path(label: str, suffix: str, section: str = config.SECTION_FIGURES, subfolder: str | None = None,
-             prefixed: bool = True) -> Path:
+def fig_path(label: str, suffix: str, section: str | None = None, subfolder: str | None = None) -> Path:
     """A per-image figure file in the results layout (lacunae.result_path);
-    the short image name is the label."""
-    return lacunae.result_path(RESULTS, label, section, suffix, subfolder, prefixed)
+    the short image name is the label. With no section given, the network
+    figure and its checks go to 2_canaliculi and every other figure file to
+    4_quantification."""
+    if section is None:
+        network = suffix.startswith(config.SUFFIX_FIGURE_NETWORK)
+        section = config.SECTION_NETWORK_FIGURES if network else config.SECTION_FIGURES
+    return lacunae.result_path(RESULTS, label, section, suffix, subfolder)
+
+
+def display_window_path(results: Path | None = None) -> Path:
+    """results/<group>/4_quantification/display_window.json."""
+    return lacunae.group_path(results or RESULTS, config.SECTION_GROUP_FIGURES, config.DISPLAY_WINDOW_FILE)
 
 
 def save(fig, name: str) -> None:
@@ -258,10 +271,22 @@ def path_of(name: str) -> Path:
 
 
 def display_window() -> tuple[float, float]:
-    """(lo, hi) on the red channel in [0, 1], fixed for the dataset."""
-    path = lacunae.all_images_path(RESULTS, config.DISPLAY_WINDOW_FILE, config.ALL_IMAGES_FIGURES_DIR)
+    """(lo, hi) on the red channel in [0, 1], fixed for the dataset. A group
+    other than WT uses the WT window, copied into its own folder with a note,
+    so that every group is shown at the same brightness."""
+    path = display_window_path()
     if path.is_file():
         w = json.loads(path.read_text(encoding="utf-8"))
+        return w["lo"], w["hi"]
+    if GROUP != config.REFERENCE_GROUP:
+        ref = display_window_path(config.RESULTS_DIR)
+        if not ref.is_file():
+            raise FileNotFoundError(f"{ref}: draw WT first (python -u src/make_figures.py window)")
+        w = json.loads(ref.read_text(encoding="utf-8"))
+        w["copied_from"] = ref.relative_to(ROOT).as_posix()
+        w["note"] = (f"The {config.REFERENCE_GROUP} display window, used unchanged for {GROUP} so that every "
+                     "group is shown at the same brightness. " + w.get("note", ""))
+        write_json(path, w)
         return w["lo"], w["hi"]
     pooled = np.concatenate([lacunae.load_channel(p)[1].ravel() for p in image_paths()])
     lo, hi = (float(v) for v in np.percentile(pooled, WINDOW_PERCENTILES))
@@ -361,11 +386,11 @@ def src_hash() -> str:
 
 def results_numbers(path: Path) -> tuple[list, list]:
     """(lacuna rows, cell rows) of the committed default output in
-    results/WT/<label>/5_quantification/, the pipeline numbers every drawn number
+    results/<group>/4_quantification/, the pipeline numbers every drawn number
     must equal. One row per lacuna now holds the shape and the network measures
     together, so both halves are the same list."""
     label = lacunae.image_label(path)
-    rows = json.loads(quantification.quant_path(config.RESULTS_DIR, label, ".json")
+    rows = json.loads(quantification.quant_path(RESULTS, label, ".json")
                       .read_text(encoding="utf-8"))["lacunae"]
     return rows, rows
 
@@ -452,7 +477,7 @@ def ring_classes(skeleton: np.ndarray, lacuna_id_map: np.ndarray, interior_ids) 
 
 def image_data(name: str) -> dict:
     """Everything the v2 figures draw for one image, checked against the
-    pipeline numbers in results/WT/<image>/ (rule 11). Raises AssertionFailed on
+    pipeline numbers in results/<group>/ (rule 11). Raises AssertionFailed on
     any difference."""
     path = path_of(name)
     name = short(path)
@@ -785,7 +810,7 @@ def done_at(stem: Path, exts: tuple = ("png", "pdf")) -> bool:
 
 
 # Display windows (P8). The main per-image figures use the fixed dataset
-# window; their variants in results/WT/<label>/4_archive_not_used/
+# window; their variants in results/<group>/5_archive/
 # variants_per_image_brightness/ use the 1st
 # and 99.8th percentile of that image's own red channel (PNG only, to keep
 # the repository small). Display only; no measurement uses either window.
@@ -803,7 +828,7 @@ def exts_for(window) -> tuple:
 
 
 def update_inset_log(name: str, key: str, entry: dict) -> None:
-    """results/WT/<label>/3_publication_figures/<label>_figure_inset_choice.json
+    """results/<group>/4_quantification/<label>_figure_inset_choice.json
     holds one entry per figure kind."""
     path = fig_path(name, config.SUFFIX_FIGURE_INSET)
     log = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {"image": name}
@@ -1100,8 +1125,8 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
 
 def figure_display_variants(name: str) -> None:
     """P8: the overview, network and gallery of one image with the image's own
-    display window, PNG only, in results/WT/<label>/4_archive_not_used/
-    variants_per_image_brightness/ (kept for history)."""
+    display window, PNG only, in results/<group>/5_archive/
+    variants_per_image_brightness/ (kept for history, not tracked)."""
     d = image_data(name)
     name = d["short"]
     win = image_window(d)
@@ -1109,26 +1134,65 @@ def figure_display_variants(name: str) -> None:
     def variant(suffix):
         return fig_path(name, suffix + config.SUFFIX_VARIANT, config.SECTION_ARCHIVE, config.VARIANTS_DIR)
 
-    window_file = fig_path(name, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR,
-                           prefixed=False)
+    window_file = fig_path(name, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR)
     if not window_file.is_file():  # skipped when it exists, like every other output
         write_json(window_file,
                    {"image": name, "lo": win[0], "hi": win[1], "lo_8bit": win[0] * 255, "hi_8bit": win[1] * 255,
                     "percentiles": list(WINDOW_PERCENTILES),
                     "note": "Display window of this image only: the 1st and 99.8th percentile of its red channel. "
                             "Display only; no measurement uses it. The main figures use the fixed dataset window "
-                            "(results/WT/all_images/figures/display_window.json)."})
+                            "(results/<group>/4_quantification/display_window.json)."})
     figure_image(name, window=win, stem=variant(config.SUFFIX_FIGURE_OVERVIEW))
     figure_network(name, window=win, stem=variant(config.SUFFIX_FIGURE_NETWORK))
     figure_gallery(name, window=win, stem=variant(config.SUFFIX_FIGURE_GALLERY))
 
 
+# WT: 543-2, the reference image. Another group: the rule of fig02_image.
 FIG02_IMAGE = "543-2"
 
 
+def group_labels() -> list[str]:
+    """The labels of the group's images, in name order."""
+    return sorted(short(p) for p in image_paths())
+
+
+def interior_count(label: str) -> int:
+    q = json.loads(quantification.quant_path(RESULTS, label, ".json").read_text(encoding="utf-8"))
+    return int(q["interior_lacuna_count"])
+
+
+def fig02_image() -> str:
+    """For a group other than WT: the image whose interior lacuna count is the
+    group median (the lower middle one when the count of images is even; ties
+    by name). A rule, so no image is picked by eye."""
+    ranked = sorted(group_labels(), key=lambda n: (interior_count(n), n))
+    return ranked[(len(ranked) - 1) // 2]
+
+
+def animal_of(label: str) -> str:
+    """The animal an image comes from: the number its label starts with (an
+    optional letter, then digits), for example 548 or I534."""
+    import re
+
+    m = re.match(r"[A-Za-z]?\d+", label)
+    return m.group(0) if m else label
+
+
+def threshold_images() -> list[str]:
+    """For a group other than WT: one image per animal, the first of that
+    animal in name order, at most three."""
+    seen, out = set(), []
+    for n in group_labels():
+        a = animal_of(n)
+        if a not in seen:
+            seen.add(a)
+            out.append(n)
+    return out[:3]
+
+
 def copy_fig02() -> None:
-    """Fig02 is a copy of the network figure of 543-2
-    (results/WT/543-2/3_publication_figures/543-2_figure_network)."""
+    """Fig02 is a copy of the network figure of FIG02_IMAGE
+    (results/<group>/2_canaliculi/<FIG02_IMAGE>_figure_network)."""
     import shutil
 
     src = fig_path(FIG02_IMAGE, config.SUFFIX_FIGURE_NETWORK)
@@ -1164,11 +1228,11 @@ INSET_MARGIN_PX = 16
 INSET_ZOOM = 3.0
 
 
-INSET_OVERRIDES = ROOT / "figures" / "inset_overrides.csv"
+INSET_OVERRIDES = ROOT / "docs" / "figures" / "inset_overrides.csv"
 
 
 def inset_override(name: str) -> int | None:
-    """The lacuna id set for an image in figures/inset_overrides.csv (columns
+    """The lacuna id set for an image in docs/figures/inset_overrides.csv (columns
     image, lacuna_id), or None. The file is empty (header only) by default."""
     import csv
 
@@ -1465,6 +1529,7 @@ def figure_contact(key_path: Path | None = None, rejected: bool = False) -> None
 
 # F3 lacuna cut sensitivity --------------------------------------------------------
 
+# WT: three images chosen for the overnight report. Another group: threshold_images().
 THRESHOLD_IMAGES = ["542_z06", "543-2", "682_z29"]
 THRESHOLD_SCALES = [0.8, 0.9, 1.0, 1.1, 1.2]
 
@@ -1549,10 +1614,56 @@ def figure_thresholds() -> None:
 
 # F5 switch examples ----------------------------------------------------------------
 
+# (image, x, y, half side of the crop, switch, value, label, lacuna id or None).
+# WT: the places the overnight report found. Another group: find_switch_cases().
 SWITCH_CASES = [
-    ("543_3", 877, 545, 60, "NARROW_CRUMB_RULE", True, "narrow crumb rule"),
-    ("542_z06", 783, 581, 60, "FILL_ENCLOSED_HOLES_MAX_PX2", 200, "hole fill (up to 200 px²)"),
+    ("543_3", 877, 545, 60, "NARROW_CRUMB_RULE", True, "narrow crumb rule", None),
+    ("542_z06", 783, 581, 60, "FILL_ENCLOSED_HOLES_MAX_PX2", 200, "hole fill (up to 200 px²)", None),
 ]
+SWITCHES_SHOWN = [("NARROW_CRUMB_RULE", True, "narrow crumb rule"),
+                  ("FILL_ENCLOSED_HOLES_MAX_PX2", 200, "hole fill (up to 200 px²)")]
+SWITCH_CROP_HALF_PX = 60
+
+
+def find_switch_cases() -> list:
+    """For a group other than WT, one place per switch, by rule: the images in
+    name order are run with the switch on until one gives a different result
+    for an interior lacuna whose 120 px crop lies inside the frame; there, the
+    lacuna with the largest change (ring 30 px length, then roots, then area).
+    A switch that changes nothing in any image has no row."""
+    cases = []
+    for switch, value, label in SWITCHES_SHOWN:
+        found = None
+        for name in group_labels():
+            off = image_data(name)
+            on = switched_output(off["path"], switch, value)
+            if int(on["lacuna_id_map"].max()) != int(off["lacuna_id_map"].max()):
+                continue
+            h, w = off["lacuna_id_map"].shape
+            area_off = {r["lacuna_id"]: r["area_px2"] or 0 for r in off["lacuna_rows"]}
+            area_on = {r["lacuna_id"]: r["area_px2"] or 0 for r in on["lacuna_rows"]}
+            cells_off = {c["lacuna_id"]: c for c in off["cell_rows"]}
+            best = None
+            for c in on["cell_rows"]:
+                i = c["lacuna_id"]
+                if i not in off["interior_ids"]:
+                    continue
+                row = next(r for r in off["lacuna_rows"] if r["lacuna_id"] == i)
+                x, y = int(round(row["centroid_col_px"])), int(round(row["centroid_row_px"]))
+                half = SWITCH_CROP_HALF_PX
+                if not (half <= x <= w - half and half <= y <= h - half):
+                    continue
+                change = (abs(c["ring_length_r30_px"] - cells_off[i]["ring_length_r30_px"]),
+                          abs(c["roots_count"] - cells_off[i]["roots_count"]),
+                          abs(area_on[i] - area_off[i]))
+                if any(change) and (best is None or change > best[0]):
+                    best = (change, x, y, i)
+            if best is not None:
+                found = (name, best[1], best[2], SWITCH_CROP_HALF_PX, switch, value, label, best[3])
+                break
+        if found is not None:
+            cases.append(found)
+    return cases
 
 
 def switched_output(path: Path, switch: str, value) -> dict:
@@ -1603,10 +1714,13 @@ def figure_switches() -> None:
     panel = 45.0
     width = left + 3 * panel + 2 * gap + margin
     legend_h = legend_height(items, width - 2 * margin)
-    fig_h = top + len(SWITCH_CASES) * (panel + text_h) + legend_h + cap_h
+    cases = SWITCH_CASES if GROUP == config.REFERENCE_GROUP else find_switch_cases()
+    if not cases:
+        raise AssertionFailed(f"{GROUP}: neither switch changes any interior lacuna inside the frame")
+    fig_h = top + len(cases) * (panel + text_h) + legend_h + cap_h
     fig = plt.figure(figsize=(width * MM, fig_h * MM))
-    log = {}
-    for r, (name, x, y, half, switch, value, label) in enumerate(SWITCH_CASES):
+    log = {"cases": [list(c) for c in cases]}
+    for r, (name, x, y, half, switch, value, label, case_lid) in enumerate(cases):
         off = image_data(name)
         on = switched_output(off["path"], switch, value)
         x0, y0, side = x - half, y - half, 2 * half
@@ -1621,7 +1735,8 @@ def figure_switches() -> None:
             else:
                 show_image(ax, overlay_image(data)[y0:y0 + side, x0:x0 + side], x0, y0, interpolation="nearest")
                 draw_skeleton(ax, data["segments"], window=view, lw=0.5)
-                lid = int(data["lacuna_id_map"][y, x]) or int(data["lacuna_id_map"][y0:y0 + side, x0:x0 + side].max())
+                lid = case_lid or int(data["lacuna_id_map"][y, x]) or int(data["lacuna_id_map"][y0:y0 + side,
+                                                                                               x0:x0 + side].max())
                 draw_lacunae(ax, data, lw=0.8, only=[lid])
                 for cc in ring_contours(data, lid):
                     ax.plot(cc[:, 0], cc[:, 1], color="white", lw=0.6, ls=(0, (3, 2)), zorder=4.5)
@@ -1718,7 +1833,7 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
         return
     with open(field_dir / "field_images.csv", newline="") as f:
         rows = list(csv.DictReader(f))
-    with open(quantification.summary_path(config.RESULTS_DIR, ".csv"), newline="") as f:
+    with open(quantification.summary_path(RESULTS, ".csv"), newline="") as f:
         summary_rows = {r["image"]: r for r in csv.DictReader(f)}
     with open(field_dir / "field_summary.csv", newline="") as f:
         field_means = {r["field"]: r for r in csv.DictReader(f)}
@@ -1727,6 +1842,8 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
     # looks like a figure name.
     field_of = {SHORT.get(r["image"], r["image"]): r["field"] for r in rows}
     alone = {n for n, fid in field_of.items() if list(field_of.values()).count(fid) == 1}
+    if merged and GROUP != config.REFERENCE_GROUP:
+        raise AssertionFailed("the merged per-field figure is a WT figure (MERGE_IMAGE)")
     if merged:
         field_of[MERGE_IMAGE] = field_of[MERGE_WITH]
     fields = sorted(set(field_of.values()), key=lambda v: int(v[1:]))
@@ -1784,15 +1901,19 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
     legend_strip(fig, 2.0, 11.5, FIG_WIDTH_MM - 4.0, 4.5, FIG_WIDTH_MM, fig_h, dark=False, items=[
         {"kind": "marker", "label": "image (mean over its interior lacunae)"},
         {"kind": "marker", "marker": "D", "face": "white", "s": 14,
-         "label": "682_z08, alone in its field by field-summary" + (", merged here by hand" if merged else "")},
+         "label": (f"{MERGE_IMAGE}, alone in its field by field-summary" + (", merged here by hand" if merged else "")
+                   if GROUP == config.REFERENCE_GROUP else "image alone in its field by field-summary")},
         {"kind": "bar", "colour": PALETTE["field_mean"], "label": "field mean"}])
     groups = "; ".join(f"{field_name[fid]}: {' + '.join(members[fid])}" for fid in fields)
     if merged:
         note = (f"{MERGE_IMAGE} (open diamond) is merged by hand into the field of 682_z23 and 682_z29 (option -m); "
                 "field-summary keeps it alone, and the merged means are computed here, not by field-summary.")
-    else:
+    elif GROUP == config.REFERENCE_GROUP:
         note = (f"{MERGE_IMAGE} (open diamond) is alone in its field by the data-derived grouping, probably the same "
                 "field as 682_z23 and 682_z29 at another depth.")
+    else:
+        note = (f"{GROUP}. Open diamond: an image alone in its field by the data-derived grouping."
+                if alone else f"{GROUP}.")
     fig.text(0.01, 0.01, "Fields from field-summary (lacuna centroids matched across images). " + groups + ". " + note
              + " n: images per field. All y axes start at zero. Pre-validation, pixel units, no test.",
              ha="left", va="bottom", fontsize=FONT_SIZE - 1, wrap=True)
@@ -1804,6 +1925,21 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
 DEFAULT_FIELD_DIR = ROOT / ".cache" / "field_summary"
 
 
+def set_group(group: str) -> None:
+    """Draw `group`: its images in data/<group>/, its figures in
+    results/<group>/, and for a group other than WT the image choices by rule.
+    The field-summary output of a group other than WT is looked for in
+    .cache/field_summary/<group>/."""
+    global GROUP, RESULTS, DATA_DIR, FIG02_IMAGE, THRESHOLD_IMAGES, DEFAULT_FIELD_DIR
+    if group not in config.GROUPS:
+        raise SystemExit(f"unknown group {group}; one of {', '.join(config.GROUPS)}")
+    GROUP, RESULTS, DATA_DIR = group, config.RESULTS_ROOT / group, config.DATA_DIR / group
+    if group != config.REFERENCE_GROUP:
+        FIG02_IMAGE = fig02_image()
+        THRESHOLD_IMAGES = threshold_images()
+        DEFAULT_FIELD_DIR = ROOT / ".cache" / "field_summary" / group
+
+
 def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DIR) -> int:
     """O4: regenerate every figure in the results layout. Every step
     skips outputs that exist; delete a file to redraw it. Prints one row per
@@ -1811,13 +1947,15 @@ def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DI
     def pair(stem):
         return [stem.with_name(stem.name + ".png"), stem.with_name(stem.name + ".pdf")]
 
+    wt = GROUP == config.REFERENCE_GROUP
     names = [short(p) for p in image_paths()]
-    steps = [("display window", display_window, (),
-              [lacunae.all_images_path(RESULTS, config.DISPLAY_WINDOW_FILE, config.ALL_IMAGES_FIGURES_DIR)])]
+    steps = [("display window", display_window, (), [display_window_path()])]
     for n in names:
         steps.append((f"overview {n}", figure_image, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_OVERVIEW))))
-    steps.append(("overview 543_3 -r", figure_image, ("543_3", None, True),
-                  pair(fig_path("543_3", config.SUFFIX_FIGURE_OVERVIEW + "_low_cut_layer", config.SECTION_ARCHIVE))))
+    if wt:
+        steps.append(("overview 543_3 -r", figure_image, ("543_3", None, True),
+                      pair(fig_path("543_3", config.SUFFIX_FIGURE_OVERVIEW + "_low_cut_layer", config.SECTION_ARCHIVE,
+                                    config.ARCHIVE_NOT_USED_DIR))))
     for n in names:
         steps.append((f"network {n}", figure_network, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_NETWORK))))
     steps.append(("Fig02 copy", copy_fig02, (), pair(fig_stem("Fig02").with_name(f"Fig02_network_overlay_{FIG02_IMAGE}"))))
@@ -1828,13 +1966,13 @@ def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DI
                       [fig_path(n, k + config.SUFFIX_VARIANT + ".png", config.SECTION_ARCHIVE, config.VARIANTS_DIR)
                        for k in (config.SUFFIX_FIGURE_OVERVIEW, config.SUFFIX_FIGURE_NETWORK,
                                  config.SUFFIX_FIGURE_GALLERY)]
-                      + [fig_path(n, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR,
-                                  prefixed=False)]))
+                      + [fig_path(n, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR)]))
     steps += [("Fig01", figure_contact, (None, False), pair(fig_stem("Fig01_contact_sheet"))),
               ("Fig03", figure_thresholds, (), pair(fig_stem("Fig03_threshold_sensitivity"))),
-              ("Fig04", figure_fields, (field_dir, False), pair(fig_stem("Fig04_per_field"))),
-              ("Fig04 merged", figure_fields, (field_dir, True), pair(fig_stem("Fig04_per_field_merged"))),
-              ("S01", figure_switches, (), pair(fig_stem("S01_switch_examples"))),
+              ("Fig04", figure_fields, (field_dir, False), pair(fig_stem("Fig04_per_field")))]
+    if wt:
+        steps.append(("Fig04 merged", figure_fields, (field_dir, True), pair(fig_stem("Fig04_per_field_merged"))))
+    steps += [("S01", figure_switches, (), pair(fig_stem("S01_switch_examples"))),
               ("S02", figure_contact, (None, True), pair(fig_stem("S02_contact_sheet_with_rejected_candidates")))]
     s03 = pair(fig_stem("S03_contact_sheet_coded"))
     if blind_key is not None:
@@ -1889,6 +2027,8 @@ def run(item: str, func, *args) -> int:
 def main() -> int:
     set_style()
     p = argparse.ArgumentParser(description="Publication figures (pre-validation, px).")
+    p.add_argument("-g", dest="group", default=config.REFERENCE_GROUP,
+                   help=f"Group to draw (default {config.REFERENCE_GROUP}): {', '.join(config.GROUPS)}.")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("window", help="Compute the fixed display window.")
     q = sub.add_parser("image", help="Per-image overview figure.")
@@ -1925,9 +2065,13 @@ def main() -> int:
     q = sub.add_parser("all", help="Regenerate every figure in results/; prints what was written or skipped.")
     q.add_argument("-b", dest="blind_key", type=Path, default=None,
                    help="Blinding key for S03 (outside the repository); without it S03 is kept.")
-    q.add_argument("-f", dest="field_dir", type=Path, default=DEFAULT_FIELD_DIR,
-                   help="Output folder of field-summary (default: .cache/field_summary).")
+    q.add_argument("-f", dest="field_dir", type=Path, default=None,
+                   help="Output folder of field-summary (default: .cache/field_summary, and "
+                        ".cache/field_summary/<group> for a group other than WT).")
     args = p.parse_args()
+    set_group(args.group)
+    if getattr(args, "field_dir", "unset") is None:
+        args.field_dir = DEFAULT_FIELD_DIR
     if args.cmd == "check":
         return run("N0", _selftest_n0)
     if args.cmd == "all":

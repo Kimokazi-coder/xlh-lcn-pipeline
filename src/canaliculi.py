@@ -65,8 +65,9 @@ Measures:
     of the skeleton is graph-connected to any lacuna in these 2D sections,
     and owned threads can lie hundreds of px from their cell.
 
-Outputs, per image, in results/<group>/<label>/2_canaliculi/ (the label is the short
-image name of config.IMAGE_LABELS; see lacunae.image_label and result_path):
+Outputs, per image, in results/<group>/2_canaliculi/, beside the files of every
+other image of the group (the label is the short image name of
+config.IMAGE_LABELS; see lacunae.image_label and result_path):
     <label>_canaliculi_skeleton.png       the skeleton, unannotated
     <label>_canaliculi_mask.png           the network mask, unannotated
     <label>_canaliculi_results.xlsx       "summary", "field", "per_lacuna", "notes"
@@ -82,9 +83,9 @@ mean edge length and 8.50 roots per interior cell
 (python src/diagnostics.py reference-check).
 
 Usage (from the repo root):
-    python src/canaliculi.py --dir data/WT
-    python src/canaliculi.py --image "data/WT/543-2.tif"
-    python src/canaliculi.py --dir data/WT -o OTHER_FOLDER
+    python src/canaliculi.py -d data/WT
+    python src/canaliculi.py -i "data/WT/543-2.tif"
+    python src/canaliculi.py -d data/WT -o OTHER_FOLDER
 (default output: results/<name of the input folder>, so data/WT writes results/WT)
 """
 
@@ -1832,7 +1833,7 @@ DETECTION_NOTE = (
     "Detection record: what feature 2 did, with no measured value in it. The "
     "mask, the skeleton, the vascular mask and the graph file beside it are what "
     "it produced; every number measured from them is in "
-    "this image's 5_quantification folder (src/quantification.py). The method is "
+    "the group's 4_quantification folder (src/quantification.py). The method is "
     "the ridge method with gap bridging off, so no gap was joined."
 )
 
@@ -1952,7 +1953,7 @@ def main() -> None:
             failures.append([image_path.name, f"{type(exc).__name__}: {exc}"])
             print(f"{image_path.name}: FAILED, skipped ({type(exc).__name__}: {exc})")
             continue
-        out_dir = args.out / lacunae.image_label(image_path)
+        out_dir = args.out / config.SECTION_CANALICULI
         print(
             f"{image_path.name}: lacunae={result['lacunae']['lacuna_count']}  "
             f"skeleton px={int(result['skeleton'].sum())}  "
@@ -1961,7 +1962,7 @@ def main() -> None:
     lacunae.report_failures(args.out, "canaliculi", failures)
 
     print("Measure these with: python src/quantification.py "
-          + (f"--dir {args.dir}" if args.dir else f'--image "{args.image}"')
+          + (f"-d {args.dir}" if args.dir else f'-i "{args.image}"')
           + (f" -o {args.out}" if explicit_out else ""))
     if failures:
         sys.exit(1)
