@@ -16,7 +16,7 @@ results/archive/ the group-independent old material.
 | phase | what | status |
 | - | - | - |
 | P1 | code writes the new layout (config.py, src/, the figures script) | done |
-| P2 | git mv every existing file, MOVE_MAP.csv, lacunae contact sheets | not started |
+| P2 | git mv every existing file, MOVE_MAP.csv, lacunae contact sheets | done |
 | P3 | publication figures for WT_HP, Hyp_RD, Hyp_HP | not started |
 | P4 | 3_pols: lacunar size, all groups | not started |
 | P5 | docs and checks, final report | not started |
@@ -53,3 +53,9 @@ results/archive/ the group-independent old material.
   validate-network 8/8 (after two fixes: image discovery read per-image
   folders, and an old tuple unpacking bug), ai-lacuna-judge stub 25/26 (the
   cap check over all 35 cached images fails the same way at 3a69e66).
+- P2 done: 1877 files moved with git mv (plus the 2 code renames of P1), all
+  in results/archive/MOVE_MAP.csv; every moved file has the same git blob as at
+  3a69e66. results_ai_judge/, results_ai_lacunae/ and figures/ are gone. Added:
+  1_lacunae/contact_sheet.png and 3_pols/README.md per group. layout-check
+  PASS for 4 of 4 groups; pol_ring_proxy check PASS 35 of 35 at the new paths.
+  Field summaries for P3 in .cache/field_summary/<group>/.
