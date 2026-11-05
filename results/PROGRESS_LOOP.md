@@ -35,3 +35,13 @@ run is, so it can be resumed after a crash. Logs of every command are in
 - Never open a held-out image or its outputs (docs/HOLDOUT.md).
 - Phase 4: the last finished round is the last one logged in
   `results/archive/REVIEW_LOOP.md`; start at the next one.
+
+## Phase 4, the loop (log: results/archive/REVIEW_LOOP.md)
+
+- Round 0 done: baseline 258 problems (fragment 153). Tables in
+  results/archive/review_loop/round0/.
+- Machine note: since about 14:00 the venv launcher venv/Scripts/python.exe
+  hangs 300 s at every start (cause not found; the base interpreter starts in
+  1 s). Commands run the base interpreter as the venv instead:
+  __PYVENV_LAUNCHER__=F:\lcn-quant\venv\Scripts\python.exe and
+  "C:\Program Files\Carl Zeiss\ZeissPython\Py22042.2\env\python.exe".
