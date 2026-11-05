@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gc
 import json
 import sys
 from pathlib import Path
@@ -92,10 +93,7 @@ RATIO_LIMITS = (0.25, 4.0)
 RATIO_TICKS = (0.25, 0.5, 1.0, 2.0, 4.0)
 COLOUR_MAP = "viridis"
 FILL_ALPHA = 0.7
-OUTLINE_LW = 1.2  # measured lacunae are also outlined in their own colour, opaque
-FLAGGED_COLOUR = "#A6A6A6"
 SCALE_BAR_UM = 10.0
-DPI = 100
 
 
 # Numbers
@@ -204,72 +202,190 @@ def notes(wt_median: float) -> list[str]:
 
 
 # Picture
+# Drawn pixel for pixel with Pillow, so that what it shows can be checked:
+# the image region is the original image at its own size, and only the masks
+# of the lacunae change colour in it. A measured lacuna is filled inside its
+# own mask and nowhere else; a flagged one gets a 1 px grey line on the inner
+# edge of its mask, also inside it. No ring, band, halo or any shape outside a
+# mask is drawn. The labels and the scale bar are text and a bar on the image,
+# each recorded as a box; the title and the colour bar sit outside the image.
 
-def save_picture(image_path: Path, labels: np.ndarray, rows: list[dict], wt_median: float, path: Path) -> None:
-    """The lacunar size picture of one image (module docstring)."""
-    import matplotlib  # noqa: PLC0415
+TITLE_H = 34
+PANEL_W = 260
+FONT_PX = 12
+GREY = (166, 166, 166)
+BAR_TOP, BAR_HEIGHT, BAR_X, BAR_W = 90, 560, 40, 24
+SCALE_BAR_PX = int(round(SCALE_BAR_UM / UM_PER_PX))
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt  # noqa: PLC0415
-    from matplotlib import colors, patheffects  # noqa: PLC0415
-    from skimage import measure  # noqa: PLC0415
 
-    display, _channel = lacunae.load_channel(image_path)
+def fill_colour(ratio: float) -> np.ndarray:
+    """The colour of a ratio to the WT median on the fixed log scale, uint8."""
+    from matplotlib import colormaps  # noqa: PLC0415
+
+    lo, hi = np.log(RATIO_LIMITS[0]), np.log(RATIO_LIMITS[1])
+    x = float(np.clip((np.log(ratio) - lo) / (hi - lo), 0.0, 1.0))
+    return np.rint(np.asarray(colormaps[COLOUR_MAP](x)[:3]) * 255).astype(np.uint8)
+
+
+def read_table(path: Path) -> list[dict]:
+    """A per-image table as written: id int, area and ratio float or None."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return [{"id": int(r["id"]), "area_um2": float(r["area_um2"]) if r["area_um2"] else None,
+                 "ratio_to_WT_median": float(r["ratio_to_WT_median"]) if r["ratio_to_WT_median"] else None,
+                 "flag": r["flag"]} for r in csv.DictReader(f)]
+
+
+def label_text(row: dict) -> str:
+    if row["area_um2"] is None:
+        return f"{row['id']}: no area"
+    return f"{row['id']}: {row['area_um2']:.1f}" + (" (edge)" if row["flag"] == "edge" else "")
+
+
+def render_picture(display: np.ndarray, labels: np.ndarray, rows: list[dict], wt_median: float,
+                   title: str) -> tuple[np.ndarray, list]:
+    """The picture as an array, and the boxes (x0, y0, x1, y1, in image
+    coordinates) of everything drawn that is not a lacuna mask: the labels and
+    the scale bar."""
+    from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
+    from scipy import ndimage as ndi  # noqa: PLC0415
+
     h, w = labels.shape
-    norm = colors.LogNorm(vmin=RATIO_LIMITS[0], vmax=RATIO_LIMITS[1], clip=True)
-    cmap = plt.get_cmap(COLOUR_MAP)
-    fill = np.zeros((h, w, 4), dtype=float)
-    for r in rows:
-        if r["flag"]:
-            continue
-        rgba = cmap(norm(r["_ratio"]))
-        fill[labels == r["id"]] = (rgba[0], rgba[1], rgba[2], FILL_ALPHA)
-
-    bar_w = 230
-    fig = plt.figure(figsize=((w + bar_w) / DPI, (h + 40) / DPI), dpi=DPI)
-    ax = fig.add_axes([0, 0, w / (w + bar_w), h / (h + 40)])
-    ax.imshow(display, interpolation="nearest")
-    ax.imshow(fill, interpolation="nearest")
-    halo = [patheffects.withStroke(linewidth=2, foreground="black")]
+    region = display.astype(np.float64)
     for r in rows:
         mask = labels == r["id"]
-        if not mask.any():
-            continue
-        edge = FLAGGED_COLOUR if r["flag"] else cmap(norm(r["_ratio"]))
-        for c in measure.find_contours(np.pad(mask, 1).astype(float), 0.5):
-            ax.plot(c[:, 1] - 1, c[:, 0] - 1, color=edge, lw=1.0 if r["flag"] else OUTLINE_LW)
-        rows_i, cols_i = np.nonzero(mask)
-        x = cols_i.max() + 4
-        ha = "left"
-        if x > w - 60:
-            x, ha = cols_i.min() - 4, "right"
-        y = float(np.clip(rows_i.mean(), 8, h - 8))
-        text = f"{r['id']}: {r['area_um2']:.1f}" if r["area_um2"] is not None else f"{r['id']}: {r['flag']}"
-        ax.text(x, y, text, color="white" if not r["flag"] else FLAGGED_COLOUR, fontsize=7, ha=ha,
-                va="center", path_effects=halo)
-    bar_px = SCALE_BAR_UM / UM_PER_PX
-    x0, y0 = w - 20 - bar_px, h - 20
-    ax.plot([x0, x0 + bar_px], [y0, y0], color="white", lw=3, solid_capstyle="butt")
-    ax.text(x0 + bar_px / 2, y0 - 6, f"{SCALE_BAR_UM:g} um", color="white", fontsize=8, ha="center",
-            va="bottom", path_effects=halo)
-    ax.set_xlim(-0.5, w - 0.5)
-    ax.set_ylim(h - 0.5, -0.5)
-    ax.axis("off")
+        if r["flag"]:
+            edge = mask & ~ndi.binary_erosion(mask)
+            region[edge] = GREY
+        else:
+            region[mask] = (1 - FILL_ALPHA) * region[mask] + FILL_ALPHA * fill_colour(r["ratio_to_WT_median"])
+    region = np.rint(region).astype(np.uint8)
 
-    cax = fig.add_axes([(w + 40) / (w + bar_w), 0.12, 22 / (w + bar_w), 0.7])
-    sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-    bar = fig.colorbar(sm, cax=cax)
-    bar.set_ticks(list(RATIO_TICKS))
-    bar.set_ticklabels([f"{t * wt_median:.0f}" + (" (WT median)" if t == 1.0 else "") for t in RATIO_TICKS])
-    bar.ax.minorticks_off()
-    bar.ax.tick_params(labelsize=8)
-    bar.set_label("lacunar area (um2), colour by ratio to the WT median", fontsize=8)
-    fig.text(0.005, 1 - 20 / (h + 40), f"{image_path.parent.name} {lacunae.image_label(image_path)}: {LABEL}. "
-             f"Grey outline: flagged (edge or no area), not filled. Pre-validation.",
-             fontsize=9, ha="left", va="center")
+    canvas = Image.new("RGB", (w + PANEL_W, h + TITLE_H), (255, 255, 255))
+    canvas.paste(Image.fromarray(region), (0, TITLE_H))
+    draw = ImageDraw.Draw(canvas)
+    font = ImageFont.load_default(size=FONT_PX)
+    boxes = []
+
+    def text_on_image(x, y, s, fill, anchor):
+        box = draw.textbbox((x, y + TITLE_H), s, font=font, anchor=anchor, stroke_width=1)
+        draw.text((x, y + TITLE_H), s, font=font, anchor=anchor, fill=fill, stroke_width=1, stroke_fill=(0, 0, 0))
+        boxes.append((int(np.floor(box[0])), int(np.floor(box[1])) - TITLE_H,
+                      int(np.ceil(box[2])), int(np.ceil(box[3])) - TITLE_H))
+
+    for r in rows:
+        ys, xs = np.nonzero(labels == r["id"])
+        if xs.size == 0:
+            continue
+        y = float(np.clip(ys.mean(), 10, h - 10))
+        if xs.max() + 70 < w:
+            text_on_image(int(xs.max()) + 4, y, label_text(r), (255, 255, 255) if not r["flag"] else GREY, "lm")
+        else:
+            text_on_image(int(xs.min()) - 4, y, label_text(r), (255, 255, 255) if not r["flag"] else GREY, "rm")
+    x1, y0 = w - 20, h - 22
+    draw.rectangle([x1 - SCALE_BAR_PX, y0 + TITLE_H, x1 - 1, y0 + 3 + TITLE_H], fill=(255, 255, 255))
+    boxes.append((x1 - SCALE_BAR_PX, y0, x1, y0 + 4))
+    text_on_image(x1 - SCALE_BAR_PX // 2, y0 - 3, f"{SCALE_BAR_UM:g} um", (255, 255, 255), "mb")
+
+    draw.text((8, TITLE_H // 2), title, font=ImageFont.load_default(size=15), anchor="lm", fill=(0, 0, 0))
+    px, py = w + BAR_X, TITLE_H + BAR_TOP
+    draw.text((w + 12, TITLE_H + 14), "lacunar area (um2)", font=font, fill=(0, 0, 0))
+    draw.text((w + 12, TITLE_H + 32), "colour: area / WT median", font=font, fill=(0, 0, 0))
+    draw.text((w + 12, TITLE_H + 50), "same scale, every group", font=font, fill=(0, 0, 0))
+    lo, hi = np.log(RATIO_LIMITS[0]), np.log(RATIO_LIMITS[1])
+    for i in range(BAR_HEIGHT):
+        ratio = float(np.exp(hi - (hi - lo) * i / (BAR_HEIGHT - 1)))
+        draw.line([px, py + i, px + BAR_W - 1, py + i], fill=tuple(int(v) for v in fill_colour(ratio)))
+    draw.rectangle([px, py, px + BAR_W - 1, py + BAR_HEIGHT - 1], outline=(0, 0, 0))
+    for ratio in RATIO_TICKS:
+        yy = py + int(round((hi - np.log(ratio)) / (hi - lo) * (BAR_HEIGHT - 1)))
+        is_median = ratio == 1.0
+        draw.line([px + BAR_W, yy, px + BAR_W + (14 if is_median else 6), yy], fill=(0, 0, 0), width=3 if is_median else 1)
+        text = f"{ratio * wt_median:.1f}" + ("  WT median" if is_median else "")
+        draw.text((px + BAR_W + 18, yy), text, font=font, anchor="lm", fill=(0, 0, 0))
+    gy = py + BAR_HEIGHT + 28
+    draw.rectangle([px, gy, px + BAR_W - 1, gy + 14], outline=GREY, width=1)
+    draw.text((px + BAR_W + 8, gy + 7), "flagged: grey outline,", font=font, anchor="lm", fill=(0, 0, 0))
+    draw.text((px + BAR_W + 8, gy + 23), "not filled (edge, no area)", font=font, anchor="lm", fill=(0, 0, 0))
+    draw.text((w + 12, gy + 52), "labels: id: area in um2", font=font, fill=(0, 0, 0))
+    out = np.asarray(canvas).copy()
+    canvas.close()
+    return out, boxes
+
+
+def picture_title(group: str, label: str) -> str:
+    return f"{group} {label}: {LABEL}. Pre-validation, not a lesion call."
+
+
+def save_picture(image_path: Path, labels: np.ndarray, table: Path, wt_median: float, path: Path) -> None:
+    """Draw the picture of one image from its table as written to disk."""
+    from PIL import Image  # noqa: PLC0415
+
+    display, _channel = lacunae.load_channel(image_path)
+    picture, _boxes = render_picture(display, labels, read_table(table), wt_median,
+                                     picture_title(image_path.parent.name, lacunae.image_label(image_path)))
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(path, dpi=DPI, facecolor="white")
-    plt.close(fig)
+    Image.fromarray(picture).save(path)
+    del display, picture
+
+
+def check_picture(image_path: Path, results_root: Path, wt_median: float) -> dict:
+    """The automatic check of one picture: it equals the picture drawn again
+    from its table; outside the label and scale bar boxes, every changed pixel
+    lies inside a lacuna mask; every measured lacuna is filled with its own
+    colour on its whole mask, so the filled count equals the measured rows; a
+    flagged lacuna is not filled; every printed area is its table value; each
+    mask's area is its table area; the image is unchanged elsewhere."""
+    from PIL import Image  # noqa: PLC0415
+    from skimage.io import imread  # noqa: PLC0415
+
+    label = lacunae.image_label(image_path)
+    table = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_TABLE)
+    picture_path = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_PICTURE)
+    rows = read_table(table)
+    labels = np.asarray(imread(lacunae.result_path(results_root, label, config.SECTION_LACUNAE,
+                                                   config.SUFFIX_LACUNA_LABELS)))
+    display, _channel = lacunae.load_channel(image_path)
+    with Image.open(picture_path) as im:
+        saved = np.asarray(im.convert("RGB")).copy()
+    again, boxes = render_picture(display, labels, rows, wt_median,
+                                  picture_title(image_path.parent.name, label))
+    h, w = labels.shape
+    region = saved[TITLE_H:TITLE_H + h, :w]
+    in_box = np.zeros((h, w), dtype=bool)
+    for x0, y0, x1, y1 in boxes:
+        in_box[max(0, y0):max(0, y1) + 1, max(0, x0):max(0, x1) + 1] = True
+    changed = np.any(region != display, axis=2)
+    out = {"image": label, "rows": len(rows), "measured_rows": sum(1 for r in rows if not r["flag"]),
+           "redrawn_from_table_equal": bool(np.array_equal(saved, again)),
+           "changed_outside_masks_px": int((changed & ~in_box & (labels == 0)).sum()),
+           "unchanged_outside_drawing": bool(not (changed & ~in_box & (labels == 0)).any())}
+    filled, wrong_fill, flagged_filled, area_mismatch = 0, [], [], []
+    for r in rows:
+        mask = labels == r["id"]
+        if r["area_um2"] is not None and abs(mask.sum() * UM2_PER_PX2 - r["area_um2"]) > 0.051:
+            area_mismatch.append(r["id"])
+        free = mask & ~in_box
+        if r["flag"]:
+            from scipy import ndimage as ndi  # noqa: PLC0415
+
+            inner = free & ndi.binary_erosion(mask)
+            if np.any(region[inner] != display[inner]):
+                flagged_filled.append(r["id"])
+            continue
+        want = np.rint((1 - FILL_ALPHA) * display[free].astype(np.float64)
+                       + FILL_ALPHA * fill_colour(r["ratio_to_WT_median"])).astype(np.uint8)
+        if free.any() and np.array_equal(region[free], want):
+            filled += 1
+        else:
+            wrong_fill.append(r["id"])
+    out.update({"filled": filled, "filled_equals_measured_rows": filled == out["measured_rows"],
+                "wrong_fill_ids": wrong_fill, "flagged_filled_ids": flagged_filled,
+                "mask_area_differs_ids": area_mismatch})
+    out["pass"] = bool(out["redrawn_from_table_equal"] and out["unchanged_outside_drawing"]
+                       and out["filled_equals_measured_rows"] and not wrong_fill and not flagged_filled
+                       and not area_mismatch)
+    del saved, again, display, labels, region
+    return out
 
 
 # Group and summary
@@ -327,17 +443,20 @@ def measure_group(group: str, results_root: Path | None = None, wt_median: float
                                                        config.SUFFIX_LACUNA_LABELS)))
         if int(labels.max()) != len(records):
             raise ValueError(f"{group}/{label}: {int(labels.max())} labels, {len(records)} lacunae in the json")
-        write_csv(lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_TABLE), LACUNA_COLUMNS, rows)
+        table = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_TABLE)
+        write_csv(table, LACUNA_COLUMNS, rows)
         picture = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_PICTURE)
-        save_picture(image_path, labels, rows, wt_median, picture)
+        save_picture(image_path, labels, table, wt_median, picture)
+        del labels
+        gc.collect()
         tiles.append((label, picture))
         image_rows.append({"status": LABEL, "group": group, "image": label, **stats(rows),
                            "WT_median_area_um2": _round(wt_median)})
         print(f"{group}/{label}: {image_rows[-1]['n']} measured, {image_rows[-1]['n_flagged']} flagged, "
               f"median {image_rows[-1]['area_um2_median']} um2")
-    table = lacunae.group_path(results_root, config.SECTION_POLS, GROUP_TABLE)
-    write_csv(table.with_suffix(".csv"), IMAGE_COLUMNS, image_rows)
-    write_xlsx(table.with_suffix(".xlsx"), IMAGE_COLUMNS, image_rows, notes(wt_median))
+    group_table = lacunae.group_path(results_root, config.SECTION_POLS, GROUP_TABLE)
+    write_csv(group_table.with_suffix(".csv"), IMAGE_COLUMNS, image_rows)
+    write_xlsx(group_table.with_suffix(".xlsx"), IMAGE_COLUMNS, image_rows, notes(wt_median))
     lacunae.save_contact_sheet(tiles, f"{group}: {LABEL}. Full size: 3_pols/<image>_{SUFFIX_PICTURE}.",
                                lacunae.group_path(results_root, config.SECTION_POLS, CONTACT_SHEET))
     write_readme(results_root, group)
@@ -394,6 +513,32 @@ def check(groups=config.GROUPS) -> int:
     return 1 if failed else 0
 
 
+PICTURE_CHECK_TABLE = config.ARCHIVE_ROOT / "POL_PICTURE_CHECK.csv"
+PICTURE_CHECK_COLUMNS = ["group", "image", "rows", "measured_rows", "filled", "filled_equals_measured_rows",
+                         "redrawn_from_table_equal", "unchanged_outside_drawing", "changed_outside_masks_px",
+                         "wrong_fill_ids", "flagged_filled_ids", "mask_area_differs_ids", "pass"]
+
+
+def check_pictures(groups=config.GROUPS) -> int:
+    """check_picture on every image of every group, one image at a time."""
+    wt_median = wt_median_um2()
+    rows = []
+    for group in groups:
+        for image_path in image_files(group):
+            r = check_picture(image_path, config.RESULTS_ROOT / group, wt_median)
+            r["group"] = group
+            for k in ("wrong_fill_ids", "flagged_filled_ids", "mask_area_differs_ids"):
+                r[k] = " ".join(str(i) for i in r[k])
+            rows.append(r)
+            print(f"{group:<7} {r['image']:<26} filled {r['filled']:>3} of {r['measured_rows']:>3} measured  "
+                  f"{'PASS' if r['pass'] else 'FAIL'}", flush=True)
+            gc.collect()
+    write_csv(PICTURE_CHECK_TABLE, PICTURE_CHECK_COLUMNS, rows)
+    failed = sum(not r["pass"] for r in rows)
+    print(f"\n{'FAIL' if failed else 'PASS'}: {len(rows) - failed} of {len(rows)} pictures. -> {PICTURE_CHECK_TABLE}")
+    return 1 if failed else 0
+
+
 # Self-test
 
 def selftest() -> int:
@@ -424,9 +569,23 @@ def selftest() -> int:
         labels[0:20, 0:25] = 3
         labels[400:410, 400:410] = 4
         with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / "picture.png"
-            save_picture(image, labels, rows, median, out)
-            checks.append(("the picture is written", out.is_file() and out.stat().st_size > 0))
+            table = Path(tmp) / "table.csv"
+            write_csv(table, LACUNA_COLUMNS, rows)
+            display = lacunae.load_channel(image)[0]
+            picture, boxes = render_picture(display, labels, read_table(table), median, "self-test")
+            region = picture[TITLE_H:TITLE_H + labels.shape[0], :labels.shape[1]]
+            in_box = np.zeros(labels.shape, dtype=bool)
+            for x0, y0, x1, y1 in boxes:
+                in_box[max(0, y0):max(0, y1) + 1, max(0, x0):max(0, x1) + 1] = True
+            changed = np.any(region != display, axis=2)
+            checks.append(("outside the masks only labels and the scale bar change",
+                           not (changed & ~in_box & (labels == 0)).any()))
+            want = np.rint(0.3 * display[labels == 2].astype(float) + 0.7 * fill_colour(2.0)).astype(np.uint8)
+            checks.append(("a measured lacuna is filled with its colour on its whole mask",
+                           np.array_equal(region[labels == 2], want)))
+            checks.append(("a flagged lacuna is not filled inside its edge",
+                           np.array_equal(region[401:409, 401:409], display[401:409, 401:409])))
+            checks.append(("its edge is grey", bool(np.all(region[400, 400:410] == GREY))))
     for name, ok in checks:
         print(f"{'PASS' if ok else 'FAIL'}  {name}")
     ok = all(ok for _n, ok in checks)
@@ -445,9 +604,13 @@ def main() -> None:
     sub.add_parser("summary", help="Only results/summary/pols_lacunar_size_by_group.csv.")
     sub.add_parser("check", help="Every 3_pols file against the quantification jsons.")
     sub.add_parser("selftest", help="Checks on synthetic records.")
+    sub.add_parser("check-pictures", help="Every 3_pols picture, one image at a time: drawn from its table, "
+                                          "colour only inside the masks (results/archive/POL_PICTURE_CHECK.csv).")
     args = parser.parse_args()
     if args.command == "selftest":
         sys.exit(selftest())
+    if args.command == "check-pictures":
+        sys.exit(check_pictures())
     if args.command == "check":
         sys.exit(check())
     if args.command == "measure":

@@ -1973,6 +1973,19 @@ median and 90th percentile of area and ratio) and a contact sheet; across groups
 all of it, `python src/pols.py check` compares every table with the jsons, and
 `python src/pols.py selftest` checks the arithmetic on synthetic records.
 
+The picture shows only measured data: it is drawn pixel for pixel from the
+table as written, the original image at its own size in which only lacuna
+masks change colour (a measured lacuna blended with its colour at 70% inside
+its own mask, a flagged one a 1 px grey line on the inner edge of its mask);
+no ring, band, halo or other shape outside a mask is drawn. Labels and the
+scale bar are the only other marks on the image, the title and colour bar sit
+beside it. `python src/pols.py check-pictures` checks every picture, one image
+at a time: it equals the picture drawn again from its table, every changed
+pixel outside the label and scale bar boxes lies inside a mask, every measured
+lacuna is filled with its own colour on its whole mask (filled count equals
+measured rows), no flagged lacuna is filled, and every mask's area equals its
+table area (`results/archive/POL_PICTURE_CHECK.csv`).
+
 **Not established.** Area is the area the lacuna stage outlined. On the groups
 other than WT that stage also keeps saturated bands, soft tissue patches and
 small fragments (section 23), which pull a group's median down; a large area
