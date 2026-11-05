@@ -755,8 +755,9 @@ def body_width_px(region) -> float:
 
 
 def fragment_filter(labels: np.ndarray, kept: list[tuple]) -> list[tuple]:
-    """The fragment rule (config.FRAGMENT_RULE, section g6): drop every kept
-    object that is a satellite of a larger kept lacuna or a speck. Each object
+    """The fragment rule (config.FRAGMENT_RULE, sections g6 and g7): drop every
+    kept object that is a satellite of a larger kept lacuna, a speck or a
+    crumb. Each object
     is judged as the label image holds it (its whole labelled region, which is
     what every measure reads), against the kept list as it comes in, so the
     order does not matter."""
@@ -766,12 +767,15 @@ def fragment_filter(labels: np.ndarray, kept: list[tuple]) -> list[tuple]:
     reach = int(np.ceil(gap)) + 1
     speck_max = config.area_px2(config.FRAGMENT_SPECK_MAX_AREA_UM2)
     speck_width = config.px(config.FRAGMENT_SPECK_MAX_WIDTH_UM)
+    crumb_max = config.area_px2(config.FRAGMENT_CRUMB_MAX_AREA_UM2)
     kept_labels = {region.label for region, _b in kept}
     whole = {r.label: r for r in measure.regionprops(labels) if r.label in kept_labels}
     out = []
     for region, on_border in kept:
         piece = whole[region.label]
         if piece.area <= speck_max and body_width_px(piece) <= speck_width:
+            continue
+        if piece.area <= crumb_max and piece.solidity < config.FRAGMENT_CRUMB_MIN_SOLIDITY:
             continue
         if piece.area <= satellite_max:
             r0, c0, r1, c1 = piece.bbox

@@ -645,6 +645,20 @@ FRAGMENT_SATELLITE_GAP_UM = 1.0
 FRAGMENT_SATELLITE_AREA_RATIO = 2.0
 FRAGMENT_SPECK_MAX_AREA_UM2 = 8.0
 FRAGMENT_SPECK_MAX_WIDTH_UM = 2.0
+#
+# (g7) Review loop, round 3 (2026-11-05): a third arm of the fragment rule. A
+# CRUMB is at most FRAGMENT_CRUMB_MAX_AREA_UM2 and less compact than
+# FRAGMENT_CRUMB_MIN_SOLIDITY (area over convex hull area): a ragged bit of
+# glow or a knot of threads, while a lacuna profile, small ones included, is a
+# compact oval. Chosen on the round 2 pictures: over 496 objects it drops 22
+# the reviewer called fragments, 1 band piece and 1 accepted object (a WT_HP
+# object of 8.4 um2 at solidity 0.78); no accepted WT lacuna (the nearest is
+# 9.2 um2 at 0.81). 10 um2 is about a quarter of the median accepted lacuna
+# (38 um2); MIN_SOLIDITY of src/lacunae.py stays 0.5 for every larger object.
+# Part of the fragment rule, so FRAGMENT_RULE = False turns it off too.
+# NOT VALIDATED.
+FRAGMENT_CRUMB_MAX_AREA_UM2 = 10.0
+FRAGMENT_CRUMB_MIN_SOLIDITY = 0.80
 
 # (h) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The

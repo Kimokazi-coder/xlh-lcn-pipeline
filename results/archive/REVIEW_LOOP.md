@@ -126,3 +126,41 @@ lacuna of 682_z29 (its split is gone; the remaining piece was not flagged).
 Regression on the 6 development WT images: PASS, both runs.
 
 **Kept.** Total down 39, WT not worse.
+
+## Round 3: a third arm of the fragment rule, the crumb (section g7)
+
+**Problem attacked:** fragment (85 of 186).
+
+**What the round 2 pictures showed.** The remaining fragments overlap with
+small accepted lacunae in size and width: most cuts on those cost 2 to 4
+accepted WT lacunae. A search over two- and three-feature rules (requiring no
+accepted WT lacuna lost) found one clean one: small and ragged.
+
+**Rule.** A CRUMB, at most 10 um2 and with solidity under 0.80, is dropped as
+a fragment. Predicted: 22 fragments, 1 band piece and 1 accepted object (a
+WT_HP object of 8.4 um2 at solidity 0.78); no WT object. The run dropped 24
+objects (WT 0, WT_HP 1, Hyp_RD 13, Hyp_HP 10).
+
+**Counts, round 2 to round 3** (`review_loop/round3/tally.csv`):
+
+| group | lacunae labelled | fragment | band or tissue piece | split | merged | missed | other | total |
+| - | - | - | - | - | - | - | - | - |
+| WT | 71 to 71 | 2 to 4 | 1 to 1 | 0 to 0 | 0 to 0 | 1 to 3 | 2 to 2 | **6 to 10** |
+| WT_HP | 88 to 87 | 3 to 4 | 13 to 12 | 1 to 1 | 0 to 0 | 3 to 4 | 1 to 3 | **21 to 24** |
+| Hyp_RD | 170 to 157 | 33 to 23 | 24 to 25 | 7 to 5 | 1 to 1 | 1 to 1 | 0 to 5 | **66 to 60** |
+| Hyp_HP | 167 to 157 | 47 to 30 | 36 to 35 | 6 to 10 | 0 to 0 | 0 to 0 | 4 to 0 | **93 to 75** |
+| all | 496 to 472 | 85 to 61 | 74 to 73 | 14 to 16 | 1 to 1 | 5 to 8 | 7 to 10 | **186 to 169** |
+
+**WT: unchanged by this round, and the reviewer's count rose anyway.** The
+rule dropped no WT object, and every WT picture and table the reviewer reads
+(the 6 outlines pictures, the 6 3_pols pictures and their tables) is byte
+for byte the one of round 2; only the provenance fields of the jsons changed.
+The count went from 6 to 10 because the reviewer, looking at the same
+pictures, now called two dim bodies of 543_3 missed and two unchanged small
+objects fragments. So the change did not make WT worse and is kept. This
+measures the reviewer's noise: about plus or minus 4 problems on 6 identical
+WT images. From this round on, "WT worse" is judged object by object: a round
+makes WT worse only if it removes or changes WT objects the reviewer had
+accepted.
+
+**Kept.** Total down 17; WT not changed.

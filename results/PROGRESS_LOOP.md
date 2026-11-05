@@ -10,7 +10,7 @@ run is, so it can be resumed after a crash. Logs of every command are in
 | 1 hold-out | done | data/holdout.json, docs/HOLDOUT.md, guard in config.py and src/lacunae.py, `diagnostics.py holdout-check` 13 of 13; tag holdout-locked-2026-11-05 |
 | 2 external data | done | docs/EXTERNAL_DATA.md; F:/external_data/ (not committed); no source has manual lacuna labels |
 | 3 reviewer | done | .claude/agents/image-reviewer.md (Read, Glob, Grep; sonnet); .gitignore tracks .claude/agents/ only |
-| 4 loop | in progress | round 2 done (225 to 186, WT 8 to 6) |
+| 4 loop | in progress | round 3 done (186 to 169; WT unchanged, reviewer 6 to 10) |
 | 5 freeze and rerun | not started | |
 | report | not started | |
 
@@ -50,3 +50,5 @@ run is, so it can be resumed after a crash. Logs of every command are in
   Round runner: the four stages per group, `-w 5 --fast`, then pols all.
 - Round 2 done: fragment rule (satellite or speck), 225 to 186, WT 8 to 6;
   regression PASS.
+- Round 3 done: crumb arm, 186 to 169; WT pictures identical, reviewer 6 to
+  10 (noise); regression PASS. Next: band rule (blob over 300 um2).
