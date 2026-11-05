@@ -525,6 +525,15 @@ def merge_dark_band_splits(label_image: np.ndarray, channel: np.ndarray) -> np.n
                if r.area >= 100}
     rows, cols = labels.shape
     max_area = MAX_AREA_FRACTION_OF_IMAGE * rows * cols
+    # Each test below works in a window around the pair, the union of their
+    # bounding boxes plus the dilation radius: a pixel of either dilation lies
+    # within `reach` of its region, so nothing outside the window can count, and
+    # two regions whose boxes are more than 2 * reach apart share nothing. The
+    # same pairs are tested in the same order, and the window holds every pixel
+    # the full frame would, in the same order, so the labels are identical to
+    # testing on the full frame (python src/diagnostics.py dark-band-check).
+    reach = 6
+    disk = morphology.disk(reach)
     merged = True
     while merged:
         merged = False
@@ -540,9 +549,14 @@ def merge_dark_band_splits(label_image: np.ndarray, channel: np.ndarray) -> np.n
                     continue  # both are lacunae already: never fuse two real cells
                 if ra.area + rb.area > max_area:
                     continue
-                mask_a, mask_b = labels == a, labels == b
-                shared = (morphology.dilation(mask_a, morphology.disk(6))
-                          & morphology.dilation(mask_b, morphology.disk(6)))
+                (a0, a1, a2, a3), (b0, b1, b2, b3) = ra.bbox, rb.bbox
+                if max(b0 - a2, a0 - b2) + 1 > 2 * reach or max(b1 - a3, a1 - b3) + 1 > 2 * reach:
+                    continue  # the two dilations cannot meet
+                win = (slice(max(min(a0, b0) - reach, 0), min(max(a2, b2) + reach, rows)),
+                       slice(max(min(a1, b1) - reach, 0), min(max(a3, b3) + reach, cols)))
+                sub = labels[win]
+                mask_a, mask_b = sub == a, sub == b
+                shared = morphology.dilation(mask_a, disk) & morphology.dilation(mask_b, disk)
                 if int(shared.sum()) < config.MERGE_MIN_SHARED_PX:
                     continue
                 gap = shared & ~mask_a & ~mask_b
@@ -551,9 +565,9 @@ def merge_dark_band_splits(label_image: np.ndarray, channel: np.ndarray) -> np.n
                 dimmer = min(float(ra.intensity_mean), float(rb.intensity_mean))
                 if dimmer <= 0:
                     continue
-                if float(channel[gap].mean()) / dimmer < config.MERGE_MIN_DIP_FRACTION:
+                if float(channel[win][gap].mean()) / dimmer < config.MERGE_MIN_DIP_FRACTION:
                     continue
-                labels[mask_b | gap] = a
+                sub[mask_b | gap] = a
                 merged = True
                 break
             if merged:
@@ -758,11 +772,12 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
     # Lacunae the plain filters miss, appended AFTER the ones they keep, so the
     # ids of the ordinary lacunae never move. Both classes carry no area or shape
     # measure: "dim" for the three rules of config section g, "out_of_focus" for
-    # the round blurred cores of section f.
-    dim = find_additional_lacunae(labels, channel, kept)
+    # the round blurred cores of section f. Both rules are off unless
+    # config.LACUNA_RESCUE_RULES is on (config, section g5).
+    dim = find_additional_lacunae(labels, channel, kept) if config.LACUNA_RESCUE_RULES else []
     dim_ids = [len(kept) + i for i in range(1, len(dim) + 1)]
     kept = kept + dim
-    out_of_focus = find_out_of_focus(labels, channel, kept)
+    out_of_focus = find_out_of_focus(labels, channel, kept) if config.LACUNA_RESCUE_RULES else []
     out_of_focus_ids = [len(kept) + i for i in range(1, len(out_of_focus) + 1)]
     kept = kept + out_of_focus
     return labels, kept, t_hi, {"dim": dim_ids, "out_of_focus": out_of_focus_ids}
@@ -930,6 +945,7 @@ def parameters() -> dict:
         "fill_enclosed_holes_max_px2": config.FILL_ENCLOSED_HOLES_MAX_PX2,
         "band_filter_min_opening_share": config.BAND_FILTER_MIN_OPENING_SHARE,
         "fast_lacuna_stage": config.FAST_LACUNA_STAGE,
+        "lacuna_rescue_rules": config.LACUNA_RESCUE_RULES,
     }
 
 
@@ -1010,6 +1026,31 @@ def add_input_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_workers_argument(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "-w", "--workers", type=int, default=1,
+        help="Images processed at the same time, one process each (default 1: one after another). "
+             "The files written are the same either way.",
+    )
+    parser.add_argument(
+        "--fast", action="store_true",
+        help="config.FAST_LACUNA_STAGE on for this run only: the bounding-box watershed, identical labels "
+             "(python src/diagnostics.py dark-band-check --watershed), recorded as fast_lacuna_stage true.",
+    )
+
+
+def map_images(func, jobs: list, workers: int = 1):
+    """func(job) for every job, yielded in job order as each is ready: one after
+    another, or in `workers` processes. func must be a module-level function."""
+    if workers <= 1 or len(jobs) <= 1:
+        yield from map(func, jobs)
+        return
+    from concurrent.futures import ProcessPoolExecutor  # noqa: PLC0415
+
+    with ProcessPoolExecutor(max_workers=min(workers, len(jobs))) as ex:
+        yield from ex.map(func, jobs)
+
+
 def output_root(args) -> Path:
     """The results folder of a run: the -o folder if one was given, else
     results/<name of the input folder> (config.RESULTS_ROOT), so a run on
@@ -1052,10 +1093,26 @@ def no_images(args, paths: list) -> bool:
     return True
 
 
+def detect_and_write(job: tuple) -> tuple:
+    """One image of a run: detect and write its files. Returns (name, counts,
+    None), or (name, None, error) when it fails, so a failed image is listed and
+    skipped and the others carry on."""
+    image_path, out_root, fast = job
+    config.FAST_LACUNA_STAGE = config.FAST_LACUNA_STAGE or fast
+    try:
+        result = analyse_image(image_path)
+        write_outputs(result, out_root)
+    except Exception as exc:
+        return image_path.name, None, f"{type(exc).__name__}: {exc}"
+    keys = ("lacuna_count", "interior_lacuna_count", "border_lacuna_count", "t_hi")
+    return image_path.name, {k: result[k] for k in keys}, None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Lacuna detection (pre-validation, px). Measures: "
                                                  "src/quantification.py.")
     add_input_arguments(parser)
+    add_workers_argument(parser)
     args = parser.parse_args()
     args.out = output_root(args)
     paths = image_paths(args)
@@ -1063,20 +1120,17 @@ def main() -> None:
         return
 
     failures = []
-    for image_path in paths:
-        # An image that fails is listed and skipped; the others carry on.
-        try:
-            result = analyse_image(image_path)
-            write_outputs(result, args.out)
-        except Exception as exc:
-            failures.append([image_path.name, f"{type(exc).__name__}: {exc}"])
-            print(f"{image_path.name}: FAILED, skipped ({type(exc).__name__}: {exc})")
+    out_dir = args.out / config.SECTION_LACUNAE
+    jobs = [(p, args.out, args.fast) for p in paths]
+    for name, counts, error in map_images(detect_and_write, jobs, args.workers):
+        if error is not None:
+            failures.append([name, error])
+            print(f"{name}: FAILED, skipped ({error})")
             continue
-        out_dir = args.out / config.SECTION_LACUNAE
         print(
-            f"{image_path.name}: lacunae={result['lacuna_count']} "
-            f"(interior {result['interior_lacuna_count']}, border {result['border_lacuna_count']})  "
-            f"t_hi={result['t_hi']:.6f}  -> {out_dir}"
+            f"{name}: lacunae={counts['lacuna_count']} "
+            f"(interior {counts['interior_lacuna_count']}, border {counts['border_lacuna_count']})  "
+            f"t_hi={counts['t_hi']:.6f}  -> {out_dir}"
         )
     report_failures(args.out, "lacunae", failures)
     if args.dir is not None:

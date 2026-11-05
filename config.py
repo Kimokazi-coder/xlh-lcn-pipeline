@@ -22,7 +22,10 @@ DATA_DIR = PROJECT_ROOT / "data"
 # Groups. The images are organised by type, one folder per group under data/.
 # RD is regular diet and HP high phosphorus. WT is the reference group: its 8
 # sections are the ones every rule of the pipeline was chosen on, by visual
-# inspection, and no parameter may be tuned on any other group.
+# inspection, until 2026-11-05. Since then (user's brief of that day) the review
+# loop of results/archive/REVIEW_LOOP.md may set lacuna rules on the development
+# images of all four groups, never on the held-out ones (docs/HOLDOUT.md); WT
+# must not get worse. Every group still runs with the same settings.
 GROUPS = ("WT", "WT_HP", "Hyp_RD", "Hyp_HP")
 REFERENCE_GROUP = "WT"
 GROUP_DESCRIPTIONS = {
@@ -601,6 +604,19 @@ MERGE_MIN_DIP_FRACTION = 0.75       # gap mean over the dimmer body's mean; 0.75
 # Lacunae accepted by (g1) to (g3) are the class "dim": counted and owning
 # threads, excluded from area and shape measures, exactly like out_of_focus.
 # MIN_AREA_PX2 is NOT lowered for everything. NOT VALIDATED.
+#
+# (g5) Review loop, round 1 (2026-11-05, results/archive/REVIEW_LOOP.md): the
+# rescue rules (f) and (g1) to (g3) are OFF. The image reviewer looked at every
+# object on the 27 development images of all four groups: of the 55 objects
+# these rules admitted, 53 were small fragments (specks, crumbs of glow, pieces
+# of thread) and 2 were accepted, both small pieces cut by the frame in WT.
+# All but one lie under the 6.76 um2 (400 px) area floor of src/lacunae.py, at
+# 1.1 to 2.5 um wide (the largest inscribed disk), while the accepted lacunae
+# are 4.2 um wide at the median. So every lacuna now clears the same area,
+# solidity and aspect rules, and the classes "dim" and "out_of_focus" stay
+# empty. True restores the four rules exactly. NOT VALIDATED: the evidence is
+# an AI reviewer's judgement, not a manual count.
+LACUNA_RESCUE_RULES = False
 
 # (h) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The

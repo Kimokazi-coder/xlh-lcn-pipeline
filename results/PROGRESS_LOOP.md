@@ -10,7 +10,7 @@ run is, so it can be resumed after a crash. Logs of every command are in
 | 1 hold-out | done | data/holdout.json, docs/HOLDOUT.md, guard in config.py and src/lacunae.py, `diagnostics.py holdout-check` 13 of 13; tag holdout-locked-2026-11-05 |
 | 2 external data | done | docs/EXTERNAL_DATA.md; F:/external_data/ (not committed); no source has manual lacuna labels |
 | 3 reviewer | done | .claude/agents/image-reviewer.md (Read, Glob, Grep; sonnet); .gitignore tracks .claude/agents/ only |
-| 4 loop | not started | |
+| 4 loop | in progress | round 1 done (258 to 225, WT 12 to 8) |
 | 5 freeze and rerun | not started | |
 | report | not started | |
 
@@ -45,3 +45,6 @@ run is, so it can be resumed after a crash. Logs of every command are in
   1 s). Commands run the base interpreter as the venv instead:
   __PYVENV_LAUNCHER__=F:\lcn-quant\venv\Scripts\python.exe and
   "C:\Program Files\Carl Zeiss\ZeissPython\Py22042.2\env\python.exe".
+- Round 1 done: rescue rules off, 258 to 225, WT 12 to 8; regression PASS on
+  the 6 development WT images (default path against the --fast results).
+  Round runner: the four stages per group, `-w 5 --fast`, then pols all.

@@ -99,6 +99,13 @@ Subcommands:
     holdout-check     the held-out guard (docs/HOLDOUT.md): in DEV mode every
                       held-out image is refused before a pixel is read and
                       every folder listing leaves it out; reads no image
+    dark-band-check   the windowed dark-band merge of src/lacunae.py against
+                      its full-frame form, and with --watershed the fast
+                      watershed against the original: identical labels, per
+                      image, with the timing
+    review-tally      the image reviewer's tables of one loop round
+                      (results/archive/review_loop/round<N>/*.md) counted per
+                      group and category, into problems.csv and tally.csv
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -7138,6 +7145,169 @@ def cmd_holdout_check(_args) -> int:
     return 1 if failed else 0
 
 
+# dark-band-check --------------------------------------------------------------------
+
+def _merge_dark_band_splits_full_frame(label_image: np.ndarray, channel: np.ndarray) -> np.ndarray:
+    """lacunae.merge_dark_band_splits as it was until 2026-11-05, every test on
+    the full frame: the reference the windowed form must equal."""
+    labels = label_image.copy()
+    rows, cols = labels.shape
+    max_area = lacunae.MAX_AREA_FRACTION_OF_IMAGE * rows * cols
+    merged = True
+    while merged:
+        merged = False
+        regions = {r.label: r for r in measure.regionprops(labels, intensity_image=channel)
+                   if r.area >= 100}
+        keys = sorted(regions)
+        for i, a in enumerate(keys):
+            for b in keys[i + 1:]:
+                ra, rb = regions[a], regions[b]
+                if ra.area >= lacunae.MIN_AREA_PX2 and rb.area >= lacunae.MIN_AREA_PX2:
+                    continue
+                if ra.area + rb.area > max_area:
+                    continue
+                mask_a, mask_b = labels == a, labels == b
+                shared = (morphology.dilation(mask_a, morphology.disk(6))
+                          & morphology.dilation(mask_b, morphology.disk(6)))
+                if int(shared.sum()) < config.MERGE_MIN_SHARED_PX:
+                    continue
+                gap = shared & ~mask_a & ~mask_b
+                if not gap.any():
+                    continue
+                dimmer = min(float(ra.intensity_mean), float(rb.intensity_mean))
+                if dimmer <= 0:
+                    continue
+                if float(channel[gap].mean()) / dimmer < config.MERGE_MIN_DIP_FRACTION:
+                    continue
+                labels[mask_b | gap] = a
+                merged = True
+                break
+            if merged:
+                break
+    return labels
+
+
+def _dark_band_check_one(job: tuple) -> dict:
+    import time
+
+    path_str, watershed = job
+    path = Path(path_str)
+    _display, channel = lacunae.load_channel(path)
+    mask, _t_hi = lacunae.multiotsu_lacuna_mask(channel)
+    distance = ndi.distance_transform_edt(mask)
+    t0 = time.time()
+    labels = lacunae.merge_shallow_splits_fast(lacunae.watershed_split_fast(mask), mask, distance)
+    row = {"group": path.parent.name, "image": lacunae.image_label(path),
+           "watershed fast s": round(time.time() - t0, 1)}
+    if watershed:
+        t0 = time.time()
+        original = lacunae.merge_shallow_splits(lacunae.watershed_split(mask), mask, distance)
+        row["watershed original s"] = round(time.time() - t0, 1)
+        row["watershed identical"] = bool(np.array_equal(labels, original))
+    t0 = time.time()
+    windowed = lacunae.merge_dark_band_splits(labels, channel)
+    row["dark band windowed s"] = round(time.time() - t0, 1)
+    t0 = time.time()
+    full = _merge_dark_band_splits_full_frame(labels, channel)
+    row["dark band full frame s"] = round(time.time() - t0, 1)
+    row["dark band identical"] = bool(np.array_equal(windowed, full))
+    return row
+
+
+def cmd_dark_band_check(args) -> int:
+    if args.image is None and args.dir is None:
+        images = [p for g in config.GROUPS
+                  for p in lacunae.image_paths(argparse.Namespace(image=None, dir=config.DATA_DIR / g))]
+    else:
+        images = lacunae.image_paths(args)
+    rows = list(lacunae.map_images(_dark_band_check_one, [(str(p), args.watershed) for p in images], args.workers))
+    columns = list(rows[0])
+    print_table(columns, [[r[c] for c in columns] for r in rows],
+                title=f"dark-band merge, windowed against full frame"
+                      + (", and the fast watershed against the original" if args.watershed else "") + "\n")
+    checks = [k for k in columns if k.endswith("identical")]
+    failed = [(r["image"], k) for r in rows for k in checks if not r[k]]
+    print(f"\n{'PASS' if not failed else 'FAIL'}: {len(rows)} images, "
+          + ", ".join(f"{k} on {sum(r[k] for r in rows)} of {len(rows)}" for k in checks))
+    if args.csv:
+        with open(args.csv, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=columns, lineterminator="\n")
+            w.writeheader()
+            w.writerows(rows)
+    return 1 if failed else 0
+
+
+# review-tally -----------------------------------------------------------------------
+
+REVIEW_LOOP_DIR = config.ARCHIVE_ROOT / "review_loop"
+REVIEW_CATEGORIES = ("fragment", "band or tissue piece", "split", "merged", "missed", "other")
+# How a row of the reviewer's table is counted. A fragment, band or tissue piece
+# or other row names wrong objects, so each id it lists is one problem; a split
+# or merged row is one lacuna drawn wrongly, and a missed row one body with no
+# outline, so each of those rows is one problem whatever ids it lists.
+REVIEW_COUNT_PER_ID = ("fragment", "band or tissue piece", "other")
+
+
+def review_rows(folder: Path) -> tuple[list, dict]:
+    """(problem rows, {(group, image): lacunae labelled}) from every table of a
+    round folder. A row's ids are the integers of its id column."""
+    import re
+
+    rows, labelled = [], {}
+    for path in sorted(Path(folder).glob("*.md")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            m = re.match(r"^(\S+) (\S+): (\d+) lacunae labelled, (\d+) problems?", line.strip())
+            if m:
+                labelled[(m.group(1), m.group(2))] = int(m.group(3))
+                continue
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) != 5 or cells[0] in ("group", "") or set(cells[0]) <= set("-: "):
+                continue
+            group, image, ids, category, reason = cells
+            if category not in REVIEW_CATEGORIES:
+                raise ValueError(f"{path.name}: unknown category {category!r} in {line!r}")
+            id_list = [] if category == "missed" else [int(v) for v in re.findall(r"\d+", ids)]
+            count = max(1, len(id_list)) if category in REVIEW_COUNT_PER_ID else 1
+            rows.append({"group": group, "image": image, "ids": " ".join(map(str, id_list)),
+                         "where": ids if category == "missed" else "", "category": category,
+                         "count": count, "reason": reason, "table": path.name})
+    return rows, labelled
+
+
+def cmd_review_tally(args) -> int:
+    folder = Path(args.round_dir).resolve()
+    rows, labelled = review_rows(folder)
+    held = lacunae.held_out_labels()
+    bad = sorted({r["image"] for r in rows if r["image"] in held} | {i for _g, i in labelled if i in held})
+    if bad:
+        print(f"FAIL: held-out images in the review: {bad}")
+        return 1
+    with open(folder / "problems.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0]) if rows else ["group"], lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+    table = []
+    for group in config.GROUPS:
+        images = sorted(i for g, i in labelled if g == group)
+        counts = {c: sum(r["count"] for r in rows if r["group"] == group and r["category"] == c)
+                  for c in REVIEW_CATEGORIES}
+        table.append({"group": group, "images": len(images),
+                      "lacunae labelled": sum(labelled[(group, i)] for i in images),
+                      **counts, "total": sum(counts.values())})
+    totals = {k: sum(t[k] for t in table) for k in table[0] if k != "group"}
+    table.append({"group": "all", **totals})
+    columns = list(table[0])
+    with open(folder / "tally.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=columns, lineterminator="\n")
+        w.writeheader()
+        w.writerows(table)
+    print_table(columns, [[t[c] for c in columns] for t in table],
+                title=f"review tally, {folder.relative_to(config.PROJECT_ROOT).as_posix()} "
+                      f"(pre-validation; an AI reviewer's judgement, not a manual count)\n")
+    print(f"\n-> {folder / 'tally.csv'}, {folder / 'problems.csv'}")
+    return 0
+
+
 # group-qc ---------------------------------------------------------------------------
 # A check list for every group other than the reference: per image, the lacuna
 # count, the lacuna-scale candidates the lacuna stage rejected and the rule that
@@ -9611,6 +9781,20 @@ def main() -> None:
     p = sub.add_parser("holdout-check",
                        help="The held-out guard (docs/HOLDOUT.md): refusals and listings, no image read.")
     p.set_defaults(func=cmd_holdout_check)
+
+    p = sub.add_parser("dark-band-check",
+                       help="The windowed dark-band merge against its full-frame form (and with --watershed "
+                            "the fast watershed against the original): identical labels, per image.")
+    add_images_arguments(p)
+    p.add_argument("--watershed", action="store_true", help="Also the fast watershed against the original.")
+    p.add_argument("-c", dest="csv", type=Path, default=None, help="Also write the table to this CSV file.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_dark_band_check)
+
+    p = sub.add_parser("review-tally",
+                       help="Count one loop round's reviewer tables per group and category.")
+    p.add_argument("round_dir", type=Path, help="The round folder, e.g. results/archive/review_loop/round0.")
+    p.set_defaults(func=cmd_review_tally)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

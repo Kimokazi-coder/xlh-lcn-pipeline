@@ -43,3 +43,52 @@ Pictures as committed before this loop. `review_loop/round0/tally.csv`:
 | all | 27 | 596 | 153 | 70 | 17 | 2 | 7 | 9 | 258 |
 
 Most frequent: fragment (153 of 258).
+
+## Round 1: the rescue rules off (config.LACUNA_RESCUE_RULES = False)
+
+**Problem attacked:** fragment (153 of 258).
+
+**What the round 0 pictures showed.** Every object of the 27 images was
+measured (area, width as the diameter of the largest inscribed disk, shape,
+brightness) and joined to the reviewer's verdict. The four rescue rules that
+add lacunae below the 6.76 um2 (400 px) area floor, out of focus (f), dim
+(g1), frame (g2) and thick process (g3), admitted 55 objects: 53 called
+fragments, 2 accepted (both small pieces cut by the frame, in WT). All but one
+are 2.5 to 6.5 um2 and 1.1 to 2.5 um wide; the accepted lacunae are 36.8 um2
+and 4.2 um wide at the median. Ordinary objects, by contrast, overlap: no
+area or width floor on them separates fragments from accepted lacunae without
+losing many of the latter (a width floor of 2.0 um alone would drop 14
+accepted lacunae, 3 in WT).
+
+**Rule.** `config.LACUNA_RESCUE_RULES = False` (section g5): the four rescue
+rules no longer add objects, so every lacuna clears the same area, solidity
+and aspect rules. True restores them exactly.
+
+**Also in this round, changing no number:** `-w` (parallel images) and
+`--fast` (the bounding-box watershed of config.FAST_LACUNA_STAGE, for that
+run only) on `src/lacunae.py` and `src/canaliculi.py`; the dark-band merge
+works in a window around each pair (identical labels; `diagnostics.py
+dark-band-check`). The loop rounds run with `--fast`; Phase 5 runs the
+default path.
+
+**Counts, round 0 to round 1** (`review_loop/round1/tally.csv`):
+
+| group | lacunae labelled | fragment | band or tissue piece | split | merged | missed | other | total |
+| - | - | - | - | - | - | - | - | - |
+| WT | 82 to 75 | 8 to 2 | 2 to 2 | 1 to 1 | 0 to 0 | 0 to 1 | 1 to 2 | **12 to 8** |
+| WT_HP | 97 to 93 | 12 to 9 | 11 to 14 | 2 to 1 | 0 to 0 | 6 to 5 | 2 to 2 | **33 to 31** |
+| Hyp_RD | 210 to 189 | 75 to 45 | 28 to 26 | 5 to 5 | 0 to 1 | 1 to 1 | 1 to 1 | **110 to 79** |
+| Hyp_HP | 207 to 185 | 58 to 65 | 29 to 32 | 9 to 5 | 2 to 0 | 0 to 0 | 5 to 5 | **103 to 107** |
+| all | 596 to 542 | 153 to 121 | 70 to 74 | 17 to 12 | 2 to 1 | 7 to 7 | 9 to 10 | **258 to 225** |
+
+**WT:** better, 12 to 8. The 8 objects removed are the WT rescue objects
+(542_z06 3, 542_z18 1, 543_3 2, 682_z08 1, 682_z29 1). One new "missed" in
+542_z06 (an elongated body at about 230,300) may be the thick-process object
+the round 0 reviewer had called a fragment; the reviewer is not fully
+consistent between looks.
+
+**Hyp_HP** rose by 4 although it lost 22 objects: the reviewer flagged more of
+the ordinary objects it had passed in round 0 (701_z26c1-2: 22 to 32). Read
+the counts as accurate to a few problems per group.
+
+**Kept.** Total down 33, WT not worse.

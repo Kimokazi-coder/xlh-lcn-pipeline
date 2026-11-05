@@ -1931,11 +1931,27 @@ def load_roi_mask(roi_dir: Path, image_path: Path, shape: tuple) -> tuple[np.nda
     return None, None
 
 
+def detect_and_write(job: tuple) -> tuple:
+    """One image of a run: detect the network and write its files. Returns
+    (name, counts, None), or (name, None, error) when it fails, so a failed
+    image is listed and skipped and the others carry on."""
+    image_path, out_root, fast = job
+    config.FAST_LACUNA_STAGE = config.FAST_LACUNA_STAGE or fast
+    try:
+        result = analyse_image(image_path)
+        write_outputs(result, out_root)
+    except Exception as exc:
+        return image_path.name, None, f"{type(exc).__name__}: {exc}"
+    return image_path.name, {"lacuna_count": result["lacunae"]["lacuna_count"],
+                             "skeleton_px": int(result["skeleton"].sum()), "t_lo": result["t_lo"]}, None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Canalicular network detection (pre-validation, px). Measures: src/quantification.py."
     )
     lacunae.add_input_arguments(parser)
+    lacunae.add_workers_argument(parser)
     args = parser.parse_args()
     explicit_out = args.out is not None
     args.out = lacunae.output_root(args)
@@ -1944,20 +1960,17 @@ def main() -> None:
         return
 
     failures = []
-    for image_path in paths:
-        # An image that fails is listed and skipped; the others carry on.
-        try:
-            result = analyse_image(image_path)
-            write_outputs(result, args.out)
-        except Exception as exc:
-            failures.append([image_path.name, f"{type(exc).__name__}: {exc}"])
-            print(f"{image_path.name}: FAILED, skipped ({type(exc).__name__}: {exc})")
+    out_dir = args.out / config.SECTION_CANALICULI
+    jobs = [(p, args.out, args.fast) for p in paths]
+    for name, counts, error in lacunae.map_images(detect_and_write, jobs, args.workers):
+        if error is not None:
+            failures.append([name, error])
+            print(f"{name}: FAILED, skipped ({error})")
             continue
-        out_dir = args.out / config.SECTION_CANALICULI
         print(
-            f"{image_path.name}: lacunae={result['lacunae']['lacuna_count']}  "
-            f"skeleton px={int(result['skeleton'].sum())}  "
-            f"t_lo={result['t_lo']:.6f}  -> {out_dir}"
+            f"{name}: lacunae={counts['lacuna_count']}  "
+            f"skeleton px={counts['skeleton_px']}  "
+            f"t_lo={counts['t_lo']:.6f}  -> {out_dir}"
         )
     lacunae.report_failures(args.out, "canaliculi", failures)
 
