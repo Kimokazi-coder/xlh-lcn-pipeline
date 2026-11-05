@@ -95,6 +95,14 @@ By default (`config.HOLDOUT_MODE` DEV) every stage refuses to read them and
 folder runs leave them out; `LCN_HOLDOUT_MODE=FINAL` processes them. Check the
 guard with `python src/diagnostics.py holdout-check`.
 
+**The lacuna stage changed on 2026-11-05** (tag `method-freeze-v1`), in a review
+loop on the 27 development images of all four groups: the rescue rules are off,
+and a fragment rule and a band rule drop specks, crumbs, pieces beside a larger
+lacuna and pieces of bright regions over 300 um2. An AI reviewer's problem count
+fell from 258 to 153 (WT 12 to 8); not validated. See
+[`docs/METHODS.md`](docs/METHODS.md) section 25 and
+[`results/archive/REVIEW_LOOP.md`](results/archive/REVIEW_LOOP.md).
+
 ## Groups
 
 The images are organised by type, one folder per group in `data/` and in

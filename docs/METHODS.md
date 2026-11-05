@@ -2046,3 +2046,47 @@ pictures sit under their image names in `5_archive/pol_ring_proxy/`.
 (Spearman 0.88), the neighbour flag removes most Hyp lacunae, and nothing separates
 a lesion from glow, staining or focus. The results and the open decisions are in
 `results/archive/pols/REPORT.md`; none of it is a result of the study.
+
+## 25. The review loop and the held-out set (2026-11-05)
+
+**The held-out set.** Before any rule below was chosen, 2 images per group
+were drawn with a fixed seed and locked (`data/holdout.json`,
+[`HOLDOUT.md`](HOLDOUT.md), tag `holdout-locked-2026-11-05`). In DEV mode, the
+default, no stage reads or shows them; `LCN_HOLDOUT_MODE=FINAL` processes
+them. They were not opened, run or reviewed while the rules were chosen.
+
+**The loop.** An AI image reviewer (a Claude Code subagent on Sonnet,
+`.claude/agents/image-reviewer.md`) looked at the lacuna outlines and the 3_pols
+picture of each of the 27 development images and listed every problem it saw
+(fragment, band or tissue piece, split, merged, missed, other). Each round, one
+general rule in physical units at 0.13 um/px was set against the most frequent
+problem, chosen on all four groups (the earlier rule to choose on WT only was
+lifted for this loop), the development images were rerun and reviewed again.
+The full record is [`results/archive/REVIEW_LOOP.md`](../results/archive/REVIEW_LOOP.md).
+
+**The rules kept** (config section g, `src/lacunae.py`):
+
+| section | rule | what it drops |
+| - | - | - |
+| g5 | `LACUNA_RESCUE_RULES = False` | nothing is added below the 6.76 um2 area floor any more: the out-of-focus (f), dim (g1), frame (g2) and thick-process (g3) rescues are off, so the classes `dim` and `out_of_focus` stay empty |
+| g6 | `FRAGMENT_RULE` | a satellite (at most 17 um2, within 1 um of a kept lacuna at least twice its area) or a speck (at most 8 um2, at most 2.0 um wide) |
+| g7 | `FRAGMENT_RULE`, crumb | at most 10 um2 with solidity under 0.80 |
+| g8 | `BAND_BLOB_RULE` | every object whose region of the lacuna mask is larger than 300 um2 |
+
+A fifth rule (a faint crumb) was tried and reverted, because the one WT object
+it dropped became a missed lacuna in the next review.
+
+**What the counts say and do not say.** Over the 27 development images the
+reviewer's problems fell from 258 to 153 and WT's from 12 to 8. These are an AI
+reviewer's judgements on pictures, not manual counts, and the reviewer is not
+consistent: on identical WT pictures its count moved by up to 4 between two
+looks. Nothing here is validated. The band rule acts as a largest lacuna
+profile of 300 um2 (about 8 times the WT median): a real lacuna that large, or
+fused in the mask to a band, is dropped too, which matters for a study of
+enlarged lacunae.
+
+**Also new, changing no number:** `-w` (images in parallel) and `--fast` (the
+bounding-box watershed of `FAST_LACUNA_STAGE` for one run) on `src/lacunae.py`
+and `src/canaliculi.py`, and the dark-band merge tested in a window around each
+pair. `python src/diagnostics.py dark-band-check --watershed` found identical
+labels on 27 of 27 development images; the regression passed after every round.
