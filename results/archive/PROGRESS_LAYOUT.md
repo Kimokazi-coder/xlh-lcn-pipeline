@@ -19,7 +19,7 @@ results/archive/ the group-independent old material.
 | P2 | git mv every existing file, MOVE_MAP.csv, lacunae contact sheets | done |
 | P3 | publication figures for WT_HP, Hyp_RD, Hyp_HP | done |
 | P4 | 3_pols: lacunar size, all groups | done |
-| P5 | docs and checks, final report | not started |
+| P5 | docs and checks, final report | done |
 
 ## Decisions
 
@@ -93,3 +93,6 @@ results/archive/ the group-independent old material.
   outside the rule), Hyp_RD and Hyp_HP two. Fig04 labels the points of the
   groups other than WT by animal and z plane. WT unchanged.
 - P4 done: 3_pols lacunar size for all four groups, pols check PASS, selftest 9/9.
+- P5 done: docs rewritten, every check run (results/archive/REPORT_REORG.md).
+  This file moved from results/ to results/archive/ with the final commit, so
+  results/ holds only README.md, summary/, archive/ and the four groups.

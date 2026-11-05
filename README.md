@@ -24,7 +24,7 @@ lossless TIFF the same way.
   piece the pipeline did not trace, whether it is a thread at all; the verdict
   becomes a zero weight attachment that the existing shortest path step uses to
   split the network (`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). Its output is
-  `results_ai_judge/WT/`, for the WT group only. The switch is **off by default**, and with it off every
+  archived in `results/WT/5_archive/ai_judge/canaliculi_judge/`, for the WT group only. The switch is **off by default**, and with it off every
   output is the deterministic method's.
 
 **Which method the study uses has not been decided, and neither has been
@@ -45,29 +45,38 @@ on 2026-10-27, on all 35 images: 35 calls to the pinned `claude-sonnet-5-5`,
 **$0.83** (estimate $0.93, ceiling $3), every answer valid; the replay gives
 identical verdicts offline. It said no to 352 of the 793 lacunae the filters
 kept and added 7 regions. **Not validated: no verdict has been checked against
-a manual count**, and its output, `results_ai_lacunae/`, is not a result of the
-study. External API use approved on 2026-10-15, approver: Karim.
+a manual count**, and its output, archived in each group's
+`results/<group>/5_archive/ai_judge/lacuna_judge/`, is not a result of the study. External API use approved on 2026-10-15, approver: Karim.
 
 ## What each folder is
 
-| folder | what it is | the one command that makes it |
-|---|---|---|
-| `results/` | **set 1, the deterministic method**, one folder per group: `results/WT/` holds every WT image's detection, quantification and figures, and the cross-image table; see [`results/README.md`](results/README.md) | `python src/lacunae.py --dir data/WT; python src/canaliculi.py --dir data/WT; python src/quantification.py --dir data/WT; python -u figures/make_figures.py all` (one line; the four stages run in that order) |
-| `results_ai_judge/` | **set 2, the AI judge method**, WT only, in `results_ai_judge/WT/`: the same per-image layout, the judge log with the case pictures that were sent, and `compare/`; see [`results_ai_judge/README.md`](results_ai_judge/README.md) | `python src/diagnostics.py ai-run --dir data/WT` (offline, from the decision files in `results_ai_judge/WT/ai_log/`) |
-| `results_ai_judge/WT/compare/` | the two sets side by side: pictures, `REPORT.md`, and `compare_methods.csv` and `.xlsx` | `python src/diagnostics.py ai-compare --dir data/WT`, then `python src/diagnostics.py compare-methods --dir data/WT` |
-| `results_ai_judge/WT/ai_log/` | every request to the judge and every answer, and the decision files | `python src/diagnostics.py ai-judge --dir data/WT` (a real run: needs `ALLOW_EXTERNAL_API=1` and a key, see `docs/EXPERIMENT_AI.md`); `--replay` reruns it offline |
-| `results_ai_lacunae/` | **the AI lacuna judge, an experiment, not validated**: the judge log with the pictures that were sent (`<group>/ai_log/`), the pipeline with its verdicts applied (`<group>/`, the same per-image layout), `dry_run/`, and `review/` with a contact sheet per group and a table per image; see [`results_ai_lacunae/README.md`](results_ai_lacunae/README.md) | `python src/diagnostics.py ai-lacuna-run -w 20` (offline, from the log); the log itself from `ai-lacuna-judge --live`, see `docs/EXPERIMENT_AI.md` |
-| `results/<group>/<label>/4_pols/`, `results/<group>/all_images/pols/`, `results/pols/`, `results/blind_review/pols/` | **the POL section, pre-validation**, a section of each image like `1_lacunae/` and `2_canaliculi/`: per image the QC overlay, the measured picture (POL proxy band tinted yellow on measured lacunae, flagged ones outlined orange with their letters), the outlines picture, the per-lacuna csv and a record; per group `pols_all_images.csv`, `.xlsx` and a contact sheet; across groups the look (`FINDINGS.md`: POLs cannot be told apart in these images), the proxy measured instead (`DEFINITION.md`), `SUMMARY.md`, `REPORT.md` and `REPORT_LAYOUT.md`; and the measured pictures under shuffled codes for a blinded review (key outside the repository). The yellow zone is a proxy, mostly optical glow; see [`results/README.md`](results/README.md), POL proxy | `python src/pols.py measure --dir data/WT --csv` per group, then `python src/pols.py summary` and `python src/pols.py check`; the blinded set: `python src/pols.py blind-review -k KEY_OUTSIDE_REPO.csv` |
-| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (the POL proxy, read from the saved detection), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
-| `config.py` | paths, the biological limits, shared settings and the switches (all off by default) | |
-| `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group --group GROUP --src SOURCE_FOLDER` |
-| `results/group_overview.csv`, `.xlsx`, `results/group_qc.csv` | every group side by side, one row per image, and the QC list of the new groups (see Groups) | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc` |
-| `figures/` | the figure code, captions and review notes | |
-| `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md) | |
+The repository holds `README.md`, `config.py`, `requirements.txt`,
+`.gitignore` and four folders: `src/` (all code), `docs/` (methods and notes),
+`data/` (the input images) and `results/` (every result).
 
-Not tracked: `.cache/` and `venv/`, and the diagnostic and archive folders that
-commands write into `results/`; [`results/README.md`](results/README.md) lists
-each with the command that makes it again.
+Every group, WT, WT_HP, Hyp_RD and Hyp_HP, has one results folder,
+`results/<group>/`, with the same five sections; inside a section each file is
+named after its image (`<image>_...`), with no folder per image. The guide to
+every file is [`results/README.md`](results/README.md).
+
+| where | what it is | the command that makes it, for group G |
+|-|-|-|
+| `results/G/1_lacunae/` | the lacunae of every image: outlines picture, label image, detection record; and a contact sheet of the group | `python src/lacunae.py -d data/G` |
+| `results/G/2_canaliculi/` | the network of every image: mask, skeleton, verification picture, vascular mask, unattached threads, graph, detection record; and the network figure of each image | `python src/canaliculi.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
+| `results/G/3_pols/` | **candidate POL measure: lacunar size, pending definition**: per image a picture of each lacuna's area against the WT median and a table, per group a table and a contact sheet | `python src/pols.py measure -d data/G` (all groups: `python src/pols.py all`) |
+| `results/G/4_quantification/` | every measured number of each image (json, xlsx, pdf), the group table `quantification_all_images`, the overview and cell gallery of each image, and the group figures Fig01 to Fig04, S01, S02 | `python src/quantification.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
+| `results/G/5_archive/` | what is no longer used: `pol_ring_proxy/` (the retired POL ring proxy), `ai_judge/lacuna_judge/` (the AI lacuna judge, every group) and, for WT, `ai_judge/canaliculi_judge/` (the AI judge method: judged pipeline, log, `compare/`) | `python src/pol_ring_proxy.py measure -d data/G` (its own options in the file); the judges: `docs/EXPERIMENT_AI.md` |
+| `results/summary/` | every group side by side: `group_overview.csv` and `.xlsx`, `group_qc.csv`, `pols_lacunar_size_by_group.csv` | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc`, `python src/pols.py all` |
+| `results/archive/` | old material of no one group: the ring proxy reports (`pols/`), its blinded review set (`blind_review/`), the format test (`format_test/`), the lacuna judge's run records, `dry_run/` and `review/` (`ai_judge/`), `MOVE_MAP.csv` (every file moved into this layout) and `REPORT_REORG.md` | see [`results/README.md`](results/README.md) |
+| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (lacunar size), `pol_ring_proxy.py` (the retired ring proxy), `make_figures.py` (the figures), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
+| `config.py` | paths, the layout, the biological limits, shared settings and the switches (all off by default) | |
+| `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group -g GROUP -s SOURCE_FOLDER` |
+| `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md), the judges' worked examples, and `docs/figures/` (captions, review notes, inset overrides) | |
+
+`python src/diagnostics.py layout-check` checks this layout for every group.
+Not tracked: `.cache/` and `venv/`, where the diagnostics also write by default,
+and two archive subfolders the figure script rewrites
+(`results/<group>/5_archive/not_used/`, `variants_per_image_brightness/`).
 
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
 confirmed for all 8 images and rounded to two decimals
@@ -85,7 +94,7 @@ The images are organised by type, one folder per group in `data/` and in
 `results/` (`config.GROUPS`). RD is regular diet, HP high phosphorus.
 
 | group | what it is | images | data | results |
-|---|---|---|---|---|
+|-|-|-|-|-|
 | `WT` | wild type: the reference group, the 8 sections every rule was chosen on | 8 | `data/WT/` | `results/WT/` |
 | `WT_HP` | wild type, high phosphorus diet | 9 | `data/WT_HP/` | `results/WT_HP/` |
 | `Hyp_RD` | Hyp, regular diet | 9 | `data/Hyp_RD/` | `results/Hyp_RD/` |
@@ -105,7 +114,7 @@ in colour; the TIFF is read back and must equal the decoded pixels; and
 of every file. Shape, channels, sample type and pixel size are still checked.
 
 Why: the format test (`python src/diagnostics.py format-test`, report in
-[`results/format_test/format_test.md`](results/format_test/format_test.md),
+[`results/archive/format_test/format_test.md`](results/archive/format_test/format_test.md),
 `docs/METHODS.md` section 22) found that the WT TIFFs themselves hold decoded
 JPEG pixels at the same quantization tables. Decoding the new groups' JPEGs
 puts every group through the same path. **Caution: the pixels are JPEG-decoded
@@ -118,20 +127,22 @@ limit written in micrometres rests on that.
 Copy a group's images (the source folder is only read):
 
 ```
-python src/diagnostics.py import-group --group Hyp_RD --src "SOURCE_FOLDER"
+python src/diagnostics.py import-group -g Hyp_RD -s "SOURCE_FOLDER"
 ```
 
-One command per group (the three stages on one line, in order):
+One command per group, the same for all four (the three stages on one line, in order):
 
 ```
-python src/lacunae.py --dir data/WT_HP -o results/WT_HP; python src/canaliculi.py --dir data/WT_HP -o results/WT_HP; python src/quantification.py --dir data/WT_HP -o results/WT_HP
-python src/lacunae.py --dir data/Hyp_RD -o results/Hyp_RD; python src/canaliculi.py --dir data/Hyp_RD -o results/Hyp_RD; python src/quantification.py --dir data/Hyp_RD -o results/Hyp_RD
-python src/lacunae.py --dir data/Hyp_HP -o results/Hyp_HP; python src/canaliculi.py --dir data/Hyp_HP -o results/Hyp_HP; python src/quantification.py --dir data/Hyp_HP -o results/Hyp_HP
+python src/lacunae.py -d data/WT; python src/canaliculi.py -d data/WT; python src/quantification.py -d data/WT
+python src/lacunae.py -d data/WT_HP; python src/canaliculi.py -d data/WT_HP; python src/quantification.py -d data/WT_HP
+python src/lacunae.py -d data/Hyp_RD; python src/canaliculi.py -d data/Hyp_RD; python src/quantification.py -d data/Hyp_RD
+python src/lacunae.py -d data/Hyp_HP; python src/canaliculi.py -d data/Hyp_HP; python src/quantification.py -d data/Hyp_HP
 ```
 
-WT is made by the command in the folder table above; a run with no `-o` writes
-to `results/<name of the input folder>/`. An image that fails is listed in
-`results/<group>/all_images/failed_images_<stage>.csv` and skipped, and the
+A run with no `-o` writes to `results/<name of the input folder>/`, so each
+line writes its group's 1_lacunae, 2_canaliculi and 4_quantification. An image
+that fails is listed in the stage's section as
+`failed_images_<stage>.csv` and skipped, and the
 others carry on; a folder with no image writes nothing. Run time: the lacuna
 stage takes from seconds to about an hour per image (701_z19 took 58 minutes,
 the images with the most lacuna candidates are the slowest), and canaliculi.py
@@ -139,12 +150,16 @@ runs it again; Hyp_HP took about 3 hours 40 minutes in all. Then, over every
 group:
 
 ```
-python src/diagnostics.py group-overview   # results/group_overview.csv and .xlsx: one row per image, no statistics
-python src/diagnostics.py group-qc         # results/group_qc.csv: lacuna count, rejected candidates by rule, flag outside the WT range
+python src/diagnostics.py group-overview   # results/summary/group_overview.csv and .xlsx: one row per image, no statistics
+python src/diagnostics.py group-qc         # results/summary/group_qc.csv: lacuna count, rejected candidates by rule, flag outside the WT range
+python src/pols.py all                     # 3_pols of every group and results/summary/pols_lacunar_size_by_group.csv
+python src/diagnostics.py layout-check     # every group: the five sections, files per section
 ```
 
 The overview holds all 35 images and the QC list the 27 of the new groups. The
-publication figures are made for WT only.
+publication figures are made for every group with the same code and settings
+(`python -u src/make_figures.py -g G all`); for the groups other than WT the
+images a figure needs are chosen by a rule written in `src/make_figures.py`.
 
 ## The canalicular method
 
@@ -201,7 +216,7 @@ the osteocyte literature reports for mouse cortical bone, used as a plausibility
 bound and never as a threshold tuned to improve a result.
 
 | constant | value | what it does |
-|---|---|---|
+|-|-|-|
 | `MAX_CANALICULUS_LENGTH_UM` | 50 um (385 px) | **prunes** the skeleton |
 | `LACUNA_ATTACH_REACH_UM` | 2.6 um (20 px) | how far a lacuna reaches for a thread |
 | `LACUNA_ATTACH_MIN_SIGNAL_FRACTION` | 0.7 of the low cut | the signal that path must carry |
@@ -256,22 +271,23 @@ networkx 3.2.1, skan 0.13.1, openpyxl 3.1.5, tifffile 2024.8.30). Run every
 command from the repository root, in this order.
 
 ```
-python src/lacunae.py --dir data/WT          # feature 1: find and label the lacunae
-python src/canaliculi.py --dir data/WT       # feature 2: trace the network
-python src/quantification.py --dir data/WT   # measure both, per image and for all images
-python -u figures/make_figures.py all        # every figure, into results/WT/
+python src/lacunae.py -d data/WT            # feature 1: find and label the lacunae
+python src/canaliculi.py -d data/WT         # feature 2: trace the network
+python src/quantification.py -d data/WT     # measure both, per image and for all images
+python -u src/make_figures.py -g WT all     # every figure of the group
+python src/pols.py measure -d data/WT       # 3_pols, lacunar size
 ```
 
 Detection draws and labels; quantification measures what detection saved, and
 every measured number is written only by it. Detection writes
-`results/WT/<label>/1_lacunae/` and `2_canaliculi/`: the overlay, the mask, the
+`results/WT/1_lacunae/` and `results/WT/2_canaliculi/`, every file named after its image: the overlay, the mask, the
 skeleton, the verification picture, the lacuna label image, the vascular mask,
 the graph with its ownership, and a record of what it did. Quantification reads
-those and writes every number into `results/WT/<label>/5_quantification/` and, for a
-folder run, `results/WT/all_images/quantification/quantification_all_images.xlsx`,
+those and writes every number into `results/WT/4_quantification/` and, for a
+folder run, `results/WT/4_quantification/quantification_all_images.xlsx`,
 `.csv` and `.pdf`. `-o` picks another output folder for all three commands;
 without it a run writes to `results/<name of the input folder>/`, so
-`--dir data/WT` writes `results/WT/`.
+`-d data/WT` writes `results/WT/`.
 
 Check it:
 
@@ -279,30 +295,33 @@ Check it:
 python src/diagnostics.py reference-check    # must PASS: 161.00 / 21.63 / 8.50 on 543-2
 python src/diagnostics.py regression         # every number against results/WT/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
-python src/diagnostics.py format-test --twins-src "SOURCE_FOLDER/22.04.25/wt"   # TIFF against JPEG on WT
-python src/diagnostics.py --help             # every other diagnostic
-python src/diagnostics.py survey -d data/WT -o results/survey        # what it does to every image (not tracked)
-python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
+python src/diagnostics.py format-test -t "SOURCE_FOLDER/22.04.25/wt"   # TIFF against JPEG on WT
+python src/diagnostics.py -h             # every other diagnostic
+python src/diagnostics.py layout-check     # the results layout of every group
+python src/diagnostics.py survey -d data/WT -o .cache/survey        # what it does to every image (not tracked)
+python src/diagnostics.py shape-picture -d data/WT -o .cache/network_shape   # not tracked
 ```
 
-The AI judge method, offline from the decision files already in the repository:
+The AI judge method, archived in `results/WT/5_archive/ai_judge/canaliculi_judge/`,
+offline from the decision files already in the repository:
 
 ```
-python src/diagnostics.py ai-run --dir data/WT            # set 2, results_ai_judge/WT/
-python src/diagnostics.py ai-judge --dir data/WT --replay # the judge log replays to the same verdicts
-python src/diagnostics.py ai-compare --dir data/WT        # judge off against judge on, pictures and report
-python src/diagnostics.py compare-methods --dir data/WT   # both sets side by side, csv and xlsx
+python src/diagnostics.py ai-run -d data/WT              # the judged pipeline, into the archive folder
+python src/diagnostics.py ai-judge -d data/WT -r   # the judge log replays to the same verdicts
+python src/diagnostics.py ai-compare -d data/WT          # judge off against judge on, pictures and report
+python src/diagnostics.py compare-methods -d data/WT     # both sets side by side, csv and xlsx
 ```
 
-The AI lacuna judge, offline from its log (all four groups unless `--dir` or
-`--image` names fewer):
+The AI lacuna judge, archived in `results/<group>/5_archive/ai_judge/lacuna_judge/`
+and `results/archive/ai_judge/`, offline from its log (all four groups unless
+`-d` or `-i` names fewer):
 
 ```
 python src/diagnostics.py ai-lacuna-judge -w 20            # dry run: the pictures and the cost, sends nothing
 python src/diagnostics.py ai-lacuna-judge -s               # self-test with a stub judge: 27 checks
-python src/diagnostics.py ai-lacuna-judge --replay -w 20   # the log replays to the same verdicts
-python src/diagnostics.py ai-lacuna-review -w 20           # contact sheets and the table, results_ai_lacunae/review/
-python src/diagnostics.py ai-lacuna-run -w 20              # the pipeline with its verdicts, results_ai_lacunae/<group>/
+python src/diagnostics.py ai-lacuna-judge -r -w 20   # the log replays to the same verdicts
+python src/diagnostics.py ai-lacuna-review -w 20           # contact sheets and the table, results/archive/ai_judge/review/
+python src/diagnostics.py ai-lacuna-run -w 20              # the pipeline with its verdicts, each group's 5_archive/ai_judge/lacuna_judge/
 ```
 
 The lacuna stage these need is cached in `.cache/ai_lacuna_candidates/` once per
@@ -342,14 +361,14 @@ cell".
 
 ## Results
 
-`results/WT/all_images/quantification/quantification_all_images.xlsx` (and `.csv`
-and `.pdf`) has one row per image. Per-lacuna numbers are in
-`results/WT/<label>/5_quantification/<label>_quantification.xlsx` (and `.json`, and
+`results/<group>/4_quantification/quantification_all_images.xlsx` (and `.csv`
+and `.pdf`) has one row per image of the group. Per-lacuna numbers are in
+`results/<group>/4_quantification/<image>_quantification.xlsx` (and `.json`, and
 `.pdf` to read), one row per lacuna with its shape and its network measures
-together.
+together. The table below is WT, the reference group.
 
 | image | lacunae (interior) | roots per cell, deterministic | AI judge | ring 30 px per cell (px), deterministic | AI judge | field density px⁻¹, deterministic | AI judge |
-|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|
 | 542_z06 | 19 (15) | 15.13 | 15.80 | 485.5 | 514.4 | 0.0399 | 0.0411 |
 | 542_z18 | 13 (11) | 11.82 | 12.45 | 478.1 | 517.9 | 0.0389 | 0.0396 |
 | 543-2 | 12 (12) | 8.50 | 9.00 | 369.6 | 410.2 | 0.0431 | 0.0437 |
@@ -361,14 +380,15 @@ together.
 
 Interior means per cell; field density is skeleton px over analysed px. Both
 sets side by side, per lacuna and with the cell pairs whose tracing changed
-hands, are in `results_ai_judge/WT/compare/compare_methods.xlsx`. With the judge
+hands, are in `results/WT/5_archive/ai_judge/canaliculi_judge/compare/compare_methods.xlsx`. With the judge
 on, roots per cell are counted only from the pipeline's own attachments; a
 verdict's attachment splits the network but is not a root (`docs/METHODS.md`
 section 20).
 
-The figures under `results/WT/<label>/3_publication_figures/` and
-`results/WT/all_images/figures/` are tracked, and
-`python -u figures/make_figures.py all` redraws any that is missing. The
+The figures of every group are tracked: the network figure of each image in
+`results/<group>/2_canaliculi/`, the overview and cell gallery of each image and
+the group figures Fig01 to Fig04, S01 and S02 in `results/<group>/4_quantification/`;
+`python -u src/make_figures.py -g <group> all` redraws any that is missing. The
 pipeline's own stage pictures under `1_lacunae/` and `2_canaliculi/` are
 tracked too: the skeleton png is an input to `diagnostics.py validate-network`.
 There are no publication figures for the AI judge set, because its method has
@@ -394,10 +414,13 @@ not been chosen.
    filters kept over the four groups, including both objects of item 4, and
    some of the regions it removes look like lacunae on its contact sheets. None
    of its verdicts has been checked against a manual count.
-7. **POLs.** The images show no separate lesion zone (`results/pols/FINDINGS.md`),
-   so `src/pols.py` measures a proxy, the body plus the surround above the bone
-   background, which in WT is optical glow. Whether to keep it, and which fields
-   leave the study, are open (`results/pols/REPORT.md`).
+7. **POLs.** The images show no separate lesion zone
+   (`results/archive/pols/FINDINGS.md`), and the ring proxy that measured the
+   surround of each body is retired: it measured the dye glow, the same width in
+   WT. The POL section (`3_pols/` of every group) now shows a candidate measure,
+   lacunar size against the WT median, **pending definition**: what makes a
+   lacuna a POL, and whether size is the measure, are open (`src/pols.py`,
+   `docs/METHODS.md` section 24).
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:

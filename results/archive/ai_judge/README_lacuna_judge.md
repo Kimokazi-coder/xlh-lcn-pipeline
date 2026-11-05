@@ -1,9 +1,16 @@
-# results_ai_lacunae
+# The AI lacuna judge, archived
+
+**Archived on 2026-11-04.** Until then this was the folder `results_ai_lacunae/`.
+What belongs to no one group (the run records, `dry_run/`, `review/`) is here in
+`results/archive/ai_judge/`; what belongs to one group is in that group's
+`results/<group>/5_archive/ai_judge/lacuna_judge/`. Every move is listed in
+[`../MOVE_MAP.csv`](../MOVE_MAP.csv). Records written before the move name the
+paths as they were then.
 
 **The AI lacuna judge. EXPERIMENT, pre-validation. NOT VALIDATED: no verdict
 here has been checked against a manual count, and nothing here is a result of
-the study.** The deterministic method is `results/`, which this folder never
-writes to; the thread judge is `results_ai_judge/`, which it never writes to
+the study.** The deterministic method is the rest of `results/`, which this judge never
+writes to; the thread judge is `results/WT/5_archive/ai_judge/canaliculi_judge/`, which it never writes to
 either.
 
 **What the judge does.** The lacuna stage was shaped on the 8 WT images. On the
@@ -27,12 +34,12 @@ numbered unless an image has more than 60, and none has. The numbers run in
 reading order, so a number does not tell the judge what the filters decided.
 
 | path | what it is |
-| --- | --- |
+| - | - |
 | `dry_run/` | what a real run would send and cost, with **every picture exactly as the judge would see it**, made by `python src/diagnostics.py ai-lacuna-judge` (the dry run is the default and sends nothing): `dry_run.md` (the report), `.json`, `.csv`, and `<group>/<image>.png` |
-| `<group>/ai_log/<image>/` | every request and answer of the real run, one json per attempt with its hashes, the picture that was sent, and the decision file, made by `python src/diagnostics.py ai-lacuna-judge --live` |
+| `results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/` | every request and answer of the real run, one json per attempt with its hashes (`<image>_attemptK.json`), the picture that was sent (`<image>_picture.png`), and the decision file (`<image>_ai_lacunae.json`), made by `ai-lacuna-judge` with its live switch |
 | `ai_lacuna_judge_run.json` | the real run's summary: per image the verdicts, tokens and cost |
-| `ai_lacuna_replay.json` | the replay of the log, offline: identical verdicts on every image, made by `python src/diagnostics.py ai-lacuna-judge --replay` |
-| `<group>/<image>/`, `<group>/all_images/`, `ai_lacuna_run.json` | the pipeline with the judge's verdicts applied, the same layout as `results/<group>/`, made offline by `python src/diagnostics.py ai-lacuna-run`; the json says what it did and that `results/` and `results_ai_judge/` were byte identical afterwards |
+| `ai_lacuna_replay.json` | the replay of the log, offline: identical verdicts on every image, made by `ai-lacuna-judge` with its replay switch |
+| `results/<group>/5_archive/ai_judge/lacuna_judge/` sections, and `ai_lacuna_run.json` here | the pipeline with the judge's verdicts applied, the same section layout as `results/<group>/`, made offline by `python src/diagnostics.py ai-lacuna-run`; the json says what it did and that `results/` and `results/WT/5_archive/ai_judge/canaliculi_judge/` were byte identical afterwards |
 | `review/` | a contact sheet per group with the verdicts drawn (green yes, red no, yellow unsure, grey unjudged or not numbered), and a table per image (`review.md`, `.csv`, `.json`), every region's verdict and why in `review_regions.csv`, made by `python src/diagnostics.py ai-lacuna-review` |
 
 **State on 2026-10-27.** The dry run: 35 calls, 1,882 numbered regions, every

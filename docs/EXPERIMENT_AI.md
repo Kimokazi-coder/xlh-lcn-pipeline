@@ -76,7 +76,7 @@ crop, every segment is shown, and they are of three **kinds**, which is what the
 What the judge is **asked** about is not the kind but the **class**, and there are four:
 
 | class | what it is |
-| --- | --- |
+| - | - |
 | **a** | an unowned segment, with at least one lacuna within reach of it |
 | **b** | a new segment from the permissive cut inside the zone of the hole |
 | **c** | a segment that touches a body that does not own it |
@@ -94,13 +94,13 @@ its body lies within that lacuna's own zone of the hole plus 10 px of the segmen
 pipeline's (METHODS section 19) and the 10 px is the minimum segment length the pipeline already
 applies, so the rule introduces no number of its own.
 
-Measured over the 8 images (regenerate with `python src/diagnostics.py ai-candidates --dir data/WT -o
+Measured over the 8 images (regenerate with `python src/diagnostics.py ai-candidates -d data/WT -o
 results/ai_dry_run`; not tracked since 2026-10-20, as cited at commit `bf3b982`). Each class cell is **segments / pixels / lacunae involved**, where a lacuna
 counts as involved when it is a candidate for at least one segment of that class, so it is the
 number of cells whose ownership the class could move:
 
 | image | segments | owned | unowned | new | a | b | c | d | numbered | calls |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| - | - | - | - | - | - | - | - | - | - | - |
 | 542_z06 | 1,334 | 1,040 | 248 | 46 | 43 / 1,195 / 15 | 46 / 789 / 16 | 0 / 0 / 0 | 19 / 612 / 11 | 108 | 24 |
 | 542_z18 | 1,356 | 978 | 332 | 46 | 49 / 1,257 / 13 | 46 / 657 / 11 | 0 / 0 / 0 | 23 / 620 / 8 | 118 | 19 |
 | 543-2 | 1,485 | 1,234 | 201 | 50 | 11 / 345 / 8 | 50 / 1,000 / 12 | 0 / 0 / 0 | 27 / 742 / 10 | 88 | 16 |
@@ -142,7 +142,7 @@ One call per case. The picture is two panels side by side:
 How a segment is drawn says what it is:
 
 | | drawn |
-| --- | --- |
+| - | - |
 | numbered, and the pipeline traced it (classes a, c, d) | **white** |
 | numbered, and the pipeline does not have it (class b) | **red** |
 | context, traced and owned | **its owner's colour** |
@@ -249,12 +249,12 @@ summary table must never mix judged and unjudged images.
 
 ## The dry run, which always comes first
 
-Regenerate with `python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures all`
+Regenerate with `python src/diagnostics.py ai-dry-run -d data/WT -o .cache/ai_dry_run -p all`
 (not tracked since 2026-10-20; as cited, at commit `bf3b982`), rerun on
 2026-10-19 with the four classes. Nothing is sent.
 
 | image | lacunae | calls | of those, left over | segments | a | b | c | d | input tokens | output tokens | cost USD |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| - | - | - | - | - | - | - | - | - | - | - | - |
 | 542_z06 | 19 | 24 | 5 | 108 | 43 | 46 | 0 | 19 | 68,968 | 4,260 | 0.1805 |
 | 542_z18 | 13 | 19 | 6 | 118 | 49 | 46 | 0 | 23 | 55,503 | 4,510 | 0.1561 |
 | 543-2 | 12 | 16 | 4 | 88 | 11 | 50 | 0 | 27 | 46,575 | 3,400 | 0.1271 |
@@ -276,11 +276,11 @@ longer asked about, and class d and the crops that can hold two candidate bodies
 **The pictures of every case of all 8 images, exactly as the judge would see them, are in
 `results/ai_dry_run/pictures/`** (145 of them, 18 MB; not tracked, regenerate with the command
 above). They are the pictures a run would send; the ones that were actually sent are in
-`results_ai_judge/WT/ai_log/<label>/pictures/`.
+`results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/pictures/`.
 
 ## The self-test
 
-`python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --self-test` rehearses the whole
+`python src/diagnostics.py ai-judge -i "data/WT/543-2.tif" -s` rehearses the whole
 chain on one image with a **stub judge**, no network and no key: a picture becomes a request, a stub
 answer becomes verdicts, the log replays to the same verdicts, and the switch then edits the mask
 and runs the rest of the pipeline on it. The stub answers by a fixed rule that means nothing
@@ -326,12 +326,12 @@ the same reason the stub's verdicts are, and they are not reported here as anyth
 - **The model is pinned** in `config.AI_JUDGE_MODEL` (`claude-sonnet-5-5`), and no server side
   fallback to another model is enabled: a refusal is logged and the case stays unjudged, because a
   silent fallback would break the pin.
-- **Every request and every answer is logged** to `results_ai_judge/WT/ai_log/<label>/`, one json per attempt,
+- **Every request and every answer is logged** to `results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/`, one json per attempt,
   with the sha256 of the canonical request, of the picture, of the prompt and of the examples. The
   picture that was sent is written beside it.
 - **Replay** reruns from the log with no network: the request is rebuilt, its hash compared with the
   logged one, and the logged answer goes through the same parser, so the verdicts are reproduced and
-  not copied. `python src/diagnostics.py ai-judge --image data/WT/543-2.tif --replay`.
+  not copied. `python src/diagnostics.py ai-judge -i data/WT/543-2.tif -r`.
 - **Temperature.** The brief asks for 0. The pinned model **rejects any non-default temperature with
   HTTP 400**, so the request carries none and the log says so in as many words rather than claiming
   a setting that was not sent. `config.AI_JUDGE_TEMPERATURE` stays 0 and is sent to any model listed
@@ -373,7 +373,7 @@ the same reason the stub's verdicts are, and they are not reported here as anyth
 The brief left these open. Each was decided, and here is the reason.
 
 | Decision | What was chosen | Why |
-| --- | --- | --- |
+| - | - | - |
 | What "the measured empty width" is measured on | the global cut skeleton, before the dim pass and the 50 um prune | that is the skeleton in hand where the candidates are made, and it depends on no later stage and on no ownership |
 | What the contrast ratio is | p90 of the ridge response in the 40 px band beyond the hole over the p90 in the hole, per lacuna | it is METHODS section 18's own measurement, per lacuna; it lands in 1.24 to 3.0, median 2.11, which is the 1.4 to 3.2 that section measured with a short tail either side |
 | How a segment is defined | a branch of the permissive skeleton, split at junctions, clipped to one zone, at least 10 px | branches are what "split into numbered segments" means for a skeleton; 10 px is the floor the pipeline already uses for an unowned thread |
@@ -397,10 +397,10 @@ The brief left these open. Each was decided, and here is the reason.
 ## Step 7: the real run, its replay, and what it did to the network
 
 **The real run was made on 2026-10-19, 15:58 to 16:14 UTC, on all 8 images**, and its every request
-and answer is in `results_ai_judge/WT/ai_log/`. From the log:
+and answer is in `results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/`. From the log:
 
 | image | calls | answers retried | cases left unjudged | input tokens | output tokens | cost USD |
-| --- | --- | --- | --- | --- | --- | --- |
+| - | - | - | - | - | - | - |
 | 542_z06 | 23 | 0 | 0 | 85,055 | 6,598 | 0.2361 |
 | 542_z18 | 19 | 0 | 0 | 71,493 | 6,588 | 0.2089 |
 | 543-2 | 16 | 0 | 0 | 59,932 | 5,180 | 0.1717 |
@@ -425,22 +425,22 @@ and answer is in `results_ai_judge/WT/ai_log/`. From the log:
   of it on input tokens (540,165 against 424,320 estimated). It stayed well inside the $5 ceiling,
   but a later estimate should be read as a floor.
 
-**The replay reproduces it offline.** `python src/diagnostics.py ai-judge --dir data/WT --replay`
+**The replay reproduces it offline.** `python src/diagnostics.py ai-judge -d data/WT -r`
 rebuilds every request and every picture, finds every hash equal to the one logged, and gets
 IDENTICAL verdicts on all 8 images: 143 attempts, 0 requests and 0 pictures differing from what was
-sent (`results_ai_judge/WT/replay.txt`). A replay never reads `ALLOW_EXTERNAL_API` or
+sent (`results/WT/5_archive/ai_judge/canaliculi_judge/replay.txt`). A replay never reads `ALLOW_EXTERNAL_API` or
 `ANTHROPIC_API_KEY`; only a live run asks.
 
-**The pipeline with the switch on** was run by `python src/diagnostics.py ai-run --dir data/WT`,
+**The pipeline with the switch on** was run by `python src/diagnostics.py ai-run -d data/WT`,
 which turns `config.AI_JUDGE_ENABLED` on for that process only, runs detection, canaliculi and
-quantification exactly as the three scripts do, and writes to `results_ai_judge/WT/`, the second
+quantification exactly as the three scripts do, and writes to `results/WT/5_archive/ai_judge/canaliculi_judge/`, the second
 labelled set, a sibling of `results/WT/` with the same per-image layout (its own README says what is
 in it). `config.py` still ships with the switch off. The command hashes every file under `results/`
 and every file of the judge log before and after, and **both were byte identical afterwards**
-(`results_ai_judge/WT/ai_run.json`).
+(`results/WT/5_archive/ai_judge/canaliculi_judge/ai_run.json`).
 
-**Judge off against judge on** is in `results_ai_judge/WT/compare/REPORT.md`, made by
-`python src/diagnostics.py ai-compare --dir data/WT`, with the verification and skeleton pictures
+**Judge off against judge on** is in `results/WT/5_archive/ai_judge/canaliculi_judge/compare/REPORT.md`, made by
+`python src/diagnostics.py ai-compare -d data/WT`, with the verification and skeleton pictures
 side by side and a picture of what changed hands for every image. Both runs are recomputed and
 checked against the files on disk pixel for pixel before a number is reported, and every check
 passed. Over the 8 images:
@@ -466,7 +466,7 @@ had already joined that cell to that node, the edge stays the pipeline's and sta
 switch off no edge is marked, so every number is what it was.
 
 | image | roots, judge off | judge on, before the fix | judge on, after the fix | mean per interior cell: off / before / after |
-| --- | --- | --- | --- | --- |
+| - | - | - | - | - |
 | 542_z06 | 249 | 289 | 262 | 15.13 / 17.27 / 15.80 |
 | 542_z18 | 133 | 182 | 141 | 11.82 / 16.18 / 12.45 |
 | 543-2 | 102 | 155 | 108 | 8.50 / 12.92 / 9.00 |
@@ -479,7 +479,7 @@ switch off no edge is marked, so every number is what it was.
 
 The 68 roots that remain above judge off are tracing the judge added that touches a body, which the
 pipeline's own contact rule attaches like any other thread. Every lacuna is in
-`results_ai_judge/WT/roots_before_and_after_the_fix.md`, and `results_ai_judge/WT/compare/REPORT.md`
+`results/WT/5_archive/ai_judge/canaliculi_judge/roots_before_and_after_the_fix.md`, and `results/WT/5_archive/ai_judge/canaliculi_judge/compare/REPORT.md`
 recomputes the before-the-fix count from the judge-on graph itself.
 
 The two guards a run leans on are still rehearsed in the self-test with no network: with every
@@ -493,9 +493,9 @@ a file):
 $env:ALLOW_EXTERNAL_API = "1"
 $env:ANTHROPIC_API_KEY  = "sk-ant-..."
 pip install anthropic
-python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run   # always first
-python src/diagnostics.py ai-judge   --dir data/WT                        # all 8 images
-python src/diagnostics.py ai-judge   --dir data/WT --replay               # offline, same verdicts
+python src/diagnostics.py ai-dry-run -d data/WT -o .cache/ai_dry_run   # always first
+python src/diagnostics.py ai-judge   -d data/WT                        # all 8 images
+python src/diagnostics.py ai-judge   -d data/WT -r               # offline, same verdicts
 ```
 
 Use `$env:` and not `setx`: `setx` writes the key into the Windows registry, where it outlives the
@@ -507,24 +507,24 @@ the two lines are `export ALLOW_EXTERNAL_API=1` and `export ANTHROPIC_API_KEY=sk
 
 ```
 # Deterministic, no network, no judge: the four classes and what needs a decision.
-python src/diagnostics.py ai-candidates --dir data/WT -o results/ai_dry_run
+python src/diagnostics.py ai-candidates -d data/WT -o .cache/ai_dry_run
 
 # What a real run would cost, with every case picture of every image.
-python src/diagnostics.py ai-dry-run --dir data/WT -o results/ai_dry_run --pictures all
+python src/diagnostics.py ai-dry-run -d data/WT -o .cache/ai_dry_run -p all
 
 # The whole chain with a stub judge, no network and no key: 15 checks.
-python src/diagnostics.py ai-judge --image "data/WT/543-2.tif" --self-test
+python src/diagnostics.py ai-judge -i "data/WT/543-2.tif" -s
 
 # A real run (needs both environment variables, see above).
-python src/diagnostics.py ai-judge --dir data/WT
+python src/diagnostics.py ai-judge -d data/WT
 
 # The same run again, offline, from the log.
-python src/diagnostics.py ai-judge --dir data/WT --replay
+python src/diagnostics.py ai-judge -d data/WT -r
 
-# The pipeline with the switch on for that run only, into results_ai_judge/WT/, and
-# judge off against judge on with the pictures, into results_ai_judge/WT/compare/.
-python src/diagnostics.py ai-run --dir data/WT
-python src/diagnostics.py ai-compare --dir data/WT
+# The pipeline with the switch on for that run only, into results/WT/5_archive/ai_judge/canaliculi_judge/, and
+# judge off against judge on with the pictures, into results/WT/5_archive/ai_judge/canaliculi_judge/compare/.
+python src/diagnostics.py ai-run -d data/WT
+python src/diagnostics.py ai-compare -d data/WT
 
 # The pipeline with the judge applied: set config.AI_JUDGE_ENABLED = True and run
 # the pipeline as usual. It needs a decision file for every image it is given.
@@ -549,7 +549,7 @@ Established, and each one measured rather than asserted:
 - a billing error stops the run at once, and a run whose answers cannot be read stops itself;
 - the real run on all 8 images left no segment unjudged, cost $1.60, and replays offline to the same
   verdicts; with the switch on, 21,373 px of tracing change hands between cells as whole networks,
-  and nothing under `results/` outside `results_ai_judge/` changes by a byte;
+  and nothing under `results/` outside `results/WT/5_archive/ai_judge/canaliculi_judge/` changes by a byte;
 - with the switch off every number is `main`'s, over 6,800 of them at tolerance 0.
 
 **Not established, and nothing here should be read as if it were.** No verdict has been checked
@@ -564,7 +564,7 @@ check is written down.
 
 **Status: EXPERIMENT, pre-validation. NOT VALIDATED: no verdict has been checked against a manual
 count, and nothing here is a result of the study.** It is behind `config.AI_LACUNA_JUDGE_ENABLED`,
-which is off by default, and it writes only to `results_ai_lacunae/`. With the switch off every
+which is off by default, and it writes only to `results/archive/ai_judge/`. With the switch off every
 number is `main`'s: `regression` PASS over 6,800 numbers at tolerance 0 in both of its runs and
 `reference-check` PASS at 161.00 / 21.63 / 8.50, on 2026-10-27. METHODS section 23 is the short
 version, with every decision taken where the brief left a choice open.
@@ -591,7 +591,7 @@ What it does **not** do:
 - It does not touch the thread stages. With the switch on, the lacunae it decided go into the
   canalicular stage and the quantification exactly as the deterministic lacunae do.
 - It does not touch the thread judge (its prompt hashes are still those its real run logged), and it
-  writes nothing under `results/` or `results_ai_judge/`.
+  writes nothing under `results/` or `results/WT/5_archive/ai_judge/canaliculi_judge/`.
 
 ## The candidates and the numbers
 
@@ -619,7 +619,7 @@ With `config.AI_LACUNA_JUDGE_ENABLED` on, the lacuna stage rebuilds the candidat
 result, checks their geometry hash against the decision file and then, per numbered region:
 
 | verdict | what happens |
-| --- | --- |
+| - | - |
 | yes | a lacuna, even if a shape filter rejected it; a region added this way is the class `judged`, counted and owning threads, with no area or shape measure, like the class `dim` |
 | no | not a lacuna, even if the filters kept it |
 | unsure | the deterministic decision stands |
@@ -633,7 +633,7 @@ over, so a run never mixes judged and unjudged images.
 - The model is pinned (`claude-sonnet-5-5`), no temperature is sent (the model rejects one), and
   thinking is off.
 - Every request and answer is logged with the sha256 of the request, the picture, the prompt and the
-  examples, in `results_ai_lacunae/<group>/ai_log/<image>/`, with the picture that was sent.
+  examples, in `results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/`, with the picture that was sent.
 - The dry run is the default and sends nothing. A real call needs `ALLOW_EXTERNAL_API=1` and
   `ANTHROPIC_API_KEY` in the environment of that one process. The key is never printed, logged or
   written to a file.
@@ -667,7 +667,7 @@ error, the cost ceiling, a live run without the flag) all hold.
 
 ## The dry run
 
-`python src/diagnostics.py ai-lacuna-judge -w 20`, in `results_ai_lacunae/dry_run/` with every picture
+`python src/diagnostics.py ai-lacuna-judge -w 20`, in `results/archive/ai_judge/dry_run/` with every picture
 exactly as the judge would see it: **35 calls, 1,882 numbered regions** (793 kept by the filters,
 all of the 793 kept lacunae; 196 regions they rejected; 893 dim candidates), estimated 133,455 input
 and 66,570 output tokens, **$0.93**. 23 images are over the cap, and no kept lacuna is left
@@ -684,19 +684,19 @@ with the two environment variables set for that one process only.
   ceiling of $3. Input ran 11% over the estimate and output 20% under it.
 - 1,882 verdicts: **304 yes, 1,408 no, 170 unsure, 0 unjudged.**
 
-The run's summary is `results_ai_lacunae/ai_lacuna_judge_run.json`.
+The run's summary is `results/archive/ai_judge/ai_lacuna_judge_run.json`.
 
 **The replay reproduces it offline**, with neither environment variable set: every request and every
 picture rebuilt hashes to what the log says was sent (35 attempts, 0 differ), and the verdicts are
-IDENTICAL on all 35 images (`results_ai_lacunae/ai_lacuna_replay.json`).
+IDENTICAL on all 35 images (`results/archive/ai_judge/ai_lacuna_replay.json`).
 
 ## What the verdicts do
 
-Over the 35 images (per image in `results_ai_lacunae/review/review.md`, with a contact sheet per
+Over the 35 images (per image in `results/archive/ai_judge/review/review.md`, with a contact sheet per
 group; every region's verdict and why in `review_regions.csv`):
 
 | | yes | no | unsure |
-| --- | --- | --- | --- |
+| - | - | - | - |
 | regions the filters kept (793) | 297 | 352 | 144 |
 | regions the filters rejected (196) | 1 | 185 | 10 |
 | dim candidates (893) | 6 | 871 | 16 |
@@ -714,11 +714,11 @@ top edge". That agrees with the suspicion; it does not validate the judge.
 
 **The pipeline with the verdicts** was run by `python src/diagnostics.py ai-lacuna-run -w 20`,
 which turns the switch on for that process only and runs detection, canaliculi and quantification
-from the decision files into `results_ai_lacunae/<group>/`, the same per-image layout as
+from the decision files into `results/<group>/5_archive/ai_judge/lacuna_judge/`, the same per-image layout as
 `results/<group>/`. Its per-image counts equal the review's on all 35 images, and every quantified
-lacuna count equals the review's count after. It hashed `results/` (601 files), `results_ai_judge/`
+lacuna count equals the review's count after. It hashed `results/` (601 files), `results/WT/5_archive/ai_judge/canaliculi_judge/`
 (438 files) and the judge's own log before and after, and **all were byte identical afterwards**
-(`results_ai_lacunae/ai_lacuna_run.json`). The numbers it writes are those of an unvalidated
+(`results/archive/ai_judge/ai_lacuna_run.json`). The numbers it writes are those of an unvalidated
 experiment and are not compared here with the deterministic ones, group by group or otherwise.
 
 ## How to run it
@@ -731,15 +731,15 @@ python src/diagnostics.py ai-lacuna-judge -w 20
 python src/diagnostics.py ai-lacuna-judge -s
 
 # A real run: needs ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY in the environment of this process.
-python src/diagnostics.py ai-lacuna-judge --live
+python src/diagnostics.py ai-lacuna-judge -l
 
 # The same run again, offline, from the log.
-python src/diagnostics.py ai-lacuna-judge --replay -w 20
+python src/diagnostics.py ai-lacuna-judge -r -w 20
 
-# The contact sheets and the per-image table, from the log, into results_ai_lacunae/review/.
+# The contact sheets and the per-image table, from the log, into results/archive/ai_judge/review/.
 python src/diagnostics.py ai-lacuna-review -w 20
 
-# The pipeline with the switch on for that run only, into results_ai_lacunae/<group>/.
+# The pipeline with the switch on for that run only, into results/<group>/5_archive/ai_judge/lacuna_judge/.
 python src/diagnostics.py ai-lacuna-run -w 20
 ```
 

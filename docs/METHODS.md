@@ -12,11 +12,11 @@ inspection of the WT images. No parameter may be tuned on the other groups.
 **Two methods, and the choice is pending.** Sections 1 to 19 describe the
 **deterministic method**, the pipeline as `config.py` ships it, whose output is
 `results/`, one folder per group. Section 20 describes the **AI judge method**, the same pipeline
-with `config.AI_JUDGE_ENABLED` on, whose output is `results_ai_judge/WT/`. Which
+with `config.AI_JUDGE_ENABLED` on, whose output is `results/WT/5_archive/ai_judge/canaliculi_judge/`. Which
 the study uses has not been decided, and **neither has been validated against a
 manual trace**. Section 23 describes an experiment beside them, the **AI lacuna
 judge**, which decides which candidate regions are lacunae on all four groups,
-behind `config.AI_LACUNA_JUDGE_ENABLED` (off), into `results_ai_lacunae/`; it is
+behind `config.AI_LACUNA_JUDGE_ENABLED` (off), into `results/archive/ai_judge/`; it is
 not validated either.
 
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
@@ -116,9 +116,9 @@ Reads the label image, the masks and the graph above, and measures them
 (section 3). Per lacuna: area, major and minor axis, aspect ratio,
 eccentricity, solidity, orientation, centroid, the frame-edge flag, and every
 network measure. Per image: the counts, the interior statistics and the field
-measures. It writes `results/WT/<label>/5_quantification/` (json, xlsx and a plain
+measures. It writes `results/WT/4_quantification/` (json, xlsx and a plain
 pdf) and the one cross-image table,
-`results/WT/all_images/quantification/quantification_all_images.csv`, `.xlsx` and
+`results/WT/4_quantification/quantification_all_images.csv`, `.xlsx` and
 `.pdf`. Every statistic is over interior lacunae only, as before.
 
 ## 2. Parameters and where each value came from
@@ -127,7 +127,7 @@ pdf) and the one cross-image table,
 held out and used to confirm.
 
 | step | parameter | value | origin |
-|---|---|---|---|
+|-|-|-|-|
 | lacunae | hole fill | ≤ 20 px² | carried over from the first counter; fills 70 of 71 raw holes in kept lacunae (all ≤ 10 px²) |
 | lacunae | seed prominence | 0.3 of each blob's peak | initial value, not tuned; over-splits are re-merged |
 | lacunae | saddle re-merge | ratio ≥ 0.35 | between the 3 splits confirmed wrong by eye (≥ 0.364) and one true two-lobe split (0.000) |
@@ -172,7 +172,7 @@ and `src/canaliculi.py`, each with a longer provenance comment.
 ## 3. Measures
 
 | measure | level | kind | meaning |
-|---|---|---|---|
+|-|-|-|-|
 | lacuna count, interior count | image | headline context | kept lacunae; interior ones do not touch the frame |
 | area, axes, aspect, eccentricity, solidity | lacuna | reported | v2 shape measures |
 | **roots per cell** (`roots_count`) | lacuna | **headline** | distinct threads leaving the lacuna surface; closest to a count by eye |
@@ -248,7 +248,7 @@ OCY network parameter, and a tree with T tips has about 2T - 1 edges.
 ## 5. Decisions made
 
 | date | decision |
-|---|---|
+|-|-|
 | 2026-09-22 | Top-hat preprocessing, graph cleanup and OCY-style ownership replace a raw threshold and nearest-lacuna assignment. |
 | 2026-09-24 | Candidate fragmentation settings judged on two guards fixed before running (length ≤ 1.20x, loops ≤ max(1.5x, +50)), never on owned fraction alone. |
 | 2026-09-28 | Hysteresis 0.75 with gap bridging becomes the default; 543-2 reference becomes 62.33 / 27.41 / 21 bridges. Block growth in vascular structures becomes the default. Exclusion stays off. Input images are committed. |
@@ -280,7 +280,7 @@ converted once with `PIXEL_SIZE_UM_ACQUIRED` = 0.13 um/px, so the micrometre
 value is the parameter and the pixel value follows from it.
 
 | limit | micrometres | pixels | effect |
-|---|---|---|---|
+|-|-|-|-|
 | `MAX_CANALICULUS_LENGTH_UM` | 50 | 385 | **prunes the skeleton** |
 | `CANALICULUS_LENGTH_RANGE_UM` | 25 to 50 | 192 to 385 | report only |
 
@@ -318,7 +318,7 @@ fixed point. On these 8 images one round settles it.
 What it removes, as skeleton px and total chain-code length:
 
 | image | px before | px after | removed | um before | um after |
-|---|---|---|---|---|---|
+|-|-|-|-|-|-|
 | 542_z06 | 38921 | 37752 | 1169 (3.0%) | 5726.0 | 5555.1 |
 | 542_z18 | 37595 | 34260 | 3335 (8.9%) | 5532.1 | 5036.9 |
 | 543-2 | 45028 | 35034 | 9994 (22.2%) | 6676.3 | 5185.3 |
@@ -471,14 +471,14 @@ glance.
 Measured before anything was changed, with the pipeline's own functions:
 
 ```
-python src/diagnostics.py contact -d data/WT -o results/contact_census --tag before \
-    --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures
+python src/diagnostics.py contact -d data/WT -o .cache/contact_census -t before \
+    -P "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" -p
 ```
 
 `results/contact_census/` is not tracked since 2026-10-20: regenerate with the command above. It
 measures the pipeline as configured, so with the contact rule on today it draws the after state; the
 tables and pictures cited in this section, before and after, are at commit `bf3b982`
-(`git checkout bf3b982 -- results/contact_census`).
+(`git checkout bf3b982 results/contact_census`).
 
 The question is narrow. Take the band 8 px wide around each lacuna body
 (`diagnostics.CONTACT_CENSUS_NEAR_PX`), which is the 2 px mask buffer plus one
@@ -489,7 +489,7 @@ owns that skeleton?
 Over the 8 images and 108 lacunae, in that band:
 
 | | |
-|---|---|
+|-|-|
 | lacunae with skeleton in the band they do not own | 92 of 108 |
 | touched by unowned skeleton | 86 |
 | touched by another lacuna's skeleton | 21 |
@@ -500,11 +500,11 @@ Over the 8 images and 108 lacunae, in that band:
 So **12.2% of the skeleton that touches a body belongs to something else**, and
 it is not a few bad cases: every image has it, 7 lacunae own nothing at all, and
 26 of 108 have fewer than 3 roots. Widened to the 20 px attach reach
-(`--tag before_reach20 --near 20`) it is 105 of 108 lacunae and 22.3% of the
+(`-t before_reach20 -n 20`) it is 105 of 108 lacunae and 22.3% of the
 touching skeleton.
 
 | image | lacunae | roots per lacuna | under 3 roots | no roots | touched by unowned | touched by another's | band unowned px | band another's px |
-|---|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|-|
 | 542_z06 | 19 | 9.84 | 1 | 0 | 15 | 2 | 135 | 18 |
 | 542_z18 | 13 | 5.38 | 4 | 1 | 12 | 3 | 128 | 17 |
 | 543-2 | 12 | 3.58 | 7 | 2 | 10 | 5 | 69 | 39 |
@@ -518,7 +518,7 @@ touching skeleton.
 20 px, which is the attach reach.
 
 | lacuna | roots | owns | band skeleton | its own | unowned | another lacuna's | cut by the 50 um limit |
-|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|
 | 542_z06 (400, 952) id 15 | 5 | 770 px | 47 / 146 | 44 / 115 | 3 / 31 | 0 / 0 | 9 / 38 |
 | 543_3 (340, 251) id 3 | 0 | 0 px | 14 / 81 | 0 / 0 | 4 / 29 | 10 / 52 | 16 / 63 |
 | 543_3 (198, 635) id 8 | 1 | 11 px | 16 / 53 | 8 / 11 | 8 / 42 | 0 / 0 | 0 / 17 |
@@ -551,7 +551,7 @@ multi-source Dijkstra, then multiplies the damage: a lacuna that attaches
 nothing cannot compete for the thread against a neighbour that did, so the
 neighbour takes the whole connected component.
 
-The pictures were in `results/contact_census/pictures/` (not tracked: regenerate with `python src/diagnostics.py contact -d data/WT -o results/contact_census --tag after --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures`; as cited, at commit `bf3b982`) (green: owned by this
+The pictures were in `results/contact_census/pictures/` (not tracked: regenerate with `python src/diagnostics.py contact -d data/WT -o .cache/contact_census -t after -P "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" -p`; as cited, at commit `bf3b982`) (green: owned by this
 lacuna, orange: owned by another, magenta: unowned, gold: cut by the 50 um
 limit, cyan: the body).
 
@@ -586,20 +586,20 @@ Beyond 6 px nothing changes at all: the signal test still governs, out to
 
 Setting `canaliculi.CONTACT_REACH_PX` to 0 turns the rule off and reproduces the
 pipeline exactly as it was, which is how the before runs below are made
-(`--contact-reach 0`): checked, and every census number of the before run is
+(`-c 0`): checked, and every census number of the before run is
 identical to the run made before the rule existed.
 
 **The four lacunae.** Band figures are the skeleton within 8 px of the body,
 then within 20 px, as its own / unowned / another lacuna's.
 
 | lacuna | roots | owned px | 8 px band | 20 px band | cut by the 50 um limit |
-|---|---|---|---|---|---|
+|-|-|-|-|-|-|
 | 542_z06 id 15 (400, 952) | 5 **6** | 770 **770** | 44/3/0 **44/3/0** | 115/31/0 **115/31/0** | 9 / 38 |
 | 543_3 id 3 (340, 251) | 0 **3** | 0 **881** | 0/4/10 **16/0/0** | 0/29/52 **69/14/0** | 16 / 63 |
 | 543_3 id 8 (198, 635) | 1 **2** | 11 **11** | 8/8/0 **8/7/0** | 11/42/0 **11/41/0** | 0 / 17 |
 | 543_3 id 1 (271, 79) | 2 **3** | 158 **811** | 4/9/0 **7/3/0** | 20/60/14 **41/36/14** | 0 / 0 |
 
-Pictures, before and after, were in `results/contact_census/pictures/` (not tracked: regenerate with `python src/diagnostics.py contact -d data/WT -o results/contact_census --tag after --points "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" --pictures`; as cited, at commit `bf3b982`)
+Pictures, before and after, were in `results/contact_census/pictures/` (not tracked: regenerate with `python src/diagnostics.py contact -d data/WT -o .cache/contact_census -t after -P "542_z06:400,940;543_3:340,250;543_3:200,635;543_3:271,79" -p`; as cited, at commit `bf3b982`)
 (`<label>_lacuna<id>_before.png` and `_after.png`, and `_x4` of each).
 
 - **543_3 id 3**, which owned nothing: it now owns 881 px and 3 roots, and the
@@ -626,10 +626,10 @@ Pictures, before and after, were in `results/contact_census/pictures/` (not trac
 ### What the contact rule does to all 8 images
 
 The rule is one rule for every lacuna, so it is read on every lacuna. Before is
-`--contact-reach 0`, after is the configured 6 px; **bold is after**.
+`-c 0`, after is the configured 6 px; **bold is after**.
 
 | image | lacunae | roots per lacuna | under 3 roots | owned px | unowned px | skeleton px | first-pass skeleton px |
-|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|
 | 542_z06 | 19 | 9.84 **12.16** | 1 **1** | 28514 **28803** +1.01% | 10710 **10426** | 39224 **39229** +0.01% | 38842 = 38842 |
 | 542_z18 | 13 | 5.38 **7.31** | 4 **1** | 22862 **24971** +9.22% | 13810 **11717** | 36672 **36688** +0.04% | 37584 = 37584 |
 | 543-2 | 12 | 3.58 **5.92** | 7 **2** | 29152 **29417** +0.91% | 8635 **8283** | 37787 **37700** -0.23% | 45028 = 45028 |
@@ -673,7 +673,7 @@ share of touching skeleton that the touched body does not own 12.2% to **5.2%**.
    **Pass.**
 4. **No lacuna loses more than 25% of its owned px unless it was holding
    skeleton that another lacuna touches closer.** Measured pixel by pixel
-   (regenerate with `python src/diagnostics.py contact-handover -d data/WT -o results/contact_census`;
+   (regenerate with `python src/diagnostics.py contact-handover -d data/WT -o .cache/contact_census`;
    not tracked, the file cited is at commit `bf3b982`):
    41 lacunae gained, 46 are unchanged, 21 lost. **One** passes the 25% guard,
    543-2 id 9 at -35.1%, and all 1388 px it lost went to lacunae 11 and 12,
@@ -720,7 +720,7 @@ Two tiers, and they are not the same thing.
   connected to them.
 
 | image | lacunae with untraced signal | untraced px above the low cut | in a vascular canal | despeckled | faint px |
-|---|---|---|---|---|---|
+|-|-|-|-|-|-|
 | 542_z06 | 12 of 19 | 179 | 113 | 62 | 3961 |
 | 542_z18 | 5 of 13 | 219 | 171 | 48 | 2404 |
 | 543-2 | 4 of 12 | 13 | 0 | 13 | 1894 |
@@ -782,7 +782,7 @@ rejected.
 
 Before any rule was written, every object the lacuna threshold produced at 100 px²
 or more over all 8 images was tabulated with its features, 173 of them
-(regenerate with `python src/diagnostics.py lacuna-candidates -d data/WT -o results/survey`; not
+(regenerate with `python src/diagnostics.py lacuna-candidates -d data/WT -o .cache/survey`; not
 tracked, as cited at commit `bf3b982`).
 
 The rule everyone expects is "a missed lacuna is clearly brighter than its
@@ -806,7 +806,7 @@ All in `config.py` section g, all identical for every image, none of them
 lowering `MIN_AREA_PX2` or raising `MAX_ASPECT_RATIO` for anything else.
 
 | rule | test | why |
-|---|---|---|
+|-|-|-|
 | **g1 dim sub-area** | area ≥ 2.7 um² (160 px), solidity ≥ 0.80, peak ≤ 0.82 | big enough to be a body, compact, and dim: the gap above |
 | **g2 cut by the frame** | area floor × 0.75 (300 px), solidity ≥ 0.85 | the frame cuts the object, so the floor is scaled; the stricter solidity is needed, because at the scaled floor alone two objects in an image that must not change would be admitted |
 | **g3 thick process** | area ≥ 16.9 um² (1000 px), contrast ≥ 2.5, solidity ≥ 0.40 | a large, bright, ragged region is a body with a thick process, not debris. One object over the 8 images qualifies; the next ragged one is a quarter of the area |
@@ -824,11 +824,11 @@ lacunae only.
 find. It passes on every image, and the four images that had to stay still did:
 
 | image | before | after | expected | the review's targets |
-|---|---|---|---|---|
+|-|-|-|-|-|
 | 542_z06 | 17 | **19** | 19 | (226,311) ragged body found by g3; (4,934) frame-cut found by g2 |
 | 542_z18 | 13 | 13 | 13 | unchanged |
 | 543-2 | 12 | 12 | 12 | unchanged |
-| 543_3 | 11 | **13** | — | (481,458) and (286,857) found by g1; the osteocyte at (877,546) that a dark band split is one 1625 px object again |
+| 543_3 | 11 | **13** | none | (481,458) and (286,857) found by g1; the osteocyte at (877,546) that a dark band split is one 1625 px object again |
 | 543_z13 | 11 | 11 | 11 | unchanged |
 | 682_z08 | 10 | **11** | 11 | (977,347) found by g1 |
 | 682_z23 | 14 | 14 | 14 | unchanged |
@@ -846,7 +846,7 @@ and nearly all are thresholding specks, so the rule has to be the most selective
 one that can be justified. All four tests must pass:
 
 | test | constant | why |
-|---|---|---|
+|-|-|-|
 | round | aspect at most 1.5 | a blurred body is round; a speck on a thread is not |
 | round | solidity at least 0.90 | a body has no ragged edge |
 | brighter than its surroundings | mean at least 1.5x the ring just outside | a body glows above its background; a speck sits on a thread no dimmer than itself |
@@ -874,7 +874,7 @@ artefact or a real anastomosis, and these record how many there are without
 deciding which.
 
 | measure | what it is |
-|---|---|
+|-|-|
 | `straight_run_fraction` | share of skeleton pixels inside a perfectly horizontal or vertical run of at least 8 px. A canaliculus has no reason to follow a row or a column, and these images carry faint axis-aligned banding, so a high share means the detector is following the grid |
 | `rectangle_count` | closed loops of four graph nodes whose four sides are all axis-aligned, to one pixel of slack. A real network has no reason to close a rectangle on the grid |
 | `loop_count` | independent cycles, the cyclomatic number E - V + C: how many edges would have to be cut to leave a forest |
@@ -897,7 +897,7 @@ value. They answer the size dependence found earlier: roots and ring length rise
 with lacuna area.
 
 | column | definition |
-|---|---|
+|-|-|
 | `perimeter_px` | regionprops perimeter of the lacuna, $P$ |
 | `ring_area_r30_px2`, `ring_area_r60_px2` | $A_r$: pixels of the nearest-lacuna partition within $r$ px of the body, lacunae excluded |
 | `in_frame_fraction_r30`, `in_frame_fraction_r60` | in-frame share of the full $r$ px annulus around this lacuna alone |
@@ -946,7 +946,7 @@ With all off, `results/WT/` is reproduced exactly
   traced threads. No hand count exists, so it has only run its self test (`-s`).
 - `contact`: does each lacuna own the threads that touch it. Per named lacuna, the one rule that holds
   every touching thread away from it; per image and over the set, roots, owned px, and the skeleton
-  within 8 px of a body that the body does not own. Measurement only. `--contact-reach 0` runs it with
+  within 8 px of a body that the body does not own. Measurement only. `-c 0` runs it with
   the contact rule off, which is how the before and after tables of section 8 are made.
 - `contact-handover`: each image run twice, contact on and off, and every owned pixel followed to where
   it went: what each lacuna gained, what it lost, and whether what it lost went to a lacuna that
@@ -975,18 +975,27 @@ PNG and PDF exist, so that run did not redraw any. An earlier note here said
 it failed on 96 figures because it unpacked `canaliculi.nearest_lacuna_map`
 into two values; it now takes the three that function returns.
 
-`figures/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
-into `results/WT/` (map: `results/README.md`). One display window for the whole
-dataset (1st and 99.8th percentile of the pooled red channel); interior lacunae
+`src/make_figures.py` writes PNG (300 dpi) and PDF (embedded TrueType fonts)
+into the results folder of one group, `-g GROUP` (WT by default): the network
+figure into `2_canaliculi/`, the overview, the cell gallery and the group
+figures into `4_quantification/` (map: `results/README.md`). Every group is
+drawn with the same code and settings. One display window for every group (1st
+and 99.8th percentile of the pooled red channel of the 8 WT images, copied into
+each group's `display_window.json`); interior lacunae
 cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
-`figures/captions.md`; review notes: `figures/REVIEW.md` and
-`figures/REVIEW_V2.md`, which also list the defects still unfixed.
+`docs/figures/captions.md`; review notes: `docs/figures/REVIEW.md` and
+`docs/figures/REVIEW_V2.md`, which also list the defects still unfixed.
 
 - **Per-image overview** (`<label>_figure_overview`), the contact sheet (Fig01),
   the lacuna-cut sensitivity figure (Fig03), the per-field plot (Fig04) and the
   switch examples (S01).
-- **Network overlay** (`<label>_figure_network`, and `all_images/figures/main/Fig02`
-  for 543-2). The skeleton is drawn as vector segments between the centres of
+- **Network overlay** (`<label>_figure_network`, and `4_quantification/Fig02`
+  for 543-2 in WT; in another group for the image whose interior lacuna count is
+  the group median). For the groups other than WT the images of Fig03 are the
+  first image of each animal in name order, and the places of S01 are found by
+  rule: in name order, the first image where the switch changes an interior
+  lacuna inside the frame, at the lacuna with the largest change. Fig04 merged
+  is a WT figure only. The skeleton is drawn as vector segments between the centres of
   8-connected neighbouring pixels, so the drawn set is exactly the skeleton. A
   skeleton pixel is vermillion if it lies in the 30 px ring of an interior
   lacuna by the pipeline's own rule, white otherwise; roots are magenta dots at
@@ -997,9 +1006,8 @@ cyan, frame-edge lacunae yellow; scale bars in pixels. Captions:
 - **Rejected candidates** (at least 150 px²) carry the filter that rejected
   them, one colour per meaning; "c" marks a lacuna inside a flagged canal
   region; insets sit at least 60 px from the frame.
-- **Regenerate** with `python -u figures/make_figures.py all`; `check` compares
-  the drawing data with `results/WT/`. Every figure it draws is reproducible, so
-  none is tracked. The pipeline's own stage pictures under `1_lacunae/` and
+- **Regenerate** with `python -u src/make_figures.py -g GROUP all`; `check`
+  compares the drawing data with `results/<group>/`. The figures are tracked. The pipeline's own stage pictures under `1_lacunae/` and
   `2_canaliculi/` are tracked: the skeleton png is an input to
   `validate-network`.
 
@@ -1018,7 +1026,7 @@ scoring script measured, kept here as the record of what a validation would
 report:
 
 | it reports | what it means |
-|---|---|
+|-|-|
 | skeleton precision | share of the pipeline's skeleton within 2 px of some hand-traced pixel: how much of what it drew is really there |
 | skeleton recall | share of the hand tracing within 2 px of some pipeline pixel: how much of what is there it drew |
 | f1 | their harmonic mean |
@@ -1049,7 +1057,7 @@ ridge response** and the **local skeleton density**: where the floor is higher,
 more of the image clears one fixed cut.
 
 **The test**, measurement only
-(regenerate with `python src/diagnostics.py ridge-background -d data/WT -o results/ridge_background`;
+(regenerate with `python src/diagnostics.py ridge-background -d data/WT -o .cache/ridge_background`;
 not tracked, as cited at commit `bf3b982`).
 The local background is the 25th percentile of the ridge response in 100 px
 windows on a 50 px grid, with every lacuna body and its mask buffer left out,
@@ -1064,7 +1072,7 @@ Spearman rho over the 8 images is at least **+0.50** and at least **7 of 8**
 images are positive.
 
 | image | tiles | Spearman rho | p | background min, median, max | max/min | density, dimmest quarter | brightest quarter | bright/dim |
-|---|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|-|
 | 542_z06 | 121 | **+0.525** | 6e-10 | 0.000216, 0.000594, 0.001735 | 8.0 | 0.0334 | 0.0507 | 1.52 |
 | 542_z18 | 121 | **+0.504** | 4e-09 | 0.000274, 0.000625, 0.001084 | 4.0 | 0.0262 | 0.0449 | 1.72 |
 | 543-2 | 121 | +0.155 | 0.09 | 0.000763, 0.001192, 0.001946 | 2.6 | 0.0350 | 0.0396 | 1.13 |
@@ -1095,7 +1103,7 @@ the attach signal test is a fixed fraction of the same global cut and would be
 punished by a dim corner in the same way.
 
 | image | rho, skeleton density | rho, owned density | rho, owned fraction | owned fraction, dimmest quarter | brightest quarter |
-|---|---|---|---|---|---|
+|-|-|-|-|-|-|
 | 542_z06 | +0.525 | +0.433 | +0.284 | 0.532 | 0.850 |
 | 542_z18 | +0.504 | +0.374 | +0.231 | 0.516 | 0.750 |
 | 543-2 | +0.155 | +0.016 | -0.143 | 0.762 | 0.586 |
@@ -1112,7 +1120,7 @@ negative at -0.14 and -0.19. Ownership does not follow local brightness at all.
 raised on, and it is where the hypothesis fails hardest:
 
 | quadrant of 543_3 | local background | skeleton density | owned fraction |
-|---|---|---|---|
+|-|-|-|-|
 | top left | 0.001080 | 0.0327 | 0.88 |
 | top right | 0.001077 | 0.0363 | 0.85 |
 | bottom right | 0.001166 | 0.0366 | 0.84 |
@@ -1133,7 +1141,7 @@ The skeleton stops short of the bodies. This is the measurement of why, before
 anything was changed:
 
 ```
-python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone
+python src/diagnostics.py empty-zone -d data/WT -o .cache/empty_zone
 ```
 
 `results/empty_zone/` is not tracked: regenerate with the command above; the files cited in this
@@ -1160,7 +1168,7 @@ the same directions, the same depth of field, differing only in being past it.
 ### How wide the hole is
 
 | image | lacunae | empty width px: min, median, p90, max | median um | p90 um |
-|---|---|---|---|---|
+|-|-|-|-|-|
 | 542_z06 | 19 | 9.0, 20.1, 29.6, 55.2 | 2.61 | 3.85 |
 | 542_z18 | 13 | 17.0, 27.3, 36.2, 51.6 | 3.55 | 4.71 |
 | 543-2 | 12 | 17.0, 28.2, 42.8, 55.4 | 3.67 | 5.56 |
@@ -1177,7 +1185,7 @@ real and are the upper end of the distribution.
 ### What is in the hole, against the band beyond it
 
 | image | p99 response: core / band | p99 flattened: core / band | mask fraction: core / band | **flattened p50: core / band** |
-|---|---|---|---|---|
+|-|-|-|-|-|
 | 542_z06 | 0.0659 / 0.2136 (31%) | 0.150 / 0.593 | 0.057 / 0.427 | **0.00000** / 0.00948 |
 | 542_z18 | 0.0794 / 0.1939 (41%) | 0.203 / 0.544 | 0.058 / 0.427 | **0.00000** / 0.01143 |
 | 543-2 | 0.1182 / 0.1662 (71%) | 0.332 / 0.467 | 0.119 / 0.453 | **0.00000** / 0.02464 |
@@ -1212,7 +1220,7 @@ is the brief's definition of visible, attributed to the FIRST stage that drops
 it:
 
 | image | visible px in the core | below the low cut | hysteresis not connected | vascular no-growth | body buffer | despeckled | already in the mask |
-|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|
 | 542_z06 | 19886 | 12758 | 66 | 200 | 724 | 40 | 6098 |
 | 542_z18 | 18027 | 11357 | 157 | 207 | 316 | 41 | 5949 |
 | 543-2 | 23324 | 11155 | 223 | 0 | 154 | 13 | 11779 |
@@ -1231,7 +1239,7 @@ are not the cause, at 1.6%, 0.1% and 0.9%.
 ### The 50 um prune, second and smaller
 
 | image | skeleton in the hole before the prune | after | removed | share |
-|---|---|---|---|---|
+|-|-|-|-|-|
 | 542_z06 | 3473 | 3222 | 251 | 7% |
 | 542_z18 | 2375 | 2016 | 359 | 15% |
 | 543-2 | 3427 | 2015 | 1412 | 41% |
@@ -1267,7 +1275,7 @@ may run 5 px past owned skeleton and the holes are 27 px wide.
 
 Profiles for the five widest holes in the set, which is a rule and not a list of
 coordinates, were in `results/empty_zone/` (not tracked: regenerate with
-`python src/diagnostics.py empty-zone -d data/WT -o results/empty_zone`; as cited, at commit `bf3b982`): the neighbourhood with the hole, its
+`python src/diagnostics.py empty-zone -d data/WT -o .cache/empty_zone`; as cited, at commit `bf3b982`): the neighbourhood with the hole, its
 core and the control band outlined, beside the radial profiles of raw, flattened
 and response with the cuts drawn on them.
 
@@ -1324,12 +1332,12 @@ thread's own contrast, which no background subtraction can raise.
 
 Each image run twice in one process, once with `canaliculi.GLOW_ZONE_MAX_PX = 0`,
 which is the pipeline as it was, and once as configured
-(regenerate with `python src/diagnostics.py glow-check -d data/WT -o results/glow_zone`; not tracked,
+(regenerate with `python src/diagnostics.py glow-check -d data/WT -o .cache/glow_zone`; not tracked,
 as cited at commit `bf3b982`). Before
 on the left of each arrow.
 
 | image | glow extent px: min, median, max | zone px | mask added | skeleton inside the zones | empty width px | roots per lacuna | under 3 roots |
-|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|
 | 542_z06 | 3.9, 12.0, 18.8 | 105,463 | 5,528 | 2694 -> 3117 (+15.7%) | 20.1 -> 18.4 | 12.16 -> 12.63 | 1 -> 1 |
 | 542_z18 | 10.9, 16.5, 26.0 | 117,124 | 6,031 | 2178 -> 2640 (+21.2%) | 27.3 -> 23.3 | 7.31 -> 9.00 | 1 -> 1 |
 | 543-2 | 13.6, 18.4, 26.9 | 80,643 | 5,945 | 1577 -> 2122 (+34.6%) | 28.2 -> 24.6 | 5.92 -> 7.67 | 2 -> 1 |
@@ -1355,7 +1363,7 @@ on the left of each arrow.
    image falls on all 8, and over the 108 lacunae from 27.4 to 24.2 px (3.56 to
    3.14 um). 84 of 108 lacunae have a smaller hole; the 11 whose hole grows are
    listed in `results/glow_zone/glow_check.json` (not tracked: regenerate with
-   `python src/diagnostics.py glow-check -d data/WT -o results/glow_zone`; as cited, at commit `bf3b982`) and move by under a pixel
+   `python src/diagnostics.py glow-check -d data/WT -o .cache/glow_zone`; as cited, at commit `bf3b982`) and move by under a pixel
    except 542_z06 lacuna 14 (26.7 to 34.4 px) and 682_z29 lacuna 1 (24.2 to
    27.3 px), where a newly traced thread nearer the body in one sector pushes
    the first skeleton pixel of another sector further out.
@@ -1372,7 +1380,7 @@ images, as it must be, since it is computed from what no lacuna owns and the
 zones are defined by lacunae.
 
 | image | skeleton px | owned px | unowned px | 50 um prune px | unattached px |
-|---|---|---|---|---|---|
+|-|-|-|-|-|-|
 | 542_z06 | 39229 -> 39890 (+1.7%) | 28803 -> 31159 (+8.2%) | 10426 -> 8731 | 787 -> 688 | 375 -> 375 |
 | 542_z18 | 36688 -> 38252 (+4.3%) | 24971 -> 27573 (+10.4%) | 11717 -> 10679 | 1884 -> 923 | 372 -> 372 |
 | 543-2 | 37700 -> 40374 (+7.1%) | 29417 -> 33719 (+14.6%) | 8283 -> 6655 | 8781 -> 6736 | 465 -> 465 |
@@ -1420,7 +1428,7 @@ of the tissue just beyond the hole. The glow extent is still measured
 the checks read the zone against; it no longer decides where the cut applies.
 
 ```
-python src/diagnostics.py hole-check -d data/WT -o results/hole_zone --pictures 543-2,543_3
+python src/diagnostics.py hole-check -d data/WT -o .cache/hole_zone -p 543-2,543_3
 ```
 
 `results/hole_zone/` is not tracked: regenerate with the command above; the file cited in this
@@ -1459,7 +1467,7 @@ the ridge response by distance from the body edge on 543-2, as a multiple of the
 low cut:
 
 | distance from the body | 0 to 5 px | 5 to 10 | 10 to 15 | 15 to 20 | 20 to 25 | 25 to 30 | 30 to 40 | 40 to 50 | 50 to 70 |
-|---|---|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|-|-|
 | response p90 / low cut | 0.87 | 1.50 | 2.07 | 2.41 | 2.71 | 3.02 | 3.41 | 3.76 | 3.70 |
 
 The loss is not flat across the hole: it is a **trough**, deepest at the body
@@ -1554,7 +1562,7 @@ Before is `config.HOLE_ZONE_RULE = False` with
 section 18 exactly; after is as configured.
 
 | image | zone px | zone extent px: min, median, max | gain at the body edge, median | mask added px | skeleton in the zones | skeleton px | changed px |
-|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|
 | 542_z06 | 150,055 | 16, 25, 59 | 1.90 | 8,439 | 6,354 -> 6,589 | 39,964 -> 40,198 | 3,516 |
 | 542_z18 | 136,149 | 21, 31, 55 | 3.00 | 8,481 | 4,963 -> 5,278 | 38,360 -> 39,183 | 3,699 |
 | 543-2 | 119,134 | 20, 34, 46 | 3.00 | 9,772 | 4,637 -> 5,077 | 40,561 -> 44,105 | 6,766 |
@@ -1568,7 +1576,7 @@ Over the set the skeleton grows from 312,817 to 323,707 px (+3.5%), and
 **39,086 px change against the glow zone version**.
 
 | image | empty width px | null floor px | roots per lacuna | under 3 roots | owned px | 50 um prune px | unattached px | loops |
-|---|---|---|---|---|---|---|---|---|
+|-|-|-|-|-|-|-|-|-|
 | 542_z06 | 18.36 -> 18.97 | 26.27 | 12.68 -> 13.11 | 1 -> 1 | 31,615 -> 32,887 | 690 -> 686 | 375 -> 355 | 153 -> 159 |
 | 542_z18 | 23.30 -> 22.47 | 20.81 | 9.00 -> 10.23 | 1 -> 1 | 28,019 -> 29,658 | 924 -> 448 | 372 -> 372 | 146 -> 156 |
 | 543-2 | 24.56 -> 23.67 | 19.23 | 7.67 -> 8.50 | 1 -> 0 | 34,260 -> 37,623 | 6,737 -> 3,560 | 465 -> 465 | 244 -> 275 |
@@ -1589,7 +1597,7 @@ where one piece of it is now part of a thread a lacuna owns.
 ### The acceptance tests
 
 | test | result | number |
-|---|---|---|
+|-|-|-|
 | **A** mask outside every zone bit identical | **PASS** | on all 8 images, outside the zones of both versions |
 | **B** empty width median under 15 px, and 90% of lacunae within their glow extent plus 10 px | **FAIL** | 24.19 -> 22.43 px against a floor of 22.02; 74 of 108 (68.5%) within |
 | **C** near-body skeleton that is not the body's own, down 80% | **FAIL** | 57 -> 78 px; the part nobody owns fell 50 -> 42, the part another lacuna owns rose 7 -> 36 |
@@ -1685,10 +1693,10 @@ from 1,045 to 1,482 over the 8 images; with the fix they are 1,113. With the
 switch off no edge is marked and every number is the deterministic method's.
 
 **What it does to the numbers**, over the 8 images
-(`results_ai_judge/WT/compare/compare_methods.xlsx`):
+(`results/WT/5_archive/ai_judge/canaliculi_judge/compare/compare_methods.xlsx`):
 
 | measure | deterministic | AI judge |
-| --- | --- | --- |
+| - | - | - |
 | roots per interior cell, pooled | 10.27 | 10.95 |
 | roots, all lacunae | 1,045 | 1,113 |
 | ring length r30 px per interior cell, pooled | 398.9 | 440.9 |
@@ -1704,7 +1712,7 @@ pairs, as whole connected networks; no single cell takes over an image.
 **Reproducibility, cost and approval.** The model is pinned
 (`claude-sonnet-5-5`), no temperature is sent (the model rejects one) and
 thinking is off. Every request and answer is logged with its hash in
-`results_ai_judge/WT/ai_log/`, with the case pictures that were actually sent, and
+`results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/`, with the case pictures that were actually sent, and
 the replay reruns the whole log offline to identical verdicts on all 8 images.
 The real run was made once, on 2026-10-19: **143 calls, $1.60**, against a dry
 run estimate of $1.19 and a ceiling of `config.MAX_COST_USD` = $5; one answer in
@@ -1721,8 +1729,10 @@ between the two methods, and none has been made.
 
 **The groups.** `config.GROUPS`: WT, WT_HP, Hyp_RD and Hyp_HP; RD is regular
 diet and HP high phosphorus. Each has its own folder in `data/` and in
-`results/`, with the same layout inside; the AI judge set holds WT only, in
-`results_ai_judge/WT/`.
+`results/`, with the same five sections inside (1_lacunae, 2_canaliculi,
+3_pols, 4_quantification, 5_archive; `results/README.md`), every file named
+after its image; the AI judge set holds WT only, archived in
+`results/WT/5_archive/ai_judge/canaliculi_judge/`.
 
 **WT is the reference, and nothing is tuned on the others.** Every rule and value
 in sections 1 to 19 was chosen by visual inspection of the 8 WT images. The other
@@ -1770,20 +1780,20 @@ pixel size, 0.13 um/px, is confirmed for the 8 WT images only (acquisition
 record); the 27 new images carry no pixel size in their files and are taken to
 share it, so every limit written in micrometres rests on that assumption for them.
 
-**Running a group.** The three stages with `--dir data/<group> -o results/<group>`.
+**Running a group.** The three stages with `-d data/<group> -o results/<group>`.
 With no `-o` a stage writes to `results/<name of the input folder>/`
 (`lacunae.output_root`), so no group can write into another's folder. An image
 that fails in a stage is listed with the error in
-`results/<group>/all_images/failed_images_<stage>.csv` and skipped, and the
+`results/<group>/<section>/failed_images_<stage>.csv` and skipped, and the
 others carry on; a folder with no `.tif` writes nothing.
 
-**Across groups.** `group-overview` writes `results/group_overview.csv` and
+**Across groups.** `group-overview` writes `results/summary/group_overview.csv` and
 `.xlsx`, one row per image with its group: lacuna count, interior count, roots per
 cell, ring length 30 px, field length density, skeleton px, unowned px and width
 median. It computes no statistic and compares no groups. Skeleton and unowned px
 come from each image's saved skeleton and graph through the owner map the
 pipeline builds; on WT they equal what `compare-methods` measured on the
-in-memory owner maps. `group-qc` writes `results/group_qc.csv`, per image of every
+in-memory owner maps. `group-qc` writes `results/summary/group_qc.csv`, per image of every
 group but WT: the lacuna count, the candidates of at least 150 px² the lacuna
 stage rejected, by the rule that rejected each (area too small or too large,
 solidity, aspect ratio; smaller specks counted apart), a flag where the count is
@@ -1799,7 +1809,7 @@ changed.** How much saving an image as JPEG changes what the pipeline measures,
 measured on the WT images before any JPEG group is run:
 
 ```
-python src/diagnostics.py format-test --twins-src "SOURCE_FOLDER/22.04.25/wt"
+python src/diagnostics.py format-test -t "SOURCE_FOLDER/22.04.25/wt"
 ```
 
 It copies the four real JPEG twins of WT fields into `.cache/format_test/` (the
@@ -1809,9 +1819,9 @@ tables equal the real JPEGs' (95, found by search); decodes every JPEG and wraps
 it in an uncompressed TIFF; runs the three stages with the shipped settings on
 the TIFFs and both JPEG sets; and compares eight measures per pair, pooled, and
 against the SD of each measure over the 8 WT images. The TIFF run must equal
-`results/WT/` first, and does. The tables are in `results/format_test/`:
+`results/WT/` first, and does. The tables are in `results/archive/format_test/`:
 `format_test.md` (the report) and `.csv`, `twin_check.csv`,
-`tiff_fingerprints.csv` and `synthetic_check.csv`. `--step` runs one of
+`tiff_fingerprints.csv` and `synthetic_check.csv`. `-s` runs one of
 `twins`, `synthetic`, `run` and `report`.
 
 **What the WT TIFFs are.** The real twins are the same fields (best shift 0,0 px
@@ -1853,8 +1863,8 @@ count, and nothing is recommended.
 
 **Status: EXPERIMENT, pre-validation, NOT VALIDATED.** No verdict has been
 checked against a manual count. Behind `config.AI_LACUNA_JUDGE_ENABLED`, off by
-default, so `results/` and `results_ai_judge/` are untouched by it; its output is
-`results_ai_lacunae/`. The full write-up is in
+default, so `results/` and `results/WT/5_archive/ai_judge/canaliculi_judge/` are untouched by it; its output is
+`results/archive/ai_judge/`. The full write-up is in
 [docs/EXPERIMENT_AI.md](EXPERIMENT_AI.md), "The lacuna judge".
 
 **What it is for.** The lacuna stage (sections 2 to 4) was shaped on the 8 WT
@@ -1892,7 +1902,7 @@ byte for byte what a fresh lacuna stage gives.
 conservative reading found, and each can be changed.
 
 | Decision | What was chosen | Why |
-| --- | --- | --- |
+| - | - | - |
 | Where the rejected regions under 300 px² go in the numbering order | last, after the dim candidates | the brief's order names three tiers and these regions fit none; they are candidates by the 100 px² rule and are numbered on every image under the cap, so they keep a number wherever there is room rather than being dropped outright |
 | What "number in this order" sets | which candidates get a number; the numbers themselves still run in reading order, down the picture | numbering the kept regions 1, 2, 3... would tell the judge which regions the filters kept, which the picture is drawn to hide (every outline is drawn the same way), and would give images over the cap a different rule from images under it |
 | What the cache holds | the lacuna stage's result, not the candidate list | the stage is the slow part; caching it means a change to the numbering or the picture needs no new stage run, and the key covers everything the stage reads |
@@ -1920,7 +1930,7 @@ the pinned `claude-sonnet-5-5`, no temperature sent, thinking off: **35 calls,
 $0.83** (147,968 input and 52,935 output tokens), against a dry run estimate of
 $0.93 and a ceiling of `config.AI_LACUNA_MAX_COST_USD` = $3. No answer was
 unreadable, retried or refused. Every request and answer is logged with its hash
-in `results_ai_lacunae/<group>/ai_log/`, with the picture sent, and the replay
+in `results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/`, with the picture sent, and the replay
 reruns the log offline to identical verdicts on all 35 images.
 **External API use approved on 2026-10-15, approver: Karim.**
 
@@ -1929,7 +1939,7 @@ reruns the log offline to identical verdicts on all 35 images.
 144 unsure; of the 1,089 they rejected or that lie under the cut, 7 yes. So 7
 regions are added and 352 removed, and the lacunae over the 35 images go from
 793 to 448. Per image, with a contact sheet per group, in
-`results_ai_lacunae/review/`. The two objects open question 4 of the README
+`results/archive/ai_judge/review/`. The two objects open question 4 of the README
 calls probably not lacunae, 542_z06 at (555,149) and 682_z23 at (363,7), were
 both judged no.
 
@@ -1939,18 +1949,55 @@ contact sheets; if it is wrong about them, every per cell measure of those image
 moves with it. Nothing here is validated, and none of it is a result of the
 study.
 
-## 24. The POL proxy
+## 24. The POL section
+
+### 24.1 Candidate POL measure: lacunar size, pending definition
+
+**Since 2026-11-04 the POL section, `results/<group>/3_pols/` of every group,
+shows lacunar size** (`src/pols.py`). Periosteocytic lesions are enlarged
+lacunae, and there is no agreed definition of one in these images yet, so the
+section shows the one candidate that needs no new detection: each lacuna's area
+as the pipeline measured it (`area_px2` of `4_quantification/<image>_quantification.json`)
+times 0.0169 um2 per px2 (`config.PIXEL_SIZE_UM_ACQUIRED` squared), and its
+ratio to the WT median lacunar area, the median of every measured WT lacuna,
+pooled over the 8 WT images (36.73 um2). A lacuna touching the frame (flag
+`edge`, its area cut) or of a class with no area measure (`dim`,
+`out_of_focus`; flag `no_area`) is flagged and left out of every statistic.
+Per image: a picture (the original image, each measured lacuna filled with the
+colour of its ratio on one log scale from 1/4 to 4 times the WT median for every
+group, the colour bar in um2, its id and area beside it, flagged lacunae
+outlined grey and not filled, a 10 um scale bar) and a table (id, area_um2,
+ratio_to_WT_median, flag). Per group: `pols_all_images.csv` and `.xlsx` (n, mean,
+median and 90th percentile of area and ratio) and a contact sheet; across groups
+`results/summary/pols_lacunar_size_by_group.csv`. `python src/pols.py all` makes
+all of it, `python src/pols.py check` compares every table with the jsons, and
+`python src/pols.py selftest` checks the arithmetic on synthetic records.
+
+**Not established.** Area is the area the lacuna stage outlined. On the groups
+other than WT that stage also keeps saturated bands, soft tissue patches and
+small fragments (section 23), which pull a group's median down; a large area
+is not a lesion call. Every output says "candidate POL measure: lacunar size,
+pending definition".
+
+### 24.2 The ring proxy, retired
+
+**Retired on 2026-11-04:** the ring it measures is the dye glow around every
+lacuna, the same width in WT, which has no lesions, and not lesions. Its outputs
+are kept in `results/<group>/5_archive/pol_ring_proxy/` and its reports in
+`results/archive/pols/`; its code is `src/pol_ring_proxy.py`, whose commands
+write only there. What follows describes it as it was.
 
 **Pre-validation, and not a measurement of periosteocytic lesions.** Added
-2026-10-29 (`src/pols.py`, `results/pols/`). The look first
-(`results/pols/FINDINGS.md`, `python src/diagnostics.py pol-look`): in these
+2026-10-29 (then `src/pols.py`, now `src/pol_ring_proxy.py`; reports in
+`results/archive/pols/`). The look first
+(`results/archive/pols/FINDINGS.md`, `python src/diagnostics.py pol-look`): in these
 images a POL cannot be told apart as a separate zone. There is no dark ring
 around the body, no distinct halo and no step inside the body; around every body,
 in every group, the red channel falls smoothly to the bone background over about
 2.3 um in WT, which has no lesions, so that zone is optical glow. A lesion that
 takes up the stain would sit inside the body mask.
 
-**What is measured instead** (`results/pols/DEFINITION.md`): per lacuna with a
+**What is measured instead** (`results/archive/pols/DEFINITION.md`): per lacuna with a
 shape measure, the body as the lacuna stage outlined it, and in its own territory
 (the pixels nearest to it), in 8 sectors of 45 degrees about the centroid, the
 median red over a 3 band slab at each 0.13 um band from the body edge, until it
@@ -1960,29 +2007,29 @@ body, and the halo width per sector. Flags: edge, vessel (vascular mask within
 8 um), neighbour (two outer regions touch), incomplete (fewer than half the
 sectors answered), no contrast. Every value is the glow zone's own (section 18)
 or chosen on no image. It reads the saved detection and changes nothing in it;
-`python src/pols.py selftest` checks it on synthetic images.
+`python src/pol_ring_proxy.py selftest` checks it on synthetic images.
 
 **Layout and pictures** (2026-11-03, visualization and file layout only; no
-measure, flag or value changed). POL is a section of each image like the lacunae
-and the canaliculi: `results/<group>/<label>/4_pols/` holds the QC overlay (body
+measure, flag or value changed). It was then a section of each image like the lacunae
+and the canaliculi; now `results/<group>/5_archive/pol_ring_proxy/` holds, per image, the QC overlay (body
 edge cyan, outer boundary yellow, 1 px, on the original), the measured picture
 (the review picture: the POL band of each measured lacuna tinted yellow at 30%,
 each flagged lacuna outlined orange with its flag letters and not tinted), the
 outlines picture (body edge and outer boundary on the original dimmed), the
-per-lacuna csv and a record; `results/<group>/all_images/pols/` holds
+per-lacuna csv and a record, and per group
 `pols_all_images.csv` and `.xlsx` and a contact sheet. Every picture is drawn at
 the image's own resolution with a 10 um scale bar at
 `config.PIXEL_SIZE_UM_ACQUIRED`, says "POL proxy, pre-validation", and is read
 back and must equal the image on every pixel nothing was drawn on.
-`python src/pols.py check` draws each picture again from the csv read back and
+`python src/pol_ring_proxy.py check` draws each picture again from the csv read back and
 requires it to equal the file, so the flags drawn are the flags in the table. The
 yellow zone is the proxy, mostly optical glow, never a lesion call.
-`python src/pols.py blind-review` copies the measured pictures under shuffled
-codes into `results/blind_review/pols/` and writes the key outside the repository;
+`python src/pol_ring_proxy.py blind-review` copies the measured pictures under shuffled
+codes into `results/archive/blind_review/pols/` and writes the key outside the repository;
 the set is blind only for a reviewer given that folder alone, since the same
-pictures sit under their image names in `4_pols/`.
+pictures sit under their image names in `5_archive/pol_ring_proxy/`.
 
 **Not established.** The halo width follows the glow extent of the network stage
 (Spearman 0.88), the neighbour flag removes most Hyp lacunae, and nothing separates
 a lesion from glow, staining or focus. The results and the open decisions are in
-`results/pols/REPORT.md`; none of it is a result of the study.
+`results/archive/pols/REPORT.md`; none of it is a result of the study.

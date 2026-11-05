@@ -53,7 +53,7 @@ data**; both figures are what the literature reports for mouse cortical bone, us
 and never as thresholds tuned to improve a result.
 
 | limit | value | effect |
-|---|---|---|
+|-|-|-|
 | `MAX_CANALICULUS_LENGTH_UM` | 50 um (385 px) | **prunes** the skeleton |
 | `CANALICULUS_LENGTH_RANGE_UM` | 25 to 50 um | report only |
 
@@ -79,14 +79,31 @@ owning their threads, but carrying no area or shape measure.
 
 ## What each folder holds
 
+The repository holds `README.md`, `config.py`, `requirements.txt`,
+`.gitignore`, and four folders:
+
 | folder | contents |
-|---|---|
-| `src/` | `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `diagnostics.py` (every check, as subcommands) |
-| `config.py` | paths, the biological limits, shared settings and the switches (all off) |
+|-|-|
+| `src/` | all code: `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `pols.py` (the POL section, lacunar size), `make_figures.py` (the figures), `pol_ring_proxy.py` (the retired ring proxy), `ai_judge.py` (both AI judges), `diagnostics.py` (every check, as subcommands) |
+| `config.py` | paths, the results layout, the biological limits, shared settings and the switches (all off) |
 | `data/` | one folder per group: `WT/` with the 8 input images, `WT_HP/`, `Hyp_RD/`, `Hyp_HP/` with 9 each, decoded from JPEG; `image_inventory.csv` records every file |
-| `results/` | the pipeline output, one folder per group: `results/WT/` holds one folder per image and `all_images/`, and is the reference for every check; guide: `results/README.md` |
-| `figures/` | the figure code (`make_figures.py`), captions and review notes |
-| `docs/` | this page, `METHODS.md` and `EXPERIMENT_AI.md` |
+| `results/` | every result; guide: [`results/README.md`](../results/README.md) |
+| `docs/` | this page, `METHODS.md`, `EXPERIMENT_AI.md`, the judges' examples, and `docs/figures/` (captions, review notes, inset overrides) |
+
+**Where things are in `results/`.** Each group, WT, WT_HP, Hyp_RD and Hyp_HP,
+has one folder, `results/<group>/`, with the same five sections, every file in
+it named after its image:
+
+| section | holds |
+|-|-|
+| `1_lacunae/` | the lacunae of each image (outlines, label image, record) and a contact sheet of the group |
+| `2_canaliculi/` | the network of each image (mask, skeleton, verification picture, vascular mask, graph, record) and its network figure |
+| `3_pols/` | candidate POL measure: lacunar size, pending definition (a picture and a table per image, a group table, a contact sheet) |
+| `4_quantification/` | every measured number per image, the group table, the overview and cell gallery figures, and the group figures Fig01 to Fig04, S01, S02 |
+| `5_archive/` | what is no longer used: the retired POL ring proxy, and the AI judge experiments |
+
+Beside them, `results/summary/` holds the tables that set the groups side by
+side, and `results/archive/` the old material of no one group.
 
 Earlier experiments, the older intensity-threshold method, the ablation that chose this one and every
 earlier report are preserved at the git tag `archive-2026-10-13` and are not in the working tree. `main`
@@ -104,7 +121,7 @@ In `config.py`. They all act on the **lacuna** stage, they are all off by defaul
 pipeline gives `results/WT/` exactly.
 
 | switch | default | what it does when on |
-|---|---|---|
+|-|-|-|
 | `NARROW_CRUMB_RULE` | `False` | a dropped watershed piece rejoins the one kept lacuna it touches if at least half of it lies inside that lacuna's convex hull (changes only 543_3 (877,545)) |
 | `FILL_ENCLOSED_HOLES_MAX_PX2` | `0` | fills holes enclosed by one kept lacuna up to this size (200 changes only 542_z06 (783,581)) |
 | `BAND_FILTER_MIN_OPENING_SHARE` | `None` | rejects kept objects keeping less than this share of their area after a 5 px opening (0.515 removes the two band objects) |
@@ -112,24 +129,28 @@ pipeline gives `results/WT/` exactly.
 
 ## Commands
 
-From the repository root, with the project's Python (3.9, the venv):
+From the repository root, with the project's Python (3.9). `G` is one of WT,
+WT_HP, Hyp_RD, Hyp_HP; every command writes into `results/G/` unless it says
+otherwise.
 
 ```
-python src/lacunae.py --dir data/WT                      # feature 1 detection (-o DIR for another folder)
-python src/canaliculi.py --dir data/WT                   # feature 2 detection
-python src/quantification.py --dir data/WT               # every measure and both tables
-python src/diagnostics.py reference-check                # must PASS: 161.00 / 21.63 / 8.50 on 543-2
-python src/diagnostics.py regression                     # every number against results/WT/, tolerance 0
-python src/diagnostics.py switch-check                   # what each switch changes
-python src/diagnostics.py import-group --group G --src F # copy a group's images, or say why not
-python src/lacunae.py --dir data/G -o results/G          # then canaliculi.py and quantification.py the same way
-python src/diagnostics.py group-overview                 # every group, one row per image
-python src/diagnostics.py group-qc                       # QC list of the groups other than WT
-python -u figures/make_figures.py all                    # every figure, into results/WT/
-python -u figures/make_figures.py check                  # drawn numbers against results/WT/
-python src/diagnostics.py survey -d data/WT -o results/survey     # what it does to every image (not tracked)
-python src/diagnostics.py shape-picture -d data/WT -o results/network_shape   # not tracked
+python src/lacunae.py -d data/G                  # 1_lacunae (-o DIR for another folder)
+python src/canaliculi.py -d data/G               # 2_canaliculi
+python src/quantification.py -d data/G           # 4_quantification: every measure and the group table
+python -u src/make_figures.py -g G all           # figures, into 2_canaliculi and 4_quantification
+python src/pols.py measure -d data/G             # 3_pols (every group at once: python src/pols.py all)
+python src/diagnostics.py group-overview         # results/summary/group_overview.csv and .xlsx
+python src/diagnostics.py group-qc               # results/summary/group_qc.csv
+python src/diagnostics.py layout-check           # the five sections of every group, files per section
+python src/diagnostics.py reference-check        # must PASS: 161.00 / 21.63 / 8.50 on 543-2
+python src/diagnostics.py regression             # every WT number against results/WT/, tolerance 0
+python src/diagnostics.py switch-check           # what each switch changes
+python src/diagnostics.py import-group -g G -s F # copy a group's images, or say why not
+python -u src/make_figures.py -g G check         # drawn numbers against results/G/
 ```
+
+Before the figures of a group other than WT, its field summary:
+`python src/diagnostics.py field-summary -d data/G -r results/G -o .cache/field_summary/G`.
 
 Do not write a new `results/WT/` unless a switch is adopted on purpose; `results/WT/` is the reference that
 `regression` compares with.

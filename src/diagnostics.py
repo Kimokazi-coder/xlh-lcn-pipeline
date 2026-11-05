@@ -9232,8 +9232,8 @@ def main() -> None:
     p = sub.add_parser("import-group",
                        help="Copy one group's images into data/<group>/ under the import rule of config.py, "
                             "and list every file, copied or skipped, in data/image_inventory.csv.")
-    p.add_argument("--group", required=True, help=f"One of {', '.join(config.GROUPS)}.")
-    p.add_argument("--src", type=Path, required=True, help="Source folder; it is only read.")
+    p.add_argument("-g", "--group", required=True, help=f"One of {', '.join(config.GROUPS)}.")
+    p.add_argument("-s", "--src", type=Path, required=True, help="Source folder; it is only read.")
     p.add_argument("--dry-run", dest="dry_run", action="store_true", help="Report only; copy and write nothing.")
     p.set_defaults(func=cmd_import_group)
 
@@ -9312,23 +9312,23 @@ def main() -> None:
                    help="Folder of .tif images.")
     p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
-    p.add_argument("--points", default="",
+    p.add_argument("-P", "--points", default="",
                    help="Lacunae to report in full, as LABEL:X,Y;LABEL:X,Y in the 1024 px frame "
                         "(the label that names its files in results/<group>/). The nearest lacuna to each "
                         "point is the one reported.")
-    p.add_argument("--near", type=int, default=CONTACT_CENSUS_NEAR_PX,
+    p.add_argument("-n", "--near", type=int, default=CONTACT_CENSUS_NEAR_PX,
                    help=f"How close to a body counts as touching it (default "
                         f"{CONTACT_CENSUS_NEAR_PX} px).")
-    p.add_argument("--pictures", action="store_true",
+    p.add_argument("-p", "--pictures", action="store_true",
                    help="Also draw the region of each named lacuna.")
     p.add_argument("--verification", type=Path, default=None,
                    help="Also write each image's whole-frame verification picture into this "
                         "folder, named <label>_<tag>.png: the before and after picture of a rule.")
     p.add_argument("--radius", type=int, default=CONTACT_PICTURE_RADIUS_PX,
                    help=f"Half-width of those pictures (default {CONTACT_PICTURE_RADIUS_PX} px).")
-    p.add_argument("--tag", default="now",
+    p.add_argument("-t", "--tag", default="now",
                    help="Name of this run, used in the output file names (default: now).")
-    p.add_argument("--contact-reach", dest="contact_reach", type=int, default=None,
+    p.add_argument("-c", "--contact-reach", dest="contact_reach", type=int, default=None,
                    help=f"Replace canaliculi.CONTACT_REACH_PX for this run; 0 turns the contact "
                         f"rule off, which is the behaviour before it (default: the configured "
                         f"{canaliculi.CONTACT_REACH_PX} px).")
@@ -9375,7 +9375,7 @@ def main() -> None:
                    help="Folder of .tif images.")
     p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
     p.add_argument("-o", dest="out", type=Path, required=True, help="Output folder.")
-    p.add_argument("--pictures", default="",
+    p.add_argument("-p", "--pictures", default="",
                    help="Image labels, comma separated, to write before and after skeleton and "
                         "verification pictures for.")
     p.add_argument("--before-after", dest="before_after", type=Path,
@@ -9393,7 +9393,7 @@ def main() -> None:
     p.add_argument("-i", dest="image", type=Path, default=None, help="One .tif image instead.")
     p.add_argument("-o", dest="out", type=Path, default=config.PROJECT_ROOT / ".cache" / "hole_zone",
                    help="Output folder (default: .cache/hole_zone).")
-    p.add_argument("--pictures", default="",
+    p.add_argument("-p", "--pictures", default="",
                    help="Image labels, comma separated, to write before and after pictures for.")
     p.add_argument("--before-after", dest="before_after", type=Path,
                    default=config.PROJECT_ROOT / ".cache" / "before_after",
@@ -9417,7 +9417,7 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path,
                    default=config.PROJECT_ROOT / ".cache" / config.AI_DRY_RUN_DIR,
                    help="Output folder (default: .cache/ai_dry_run).")
-    p.add_argument("--pictures", default="",
+    p.add_argument("-p", "--pictures", default="",
                    help="Image labels, comma separated, to write every case picture for, "
                         "or 'all' for every image.")
     p.add_argument("--count-tokens", dest="count_tokens", action="store_true",
@@ -9461,7 +9461,7 @@ def main() -> None:
     p = sub.add_parser("ai-judge",
                        help="EXPERIMENT: run the AI judge on an image, or replay it from the log.")
     add_images_arguments(p)
-    p.add_argument("--replay", action="store_true",
+    p.add_argument("-r", "--replay", action="store_true",
                    help="No network: rerun from results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/ and check the verdicts match.")
     p.add_argument("-s", "--self-test", dest="self_test", action="store_true",
                    help="Rehearse the whole chain on one image with a stub judge, no network "
@@ -9477,9 +9477,9 @@ def main() -> None:
                             "--replay reruns from the log offline, -s rehearses with a stub.")
     add_images_arguments(p)
     mode = p.add_mutually_exclusive_group()
-    mode.add_argument("--live", action="store_true",
+    mode.add_argument("-l", "--live", action="store_true",
                       help="Real calls (needs ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY).")
-    mode.add_argument("--replay", action="store_true",
+    mode.add_argument("-r", "--replay", action="store_true",
                       help="No network: rerun from the log and check the verdicts match.")
     mode.add_argument("-s", "--self-test", dest="self_test", action="store_true",
                       help="Rehearse the whole chain on one image (default WT 543-2) with a stub "
@@ -9534,9 +9534,9 @@ def main() -> None:
     p = sub.add_parser("format-test",
                        help="How much saving an image as JPEG changes what the pipeline measures, "
                             "on the WT images. Measurement only.")
-    p.add_argument("--step", choices=("all",) + FORMAT_STEPS, default="all",
+    p.add_argument("-s", "--step", choices=("all",) + FORMAT_STEPS, default="all",
                    help="One step only (default: all, in order).")
-    p.add_argument("--twins-src", dest="twins_src", type=Path, default=None,
+    p.add_argument("-t", "--twins-src", dest="twins_src", type=Path, default=None,
                    help="Folder holding the real JPEG twins; it is only read. Without it the copies "
                         "already in .cache/format_test/real_jpeg/ are used.")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")

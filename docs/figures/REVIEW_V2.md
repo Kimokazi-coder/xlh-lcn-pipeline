@@ -1,6 +1,6 @@
 # Figure review, figures v2
 
-**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../results/README.md); the table of every old and new path, `results/RENAMES.csv`, was removed on 2026-10-20 and is at commit `41c00ae`), and before the grouping of 2026-10-20, which moved `results/<label>/` and `results/all_images/` into `results/WT/`. The `figures_out/` paths quoted below are where each value was written at the time; that folder is retired and the files are at the git tag `archive-2026-10-13`.
+**Paths.** Written before the results layout of 2026-10-05, which moved every result and figure into `results/` (guide: [results/README.md](../../results/README.md); the table of every old and new path, `results/RENAMES.csv`, was removed on 2026-10-20 and is at commit `41c00ae`), and before the grouping of 2026-10-20 (one results folder per group) and the layout of 2026-11-04, which flattened every group into five sections (`results/archive/MOVE_MAP.csv`). The `figures_out/` paths quoted below are where each value was written at the time; that folder is retired and the files are at the git tag `archive-2026-10-13`.
 
 Each exported PNG is viewed at 1000 px wide (a column-width preview) and as a 100% crop of its densest
 region. Defects found, what was changed, and what remains. At most two rounds per figure.
@@ -58,7 +58,7 @@ Remaining, left as is:
 ## N1 against the old verification images
 
 Compared with `results/<image>/canaliculi_verification.png` (now
-`results/<label>/2_canaliculi/<label>_canaliculi_verification.png`; 543-2 and 542_z06 side by side at the
+`results/WT/2_canaliculi/<label>_canaliculi_verification.png`; 543-2 and 542_z06 side by side at the
 same crop). Better: the raw structure stays visible, because the skeleton is a one-pixel vector line over
 the image at 85% instead of a 5 px wide coloured band; every skeleton pixel is drawn, not only the
 threads a cell owns, so the figure no longer implies an ownership claim that the headline measures do
@@ -199,7 +199,7 @@ touching. Gallery headers (542_z06 viewed): clear. The Fig03 lacuna counts equal
 
 New rule (as the network figure, then a tie break on size): interior lacunae with the bounding box at
 least 60 px from the frame; roots closest to the interior median; then area closest to the interior
-median area; then the smallest id. `figures/inset_overrides.csv` (header only) is read when present;
+median area; then the smallest id. `docs/figures/inset_overrides.csv` (header only) is read when present;
 `-c` still overrides both. Tested: an override row for 543-2 was read, then the file was emptied again.
 The choice is logged under "overview" in `per_image/<image>/inset.json`.
 
