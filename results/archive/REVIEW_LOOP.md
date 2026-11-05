@@ -206,3 +206,56 @@ identical labels on 27 of 27 (the merge took up to 2646 s per image on the
 full frame, about 1 s in the window).
 
 **Kept.** Total down 16; WT not changed.
+
+## Round 5: a fourth fragment arm, the faint crumb; tried and REVERTED
+
+**Problem attacked:** fragment (72 of 153).
+
+**What the round 4 pictures showed.** No clean rule was left for the
+remaining fragments: they overlap small accepted lacunae in area, width,
+solidity, brightness and position. The cleanest found: small (at most
+12 um2), thin (at most 2.8 um) and faint (at most 1.6 times as bright as the
+ring 2 to 6 px outside it, `lacunae.region_contrast`): 9 fragments and 1 band
+piece, no accepted object.
+
+**Run.** It dropped the predicted 10 objects (WT 1, WT_HP 2, Hyp_HP 7).
+
+**Counts, round 4 to round 5** (`review_loop/round5/tally.csv`):
+
+| group | lacunae labelled | fragment | band or tissue piece | split | merged | missed | other | total |
+| - | - | - | - | - | - | - | - | - |
+| WT | 71 to 70 | 5 to 3 | 1 to 1 | 0 to 0 | 0 to 0 | 1 to 4 | 1 to 2 | **8 to 10** |
+| WT_HP | 85 to 83 | 5 to 4 | 11 to 12 | 1 to 2 | 0 to 0 | 5 to 5 | 2 to 2 | **24 to 25** |
+| Hyp_RD | 150 to 150 | 26 to 28 | 15 to 15 | 5 to 7 | 1 to 1 | 1 to 1 | 3 to 1 | **51 to 53** |
+| Hyp_HP | 149 to 142 | 36 to 28 | 22 to 23 | 6 to 10 | 1 to 0 | 0 to 0 | 5 to 3 | **70 to 64** |
+| all | 455 to 445 | 72 to 63 | 49 to 51 | 12 to 19 | 2 to 1 | 7 to 10 | 11 to 8 | **153 to 152** |
+
+**WT got worse, object by object.** The one WT object dropped, 682_z29 at
+(861, 728), had been called a thread sliver in round 4; with it gone, the
+round 5 reviewer reports a missed out-of-focus lacuna at (865, 725), the same
+place. The reviewer contradicts itself, but taken at face value the change
+made WT worse, and the total fell by 1 only, inside the reviewer's noise.
+
+**Reverted.** `config.py`, `src/lacunae.py` and every result file are back
+to round 4 (commit feed1af). The round 5 tables stay here as the record.
+
+## End of the loop
+
+Stopped after round 5 (the brief's limit), whose change was reverted. The
+method is rounds 1 to 4.
+
+| round | rule | problems (all) | WT |
+| - | - | - | - |
+| 0 | baseline, the method of 0b0be38 | 258 | 12 |
+| 1 | rescue rules off (g5) | 225 | 8 |
+| 2 | fragment rule: satellite or speck (g6) | 186 | 6 |
+| 3 | fragment rule: crumb (g7) | 169 | 10 (pictures unchanged) |
+| 4 | band rule: mask region over 300 um2 (g8) | **153** | 8 (pictures unchanged) |
+| 5 | fragment rule: faint crumb (g9), reverted | 152 | 10 |
+
+From 258 to 153 problems over the 27 development images (minus 41%), and the
+labelled objects from 596 to 455: fragments 153 to 72, band or tissue pieces
+70 to 49, splits 17 to 12, merged 2 to 2, missed 7 to 7, other 9 to 11. WT
+12 to 8. Every count is an AI reviewer's judgement on these pictures, with a
+noise of a few problems per group between two looks at the same picture;
+none of it is a manual count.

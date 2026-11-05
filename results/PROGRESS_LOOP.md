@@ -10,7 +10,7 @@ run is, so it can be resumed after a crash. Logs of every command are in
 | 1 hold-out | done | data/holdout.json, docs/HOLDOUT.md, guard in config.py and src/lacunae.py, `diagnostics.py holdout-check` 13 of 13; tag holdout-locked-2026-11-05 |
 | 2 external data | done | docs/EXTERNAL_DATA.md; F:/external_data/ (not committed); no source has manual lacuna labels |
 | 3 reviewer | done | .claude/agents/image-reviewer.md (Read, Glob, Grep; sonnet); .gitignore tracks .claude/agents/ only |
-| 4 loop | in progress | round 4 done (169 to 153; WT unchanged) |
+| 4 loop | done | rounds 1 to 4 kept (258 to 153, WT 12 to 8); round 5 tried and reverted |
 | 5 freeze and rerun | not started | |
 | report | not started | |
 
@@ -54,3 +54,6 @@ run is, so it can be resumed after a crash. Logs of every command are in
   10 (noise); regression PASS. Next: band rule (blob over 300 um2).
 - Round 4 done: band rule (mask region over 300 um2), 169 to 153; WT
   unchanged; regression PASS; dark-band-check 27 of 27 identical.
+- Round 5 tried (faint crumb arm), WT worse object by object (one removed
+  object became a missed body), total 153 to 152: reverted to round 4
+  (feed1af). Loop ended. Next: docs, tag method-freeze-v1, FINAL run.
