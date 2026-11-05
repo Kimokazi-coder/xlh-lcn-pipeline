@@ -9,7 +9,7 @@ run is, so it can be resumed after a crash. Logs of every command are in
 | 0 sync | done | see below |
 | 1 hold-out | done | data/holdout.json, docs/HOLDOUT.md, guard in config.py and src/lacunae.py, `diagnostics.py holdout-check` 13 of 13; tag holdout-locked-2026-11-05 |
 | 2 external data | done | docs/EXTERNAL_DATA.md; F:/external_data/ (not committed); no source has manual lacuna labels |
-| 3 reviewer | in progress | |
+| 3 reviewer | done | .claude/agents/image-reviewer.md (Read, Glob, Grep; sonnet); .gitignore tracks .claude/agents/ only |
 | 4 loop | not started | |
 | 5 freeze and rerun | not started | |
 | report | not started | |
