@@ -88,6 +88,13 @@ setting it would change the recorded values and a fresh run would no longer equa
 `results/WT/` at tolerance 0. Convert with 0.13 um/px where a physical length is
 wanted.
 
+**Held-out images.** Since 2026-11-05 (tag `holdout-locked-2026-11-05`), 2
+images per group are held out for the final validation
+([`docs/HOLDOUT.md`](docs/HOLDOUT.md), [`data/holdout.json`](data/holdout.json)).
+By default (`config.HOLDOUT_MODE` DEV) every stage refuses to read them and
+folder runs leave them out; `LCN_HOLDOUT_MODE=FINAL` processes them. Check the
+guard with `python src/diagnostics.py holdout-check`.
+
 ## Groups
 
 The images are organised by type, one folder per group in `data/` and in

@@ -7,7 +7,7 @@ run is, so it can be resumed after a crash. Logs of every command are in
 | phase | state | commit or note |
 | - | - | - |
 | 0 sync | done | see below |
-| 1 hold-out | in progress | |
+| 1 hold-out | done | data/holdout.json, docs/HOLDOUT.md, guard in config.py and src/lacunae.py, `diagnostics.py holdout-check` 13 of 13; tag holdout-locked-2026-11-05 |
 | 2 external data | in progress | downloads in F:/external_data/ |
 | 3 reviewer | in progress | |
 | 4 loop | not started | |

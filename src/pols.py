@@ -103,7 +103,8 @@ def _round(value):
 
 
 def image_files(group: str) -> list[Path]:
-    return sorted((config.DATA_DIR / group).glob("*.tif"))
+    """The group's images, without the held-out ones in DEV mode (docs/HOLDOUT.md)."""
+    return lacunae.without_held_out(sorted((config.DATA_DIR / group).glob("*.tif")))
 
 
 def lacuna_records(results_root: Path, label: str) -> list[dict]:

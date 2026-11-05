@@ -256,7 +256,8 @@ def write_json(path: Path, obj) -> None:
 # Display window ----------------------------------------------------------------------
 
 def image_paths() -> list[Path]:
-    return sorted(DATA_DIR.glob("*.tif"))
+    """The group's images, without the held-out ones in DEV mode (docs/HOLDOUT.md)."""
+    return lacunae.without_held_out(sorted(DATA_DIR.glob("*.tif")))
 
 
 def short(path: Path) -> str:

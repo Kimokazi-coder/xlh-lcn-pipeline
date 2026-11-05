@@ -1,0 +1,19 @@
+{
+  "status": "pre-validation",
+  "purpose": "Held-out images for the final validation only. While config.HOLDOUT_MODE is DEV the pipeline refuses to process or display them, and no one may open them or their outputs during method development. See docs/HOLDOUT.md.",
+  "date": "2026-11-05",
+  "seed": 20261105,
+  "per_group": 2,
+  "method": "For each group of config.GROUPS: random.Random(f\"{seed}:{group}\").sample(sorted file names of data/<group>/*.tif, 2), then sorted. Python 3.9.10. Drawn from the file names only; no image was opened to choose.",
+  "tag": "holdout-locked-2026-11-05",
+  "images": [
+    {"group": "WT", "image": "543-2.tif", "label": "543-2"},
+    {"group": "WT", "image": "682_z23c-2.tif", "label": "682_z23"},
+    {"group": "WT_HP", "image": "876_z82c1-2.tif", "label": "876_z82c1-2"},
+    {"group": "WT_HP", "image": "877 wt_z081c1-2.tif", "label": "877_wt_z081c1-2"},
+    {"group": "Hyp_RD", "image": "535_z20c1-2.tif", "label": "535_z20c1-2"},
+    {"group": "Hyp_RD", "image": "I534_z19c1-2.tif", "label": "I534_z19c1-2"},
+    {"group": "Hyp_HP", "image": "701_z19c1-2.tif", "label": "701_z19c1-2"},
+    {"group": "Hyp_HP", "image": "701_z36c1-2.tif", "label": "701_z36c1-2"}
+  ]
+}

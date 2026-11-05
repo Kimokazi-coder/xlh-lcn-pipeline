@@ -7,6 +7,7 @@ the top of src/lacunae.py and src/canaliculi.py.
 All sizes are in PIXELS: see PIXEL_SIZE_UM below.
 """
 
+import os
 from pathlib import Path
 
 # Paths
@@ -30,6 +31,20 @@ GROUP_DESCRIPTIONS = {
     "Hyp_RD": "Hyp, regular diet",
     "Hyp_HP": "Hyp, high phosphorus diet",
 }
+
+# The held-out validation set (docs/HOLDOUT.md). Two images per group, drawn
+# with a fixed seed on 2026-11-05 and listed in HOLDOUT_FILE, are kept for the
+# final validation only. In "DEV" mode, the default, no stage reads or shows
+# them (lacunae.refuse_held_out and lacunae.without_held_out); "FINAL" processes
+# every image, for the one run after the method is frozen. The mode is read from
+# the environment variable LCN_HOLDOUT_MODE, so the final run needs no edit:
+# LCN_HOLDOUT_MODE=FINAL python src/lacunae.py -d data/WT. It decides which
+# images run and never a number, so it is left out of the settings hash
+# (lacunae.config_values).
+HOLDOUT_FILE = DATA_DIR / "holdout.json"
+HOLDOUT_MODE = os.environ.get("LCN_HOLDOUT_MODE", "DEV").strip().upper()
+if HOLDOUT_MODE not in ("DEV", "FINAL"):
+    raise ValueError(f"LCN_HOLDOUT_MODE must be DEV or FINAL, not {HOLDOUT_MODE!r}")
 
 # Image import (python src/diagnostics.py import-group). A source image is
 # copied into data/<group>/, under its own name, only when the pipeline would

@@ -96,6 +96,9 @@ Subcommands:
                       every field, 4x crop sheets with the radial profile
                       from the body edge, and profile tables, in
                       results/archive/pols/phase0_look/ (results/archive/pols/FINDINGS.md)
+    holdout-check     the held-out guard (docs/HOLDOUT.md): in DEV mode every
+                      held-out image is refused before a pixel is read and
+                      every folder listing leaves it out; reads no image
 
 Usage (from the repo root):
     python src/diagnostics.py reference-check
@@ -7083,6 +7086,58 @@ def _group_absence(group: str) -> str:
     return f"all {len(rows)} source files were skipped by the import rule ({'; '.join(reasons)})."
 
 
+# holdout-check ----------------------------------------------------------------------
+
+def cmd_holdout_check(_args) -> int:
+    """The held-out guard, checked without reading any image: the refusal comes
+    before imread, and the listings are of file names only."""
+    import pols  # noqa: PLC0415
+
+    record = json.loads(Path(config.HOLDOUT_FILE).read_text(encoding="utf-8"))
+    held = {(item["group"], item["image"]) for item in record["images"]}
+    checks = []
+    mode = config.HOLDOUT_MODE
+    try:
+        config.HOLDOUT_MODE = "DEV"
+        checks.append(("8 held-out images, 2 per group",
+                       len(held) == 8 and all(sum(g == group for g, _i in held) == 2 for group in config.GROUPS)))
+        for group in config.GROUPS:
+            names = sorted(p.name for p in (config.DATA_DIR / group).glob("*.tif"))
+            listed = [p.name for p in lacunae.image_paths(argparse.Namespace(image=None, dir=config.DATA_DIR / group))]
+            expected = [n for n in names if (group, n) not in held]
+            checks.append((f"DEV: a folder run of {group} lists {len(expected)} of {len(names)}", listed == expected))
+            checks.append((f"DEV: pols lists the same {group} images",
+                           [p.name for p in pols.image_files(group)] == expected))
+        refused = 0
+        for group, name in sorted(held):
+            path = config.DATA_DIR / group / name
+            for call in (lambda: lacunae.load_channel(path),
+                         lambda: lacunae.image_paths(argparse.Namespace(image=path, dir=None))):
+                try:
+                    call()
+                except lacunae.HeldOutImageError:
+                    refused += 1
+        checks.append(("DEV: load_channel and -i refuse every held-out image", refused == 2 * len(held)))
+        tiles = [(item["label"], Path("unused.png")) for item in record["images"]]
+        checks.append(("DEV: a contact sheet leaves every held-out tile out",
+                       all(lacunae.is_held_out(label) for label, _p in tiles)))
+        config.HOLDOUT_MODE = "FINAL"
+        total = sum(len(list((config.DATA_DIR / g).glob("*.tif"))) for g in config.GROUPS)
+        listed = sum(len(lacunae.image_paths(argparse.Namespace(image=None, dir=config.DATA_DIR / g)))
+                     for g in config.GROUPS)
+        checks.append((f"FINAL: every image is listed ({total})", listed == total))
+        checks.append(("FINAL: no image counts as held out",
+                       not any(lacunae.is_held_out(item["label"]) for item in record["images"])))
+    finally:
+        config.HOLDOUT_MODE = mode
+    print_table(["check", "result"], [[name, "PASS" if ok else "FAIL"] for name, ok in checks],
+                title=f"held-out guard, {config.HOLDOUT_FILE.relative_to(config.PROJECT_ROOT).as_posix()} "
+                      f"(mode of this process: {mode})\n")
+    failed = [name for name, ok in checks if not ok]
+    print(f"\n{'PASS' if not failed else 'FAIL'}: {len(checks) - len(failed)} of {len(checks)} checks.")
+    return 1 if failed else 0
+
+
 # group-qc ---------------------------------------------------------------------------
 # A check list for every group other than the reference: per image, the lacuna
 # count, the lacuna-scale candidates the lacuna stage rejected and the rule that
@@ -9552,6 +9607,10 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, default=POL_LOOK_DIR,
                    help="Output folder (default: results/archive/pols/phase0_look).")
     p.set_defaults(func=cmd_pol_look)
+
+    p = sub.add_parser("holdout-check",
+                       help="The held-out guard (docs/HOLDOUT.md): refusals and listings, no image read.")
+    p.set_defaults(func=cmd_holdout_check)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

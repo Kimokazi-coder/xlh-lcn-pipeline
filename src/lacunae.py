@@ -124,6 +124,7 @@ def load_channel(image_path: Path) -> tuple[np.ndarray, np.ndarray]:
     display_rgb_uint8 is the original image as RGB uint8, for overlays.
     signal_channel_float is config.CHANNEL as a 2D float array in [0, 1],
     inverted if config.INVERT_SIGNAL is set."""
+    refuse_held_out(image_path)
     raw = imread(image_path)
 
     if raw.ndim == 2:
@@ -170,6 +171,50 @@ def image_label(image) -> str:
     return config.IMAGE_LABELS.get(name, name)
 
 
+# The held-out images (docs/HOLDOUT.md)
+
+class HeldOutImageError(RuntimeError):
+    """A held-out image was asked for while config.HOLDOUT_MODE is DEV."""
+
+
+def held_out_labels() -> frozenset:
+    """Labels of the held-out images listed in config.HOLDOUT_FILE (none when
+    the file is absent)."""
+    path = Path(config.HOLDOUT_FILE)
+    if not path.is_file():
+        return frozenset()
+    record = json.loads(path.read_text(encoding="utf-8"))
+    return frozenset(item["label"] for item in record["images"])
+
+
+def is_held_out(image) -> bool:
+    """True when an image (a path, a cleaned name or a label) is held out and
+    the mode is DEV, so that it must be neither processed nor shown."""
+    return config.HOLDOUT_MODE != "FINAL" and image_label(image) in held_out_labels()
+
+
+def refuse_held_out(image) -> None:
+    """Raise HeldOutImageError for a held-out image in DEV mode."""
+    if is_held_out(image):
+        raise HeldOutImageError(f"{image_label(image)} is a held-out image (docs/HOLDOUT.md); it is read "
+                                "only with LCN_HOLDOUT_MODE=FINAL")
+
+
+_HELD_OUT_NOTED = set()
+
+
+def without_held_out(paths) -> list:
+    """The image paths without the held-out images in DEV mode. Says once per
+    process how many were left out of a folder."""
+    paths = list(paths)
+    kept = [p for p in paths if not is_held_out(p)]
+    skipped = tuple(sorted(str(p) for p in paths if is_held_out(p)))
+    if skipped and skipped not in _HELD_OUT_NOTED:
+        _HELD_OUT_NOTED.add(skipped)
+        print(f"DEV mode: {len(skipped)} held-out image(s) left out (docs/HOLDOUT.md).")
+    return kept
+
+
 def result_path(out_root: Path, label: str, section: str, suffix: str, subfolder: str | None = None) -> Path:
     """Path of one result file of one image: <out_root>/<section>/[<subfolder>/]
     <label>_<suffix>. There is no folder per image: the files of every image of
@@ -191,6 +236,7 @@ def save_contact_sheet(tiles: list, title: str, path: Path, columns: int = 3, ti
     row, each labelled, under one title line. Display only."""
     from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
 
+    tiles = [(label, picture) for label, picture in tiles if not is_held_out(label)]
     font = ImageFont.load_default(size=11)
     gap, label_h, title_h = 6, 18, 24
     n_rows = max(1, -(-len(tiles) // columns))
@@ -786,7 +832,7 @@ def config_values() -> dict:
     between machines and do not change any number."""
     out = {}
     for name in sorted(dir(config)):
-        if not name.isupper():
+        if not name.isupper() or name == "HOLDOUT_MODE":
             continue
         value = getattr(config, name)
         if isinstance(value, Path):
@@ -940,14 +986,16 @@ def write_outputs(result: dict, out_root: Path) -> None:
 
 
 def image_paths(args) -> list[Path]:
-    """The images named by -i or -d (sorted *.tif)."""
+    """The images named by -i or -d (sorted *.tif). In DEV mode a held-out
+    image named by -i is refused and a folder run leaves them out."""
     if args.image:
         if not args.image.is_file():
             raise FileNotFoundError(f"No such file: {args.image}")
+        refuse_held_out(args.image)
         return [args.image]
     if not args.dir.is_dir():
         raise NotADirectoryError(f"No such directory: {args.dir}")
-    return sorted(args.dir.glob("*.tif"))
+    return without_held_out(sorted(args.dir.glob("*.tif")))
 
 
 def add_input_arguments(parser: argparse.ArgumentParser) -> None:
