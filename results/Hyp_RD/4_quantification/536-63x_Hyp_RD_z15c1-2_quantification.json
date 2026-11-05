@@ -4,8 +4,8 @@
   "image": "536-63x Hyp RD_z15c1-2.tif",
   "image_label": "536-63x_Hyp_RD_z15c1-2",
   "note": "Pre-validation: not checked against manual counts. Pixel units. Headline measures: roots_count, ring_length_r30_px, the per-field canalicular_length_density_per_px, and the canalicular width (width_median_px per image, ring_width_mean_r30_px per lacuna). owned_length_px, edge_count and mean_edge_length_px depend on which cell owns which thread, which is unbounded in distance; they are network descriptors, and edge_count is not canaliculi per cell. The width is quantised by the pixel grid (threads are about 2 to 6 px wide) and moves with the threshold. Summary statistics cover interior lacunae only.",
-  "lacuna_count": 11,
-  "border_lacuna_count": 1,
+  "lacuna_count": 10,
+  "border_lacuna_count": 0,
   "interior_lacuna_count": 10,
   "headline_measures": [
     "roots_count",
@@ -97,24 +97,24 @@
       "sd": 92.5652
     },
     "ring_length_r60_px": {
-      "mean": 812.7,
-      "median": 821.5,
-      "sd": 246.8013
+      "mean": 817.8,
+      "median": 824.5,
+      "sd": 242.3834
     },
     "owned_length_px": {
-      "mean": 1456.6733,
+      "mean": 1463.7432,
       "median": 1109.3951,
-      "sd": 1205.6471
+      "sd": 1199.6277
     },
     "edge_count": {
-      "mean": 67.8,
+      "mean": 68.2,
       "median": 45.0,
-      "sd": 57.7635
+      "sd": 57.4317
     },
     "mean_edge_length_px": {
-      "mean": 21.4388,
-      "median": 21.113,
-      "sd": 2.3372
+      "mean": 21.3765,
+      "median": 21.0791,
+      "sd": 2.3324
     },
     "perimeter_px": {
       "mean": 320.5696,
@@ -127,9 +127,9 @@
       "sd": 2044.831
     },
     "ring_area_r60_px2": {
-      "mean": 25631.5,
+      "mean": 25748.4,
       "median": 25946.0,
-      "sd": 3637.6956
+      "sd": 3580.5201
     },
     "in_frame_fraction_r30": {
       "mean": 0.9949,
@@ -147,9 +147,9 @@
       "sd": 0.00597497
     },
     "ring_density_r60": {
-      "mean": 0.03142237,
-      "median": 0.02935704,
-      "sd": 0.00753015
+      "mean": 0.03150853,
+      "median": 0.02940087,
+      "sd": 0.00745809
     },
     "roots_per_100px_perimeter": {
       "mean": 2.9425,
@@ -162,9 +162,9 @@
       "sd": 106.9047
     },
     "ring_attached_length_r60_px": {
-      "mean": 650.8,
+      "mean": 652.0,
       "median": 625.0,
-      "sd": 275.9117
+      "sd": 274.627
     },
     "ring_length_w_r30_px": {
       "mean": 356.9605,
@@ -172,9 +172,9 @@
       "sd": 106.6364
     },
     "ring_length_w_r60_px": {
-      "mean": 921.4105,
-      "median": 935.2078,
-      "sd": 280.4454
+      "mean": 927.356,
+      "median": 938.4149,
+      "sd": 274.9689
     },
     "sholl_crossings_r10": {
       "mean": 7.5,
@@ -197,9 +197,9 @@
       "sd": 5.3083
     },
     "loop_edge_share": {
-      "mean": 0.213,
+      "mean": 0.2111,
       "median": 0.1958,
-      "sd": 0.1551
+      "sd": 0.1564
     },
     "ring_width_mean_r30_px": {
       "mean": 7.8457,
@@ -208,33 +208,33 @@
     }
   },
   "field": {
-    "analysed_area_px2": 976682.0,
-    "total_skeleton_length_px": 25358.0,
-    "canalicular_length_density_per_px": 0.02596341,
-    "junction_count": 483,
-    "junction_density_per_px2": 0.00049453,
-    "lacuna_count": 11,
-    "lacunae_per_px2": 1.126e-05,
+    "analysed_area_px2": 1019984.0,
+    "total_skeleton_length_px": 25239.0,
+    "canalicular_length_density_per_px": 0.02474451,
+    "junction_count": 479,
+    "junction_density_per_px2": 0.00046962,
+    "lacuna_count": 10,
+    "lacunae_per_px2": 9.8e-06,
     "skeleton_component_count": 347,
-    "mean_component_length_px": 73.0778,
+    "mean_component_length_px": 72.7349,
     "median_component_length_px": 20.0,
-    "field_length_density_w_per_px": 0.02947138,
-    "field_density_without_flagged_per_px": 0.02613973,
+    "field_length_density_w_per_px": 0.02808852,
+    "field_density_without_flagged_per_px": 0.02606627,
     "field_density_in_roi_per_px": null,
     "unattached_length_px": 607.0,
     "unattached_component_count": 30,
-    "canalicular_length_density_attached_per_px": 0.02596341,
-    "field_length_density_with_unattached_per_px": 0.02658491,
+    "canalicular_length_density_attached_per_px": 0.02474451,
+    "field_length_density_with_unattached_per_px": 0.02533961,
     "loop_count": 59,
-    "loop_edge_share": 0.1803,
-    "edge_count": 1270
+    "loop_edge_share": 0.1815,
+    "edge_count": 1262
   },
   "width": {
-    "width_mean_px": 7.7509,
+    "width_mean_px": 7.7371,
     "width_median_px": 8.0,
     "width_p10_px": 4.0,
     "width_p90_px": 10.7703,
-    "width_pixels_used": 25264
+    "width_pixels_used": 25193
   },
   "biological_limits": {
     "status": "report only, nothing is pruned or filtered by this block",
@@ -253,13 +253,13 @@
         24.96,
         50.05
       ],
-      "n_threads": 380,
-      "median_um": 13.1047,
+      "n_threads": 376,
+      "median_um": 13.1789,
       "p10_um": 0.3677,
-      "p90_um": 33.4751,
+      "p90_um": 33.5382,
       "max_um": 49.9671,
-      "fraction_in_range": 0.2237,
-      "fraction_below_range": 0.7763,
+      "fraction_in_range": 0.2261,
+      "fraction_below_range": 0.7739,
       "fraction_above_range": 0.0
     },
     "roots_per_lacuna": {
@@ -280,15 +280,15 @@
   },
   "network_shape": {
     "status": "report only, nothing here filters or prunes",
-    "skeleton_px": 25358,
+    "skeleton_px": 25239,
     "straight_run_min_px": 8,
-    "straight_run_px": 5972,
-    "straight_run_fraction": 0.2355,
+    "straight_run_px": 5936,
+    "straight_run_fraction": 0.2352,
     "rectangle_count": 0,
     "rectangle_tolerance_px": 1,
     "loop_count": 59,
-    "loop_edge_share": 0.180315,
-    "edge_count_real": 1270
+    "loop_edge_share": 0.181458,
+    "edge_count_real": 1262
   },
   "lacunae": [
     {
@@ -388,22 +388,22 @@
       "dim": false,
       "roots_count": 9,
       "ring_length_r30_px": 308,
-      "ring_length_r60_px": 727,
+      "ring_length_r60_px": 733,
       "owned_length_px": 697.0681,
       "edge_count": 31,
       "mean_edge_length_px": 22.4861,
       "perimeter_px": 360.7767,
       "ring_area_r30_px2": 12077,
-      "ring_area_r60_px2": 24313,
+      "ring_area_r60_px2": 24442,
       "in_frame_fraction_r30": 0.9489,
       "in_frame_fraction_r60": 0.7871,
       "ring_density_r30": 0.02550302,
-      "ring_density_r60": 0.0299017,
+      "ring_density_r60": 0.02998936,
       "roots_per_100px_perimeter": 2.4946,
       "ring_attached_length_r30_px": 270,
-      "ring_attached_length_r60_px": 466,
+      "ring_attached_length_r60_px": 468,
       "ring_length_w_r30_px": 353.1198,
-      "ring_length_w_r60_px": 834.2519,
+      "ring_length_w_r60_px": 840.6661,
       "sholl_crossings_r10": 9,
       "sholl_crossings_r20": 10,
       "sholl_crossings_r30": 8,
@@ -533,46 +533,6 @@
     },
     {
       "lacuna_id": 7,
-      "area_px2": 43302.0,
-      "major_axis_length_px": 512.8712,
-      "minor_axis_length_px": 132.4065,
-      "aspect_ratio": 3.8735,
-      "eccentricity": 0.9661,
-      "solidity": 0.9015,
-      "orientation_rad": -0.1647,
-      "centroid_row_px": 845.911,
-      "centroid_col_px": 969.1506,
-      "on_border": true,
-      "lacuna_class": "ordinary",
-      "out_of_focus": false,
-      "dim": false,
-      "roots_count": 5,
-      "ring_length_r30_px": 193,
-      "ring_length_r60_px": 677,
-      "owned_length_px": 287.865,
-      "edge_count": 13,
-      "mean_edge_length_px": 22.1435,
-      "perimeter_px": 1310.926,
-      "ring_area_r30_px2": 17620,
-      "ring_area_r60_px2": 35307,
-      "in_frame_fraction_r30": 0.437,
-      "in_frame_fraction_r60": 0.4235,
-      "ring_density_r30": 0.01095346,
-      "ring_density_r60": 0.01917467,
-      "roots_per_100px_perimeter": 0.3814,
-      "ring_attached_length_r30_px": 102,
-      "ring_attached_length_r60_px": 230,
-      "ring_length_w_r30_px": 214.2376,
-      "ring_length_w_r60_px": 766.6955,
-      "sholl_crossings_r10": 4,
-      "sholl_crossings_r20": 8,
-      "sholl_crossings_r30": 12,
-      "loop_count": 0,
-      "loop_edge_share": 0.0,
-      "ring_width_mean_r30_px": 7.9667
-    },
-    {
-      "lacuna_id": 8,
       "area_px2": 2767.0,
       "major_axis_length_px": 117.6135,
       "minor_axis_length_px": 33.0604,
@@ -612,7 +572,7 @@
       "ring_width_mean_r30_px": 7.3144
     },
     {
-      "lacuna_id": 9,
+      "lacuna_id": 8,
       "area_px2": 3423.0,
       "major_axis_length_px": 136.956,
       "minor_axis_length_px": 33.4698,
@@ -652,7 +612,7 @@
       "ring_width_mean_r30_px": 8.2971
     },
     {
-      "lacuna_id": 10,
+      "lacuna_id": 9,
       "area_px2": 2309.0,
       "major_axis_length_px": 104.7386,
       "minor_axis_length_px": 31.8331,
@@ -692,7 +652,7 @@
       "ring_width_mean_r30_px": 6.9551
     },
     {
-      "lacuna_id": 11,
+      "lacuna_id": 10,
       "area_px2": 2456.0,
       "major_axis_length_px": 90.7499,
       "minor_axis_length_px": 38.8445,
@@ -708,27 +668,27 @@
       "dim": false,
       "roots_count": 9,
       "ring_length_r30_px": 264,
-      "ring_length_r60_px": 588,
-      "owned_length_px": 503.3036,
-      "edge_count": 23,
-      "mean_edge_length_px": 21.8828,
+      "ring_length_r60_px": 633,
+      "owned_length_px": 574.0021,
+      "edge_count": 27,
+      "mean_edge_length_px": 21.2593,
       "perimeter_px": 253.7645,
       "ring_area_r30_px2": 9563,
-      "ring_area_r60_px2": 23547,
+      "ring_area_r60_px2": 24587,
       "in_frame_fraction_r30": 1.0,
       "in_frame_fraction_r60": 1.0,
       "ring_density_r30": 0.0276064,
-      "ring_density_r60": 0.02497133,
+      "ring_density_r60": 0.02574531,
       "roots_per_100px_perimeter": 3.5466,
       "ring_attached_length_r30_px": 209,
-      "ring_attached_length_r60_px": 365,
+      "ring_attached_length_r60_px": 375,
       "ring_length_w_r30_px": 293.6934,
-      "ring_length_w_r60_px": 650.3158,
+      "ring_length_w_r60_px": 703.3574,
       "sholl_crossings_r10": 7,
       "sholl_crossings_r20": 11,
       "sholl_crossings_r30": 10,
       "loop_count": 1,
-      "loop_edge_share": 0.1304,
+      "loop_edge_share": 0.1111,
       "ring_width_mean_r30_px": 6.5034
     }
   ],
@@ -753,6 +713,7 @@
       "fast_lacuna_stage": true,
       "lacuna_rescue_rules": false,
       "fragment_rule": true,
+      "band_blob_rule": true,
       "computed_threshold_t_hi": 0.6439797794117648
     },
     "canaliculi": {
@@ -785,7 +746,7 @@
       "dim_thread_cut_fraction": 0.5,
       "dim_thread_reach_um": 0.65,
       "dim_thread_reach_px": 5,
-      "dim_pass_added_px": 15827,
+      "dim_pass_added_px": 15591,
       "lacuna_attach_reach_um": 2.6,
       "lacuna_attach_reach_px": 20,
       "lacuna_attach_min_signal_fraction": 0.7,
@@ -807,15 +768,15 @@
       "hole_new_min_length_um": 10.0,
       "hole_new_min_length_px": 77,
       "hole_new_min_aspect": 3.0,
-      "hole_zone_px": 186435,
-      "hole_zone_added_px": 10115,
+      "hole_zone_px": 161940,
+      "hole_zone_added_px": 8974,
       "hole_gain_step_um": 0.26,
       "hole_gain_smooth_annuli": 3,
       "hole_zone_gains": {
-        "lacunae": 11,
+        "lacunae": 10,
         "at_the_body_edge": {
           "min": 1.0,
-          "median": 3.0,
+          "median": 2.4226,
           "max": 3.0
         },
         "at_the_outer_end": {
@@ -823,9 +784,9 @@
           "median": 1.0,
           "max": 1.563
         },
-        "at_the_cap": 7
+        "at_the_cap": 6
       },
-      "hole_zone_guard_dropped_px": 806,
+      "hole_zone_guard_dropped_px": 519,
       "contact_every_touching_body": true,
       "lacuna_attach_rule": "a node attaches only if the dimmest ridge response on the straight path from the lacuna surface to it reaches that fraction of the response's own low cut",
       "prune_spur_len_px": 4,
@@ -865,7 +826,7 @@
     }
   },
   "provenance": {
-    "git_commit": "50ffbd9d954c2eb8c8e601fa4679d60c94a90031",
+    "git_commit": "300bdcc60e13e8d23ce178bf5b66dd3ce3dd0547",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -876,7 +837,7 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "1d23eeff4b2c8a82",
+    "config_hash": "060d9e0d484fb636",
     "config_hash_covers": [
       "AI_CANDIDATE_CUT_FRACTION",
       "AI_CONTRAST_RATIO_MAX",
@@ -916,6 +877,8 @@
       "ARCHIVE_AI_JUDGE_DIR",
       "ARCHIVE_NOT_USED_DIR",
       "ARCHIVE_POL_RING_PROXY_DIR",
+      "BAND_BLOB_MAX_AREA_UM2",
+      "BAND_BLOB_RULE",
       "BAND_FILTER_MIN_OPENING_SHARE",
       "BORDER_AREA_FRACTION",
       "BORDER_MIN_SOLIDITY",

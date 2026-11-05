@@ -659,6 +659,26 @@ FRAGMENT_SPECK_MAX_WIDTH_UM = 2.0
 # NOT VALIDATED.
 FRAGMENT_CRUMB_MAX_AREA_UM2 = 10.0
 FRAGMENT_CRUMB_MIN_SOLIDITY = 0.80
+#
+# (g8) Review loop, round 4 (2026-11-05): the band rule. A saturated band, the
+# bone surface or soft tissue is one large bright region in the lacuna mask
+# (the top class of the cut, after its hole fill and opening), and the
+# watershed cuts it into pieces of lacuna size that the area and shape rules
+# then keep. So a kept object is dropped when the connected region of the mask
+# it lies in (most of its pixels) is larger than BAND_BLOB_MAX_AREA_UM2: no
+# single lacuna profile is that large, and every piece of such a region is a
+# piece of a band or tissue. Chosen on the round 3 pictures: the largest
+# lacuna the reviewer accepted is 200.9 um2 and lies in a region of the same
+# size; one accepted lacuna of 32.8 um2 lies in a region of 251.6 um2 (fused in
+# the mask to a band), and the next accepted one below that is 165 um2. At 300
+# um2 the rule drops 17 objects the reviewer called band or tissue pieces and
+# no accepted object; no WT object. CAUTION: this is in effect a largest
+# lacuna profile of 300 um2 (about 8 times the WT median), so a real lacuna
+# larger than that, or one fused in the mask to a band, is dropped too: a
+# limit on exactly the enlarged lacunae a periosteocytic lesion study looks
+# for. NOT VALIDATED. BAND_BLOB_RULE = False turns it off.
+BAND_BLOB_RULE = True
+BAND_BLOB_MAX_AREA_UM2 = 300.0
 
 # (h) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The

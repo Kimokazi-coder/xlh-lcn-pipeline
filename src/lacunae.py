@@ -792,6 +792,26 @@ def fragment_filter(labels: np.ndarray, kept: list[tuple]) -> list[tuple]:
     return out
 
 
+def band_blob_filter(mask: np.ndarray, labels: np.ndarray, kept: list[tuple]) -> list[tuple]:
+    """The band rule (config.BAND_BLOB_RULE, section g8): drop every kept object
+    whose region of the lacuna mask (the connected region holding most of its
+    pixels) is larger than config.BAND_BLOB_MAX_AREA_UM2."""
+    blobs = measure.label(mask, connectivity=2)
+    blob_area = np.bincount(blobs.ravel())
+    limit = config.area_px2(config.BAND_BLOB_MAX_AREA_UM2)
+    kept_labels = {region.label for region, _b in kept}
+    whole = {r.label: r for r in measure.regionprops(labels) if r.label in kept_labels}
+    out = []
+    for region, on_border in kept:
+        rr, cc = whole[region.label].coords[:, 0], whole[region.label].coords[:, 1]
+        ids = blobs[rr, cc]
+        ids = ids[ids > 0]
+        if ids.size and blob_area[int(np.bincount(ids).argmax())] > limit:
+            continue
+        out.append((region, on_border))
+    return out
+
+
 def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
     """(label_image, kept, t_hi) for one signal channel. The switch steps run
     only when their switch in config.py is on. A given t_hi replaces the
@@ -815,6 +835,8 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
         kept = band_filter(kept, config.BAND_FILTER_MIN_OPENING_SHARE)
     if config.FRAGMENT_RULE:
         kept = fragment_filter(labels, kept)
+    if config.BAND_BLOB_RULE:
+        kept = band_blob_filter(mask, labels, kept)
     # Lacunae the plain filters miss, appended AFTER the ones they keep, so the
     # ids of the ordinary lacunae never move. Both classes carry no area or shape
     # measure: "dim" for the three rules of config section g, "out_of_focus" for
@@ -993,6 +1015,7 @@ def parameters() -> dict:
         "fast_lacuna_stage": config.FAST_LACUNA_STAGE,
         "lacuna_rescue_rules": config.LACUNA_RESCUE_RULES,
         "fragment_rule": config.FRAGMENT_RULE,
+        "band_blob_rule": config.BAND_BLOB_RULE,
     }
 
 

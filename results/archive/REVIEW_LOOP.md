@@ -164,3 +164,45 @@ makes WT worse only if it removes or changes WT objects the reviewer had
 accepted.
 
 **Kept.** Total down 17; WT not changed.
+
+## Round 4: the band rule (config.BAND_BLOB_RULE, section g8)
+
+**Problem attacked:** band or tissue piece (73 of 169).
+
+**What the round 3 pictures showed.** A saturated band, the bone surface or
+soft tissue is one large bright region of the lacuna mask, and the watershed
+cuts it into lacuna-sized pieces. Measured on the mask the pipeline uses (the
+cut after its hole fill and opening), every object lying in a region larger
+than 300 um2 was a band or tissue piece (17 of 17); the largest accepted
+lacuna is 200.9 um2 and is its own region. At 250 um2 the rule would also
+drop a 32.8 um2 lacuna fused in the mask to a band.
+
+**Rule.** A kept object is dropped when its region of the lacuna mask is
+larger than 300 um2. Predicted: 17 band pieces, no accepted object, no WT
+object. The run dropped 17 (WT 0, WT_HP 2, Hyp_RD 7, Hyp_HP 8). **Caution:**
+this acts as a largest lacuna profile of 300 um2, about 8 times the WT median;
+a real lacuna larger than that, or fused in the mask to a band, is dropped
+too. In a POL study that is the side to watch.
+
+**Counts, round 3 to round 4** (`review_loop/round4/tally.csv`):
+
+| group | lacunae labelled | fragment | band or tissue piece | split | merged | missed | other | total |
+| - | - | - | - | - | - | - | - | - |
+| WT | 71 to 71 | 4 to 5 | 1 to 1 | 0 to 0 | 0 to 0 | 3 to 1 | 2 to 1 | **10 to 8** |
+| WT_HP | 87 to 85 | 4 to 5 | 12 to 11 | 1 to 1 | 0 to 0 | 4 to 5 | 3 to 2 | **24 to 24** |
+| Hyp_RD | 157 to 150 | 23 to 26 | 25 to 15 | 5 to 5 | 1 to 1 | 1 to 1 | 5 to 3 | **60 to 51** |
+| Hyp_HP | 157 to 149 | 30 to 36 | 35 to 22 | 10 to 6 | 0 to 1 | 0 to 0 | 0 to 5 | **75 to 70** |
+| all | 472 to 455 | 61 to 72 | 73 to 49 | 16 to 12 | 1 to 2 | 8 to 7 | 10 to 11 | **169 to 153** |
+
+**WT:** unchanged by this round again (no WT object dropped, pictures
+identical); the reviewer's count moved 10 to 8 on the same pictures. The
+fragment count rose 61 to 72 though no fragment-like object was added: the
+reviewer moved objects between categories and flagged objects it had passed.
+Its noise is now about the size of one rule's effect.
+
+**Also checked:** `diagnostics.py dark-band-check --watershed` on all 27
+development images: the fast watershed and the windowed dark-band merge give
+identical labels on 27 of 27 (the merge took up to 2646 s per image on the
+full frame, about 1 s in the window).
+
+**Kept.** Total down 16; WT not changed.

@@ -43,7 +43,7 @@
     "dim_thread_cut_fraction": 0.5,
     "dim_thread_reach_um": 0.65,
     "dim_thread_reach_px": 5,
-    "dim_pass_added_px": 25415,
+    "dim_pass_added_px": 24266,
     "lacuna_attach_reach_um": 2.6,
     "lacuna_attach_reach_px": 20,
     "lacuna_attach_min_signal_fraction": 0.7,
@@ -65,15 +65,15 @@
     "hole_new_min_length_um": 10.0,
     "hole_new_min_length_px": 77,
     "hole_new_min_aspect": 3.0,
-    "hole_zone_px": 215815,
-    "hole_zone_added_px": 12121,
+    "hole_zone_px": 161733,
+    "hole_zone_added_px": 8872,
     "hole_gain_step_um": 0.26,
     "hole_gain_smooth_annuli": 3,
     "hole_zone_gains": {
-      "lacunae": 31,
+      "lacunae": 25,
       "at_the_body_edge": {
         "min": 1.0,
-        "median": 1.7325,
+        "median": 1.5859,
         "max": 3.0
       },
       "at_the_outer_end": {
@@ -81,9 +81,9 @@
         "median": 1.0,
         "max": 1.8054
       },
-      "at_the_cap": 5
+      "at_the_cap": 3
     },
-    "hole_zone_guard_dropped_px": 3357,
+    "hole_zone_guard_dropped_px": 1568,
     "contact_every_touching_body": true,
     "lacuna_attach_rule": "a node attaches only if the dimmest ridge response on the straight path from the lacuna surface to it reaches that fraction of the response's own low cut",
     "prune_spur_len_px": 4,
@@ -105,7 +105,7 @@
     ]
   },
   "provenance": {
-    "git_commit": "50ffbd9d954c2eb8c8e601fa4679d60c94a90031",
+    "git_commit": "300bdcc60e13e8d23ce178bf5b66dd3ce3dd0547",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -116,7 +116,7 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "70b3936aa2dc1899",
+    "config_hash": "f1dc7c170c642727",
     "config_hash_covers": [
       "AI_CANDIDATE_CUT_FRACTION",
       "AI_CONTRAST_RATIO_MAX",
@@ -156,6 +156,8 @@
       "ARCHIVE_AI_JUDGE_DIR",
       "ARCHIVE_NOT_USED_DIR",
       "ARCHIVE_POL_RING_PROXY_DIR",
+      "BAND_BLOB_MAX_AREA_UM2",
+      "BAND_BLOB_RULE",
       "BAND_FILTER_MIN_OPENING_SHARE",
       "BORDER_AREA_FRACTION",
       "BORDER_MIN_SOLIDITY",
