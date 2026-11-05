@@ -91,7 +91,8 @@ DIGITS = 4
 RATIO_LIMITS = (0.25, 4.0)
 RATIO_TICKS = (0.25, 0.5, 1.0, 2.0, 4.0)
 COLOUR_MAP = "viridis"
-FILL_ALPHA = 0.5
+FILL_ALPHA = 0.7
+OUTLINE_LW = 1.2  # measured lacunae are also outlined in their own colour, opaque
 FLAGGED_COLOUR = "#A6A6A6"
 SCALE_BAR_UM = 10.0
 DPI = 100
@@ -234,9 +235,9 @@ def save_picture(image_path: Path, labels: np.ndarray, rows: list[dict], wt_medi
         mask = labels == r["id"]
         if not mask.any():
             continue
-        if r["flag"]:
-            for c in measure.find_contours(np.pad(mask, 1).astype(float), 0.5):
-                ax.plot(c[:, 1] - 1, c[:, 0] - 1, color=FLAGGED_COLOUR, lw=1.0)
+        edge = FLAGGED_COLOUR if r["flag"] else cmap(norm(r["_ratio"]))
+        for c in measure.find_contours(np.pad(mask, 1).astype(float), 0.5):
+            ax.plot(c[:, 1] - 1, c[:, 0] - 1, color=edge, lw=1.0 if r["flag"] else OUTLINE_LW)
         rows_i, cols_i = np.nonzero(mask)
         x = cols_i.max() + 4
         ha = "left"

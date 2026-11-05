@@ -18,7 +18,7 @@ results/archive/ the group-independent old material.
 | P1 | code writes the new layout (config.py, src/, the figures script) | done |
 | P2 | git mv every existing file, MOVE_MAP.csv, lacunae contact sheets | done |
 | P3 | publication figures for WT_HP, Hyp_RD, Hyp_HP | done |
-| P4 | 3_pols: lacunar size, all groups | not started |
+| P4 | 3_pols: lacunar size, all groups | done |
 | P5 | docs and checks, final report | not started |
 
 ## Decisions
@@ -92,3 +92,4 @@ results/archive/ the group-independent old material.
   S01: WT_HP has one row (hole fill; the crumb rule changed 876_z89c1-2 only
   outside the rule), Hyp_RD and Hyp_HP two. Fig04 labels the points of the
   groups other than WT by animal and z plane. WT unchanged.
+- P4 done: 3_pols lacunar size for all four groups, pols check PASS, selftest 9/9.
