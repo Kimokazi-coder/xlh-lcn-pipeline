@@ -1178,6 +1178,18 @@ def animal_of(label: str) -> str:
     return m.group(0) if m else label
 
 
+def plot_name(label: str) -> str:
+    """The label a point carries in a plot: the image label for WT; for another
+    group the animal and the z plane, in the WT style (548_hyp_HP_z08c1-2 is
+    548_z08), so the labels do not run into each other. Display only."""
+    import re
+
+    if GROUP == config.REFERENCE_GROUP:
+        return label
+    z = re.search(r"z\d+", label)
+    return f"{animal_of(label)}_{z.group(0)}" if z else label
+
+
 def threshold_images() -> list[str]:
     """For a group other than WT: one image per animal, the first of that
     animal in name order, at most three."""
@@ -1527,6 +1539,111 @@ def figure_contact(key_path: Path | None = None, rejected: bool = False) -> None
     print(fig_name, "written")
 
 
+# Parallel precompute ---------------------------------------------------------------
+# Fig03 and the S01 switch search run the lacuna stage many times, which takes
+# minutes per run on the groups other than WT. These run it in parallel
+# processes and keep each result in .cache/ (git-ignored), keyed by the source
+# hash, so a rerun or an interruption loses nothing. The computation is the
+# one the figures made before, unchanged.
+
+CACHE3 = ROOT / ".cache" / "figures_lacuna_runs"
+# Each lacuna run of a group other than WT can hold more than 1 GB; three at a
+# time keep a machine with 8 GB of memory out of swap. LCN_FIGURE_WORKERS sets
+# another number.
+PARALLEL_WORKERS = int(os.environ.get("LCN_FIGURE_WORKERS", "3"))
+
+
+def _threshold_job(job: tuple) -> str:
+    """One lacuna stage run at t_hi x scale; saves what Fig03 draws."""
+    from skimage import measure
+
+    path_str, scale, out_str = job
+    path = Path(path_str)
+    if scale != 1.0:
+        _display, channel = lacunae.load_channel(path)
+        _mask, t_hi = lacunae.multiotsu_lacuna_mask(channel)
+        lac = lacunae.analyse_image(path, t_hi * scale)
+    else:
+        lac = lacunae.analyse_image(path)
+    id_map = np.zeros(lac["labels"].shape, dtype=np.int32)
+    for lid, (region, _b) in enumerate(lac["kept"], start=1):
+        id_map[lac["labels"] == region.label] = lid
+    kept_labels = {region.label for region, _b in lac["kept"]}
+    n_rej = sum(1 for rg in measure.regionprops(lac["labels"])
+                if rg.label not in kept_labels and rg.area >= REJECTED_MIN_DRAW_PX2)
+    rows = quantification.measurements_for(lac["kept"], config.CSV_FLOAT_PRECISION)
+    out = Path(out_str)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(out.name + "_tmp.npz")
+    np.savez_compressed(tmp, id_map=id_map)
+    os.replace(tmp, out.with_name(out.name + ".npz"))
+    write_json(out.with_name(out.name + ".json"), {"n_rej": n_rej, "lac_rows": rows, "t_hi": lac["t_hi"],
+                                          "lacuna_count": lac["lacuna_count"],
+                                          "interior_lacuna_count": lac["interior_lacuna_count"]})
+    return out.name
+
+
+def threshold_stem(name: str, scale: float) -> Path:
+    """The cache files of one run, without extension: the scale in hundredths
+    (x080 for 0.8), so the name holds no dot and every scale has its own file."""
+    return CACHE3 / f"{name}_thr_x{round(scale * 100):03d}_{src_hash()}"
+
+
+def threshold_runs(names: list) -> None:
+    """Every (image, scale) of Fig03 not yet cached, in parallel."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    jobs = [(str(path_of(n)), s, str(threshold_stem(n, s))) for n in names for s in THRESHOLD_SCALES
+            if not threshold_stem(n, s).with_name(threshold_stem(n, s).name + ".json").is_file()]
+    if jobs:
+        with ProcessPoolExecutor(max_workers=min(PARALLEL_WORKERS, len(jobs))) as ex:
+            for done_name in ex.map(_threshold_job, jobs):
+                print("lacuna run cached:", done_name, flush=True)
+
+
+def threshold_run(name: str, scale: float) -> dict:
+    stem = threshold_stem(name, scale)
+    meta = json.loads(stem.with_name(stem.name + ".json").read_text(encoding="utf-8"))
+    with np.load(stem.with_name(stem.name + ".npz")) as z:
+        meta["id_map"] = z["id_map"]
+    return meta
+
+
+def _switch_job(job: tuple) -> tuple:
+    """Does the lacuna stage with one switch on keep other lacunae than the
+    cached default run (.cache/figures_v2) of the image?"""
+    path_str, switch, value, out_str = job
+    path = Path(path_str)
+    setattr(config, switch, value)
+    lac = lacunae.analyse_image(path)
+    id_map = np.zeros(lac["labels"].shape, dtype=np.int32)
+    for lid, (region, _b) in enumerate(lac["kept"], start=1):
+        id_map[lac["labels"] == region.label] = lid
+    with np.load(CACHE2 / f"{short(path)}.npz") as z:
+        changed = not np.array_equal(id_map, z["lacuna_id_map"])
+    write_json(Path(out_str), {"changed": changed})
+    return short(path), changed
+
+
+def switch_stem(name: str, switch: str, value) -> Path:
+    return CACHE3 / f"{name}_switch_{switch}_{value}_{src_hash()}.json"
+
+
+def switch_changes(switch: str, value, names: list) -> dict:
+    """{image: does the switch change its lacuna labels}, every image, in parallel."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    for n in names:
+        image_data(n)  # the default run must be cached before the workers compare with it
+    jobs = [(str(path_of(n)), switch, value, str(switch_stem(n, switch, value))) for n in names
+            if not switch_stem(n, switch, value).is_file()]
+    if jobs:
+        with ProcessPoolExecutor(max_workers=min(PARALLEL_WORKERS, len(jobs))) as ex:
+            for name, changed in ex.map(_switch_job, jobs):
+                print(f"switch {switch}: {name} {'changes' if changed else 'no change'}", flush=True)
+    return {n: json.loads(switch_stem(n, switch, value).read_text(encoding="utf-8"))["changed"] for n in names}
+
+
 # F3 lacuna cut sensitivity --------------------------------------------------------
 
 # WT: three images chosen for the overnight report. Another group: threshold_images().
@@ -1557,21 +1674,17 @@ def figure_thresholds() -> None:
     fig_h = top + len(THRESHOLD_IMAGES) * (panel + text_h) + legend_h + cap_h
     fig = plt.figure(figsize=(FIG_WIDTH_MM * MM, fig_h * MM))
     log = {}
+    threshold_runs(THRESHOLD_IMAGES)
     for r, name in enumerate(THRESHOLD_IMAGES):
         path = path_of(name)
         _display, channel = lacunae.load_channel(path)
-        _mask, t_hi = lacunae.multiotsu_lacuna_mask(channel)
         raw = windowed(channel)
         flagged = image_data(name)["flagged"]
         for c, scale in enumerate(THRESHOLD_SCALES):
-            lac = lacunae.analyse_image(path, t_hi * scale) if scale != 1.0 else lacunae.analyse_image(path)
-            id_map = np.zeros(lac["labels"].shape, dtype=np.int32)
-            for lid, (region, _b) in enumerate(lac["kept"], start=1):
-                id_map[lac["labels"] == region.label] = lid
-            kept_labels = {region.label for region, _b in lac["kept"]}
-            n_rej = sum(1 for rg in measure.regionprops(lac["labels"])
-                        if rg.label not in kept_labels and rg.area >= REJECTED_MIN_DRAW_PX2)
-            lac_rows = quantification.measurements_for(lac["kept"], config.CSV_FLOAT_PRECISION)
+            lac = threshold_run(name, scale)
+            id_map = lac["id_map"]
+            n_rej = lac["n_rej"]
+            lac_rows = lac["lac_rows"]
             areas = np.bincount(id_map.ravel(), minlength=len(lac_rows) + 1)
             inside = np.bincount(id_map[flagged].ravel(), minlength=len(lac_rows) + 1)
             canal = [rr["lacuna_id"] for rr in lac_rows
@@ -1630,40 +1743,61 @@ def find_switch_cases() -> list:
     name order are run with the switch on until one gives a different result
     for an interior lacuna whose 120 px crop lies inside the frame; there, the
     lacuna with the largest change (ring 30 px length, then roots, then area).
-    A switch that changes nothing in any image has no row."""
+    A switch that changes nothing in any image has no row. Both switches act
+    on the lacuna stage, so an image is run in full with the switch on only
+    when its lacuna labels change; the result is the same, the search faster."""
     cases = []
+    names = group_labels()
     for switch, value, label in SWITCHES_SHOWN:
         found = None
-        for name in group_labels():
-            off = image_data(name)
-            on = switched_output(off["path"], switch, value)
-            if int(on["lacuna_id_map"].max()) != int(off["lacuna_id_map"].max()):
-                continue
-            h, w = off["lacuna_id_map"].shape
-            area_off = {r["lacuna_id"]: r["area_px2"] or 0 for r in off["lacuna_rows"]}
-            area_on = {r["lacuna_id"]: r["area_px2"] or 0 for r in on["lacuna_rows"]}
-            cells_off = {c["lacuna_id"]: c for c in off["cell_rows"]}
-            best = None
-            for c in on["cell_rows"]:
-                i = c["lacuna_id"]
-                if i not in off["interior_ids"]:
+        # The images are checked in name order, PARALLEL_WORKERS at a time, and
+        # the search stops at the first that qualifies: the same image as checking
+        # them all, with fewer runs.
+        for start in range(0, len(names), PARALLEL_WORKERS):
+            batch = names[start:start + PARALLEL_WORKERS]
+            changes = switch_changes(switch, value, batch)
+            for name in batch:
+                if not changes[name]:
                     continue
-                row = next(r for r in off["lacuna_rows"] if r["lacuna_id"] == i)
-                x, y = int(round(row["centroid_col_px"])), int(round(row["centroid_row_px"]))
-                half = SWITCH_CROP_HALF_PX
-                if not (half <= x <= w - half and half <= y <= h - half):
-                    continue
-                change = (abs(c["ring_length_r30_px"] - cells_off[i]["ring_length_r30_px"]),
-                          abs(c["roots_count"] - cells_off[i]["roots_count"]),
-                          abs(area_on[i] - area_off[i]))
-                if any(change) and (best is None or change > best[0]):
-                    best = (change, x, y, i)
-            if best is not None:
-                found = (name, best[1], best[2], SWITCH_CROP_HALF_PX, switch, value, label, best[3])
+                found = switch_case_in(name, switch, value, label)
+                if found is not None:
+                    break
+            if found is not None:
                 break
         if found is not None:
             cases.append(found)
     return cases
+
+
+def switch_case_in(name: str, switch: str, value, label: str):
+    """The S01 case of one image whose lacuna labels the switch changes: the
+    interior lacuna, inside the frame, with the largest change, or None."""
+    off = image_data(name)
+    on = switched_output(off["path"], switch, value)
+    if int(on["lacuna_id_map"].max()) != int(off["lacuna_id_map"].max()):
+        return None
+    h, w = off["lacuna_id_map"].shape
+    area_off = {r["lacuna_id"]: r["area_px2"] or 0 for r in off["lacuna_rows"]}
+    area_on = {r["lacuna_id"]: r["area_px2"] or 0 for r in on["lacuna_rows"]}
+    cells_off = {c["lacuna_id"]: c for c in off["cell_rows"]}
+    best = None
+    for c in on["cell_rows"]:
+        i = c["lacuna_id"]
+        if i not in off["interior_ids"]:
+            continue
+        row = next(r for r in off["lacuna_rows"] if r["lacuna_id"] == i)
+        x, y = int(round(row["centroid_col_px"])), int(round(row["centroid_row_px"]))
+        half = SWITCH_CROP_HALF_PX
+        if not (half <= x <= w - half and half <= y <= h - half):
+            continue
+        change = (abs(c["ring_length_r30_px"] - cells_off[i]["ring_length_r30_px"]),
+                  abs(c["roots_count"] - cells_off[i]["roots_count"]),
+                  abs(area_on[i] - area_off[i]))
+        if any(change) and (best is None or change > best[0]):
+            best = (change, x, y, i)
+    if best is None:
+        return None
+    return (name, best[1], best[2], SWITCH_CROP_HALF_PX, switch, value, label, best[3])
 
 
 def switched_output(path: Path, switch: str, value) -> dict:
@@ -1751,7 +1885,7 @@ def figure_switches() -> None:
                         f"ring 30: {cell['ring_length_r30_px']} px", transform=ax.transAxes, ha="center", va="top")
                 log[f"{name} {title}"] = {"area_px2": row["area_px2"], "roots": cell["roots_count"],
                                           "ring30": cell["ring_length_r30_px"]}
-            ax.set_title(title, pad=2)
+            ax.set_title(title, pad=2, fontsize=FONT_SIZE if c > 0 or len(title) <= 30 else FONT_SIZE * 30 / len(title))
             if c == 0:
                 panel_letter(fig, ax, "AB"[r])
     legend_strip(fig, margin, cap_h, width - 2 * margin, legend_h, width, fig_h, items)
@@ -1885,10 +2019,10 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
                     ax.scatter([x], [v], s=9, c="black", zorder=3, linewidths=0)
                 # Label right of the mean bar, joined to its dot by a thin leader.
                 ax.plot([x, j + 0.25], [v, ly], color="0.6", lw=0.3, zorder=1)
-                ax.text(j + 0.27, ly, n, fontsize=FONT_SIZE - 2.5, ha="left", va="center", color="0.25", zorder=4)
+                ax.text(j + 0.27, ly, plot_name(n), fontsize=FONT_SIZE - 2.5, ha="left", va="center", color="0.25", zorder=4)
         ax.set_xticks(range(len(fields)))
         ax.set_xticklabels([f"{field_name[fid]}\nn={len(members[fid])}" for fid in fields])
-        ax.set_xlim(-0.45, len(fields) - 0.2)
+        ax.set_xlim(-0.45, len(fields) - (0.2 if GROUP == config.REFERENCE_GROUP else -0.35))
         ax.set_title(title, pad=3)
         ax.set_ylabel(unit, labelpad=1)
         ax.spines["top"].set_visible(False)
@@ -1904,7 +2038,7 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
          "label": (f"{MERGE_IMAGE}, alone in its field by field-summary" + (", merged here by hand" if merged else "")
                    if GROUP == config.REFERENCE_GROUP else "image alone in its field by field-summary")},
         {"kind": "bar", "colour": PALETTE["field_mean"], "label": "field mean"}])
-    groups = "; ".join(f"{field_name[fid]}: {' + '.join(members[fid])}" for fid in fields)
+    groups = "; ".join(f"{field_name[fid]}: {' + '.join(plot_name(m) for m in members[fid])}" for fid in fields)
     if merged:
         note = (f"{MERGE_IMAGE} (open diamond) is merged by hand into the field of 682_z23 and 682_z29 (option -m); "
                 "field-summary keeps it alone, and the merged means are computed here, not by field-summary.")
@@ -1912,8 +2046,9 @@ def figure_fields(field_dir: Path, merged: bool = False) -> None:
         note = (f"{MERGE_IMAGE} (open diamond) is alone in its field by the data-derived grouping, probably the same "
                 "field as 682_z23 and 682_z29 at another depth.")
     else:
-        note = (f"{GROUP}. Open diamond: an image alone in its field by the data-derived grouping."
-                if alone else f"{GROUP}.")
+        note = (f"{GROUP}; the points are labelled by animal and z plane ("
+                + ", ".join(f"{plot_name(k)} = {k}" for k in sorted(field_of)) + "). "
+                + ("Open diamond: an image alone in its field by the data-derived grouping." if alone else ""))
     fig.text(0.01, 0.01, "Fields from field-summary (lacuna centroids matched across images). " + groups + ". " + note
              + " n: images per field. All y axes start at zero. Pre-validation, pixel units, no test.",
              ha="left", va="bottom", fontsize=FONT_SIZE - 1, wrap=True)
@@ -1945,7 +2080,11 @@ def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DI
     skips outputs that exist; delete a file to redraw it. Prints one row per
     output: written, skipped, failed or missing. Returns 1 if any step failed."""
     def pair(stem):
-        return [stem.with_name(stem.name + ".png"), stem.with_name(stem.name + ".pdf")]
+        """The png and pdf of a figure; for a gallery of more than one page,
+        the png and pdf of every page (<stem>_p1, <stem>_p2, ...)."""
+        pages = sorted(stem.parent.glob(stem.name + "_p[0-9]*.png"))
+        stems = [p.with_suffix("") for p in pages] or [stem]
+        return [s.with_name(s.name + ext) for s in stems for ext in (".png", ".pdf")]
 
     wt = GROUP == config.REFERENCE_GROUP
     names = [short(p) for p in image_paths()]

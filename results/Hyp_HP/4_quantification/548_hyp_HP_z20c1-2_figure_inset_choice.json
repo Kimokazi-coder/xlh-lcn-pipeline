@@ -1,0 +1,79 @@
+{
+  "image": "548_hyp_HP_z20c1-2",
+  "overview": {
+    "rule": "interior lacunae with the bounding box at least 60 px from the frame; roots closest to the interior median, then area closest to the interior median area, then the smallest id",
+    "interior_median_roots": 6.0,
+    "interior_median_area_px2": 1100.0,
+    "eligible": [
+      6,
+      8,
+      9,
+      10,
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      25,
+      28,
+      29,
+      30,
+      31
+    ],
+    "inset": {
+      "lacuna_id": 6,
+      "roots": 6,
+      "area_px2": 575.0,
+      "frame_margin_px": 89
+    }
+  },
+  "network": {
+    "rule": "interior lacunae with the bounding box at least 60 px from the frame; fewest roots, roots closest to the interior median, most roots; ties to the smallest id; each lacuna once",
+    "interior_median_roots": 6.0,
+    "eligible": [
+      6,
+      8,
+      9,
+      10,
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      25,
+      28,
+      29,
+      30,
+      31
+    ],
+    "insets": [
+      {
+        "lacuna_id": 14,
+        "roots": 2,
+        "role": "fewest roots"
+      },
+      {
+        "lacuna_id": 6,
+        "roots": 6,
+        "role": "roots closest to the median"
+      },
+      {
+        "lacuna_id": 12,
+        "roots": 24,
+        "role": "most roots"
+      }
+    ]
+  }
+}
