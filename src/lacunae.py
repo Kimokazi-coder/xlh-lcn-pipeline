@@ -748,6 +748,46 @@ def band_filter(kept: list[tuple], min_share: float) -> list[tuple]:
     return [(region, b) for region, b in kept if opening_share(region) >= min_share]
 
 
+def body_width_px(region) -> float:
+    """Diameter (px) of the largest disk that fits inside a region: twice its
+    largest distance to the background."""
+    return 2.0 * float(ndi.distance_transform_edt(np.pad(region.image, 1)).max())
+
+
+def fragment_filter(labels: np.ndarray, kept: list[tuple]) -> list[tuple]:
+    """The fragment rule (config.FRAGMENT_RULE, section g6): drop every kept
+    object that is a satellite of a larger kept lacuna or a speck. Each object
+    is judged as the label image holds it (its whole labelled region, which is
+    what every measure reads), against the kept list as it comes in, so the
+    order does not matter."""
+    rows, cols = labels.shape
+    satellite_max = config.area_px2(config.FRAGMENT_SATELLITE_MAX_AREA_UM2)
+    gap = config.px(config.FRAGMENT_SATELLITE_GAP_UM)
+    reach = int(np.ceil(gap)) + 1
+    speck_max = config.area_px2(config.FRAGMENT_SPECK_MAX_AREA_UM2)
+    speck_width = config.px(config.FRAGMENT_SPECK_MAX_WIDTH_UM)
+    kept_labels = {region.label for region, _b in kept}
+    whole = {r.label: r for r in measure.regionprops(labels) if r.label in kept_labels}
+    out = []
+    for region, on_border in kept:
+        piece = whole[region.label]
+        if piece.area <= speck_max and body_width_px(piece) <= speck_width:
+            continue
+        if piece.area <= satellite_max:
+            r0, c0, r1, c1 = piece.bbox
+            win = (slice(max(r0 - reach, 0), min(r1 + reach, rows)),
+                   slice(max(c0 - reach, 0), min(c1 + reach, cols)))
+            sub = labels[win]
+            near = [int(v) for v in np.unique(sub) if v in whole and v != region.label
+                    and whole[v].area >= config.FRAGMENT_SATELLITE_AREA_RATIO * piece.area]
+            if near:
+                distance = ndi.distance_transform_edt(sub != region.label)
+                if float(distance[np.isin(sub, near)].min()) <= gap:
+                    continue
+        out.append((region, on_border))
+    return out
+
+
 def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
     """(label_image, kept, t_hi) for one signal channel. The switch steps run
     only when their switch in config.py is on. A given t_hi replaces the
@@ -769,6 +809,8 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
         kept = filter_regions(labels)
     if config.BAND_FILTER_MIN_OPENING_SHARE is not None:
         kept = band_filter(kept, config.BAND_FILTER_MIN_OPENING_SHARE)
+    if config.FRAGMENT_RULE:
+        kept = fragment_filter(labels, kept)
     # Lacunae the plain filters miss, appended AFTER the ones they keep, so the
     # ids of the ordinary lacunae never move. Both classes carry no area or shape
     # measure: "dim" for the three rules of config section g, "out_of_focus" for
@@ -946,6 +988,7 @@ def parameters() -> dict:
         "band_filter_min_opening_share": config.BAND_FILTER_MIN_OPENING_SHARE,
         "fast_lacuna_stage": config.FAST_LACUNA_STAGE,
         "lacuna_rescue_rules": config.LACUNA_RESCUE_RULES,
+        "fragment_rule": config.FRAGMENT_RULE,
     }
 
 

@@ -617,6 +617,34 @@ MERGE_MIN_DIP_FRACTION = 0.75       # gap mean over the dimmer body's mean; 0.75
 # empty. True restores the four rules exactly. NOT VALIDATED: the evidence is
 # an AI reviewer's judgement, not a manual count.
 LACUNA_RESCUE_RULES = False
+#
+# (g6) Review loop, round 2 (2026-11-05): the fragment rule. After round 1 the
+# reviewer still called 121 objects fragments: crumbs of glow or thread beside
+# a lacuna with their own id, and specks. A kept object is dropped as a
+# fragment when either holds:
+#   a SATELLITE: at most FRAGMENT_SATELLITE_MAX_AREA_UM2, and within
+#     FRAGMENT_SATELLITE_GAP_UM of another kept lacuna at least
+#     FRAGMENT_SATELLITE_AREA_RATIO times its area: a lobe of that cell's glow
+#     or the root of one of its threads, cut off by the watershed;
+#   a SPECK: at most FRAGMENT_SPECK_MAX_AREA_UM2 and at most
+#     FRAGMENT_SPECK_MAX_WIDTH_UM wide (the diameter of the largest disk that
+#     fits inside it), too small and too thin to be a cell body.
+# Chosen on the round 1 pictures of the 27 development images: over 541
+# objects the two arms together drop 44 the reviewer called problems (36
+# fragments, 6 band pieces, 2 pieces of a split lacuna) and 1 it accepted (a
+# 7.0 um2 sliver at the frame, called a fragment in round 0). In WT they drop a
+# band sliver, a thread sliver and one piece of a split. The satellite is
+# dropped, not joined to its neighbour, so the neighbour's area, the lacunar
+# size of 3_pols, is not inflated by glow. The areas of accepted lacunae are
+# 36.9 um2 at the median, so 17 um2 is under half a typical lacuna; 1 um is
+# about 8 px, a narrow gap; 2.0 um is under half the median width of accepted
+# lacunae (4.2 um). FRAGMENT_RULE = False turns the rule off. NOT VALIDATED.
+FRAGMENT_RULE = True
+FRAGMENT_SATELLITE_MAX_AREA_UM2 = 17.0
+FRAGMENT_SATELLITE_GAP_UM = 1.0
+FRAGMENT_SATELLITE_AREA_RATIO = 2.0
+FRAGMENT_SPECK_MAX_AREA_UM2 = 8.0
+FRAGMENT_SPECK_MAX_WIDTH_UM = 2.0
 
 # (h) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The

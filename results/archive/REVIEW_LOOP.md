@@ -92,3 +92,37 @@ the ordinary objects it had passed in round 0 (701_z26c1-2: 22 to 32). Read
 the counts as accurate to a few problems per group.
 
 **Kept.** Total down 33, WT not worse.
+
+## Round 2: the fragment rule (config.FRAGMENT_RULE, section g6)
+
+**Problem attacked:** fragment (121 of 225).
+
+**What the round 1 pictures showed.** The remaining fragments were ordinary
+objects: crumbs of glow or thread with their own id right beside a lacuna,
+and specks. A small object touching or nearly touching a much larger lacuna
+was a problem 28 times and accepted 0 times; small objects that are also
+thin were mostly fragments.
+
+**Rule.** A kept object is dropped as a fragment when it is a SATELLITE (at
+most 17 um2, within 1 um of a kept lacuna at least twice its area) or a SPECK
+(at most 8 um2 and at most 2.0 um wide). Judged on the whole labelled region.
+The satellite is dropped, not joined, so its neighbour's area is not inflated
+by glow. Predicted on the round 1 pictures: 44 problems and 1 accepted object
+dropped; the run dropped 45 objects (WT 3, WT_HP 5, Hyp_RD 19, Hyp_HP 18).
+
+**Counts, round 1 to round 2** (`review_loop/round2/tally.csv`):
+
+| group | lacunae labelled | fragment | band or tissue piece | split | merged | missed | other | total |
+| - | - | - | - | - | - | - | - | - |
+| WT | 75 to 71 | 2 to 2 | 2 to 1 | 1 to 0 | 0 to 0 | 1 to 1 | 2 to 2 | **8 to 6** |
+| WT_HP | 93 to 88 | 9 to 3 | 14 to 13 | 1 to 1 | 0 to 0 | 5 to 3 | 2 to 1 | **31 to 21** |
+| Hyp_RD | 189 to 170 | 45 to 33 | 26 to 24 | 5 to 7 | 1 to 1 | 1 to 1 | 1 to 0 | **79 to 66** |
+| Hyp_HP | 185 to 167 | 65 to 47 | 32 to 36 | 5 to 6 | 0 to 0 | 0 to 0 | 5 to 4 | **107 to 93** |
+| all | 542 to 496 | 121 to 85 | 74 to 74 | 12 to 14 | 1 to 1 | 7 to 5 | 10 to 7 | **225 to 186** |
+
+**WT:** better, 8 to 6. The three objects dropped are the band sliver of
+542_z06, a thread sliver of 682_z29 and the smaller piece of the split
+lacuna of 682_z29 (its split is gone; the remaining piece was not flagged).
+Regression on the 6 development WT images: PASS, both runs.
+
+**Kept.** Total down 39, WT not worse.

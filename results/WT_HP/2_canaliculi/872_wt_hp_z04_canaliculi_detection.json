@@ -43,7 +43,7 @@
     "dim_thread_cut_fraction": 0.5,
     "dim_thread_reach_um": 0.65,
     "dim_thread_reach_px": 5,
-    "dim_pass_added_px": 44198,
+    "dim_pass_added_px": 44170,
     "lacuna_attach_reach_um": 2.6,
     "lacuna_attach_reach_px": 20,
     "lacuna_attach_min_signal_fraction": 0.7,
@@ -65,15 +65,15 @@
     "hole_new_min_length_um": 10.0,
     "hole_new_min_length_px": 77,
     "hole_new_min_aspect": 3.0,
-    "hole_zone_px": 99823,
-    "hole_zone_added_px": 2454,
+    "hole_zone_px": 97428,
+    "hole_zone_added_px": 2504,
     "hole_gain_step_um": 0.26,
     "hole_gain_smooth_annuli": 3,
     "hole_zone_gains": {
-      "lacunae": 21,
+      "lacunae": 20,
       "at_the_body_edge": {
         "min": 1.0,
-        "median": 1.0874,
+        "median": 1.1927,
         "max": 2.7207
       },
       "at_the_outer_end": {
@@ -105,7 +105,7 @@
     ]
   },
   "provenance": {
-    "git_commit": "12af578dd229d380a825593994f3c7f4292b4d21",
+    "git_commit": "d4a008de95bdfd8e89d6667a3c0bc8b93663e5d5",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -116,7 +116,7 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "a6bbd9bab3ec0f9a",
+    "config_hash": "964d828e3a2bf01f",
     "config_hash_covers": [
       "AI_CANDIDATE_CUT_FRACTION",
       "AI_CONTRAST_RATIO_MAX",
@@ -174,6 +174,12 @@
       "FAILED_IMAGES_NAME",
       "FAST_LACUNA_STAGE",
       "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "FRAGMENT_RULE",
+      "FRAGMENT_SATELLITE_AREA_RATIO",
+      "FRAGMENT_SATELLITE_GAP_UM",
+      "FRAGMENT_SATELLITE_MAX_AREA_UM2",
+      "FRAGMENT_SPECK_MAX_AREA_UM2",
+      "FRAGMENT_SPECK_MAX_WIDTH_UM",
       "GLOW_PROFILE_FRACTION",
       "GLOW_TRIM_WIDTH_FRACTION",
       "GLOW_ZONE_CUT_FRACTION",
