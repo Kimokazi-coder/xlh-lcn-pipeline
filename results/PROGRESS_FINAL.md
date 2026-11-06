@@ -10,7 +10,7 @@ repository is moved, copied or deleted.
 | - | - | - |
 | 0 pull | done | already up to date at 8bd05f1; statsmodels 0.14.4 and patsy 1.0.3 installed into venv/ (asked for by the brief; no pip cache, temporary files in .cache/) |
 | 1 POL definition | done | METHODS 24.0 and results/README.md |
-| 2 replace the cap | in progress | |
+| 2 replace the cap | done | structure rule (config g9) on, band rule g8 off; cluster flag; CAP_V2.md: wrong over 150 um2 8 before, 7 after, no real lacuna removed; regression against the v1 results differs only in band_blob_rule and the new fields (cluster, excluded_area_px2, analysed_field_area_px2), every measured value identical on the 6 WT development images; pols selftest 12/12, holdout-check 13/13. The committed results are still v1 until the dev rerun of phase 4 and the FINAL run of phase 7 |
 | 3 excluded regions | not started | |
 | 4 POL metrics and picture | not started | |
 | 5 animals and statistics | not started | |

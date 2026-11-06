@@ -824,10 +824,70 @@ def band_blob_filter(mask: np.ndarray, labels: np.ndarray, kept: list[tuple]) ->
     return out
 
 
+def excluded_region(channel: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """The excluded region of one image (config section g9), bool: the
+    saturated border regions and the very large structures of the lacuna mask,
+    grown by config.EXCLUSION_MARGIN_UM. All False with config.STRUCTURE_RULE
+    off."""
+    rows, cols = channel.shape
+    if not config.STRUCTURE_RULE:
+        return np.zeros((rows, cols), dtype=bool)
+    # 1.0 is the top of the 8 bit scale (255) after img_as_float.
+    saturated = morphology.closing(channel >= 1.0, morphology.disk(config.px_int(config.SATURATED_CLOSING_UM)))
+    core = np.zeros((rows, cols), dtype=bool)
+    sat_min = config.area_px2(config.SATURATED_BORDER_MIN_AREA_UM2)
+    sat_labels = measure.label(saturated, connectivity=2)
+    for region in measure.regionprops(sat_labels):
+        r0, c0, r1, c1 = region.bbox
+        if (r0 == 0 or c0 == 0 or r1 == rows or c1 == cols) and region.area >= sat_min:
+            core[region.coords[:, 0], region.coords[:, 1]] = True
+    large_min = config.area_px2(config.LARGE_STRUCTURE_MIN_AREA_UM2)
+    blobs = measure.label(mask, connectivity=2)
+    large_ids = [region.label for region in measure.regionprops(blobs) if region.area >= large_min]
+    if large_ids:
+        core |= ndi.binary_fill_holes(np.isin(blobs, large_ids))
+    if not core.any():
+        return core
+    return ndi.distance_transform_edt(~core) <= config.px(config.EXCLUSION_MARGIN_UM)
+
+
+def structure_filter(labels: np.ndarray, kept: list[tuple], excluded: np.ndarray) -> list[tuple]:
+    """The structure rule (config section g9): drop every kept object with more
+    than config.EXCLUDED_OBJECT_MAX_SHARE of its whole labelled region in the
+    excluded region."""
+    if not excluded.any():
+        return kept
+    kept_labels = {region.label for region, _b in kept}
+    whole = {r.label: r for r in measure.regionprops(labels) if r.label in kept_labels}
+    out = []
+    for region, on_border in kept:
+        coords = whole[region.label].coords
+        if excluded[coords[:, 0], coords[:, 1]].mean() > config.EXCLUDED_OBJECT_MAX_SHARE:
+            continue
+        out.append((region, on_border))
+    return out
+
+
+def is_cluster(region_image: np.ndarray) -> bool:
+    """The cluster flag (config section g9): two or more cores of at least
+    config.CLUSTER_CORE_MIN_UM2 left after shaving half of
+    config.CLUSTER_NECK_MAX_UM off the outline of one object (its bool image)."""
+    shave = morphology.disk(max(1, config.px_int(config.CLUSTER_NECK_MAX_UM / 2)))
+    cores = measure.label(ndi.binary_erosion(np.pad(region_image, 2), shave), connectivity=2)
+    core_min = config.area_px2(config.CLUSTER_CORE_MIN_UM2)
+    return int((np.bincount(cores.ravel())[1:] >= core_min).sum()) >= 2
+
+
 def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
-    """(label_image, kept, t_hi) for one signal channel. The switch steps run
-    only when their switch in config.py is on. A given t_hi replaces the
-    computed cut (sensitivity diagnostics only)."""
+    """(label_image, kept, t_hi, classes) for one signal channel. The switch
+    steps run only when their switch in config.py is on. A given t_hi replaces
+    the computed cut (sensitivity diagnostics only)."""
+    labels, kept, t_hi, classes, _excluded = segment_with_exclusion(channel, t_hi)
+    return labels, kept, t_hi, classes
+
+
+def segment_with_exclusion(channel: np.ndarray, t_hi: float | None = None) -> tuple:
+    """segment, and the excluded region (config section g9) as a fifth value."""
     mask, t_hi = multiotsu_lacuna_mask(channel, t_hi)
     fast = config.FAST_LACUNA_STAGE
     labels = (watershed_split_fast if fast else watershed_split)(mask)
@@ -849,6 +909,8 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
         kept = fragment_filter(labels, kept)
     if config.BAND_BLOB_RULE:
         kept = band_blob_filter(mask, labels, kept)
+    excluded = excluded_region(channel, mask)
+    kept = structure_filter(labels, kept, excluded)
     # Lacunae the plain filters miss, appended AFTER the ones they keep, so the
     # ids of the ordinary lacunae never move. Both classes carry no area or shape
     # measure: "dim" for the three rules of config section g, "out_of_focus" for
@@ -860,7 +922,7 @@ def segment(channel: np.ndarray, t_hi: float | None = None) -> tuple:
     out_of_focus = find_out_of_focus(labels, channel, kept) if config.LACUNA_RESCUE_RULES else []
     out_of_focus_ids = [len(kept) + i for i in range(1, len(out_of_focus) + 1)]
     kept = kept + out_of_focus
-    return labels, kept, t_hi, {"dim": dim_ids, "out_of_focus": out_of_focus_ids}
+    return labels, kept, t_hi, {"dim": dim_ids, "out_of_focus": out_of_focus_ids}, excluded
 
 
 def segment_image(image_path: Path, t_hi: float | None = None):
@@ -878,7 +940,8 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
     objects and the cut that was used. The counts are how many objects the
     filters kept, which belongs to detection. Every measured number comes from
     src/quantification.py. t_hi: see segment_image."""
-    display, channel, labels, kept, t_hi, classes = segment_image(image_path, t_hi)
+    display, channel = load_channel(image_path)
+    labels, kept, t_hi, classes, excluded = segment_with_exclusion(channel, t_hi)
     # The AI lacuna judge (config.AI_LACUNA_JUDGE_ENABLED, docs/EXPERIMENT_AI.md),
     # off by default. With it on, the judge's verdicts decide which of the
     # regions this stage outlined are lacunae: yes keeps a region the filters
@@ -905,6 +968,9 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
         # the AI lacuna judge on, a third, "judged", for a region it added.
         "lacuna_classes": {k: list(v) for k, v in classes.items()},
         "no_shape_ids": sorted(no_shape),
+        # The excluded region (config section g9), bool; every area measure of
+        # src/quantification.py leaves it out.
+        "excluded": excluded,
         "dim_count": len(classes["dim"]),
         "out_of_focus_count": len(classes["out_of_focus"]),
         "lacuna_count": len(kept),
@@ -1028,6 +1094,7 @@ def parameters() -> dict:
         "lacuna_rescue_rules": config.LACUNA_RESCUE_RULES,
         "fragment_rule": config.FRAGMENT_RULE,
         "band_blob_rule": config.BAND_BLOB_RULE,
+        "structure_rule": config.STRUCTURE_RULE,
     }
 
 
@@ -1053,6 +1120,8 @@ def save_detection_json(result: dict, out_path: Path) -> None:
         "outputs": {
             "label_image": f"{image_label(result['image_path'])}_{config.SUFFIX_LACUNA_LABELS}",
             "outlines": f"{image_label(result['image_path'])}_{config.SUFFIX_LACUNAE_OUTLINES}",
+            "excluded_region_mask": f"{image_label(result['image_path'])}_{config.SUFFIX_EXCLUDED_MASK}",
+            "excluded_region_picture": f"{image_label(result['image_path'])}_{config.SUFFIX_EXCLUDED_PICTURE}",
         },
         "parameters": {**parameters(), "computed_threshold_t_hi": result["t_hi"]},
         # Which lacunae carry no shape measure, and under which rule. Saved
@@ -1072,11 +1141,70 @@ def save_detection_json(result: dict, out_path: Path) -> None:
         json.dump(payload, f, indent=2)
 
 
+# Display only: the shade of the excluded region and its edge in the pictures.
+EXCLUDED_SHADE_RGB = (128, 128, 128)
+EXCLUDED_SHADE_ALPHA = 0.6
+EXCLUDED_EDGE_RGB = (255, 255, 255)
+
+
+def shade_excluded(rgb: np.ndarray, excluded: np.ndarray) -> np.ndarray:
+    """rgb (uint8) with the excluded region shaded grey and edged white."""
+    out = rgb.astype(float)
+    out[excluded] = (1 - EXCLUDED_SHADE_ALPHA) * out[excluded] + EXCLUDED_SHADE_ALPHA * np.array(EXCLUDED_SHADE_RGB)
+    out[segmentation.find_boundaries(excluded, mode="inner")] = EXCLUDED_EDGE_RGB
+    return np.rint(out).astype(np.uint8)
+
+
+def draw_scale_bar(draw, font, x: int, y: int, scale: float = 1.0) -> None:
+    """A 10 um bar with its label, left end at (x, y), on a picture enlarged by
+    scale."""
+    bar = int(round(config.px(10.0) * scale))
+    draw.rectangle([x, y, x + bar, y + 3], fill=(255, 255, 255))
+    draw.text((x + bar // 2, y - 3), "10 um", font=font, fill=(255, 255, 255), anchor="mb")
+
+
+def save_excluded_picture(result: dict, out_path: Path) -> None:
+    """The excluded region of one image (config section g9) on the original:
+    shaded grey with a white edge, the kept lacunae outlined green as in the
+    outline picture, the area and share in a header, a legend and a 10 um bar."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    excluded = result["excluded"]
+    picture = result["display"].copy()
+    kept_ids = [region.label for region, _ in result["kept"]]
+    kept_mask = np.isin(result["labels"], kept_ids) if kept_ids else np.zeros(excluded.shape, dtype=bool)
+    picture[segmentation.find_boundaries(kept_mask, mode="outer")] = [0, 255, 0]
+    picture = shade_excluded(picture, excluded)
+    rows, cols = excluded.shape
+    header = 56
+    canvas = Image.new("RGB", (cols, rows + header), (0, 0, 0))
+    canvas.paste(Image.fromarray(picture), (0, header))
+    draw = ImageDraw.Draw(canvas)
+    font = ImageFont.load_default(size=15)
+    share = float(excluded.mean())
+    area = float(excluded.sum()) * config.PIXEL_SIZE_UM_ACQUIRED ** 2
+    draw.text((8, 6), f"{image_label(result['image_path'])}   excluded region: {area:.0f} um2, "
+              f"{100 * share:.1f}% of the field   (pre-validation)", font=font, fill=(255, 255, 255))
+    draw.text((8, 30), "grey with white edge: excluded (saturated border regions and very large bright "
+              "structures, with a 3 um margin); green: lacunae kept", font=font, fill=(200, 200, 200))
+    draw_scale_bar(draw, font, 12, header + rows - 14)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(out_path)
+
+
 def write_outputs(result: dict, out_root: Path) -> None:
     """The lacuna files of one image under out_root (the results layout)."""
     label = image_label(result["image_path"])
     save_overlay(result["display"], result["labels"], result["kept"],
                  result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_OUTLINES))
+    excluded = result.get("excluded")
+    if excluded is None:
+        excluded = np.zeros(result["labels"].shape, dtype=bool)
+    mask_path = result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_EXCLUDED_MASK)
+    mask_path.parent.mkdir(parents=True, exist_ok=True)
+    imsave(mask_path, (excluded * 255).astype(np.uint8), check_contrast=False)
+    save_excluded_picture({**result, "excluded": excluded},
+                          result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_EXCLUDED_PICTURE))
     save_label_image(result["labels"], result["kept"],
                      result_path(out_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNA_LABELS))
     save_detection_json(result, result_path(out_root, label, config.SECTION_LACUNAE,

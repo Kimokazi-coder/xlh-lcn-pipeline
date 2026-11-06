@@ -2084,7 +2084,7 @@ The full record is [`results/archive/REVIEW_LOOP.md`](../results/archive/REVIEW_
 | g5 | `LACUNA_RESCUE_RULES = False` | nothing is added below the 6.76 um2 area floor any more: the out-of-focus (f), dim (g1), frame (g2) and thick-process (g3) rescues are off, so the classes `dim` and `out_of_focus` stay empty |
 | g6 | `FRAGMENT_RULE` | a satellite (at most 17 um2, within 1 um of a kept lacuna at least twice its area) or a speck (at most 8 um2, at most 2.0 um wide) |
 | g7 | `FRAGMENT_RULE`, crumb | at most 10 um2 with solidity under 0.80 |
-| g8 | `BAND_BLOB_RULE` | every object whose region of the lacuna mask is larger than 300 um2 |
+| g8 | `BAND_BLOB_RULE` | every object whose region of the lacuna mask is larger than 300 um2 (off since 2026-11-06; the structure rule of section 27.1 replaces it) |
 
 A fifth rule (a faint crumb) was tried and reverted, because the one WT object
 it dropped became a missed lacuna in the next review.
@@ -2132,4 +2132,39 @@ judges' results moved from `5_archive/` into the sections of their group,
 `<section>/ai_judge/` and, for the thread judge, `<section>/ai_judge_canaliculi/`
 (`results/archive/MOVE_MAP.csv`); `config.result_set_root` and
 `lacunae.section_folder` let the judge runs read and write there.
+
+## 27. Finishing the pipeline (2026-11-06)
+
+Pre-validation. Every rule below was chosen on the 27 development images
+only, in DEV mode, in physical units at 0.13 um/px, with no per-image
+constant. Progress: `results/PROGRESS_FINAL.md`.
+
+### 27.1 The structure rule replaces the 300 um2 band rule
+
+The band rule (g8) acted as a largest lacuna of 300 um2, a limit on exactly
+the enlarged lacunae a POL study looks for. It is off now
+(`BAND_BLOB_RULE = False`, True restores it) and the **structure rule**
+(config section g9, `STRUCTURE_RULE`) replaces it: large objects are kept as
+lacunae unless they lie in a structure that is not a lacuna. Each image gets
+an **excluded region**, the union of the saturated border regions (255 after a
+1 um closing, connected, touching the frame, at least 100 um2: the blooming at
+a tissue border) and the very large structures (connected regions of the
+lacuna mask of at least 500 um2, holes filled: a vascular canal, a resorption
+feature, the bone surface, medium or soft tissue), grown by 3 um. A kept
+object with more than half its area in it is dropped
+(`lacunae.excluded_region`, `lacunae.structure_filter`). Each number's source
+is in config.py, section g9.
+
+A **cluster flag** marks a merged multi-lacunar space and removes nothing: a
+lacuna whose outline, shaved by 1.5 um, falls into two or more cores of at
+least 3 um2 (`lacunae.is_cluster`, column `cluster` of the per-lacuna tables).
+
+Audit (`diagnostics.py cap-v2-audit` and `cap-v2-tally`,
+`results/archive/audit/CAP_V2.md`): over the 28 objects over 150 um2 the
+blind reviewer called, the band rule had 8 wrong and the structure rule 7; no
+real lacuna over 150 um2 is removed by either. All 7 still wrong are band or
+tissue pieces at the frame, which carry no size measure. Of the 10 smaller
+objects the new rule removes, 8 are not lacunae, 1 is unsure and 1 is a
+lacuna of 9.6 um2. The cluster flag agreed with the reviewer on 1 of 2
+clusters it named. Not validated.
 

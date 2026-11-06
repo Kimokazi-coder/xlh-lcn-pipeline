@@ -175,6 +175,9 @@ def region_to_measurement(lacuna_id: int, region, on_border: bool, precision: in
         "lacuna_class": lacuna_class,
         "out_of_focus": bool(lacuna_class == "out_of_focus"),
         "dim": bool(lacuna_class == "dim"),
+        # The cluster flag (config section g9): a merged multi-lacunar space.
+        # A flag only; None where the lacuna carries no shape.
+        "cluster": None if no_shape else bool(lacunae.is_cluster(region.image)),
     }
 
 
@@ -760,20 +763,31 @@ def network_shape_measures(skeleton: np.ndarray, graph, precision: int) -> dict:
 
 def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_lacunae: int, precision: int,
                   flagged: np.ndarray | None = None, roi: np.ndarray | None = None,
-                  unattached: np.ndarray | None = None) -> dict:
+                  unattached: np.ndarray | None = None, excluded: np.ndarray | None = None) -> dict:
     """Per-field measures. They use the whole skeleton and no ownership, so
     fragmentation affects them far less than any per-cell measure. The
     appended densities without the flagged mask and in an ROI are None when
-    that mask is not given."""
+    that mask is not given. Every area measure leaves out the excluded region
+    (config section g9): the field is the image minus that region, and the
+    skeleton, its junctions and the unattached threads inside it are not
+    counted. With nothing excluded every number is as before."""
     rows, cols = skeleton.shape
-    analysed_area = float(rows * cols - lacuna_mask.sum())
+    if excluded is not None and excluded.any():
+        skeleton = skeleton & ~excluded
+        lacuna_mask = lacuna_mask & ~excluded
+        unattached = unattached & ~excluded if unattached is not None else None
+        flagged = flagged & ~excluded if flagged is not None else None
+        roi = roi & ~excluded if roi is not None else None
+    excluded_px = float(excluded.sum()) if excluded is not None else 0.0
+    analysed_area = float(rows * cols - excluded_px - lacuna_mask.sum())
     skel_px = float(skeleton.sum())
 
     comp_labels = measure.label(skeleton, connectivity=2)
     sizes = np.bincount(comp_labels.ravel())[1:].astype(float)
 
     real = canaliculi.real_subgraph(G)
-    junctions = sum(1 for n in real.nodes() if real.degree(n) >= 3)
+    junctions = sum(1 for n in real.nodes() if real.degree(n) >= 3
+                    and not (excluded_px and excluded[min(max(n[0], 0), rows - 1), min(max(n[1], 0), cols - 1)]))
 
     def per_area(value: float) -> float | None:
         return round(value / analysed_area, precision + 4) if analysed_area > 0 else None
@@ -805,6 +819,11 @@ def field_metrics(skeleton: np.ndarray, G: nx.Graph, lacuna_mask: np.ndarray, n_
         "canalicular_length_density_attached_per_px": per_area(skel_px),
         "field_length_density_with_unattached_per_px": per_area(
             skel_px + (float(unattached.sum()) if unattached is not None else 0.0)),
+        # The excluded region (config section g9) and the field left: the image
+        # minus the excluded region, lacunae included. The POL area per analysed
+        # area of src/pols.py divides by this.
+        "excluded_area_px2": round(excluded_px, precision),
+        "analysed_field_area_px2": round(float(rows * cols) - excluded_px, precision),
     }
 
 
@@ -840,6 +859,9 @@ FIELD_UNITS = {
     "loop_count": "count",
     "loop_edge_share": "share",
     "edge_count": "count",
+    # The excluded region (config section g9).
+    "excluded_area_px2": "px^2",
+    "analysed_field_area_px2": "px^2",
 }
 
 
@@ -887,6 +909,8 @@ SUMMARY_NOTES = [
     "ring length 30 / 60 px per cell: skeleton px within 30 / 60 px of each lacuna body, each pixel counted",
     "for its nearest lacuna only (mean over interior cells). Neither depends on network ownership.",
     "field length density: all skeleton px divided by the analysed field area (field minus lacunae).",
+    "The field is the image minus its excluded region (config section g9: saturated border regions and very",
+    "large bright structures, with a 3 um margin); skeleton, junctions and lacunae inside it are not counted.",
     "Headline measures: roots per cell, ring length 30 px, field length density.",
     "Appended columns (normalised measures, means over interior cells): perimeter; ring area A_r, the pixels",
     "of the nearest-lacuna partition within r px of the body; in-frame fraction of the full r px annulus;",
@@ -971,7 +995,12 @@ def load_detection(out_root: Path, label: str) -> dict:
         graph_data = pickle.load(f)
     labels = np.asarray(imread(needed["labels"])).astype(np.int32)
     mask = _read_mask(needed["mask"])
+    # The excluded region (config section g9). Detection made before it
+    # existed saved none, and excluded nothing.
+    excluded_path = lac(config.SUFFIX_EXCLUDED_MASK)
+    excluded = _read_mask(excluded_path) if excluded_path.is_file() else None
     return {
+        "excluded": excluded,
         "label": label,
         "lacuna_id_map": labels,
         "lacuna_mask": labels > 0,
@@ -1202,7 +1231,7 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
 
     field = field_metrics(skeleton, detection["graph"], detection["lacuna_mask"],
                                      len(kept), precision, detection["vascular"], roi_mask,
-                                     detection.get("unattached"))
+                                     detection.get("unattached"), detection.get("excluded"))
     limits = biological_limits_report(detection, net_rows, width, sample, precision)
     shape = network_shape_measures(skeleton, detection["graph"], precision)
     return {
@@ -1264,7 +1293,7 @@ def width_columns() -> list[str]:
 def lacuna_columns(rows: list[dict]) -> list[str]:
     """Every per-lacuna column, in output order, that the rows actually hold."""
     order = (shape_columns() + network_columns() + normalised_columns() + v2_columns()
-             + width_columns() + loop_columns())
+             + width_columns() + loop_columns() + ["cluster"])
     seen, out = set(), []
     for name in order:
         if name not in seen and (not rows or name in rows[0]):
@@ -1301,6 +1330,7 @@ def detection_in_memory(result: dict) -> dict:
         },
         "no_shape_ids": list(lac.get("no_shape_ids") or ()),
         "lacuna_classes": lac.get("lacuna_classes") or {},
+        "excluded": lac.get("excluded"),
         "canaliculi_detection": {
             "parameters": canaliculi.parameters(result),
         },

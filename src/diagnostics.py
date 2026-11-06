@@ -7341,6 +7341,7 @@ def _cap_audit_one(path_str: str) -> list:
     off, then apply it to the same kept list, as src/lacunae.py does."""
     config.FAST_LACUNA_STAGE = True  # identical labels (dark-band-check --watershed)
     config.BAND_BLOB_RULE = False
+    config.STRUCTURE_RULE = False  # the method of method-freeze-v1, as audited
     path = Path(path_str)
     group, label = path.parent.name, lacunae.image_label(path)
     display, channel = lacunae.load_channel(path)
@@ -7386,6 +7387,8 @@ def _dim_audit_one(path_str: str) -> tuple:
     many lacunae it has with them off (the frozen method)."""
     config.FAST_LACUNA_STAGE = True  # identical labels (dark-band-check --watershed)
     config.LACUNA_RESCUE_RULES = True
+    # The method of method-freeze-v1, as audited.
+    config.BAND_BLOB_RULE, config.STRUCTURE_RULE = True, False
     path = Path(path_str)
     group, label = path.parent.name, lacunae.image_label(path)
     display, channel = lacunae.load_channel(path)
@@ -7501,6 +7504,121 @@ def cmd_dim_rule_search(_args) -> int:
     print_table(list(out[0]), [list(r.values()) for r in out],
                 title=f"narrow rescue rules over {len(rows)} rescued objects ({n_real} real lacunae, "
                       f"{verdict.count('not a lacuna')} not a lacuna)\n")
+    return 0
+
+
+# cap-v2-audit -----------------------------------------------------------------------
+
+CAP_V2_DIR = AUDIT_DIR / "cap_v2"
+# The finishing brief (2026-11-06, phase 2): every object over 150 um2 is reviewed.
+CAP_V2_MIN_AREA_UM2 = 150.0
+CAP_V2_COLUMNS = AUDIT_COLUMNS + ["excluded_share", "cluster_flag", "before", "after"]
+CAP_V2_CLASSES = ("lacuna", "not a lacuna", "unsure")
+
+
+def _cap_v2_one(path_str: str) -> list:
+    """The objects of one image the review looks at: every object over
+    CAP_V2_MIN_AREA_UM2 that the filters keep with the band rule and the
+    structure rule both off, and every smaller one the structure rule removes,
+    each with what the 300 um2 band rule (before) and the structure rule
+    (after) decide, as src/lacunae.py applies them to the same kept list."""
+    config.FAST_LACUNA_STAGE = True  # identical labels (dark-band-check --watershed)
+    config.BAND_BLOB_RULE = False
+    config.STRUCTURE_RULE = False
+    path = Path(path_str)
+    group, label = path.parent.name, lacunae.image_label(path)
+    display, channel = lacunae.load_channel(path)
+    labels, kept, _t_hi, _classes = lacunae.segment(channel)
+    mask, _ = lacunae.multiotsu_lacuna_mask(channel)
+    before = {r.label for r, _b in lacunae.band_blob_filter(mask, labels, kept)}
+    config.STRUCTURE_RULE = True
+    excluded = lacunae.excluded_region(channel, mask)
+    after = {r.label for r, _b in lacunae.structure_filter(labels, kept, excluded)}
+    blobs = measure.label(mask, connectivity=2)
+    blob_area = np.bincount(blobs.ravel())
+    regions = {r.label: r for r in measure.regionprops(labels, intensity_image=channel)}
+    big = config.area_px2(CAP_V2_MIN_AREA_UM2)
+    out = []
+    for region, _b in kept:
+        lab = region.label
+        whole = regions[lab]
+        if whole.area <= big and lab in after:
+            continue
+        crop = CAP_V2_DIR / group / f"{label}_obj{lab}.png"
+        save_audit_crop(display, labels, whole, f"{group} {label} object {lab}", crop)
+        out.append({**audit_row(group, label, whole, channel, labels, blobs, blob_area, crop),
+                    "excluded_share": round(float(excluded[whole.coords[:, 0], whole.coords[:, 1]].mean()), 3),
+                    "cluster_flag": bool(lacunae.is_cluster(whole.image)),
+                    "before": "kept" if lab in before else "removed",
+                    "after": "kept" if lab in after else "removed"})
+    return out
+
+
+def cmd_cap_v2_audit(args) -> int:
+    images = development_images()
+    rows = [r for part in lacunae.map_images(_cap_v2_one, [str(p) for p in images], args.workers) for r in part]
+    out = AUDIT_DIR / "cap_v2.csv"
+    write_audit_csv(out, CAP_V2_COLUMNS, rows)
+    print(f"{len(images)} development images; {len(rows)} objects to review -> {out}")
+    for group in config.GROUPS:
+        part = [r for r in rows if r["group"] == group]
+        print(f"  {group}: {len(part)}, before removes {sum(r['before'] == 'removed' for r in part)}, "
+              f"after removes {sum(r['after'] == 'removed' for r in part)}")
+    return 0
+
+
+def cap_v2_review() -> dict:
+    """{crop file name: (class, cluster)} from the reviewer's tables
+    reviews/cap_v2_*.md, rows "| crop | class | cluster | reason |"."""
+    out = {}
+    for path in sorted((AUDIT_DIR / "reviews").glob("cap_v2_*.md")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) == 4 and cells[0].endswith(".png"):
+                if cells[1] not in CAP_V2_CLASSES:
+                    raise ValueError(f"{path.name}: unknown class {cells[1]!r} in {line!r}")
+                out[cells[0]] = (cells[1], cells[2])
+    return out
+
+
+def cap_v2_outcome(decision: str, cls: str) -> str:
+    """kept correctly, removed correctly, wrong or unsure, for one decision on
+    one reviewed object."""
+    if cls == "unsure":
+        return "unsure"
+    if decision == "kept":
+        return "kept correctly" if cls == "lacuna" else "wrong"
+    return "removed correctly" if cls == "not a lacuna" else "wrong"
+
+
+def cmd_cap_v2_tally(_args) -> int:
+    """Before (the 300 um2 band rule) and after (the structure rule), per
+    group, over the objects over 150 um2, from cap_v2.csv and the review."""
+    review = cap_v2_review()
+    with open(AUDIT_DIR / "cap_v2.csv", newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    missing = [r["crop"] for r in rows if r["crop"] not in review]
+    if missing:
+        print(f"FAIL: {len(missing)} crops have no class: {missing[:5]}")
+        return 1
+    outcomes = ("kept correctly", "removed correctly", "wrong", "unsure")
+    table = []
+    for scope in ("over 150 um2", "removed by the rule, 150 um2 or less"):
+        for group in (*config.GROUPS, "all"):
+            part = [r for r in rows if (group == "all" or r["group"] == group)
+                    and ((float(r["area_um2"]) > CAP_V2_MIN_AREA_UM2) == (scope == "over 150 um2"))]
+            for when in ("before", "after"):
+                counts = [sum(cap_v2_outcome(r[when], review[r["crop"]][0]) == o for r in part) for o in outcomes]
+                table.append({"objects": scope, "group": group, "rule": when, "n": len(part),
+                              **dict(zip(outcomes, counts))})
+    flagged = [r for r in rows if r["cluster_flag"] == "True"]
+    agree = sum(review[r["crop"]][1] == "yes" for r in flagged)
+    called = [r for r in rows if review[r["crop"]][1] == "yes"]
+    write_audit_csv(AUDIT_DIR / "cap_v2_tally.csv", list(table[0]), table)
+    print_table(list(table[0]), [list(t.values()) for t in table], title="cap v2: before and after\n")
+    print(f"\ncluster flag: {len(flagged)} flagged, {agree} of them called a cluster by the reviewer; "
+          f"the reviewer called {len(called)} reviewed objects a cluster, "
+          f"{sum(r['cluster_flag'] == 'True' for r in called)} of them flagged.")
     return 0
 
 
@@ -10070,6 +10188,18 @@ def main() -> None:
                             "crops in results/archive/audit/.")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_dim_audit)
+
+    p = sub.add_parser("cap-v2-audit",
+                       help="The structure rule against the 300 um2 band rule on the development images: every "
+                            "object over 150 um2 and every one the rule removes, measures and blind crops in "
+                            "results/archive/audit/cap_v2/.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_cap_v2_audit)
+
+    p = sub.add_parser("cap-v2-tally",
+                       help="Before and after per group from cap_v2.csv and the reviewer's tables "
+                            "(results/archive/audit/reviews/cap_v2_*.md).")
+    p.set_defaults(func=cmd_cap_v2_tally)
 
     p = sub.add_parser("dim-rule-search",
                        help="Narrow rescue rules over the dim audit's objects and the reviewer's classes: "

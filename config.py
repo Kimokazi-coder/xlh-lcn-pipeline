@@ -197,6 +197,10 @@ SUFFIX_CANALICULI_VERIFICATION = "canaliculi_verification.png"
 # 0 outside a kept lacuna and its 1..N lacuna_id inside; the three masks are
 # 0 or 255; the graph file holds the cleaned graph with its ownership.
 SUFFIX_LACUNA_LABELS = "lacuna_labels.png"
+# The excluded region (section g9): the 0 or 255 mask quantification reads, and
+# the picture of it on the original. Both in SECTION_LACUNAE.
+SUFFIX_EXCLUDED_MASK = "excluded_region_mask.png"
+SUFFIX_EXCLUDED_PICTURE = "excluded_region.png"
 SUFFIX_CANALICULI_VASCULAR = "canaliculi_vascular_mask.png"
 SUFFIX_CANALICULI_GRAPH = "canaliculi_graph.pickle"
 # Dim thread-shaped structure no lacuna owns (canaliculi.find_unattached_threads).
@@ -692,9 +696,66 @@ FRAGMENT_CRUMB_MIN_SOLIDITY = 0.80
 # lacuna profile of 300 um2 (about 8 times the WT median), so a real lacuna
 # larger than that, or one fused in the mask to a band, is dropped too: a
 # limit on exactly the enlarged lacunae a periosteocytic lesion study looks
-# for. NOT VALIDATED. BAND_BLOB_RULE = False turns it off.
-BAND_BLOB_RULE = True
+# for. NOT VALIDATED. Off since 2026-11-06 (finishing brief, phase 2): the
+# structure rule (g9) replaces it. BAND_BLOB_RULE = True restores it exactly.
+BAND_BLOB_RULE = False
 BAND_BLOB_MAX_AREA_UM2 = 300.0
+#
+# (g9) The structure rule and the excluded region (finishing brief of
+# 2026-11-06, phases 2 and 3; results/archive/audit/CAP_V2.md). Large objects
+# are kept as lacunae, because an enlarged or merged lacunar space is what a
+# periosteocytic lesion looks like, unless they lie in a structure that is not
+# a lacuna. The EXCLUDED REGION of an image is the union of
+#   SATURATED BORDER REGIONS: saturated pixels (255, after a closing with a
+#     disk of SATURATED_CLOSING_UM, so a band's speckled saturation is one
+#     region) forming a connected region that touches the frame and covers at
+#     least SATURATED_BORDER_MIN_AREA_UM2: the blooming at a tissue border, as
+#     at the top of the 699 fields;
+#   VERY LARGE STRUCTURES: connected regions of the lacuna mask (the top class
+#     of the cut, as in g8) of at least LARGE_STRUCTURE_MIN_AREA_UM2, holes
+#     filled: a vascular canal, a resorption feature, the bone surface or soft
+#     tissue, as at the centre of 701_z26;
+# both grown by EXCLUSION_MARGIN_UM, the halo of their glow. A kept object
+# with more than EXCLUDED_OBJECT_MAX_SHARE of its area in the excluded region
+# is dropped; every area measure uses the analysed area, the image minus the
+# excluded region. Chosen on the 27 development images only (cap off, fast
+# lacuna stage):
+#   100 um2: the largest frame-touching saturated region inside a lacuna cut by
+#     the frame is 67.6 um2 (I534_z11c1-2, object 194), and 94.8 um2 lies in a
+#     WT object at the top frame of 682_z08 whose class is unclear; band and
+#     bloom regions reach 105 to 1104 um2. CAUTION: an interior lacuna holds
+#     up to 168.7 um2 of saturated pixels (I534_z11c1-2, object 93), so a very
+#     bright lacuna cut by the frame can fall in the excluded region. Border
+#     lacunae carry no size measure, so this moves counts, not sizes.
+#   1 um: the closing of the cap audit (src/diagnostics.py cap-audit).
+#   500 um2: every mask region of at least 657 um2 is band, bloom, medium or
+#     tissue (11 regions, 657 to 3253 um2); the largest mask region holding an
+#     object the reviewer accepted is 253 um2. 500 is about 14 WT median
+#     lacunae, so a cluster of up to about six enlarged lacunae stays.
+#   3 um: by 3 um from a saturated border region the brightness has fallen at
+#     least 79% of the way from the saturated edge to its level 10 to 15 um
+#     out, on all 8 development images that have one.
+#   0.5: an object counts where most of it lies; an initial value.
+# STRUCTURE_RULE = False turns the rule and the excluded region off (nothing
+# excluded). NOT VALIDATED.
+STRUCTURE_RULE = True
+SATURATED_CLOSING_UM = 1.0
+SATURATED_BORDER_MIN_AREA_UM2 = 100.0
+LARGE_STRUCTURE_MIN_AREA_UM2 = 500.0
+EXCLUSION_MARGIN_UM = 3.0
+EXCLUDED_OBJECT_MAX_SHARE = 0.5
+#
+# The cluster flag (finishing brief, phase 2): a flag, never a filter. A kept
+# lacuna is flagged "cluster", a merged multi-lacunar space, when shaving
+# CLUSTER_NECK_MAX_UM / 2 off its outline leaves two or more cores of at least
+# CLUSTER_CORE_MIN_UM2: two lacuna bodies joined by a neck narrower than
+# CLUSTER_NECK_MAX_UM. 3 um is about 70% of the median width of accepted
+# lacunae (4.2 um, g6), so the neck is narrower than a lacuna body; a part
+# that keeps a 3 um2 core is about 20 um2, half a WT median lacuna, so a tip
+# of a ragged outline is not a second body. Initial values, checked by the
+# reviewer on the development images (CAP_V2.md). NOT VALIDATED.
+CLUSTER_NECK_MAX_UM = 3.0
+CLUSTER_CORE_MIN_UM2 = 3.0
 
 # (h) Report only, no pruning. The range a canalicular length is reported
 # against, so a reader can see what share of threads falls inside it. The
