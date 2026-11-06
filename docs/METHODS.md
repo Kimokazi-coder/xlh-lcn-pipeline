@@ -12,7 +12,7 @@ inspection of the WT images. No parameter may be tuned on the other groups.
 **Two methods, and the choice is pending.** Sections 1 to 19 describe the
 **deterministic method**, the pipeline as `config.py` ships it, whose output is
 `results/`, one folder per group. Section 20 describes the **AI judge method**, the same pipeline
-with `config.AI_JUDGE_ENABLED` on, whose output is `results/WT/5_archive/ai_judge/canaliculi_judge/`. Which
+with `config.AI_JUDGE_ENABLED` on, whose output is `results/WT/<section>/ai_judge_canaliculi/`. Which
 the study uses has not been decided, and **neither has been validated against a
 manual trace**. Section 23 describes an experiment beside them, the **AI lacuna
 judge**, which decides which candidate regions are lacunae on all four groups,
@@ -1694,7 +1694,7 @@ from 1,045 to 1,482 over the 8 images; with the fix they are 1,113. With the
 switch off no edge is marked and every number is the deterministic method's.
 
 **What it does to the numbers**, over the 8 images
-(`results/WT/5_archive/ai_judge/canaliculi_judge/compare/compare_methods.xlsx`):
+(`results/WT/2_canaliculi/ai_judge_canaliculi/compare/compare_methods.xlsx`):
 
 | measure | deterministic | AI judge |
 | - | - | - |
@@ -1713,7 +1713,7 @@ pairs, as whole connected networks; no single cell takes over an image.
 **Reproducibility, cost and approval.** The model is pinned
 (`claude-sonnet-5-5`), no temperature is sent (the model rejects one) and
 thinking is off. Every request and answer is logged with its hash in
-`results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/`, with the case pictures that were actually sent, and
+`results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/`, with the case pictures that were actually sent, and
 the replay reruns the whole log offline to identical verdicts on all 8 images.
 The real run was made once, on 2026-10-19: **143 calls, $1.60**, against a dry
 run estimate of $1.19 and a ceiling of `config.MAX_COST_USD` = $5; one answer in
@@ -1733,7 +1733,7 @@ diet and HP high phosphorus. Each has its own folder in `data/` and in
 `results/`, with the same five sections inside (1_lacunae, 2_canaliculi,
 3_pols, 4_quantification, 5_archive; `results/README.md`), every file named
 after its image; the AI judge set holds WT only, archived in
-`results/WT/5_archive/ai_judge/canaliculi_judge/`.
+`results/WT/<section>/ai_judge_canaliculi/`.
 
 **WT is the reference, and nothing is tuned on the others.** Every rule and value
 in sections 1 to 19 was chosen by visual inspection of the 8 WT images. The other
@@ -1864,7 +1864,7 @@ count, and nothing is recommended.
 
 **Status: EXPERIMENT, pre-validation, NOT VALIDATED.** No verdict has been
 checked against a manual count. Behind `config.AI_LACUNA_JUDGE_ENABLED`, off by
-default, so `results/` and `results/WT/5_archive/ai_judge/canaliculi_judge/` are untouched by it; its output is
+default, so `results/` and `results/WT/<section>/ai_judge_canaliculi/` are untouched by it; its output is
 `results/archive/ai_judge/`. The full write-up is in
 [docs/EXPERIMENT_AI.md](EXPERIMENT_AI.md), "The lacuna judge".
 
@@ -1931,7 +1931,7 @@ the pinned `claude-sonnet-5-5`, no temperature sent, thinking off: **35 calls,
 $0.83** (147,968 input and 52,935 output tokens), against a dry run estimate of
 $0.93 and a ceiling of `config.AI_LACUNA_MAX_COST_USD` = $3. No answer was
 unreadable, retried or refused. Every request and answer is logged with its hash
-in `results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/`, with the picture sent, and the replay
+in `results/<group>/1_lacunae/ai_judge/ai_log/`, with the picture sent, and the replay
 reruns the log offline to identical verdicts on all 35 images.
 **External API use approved on 2026-10-15, approver: Karim.**
 
@@ -2091,3 +2091,33 @@ bounding-box watershed of `FAST_LACUNA_STAGE` for one run) on `src/lacunae.py`
 and `src/canaliculi.py`, and the dark-band merge tested in a window around each
 pair. `python src/diagnostics.py dark-band-check --watershed` found identical
 labels on 27 of 27 development images; the regression passed after every round.
+
+## 26. The bias audit of the frozen method (2026-11-06)
+
+Two choices of the review loop could treat the groups differently, and both
+were audited on the 27 development images, in DEV mode, with the
+`image-reviewer` subagent classifying a crop of each object
+(`results/archive/audit/`):
+
+- **The band rule** (section 25, g8) removes 17 objects (WT 0, WT_HP 2,
+  Hyp_RD 7, Hyp_HP 8): 15 band or tissue, 2 unsure, no real lacuna
+  (`diagnostics.py cap-audit`, `CAP_AUDIT.md`). Not biased by the test of the
+  brief (any real lacuna removed), so unchanged. The 6 objects of Hyp_HP
+  701_z26c1-2 hold no saturated pixel, so a saturation rule would not replace it.
+- **The rescue rules off** (g5) lose 11 real lacunae among 60 objects the rules
+  would add: WT 4 of 71 detected (5.6%), WT_HP 1 of 85 (1.2%), Hyp_RD 6 of 150
+  (4.0%), Hyp_HP 0 of 149 (0.0%) (`diagnostics.py dim-audit`, `DIM_AUDIT.md`). The
+  spread, 5.6 points, is over the test's 5, so biased by the test. No rule of one
+  to three bounds on the measured features returns those lacunae without
+  fragments (`diagnostics.py dim-rule-search`: 3 of 11 with none, 10 of 11 with
+  8), so no rule was added and the method stays at `method-freeze-v1`
+  (`FIX_LOG.md`). The choice is open.
+
+Every count is an AI reviewer's single look at a crop. Not validated.
+
+Also on 2026-11-06: `reference-check` moved to 543_3 (section 13), and the AI
+judges' results moved from `5_archive/` into the sections of their group,
+`<section>/ai_judge/` and, for the thread judge, `<section>/ai_judge_canaliculi/`
+(`results/archive/MOVE_MAP.csv`); `config.result_set_root` and
+`lacunae.section_folder` let the judge runs read and write there.
+

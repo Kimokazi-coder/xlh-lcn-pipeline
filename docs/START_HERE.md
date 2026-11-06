@@ -105,10 +105,16 @@ it named after its image:
 | `2_canaliculi/` | the network of each image (mask, skeleton, verification picture, vascular mask, graph, record) and its network figure |
 | `3_pols/` | candidate POL measure: lacunar size, pending definition (a picture and a table per image, a group table, a contact sheet) |
 | `4_quantification/` | every measured number per image, the group table, the overview and cell gallery figures, and the group figures Fig01 to Fig04, S01, S02 |
-| `5_archive/` | what is no longer used: the retired POL ring proxy, and the AI judge experiments |
+| `5_archive/` | what is no longer used: the retired POL ring proxy |
+| `<section>/ai_judge/` | the AI lacuna judge's set in each section it writes (its log in `1_lacunae/ai_judge/ai_log/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/`. Made before `method-freeze-v1`, so they do not match the current results until rerun (a README in each) |
 
 Beside them, `results/summary/` holds the tables that set the groups side by
-side, and `results/archive/` the old material of no one group.
+side, and `results/archive/` the old material of no one group, with the review
+loop of 2026-11-05 (`REVIEW_LOOP.md`) and the bias audit of 2026-11-06
+(`audit/REPORT_AUDIT.md`).
+
+**Held-out images.** 2 images per group are kept for the final validation
+(`docs/HOLDOUT.md`); in the default DEV mode no stage reads them.
 
 Earlier experiments, the older intensity-threshold method, the ablation that chose this one and every
 earlier report are preserved at the git tag `archive-2026-10-13` and are not in the working tree. `main`

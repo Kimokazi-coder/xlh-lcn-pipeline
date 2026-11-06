@@ -1,5 +1,14 @@
 # Experiment: an AI judge for the threads around a lacuna
 
+**Moved, 2026-11-06.** The judges' results are now part of the group sections,
+not archive: what this file calls `results/WT/5_archive/ai_judge/canaliculi_judge/` is in
+`results/WT/<section>/ai_judge_canaliculi/` (its log, `compare/` and run records in
+`results/WT/2_canaliculi/ai_judge_canaliculi/`), and what it calls
+`results/<group>/5_archive/ai_judge/lacuna_judge/` is in `results/<group>/<section>/ai_judge/`
+(its log in `results/<group>/1_lacunae/ai_judge/ai_log/`); `results/archive/MOVE_MAP.csv` has
+every file. The text below keeps the paths of the day it describes. Both sets were made with
+the detector before `method-freeze-v1` and do not match the current results until rerun.
+
 **Status: EXPERIMENT. Branch `exp-ai-layer` only. Not merged, not validated, not used for any
 result. NOTHING IN THIS FILE IS VALIDATED.** No verdict here has been checked against a manual
 trace, no number here has been compared with ground truth, and no result in `results/` was made with

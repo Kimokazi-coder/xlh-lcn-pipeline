@@ -12,5 +12,5 @@ opened, printed or summarized.
 | 2 dim audit | done | 60 added (11 real, 16 unsure, 33 not); lost real WT 5.6%, WT_HP 1.2%, Hyp_RD 4.0%, Hyp_HP 0.0%: spread 5.6 points, biased by the test |
 | 3 fix if biased | done | cap not biased; dim biased but no narrow rule exists (3 of 11 at no fragment): method not changed, no new tag (FIX_LOG.md) |
 | 4 final rerun if changed | skipped | the method did not change |
-| 5 leftovers | in progress | reference-check on 543_3 done; AI judge sets moved into the sections (1009 git mv), writers changed |
-| report | not started | |
+| 5 leftovers | done | reference-check on 543_3; judge sets moved (1009 git mv), writers changed; venv hang traced to USB removal events and documented; docs updated; regression PASS (DEV) |
+| report | done | results/archive/audit/REPORT_AUDIT.md |

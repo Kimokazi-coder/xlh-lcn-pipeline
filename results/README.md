@@ -71,13 +71,20 @@ image, the only cross-image table), `<image>_figure_cell_gallery` and
 `<image>_figure_inset_choice.json`), the group figures `Fig01` to `Fig04`,
 `S01` and `S02` with their value files, and `display_window.json`.
 
+**ai_judge/ in the sections** (since 2026-11-06, moved from `5_archive/`,
+`archive/MOVE_MAP.csv`): the AI lacuna judge's set of the group, the same file
+names as the section around it, in `1_lacunae/ai_judge/` (its log in
+`ai_log/`), `2_canaliculi/ai_judge/` and `4_quantification/ai_judge/`; for WT
+also the AI thread judge in `1_lacunae/ai_judge_canaliculi/`,
+`2_canaliculi/ai_judge_canaliculi/` (with its log, `compare/` and run records)
+and `4_quantification/ai_judge_canaliculi/`. Both were made with the detector
+before `method-freeze-v1` and do not match the current results until rerun
+(a README in each folder). Not validated.
+
 **5_archive/**: `pol_ring_proxy/` (the retired ring proxy of the POL
 section: per image overlay, measured and outlines pictures, csv and json, the
-group table and contact sheet), `ai_judge/lacuna_judge/` (the AI lacuna judge
-experiment: its log in `ai_log/` and the pipeline with its verdicts in the
-same sections), and for WT `ai_judge/canaliculi_judge/` (the AI thread judge
-experiment: log, judged pipeline, `compare/`). The figure script also writes
-`not_used/` and `variants_per_image_brightness/` here; they are not tracked.
+group table and contact sheet). The figure script also writes `not_used/` and
+`variants_per_image_brightness/` here; they are not tracked.
 
 **summary/**: `group_overview.csv` and `.xlsx` (every image of every group,
 one row each), `group_qc.csv` (QC list of the groups other than WT), and
@@ -89,7 +96,10 @@ DEFINITION, SUMMARY, REPORT, REPORT_LAYOUT, PROGRESS, the phase 0 look,
 layout_check), `ai_judge/` (run records of the lacuna judge, its `dry_run/`
 and `review/`, and the README of each judge), `MOVE_MAP.csv` (every file moved
 into this layout, old path and new path), `REPORT_REORG.md` (what the move
-did) and `PROGRESS_LAYOUT.md` (its working log).
+did) and `PROGRESS_LAYOUT.md` (its working log); `REVIEW_LOOP.md` and
+`REPORT_LOOP.md` with `review_loop/` (the review loop of 2026-11-05) and
+`audit/` (the bias audit of 2026-11-06: `CAP_AUDIT.md`, `DIM_AUDIT.md`,
+`FIX_LOG.md`, `REPORT_AUDIT.md`, the crops and the reviewer's tables).
 
 ## How to regenerate
 

@@ -24,7 +24,7 @@ lossless TIFF the same way.
   piece the pipeline did not trace, whether it is a thread at all; the verdict
   becomes a zero weight attachment that the existing shortest path step uses to
   split the network (`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). Its output is
-  archived in `results/WT/5_archive/ai_judge/canaliculi_judge/`, for the WT group only. The switch is **off by default**, and with it off every
+  kept in `results/WT/<section>/ai_judge_canaliculi/`, for the WT group only. The switch is **off by default**, and with it off every
   output is the deterministic method's.
 
 **Which method the study uses has not been decided, and neither has been
@@ -46,7 +46,7 @@ on 2026-10-27, on all 35 images: 35 calls to the pinned `claude-sonnet-5-5`,
 identical verdicts offline. It said no to 352 of the 793 lacunae the filters
 kept and added 7 regions. **Not validated: no verdict has been checked against
 a manual count**, and its output, archived in each group's
-`results/<group>/5_archive/ai_judge/lacuna_judge/`, is not a result of the study. External API use approved on 2026-10-15, approver: Karim.
+`results/<group>/<section>/ai_judge/`, is not a result of the study. External API use approved on 2026-10-15, approver: Karim.
 
 ## What each folder is
 
@@ -65,9 +65,10 @@ every file is [`results/README.md`](results/README.md).
 | `results/G/2_canaliculi/` | the network of every image: mask, skeleton, verification picture, vascular mask, unattached threads, graph, detection record; and the network figure of each image | `python src/canaliculi.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
 | `results/G/3_pols/` | **candidate POL measure: lacunar size, pending definition**: per image a picture of each lacuna's area against the WT median and a table, per group a table and a contact sheet | `python src/pols.py measure -d data/G` (all groups: `python src/pols.py all`) |
 | `results/G/4_quantification/` | every measured number of each image (json, xlsx, pdf), the group table `quantification_all_images`, the overview and cell gallery of each image, and the group figures Fig01 to Fig04, S01, S02 | `python src/quantification.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
-| `results/G/5_archive/` | what is no longer used: `pol_ring_proxy/` (the retired POL ring proxy), `ai_judge/lacuna_judge/` (the AI lacuna judge, every group) and, for WT, `ai_judge/canaliculi_judge/` (the AI judge method: judged pipeline, log, `compare/`) | `python src/pol_ring_proxy.py measure -d data/G` (its own options in the file); the judges: `docs/EXPERIMENT_AI.md` |
+| `results/G/<section>/ai_judge/` | the AI lacuna judge's set of the group, in each section it writes (`1_lacunae/ai_judge/` with its log in `ai_log/`, `2_canaliculi/ai_judge/`, `4_quantification/ai_judge/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/` (log, `compare/` and run records in `2_canaliculi/ai_judge_canaliculi/`). Made with the detector before `method-freeze-v1`: a README in each folder says they do not match the current results until rerun | `python src/diagnostics.py ai-lacuna-run`, `ai-run`; `docs/EXPERIMENT_AI.md` |
+| `results/G/5_archive/` | what is no longer used: `pol_ring_proxy/` (the retired POL ring proxy) | `python src/pol_ring_proxy.py measure -d data/G` (its own options in the file) |
 | `results/summary/` | every group side by side: `group_overview.csv` and `.xlsx`, `group_qc.csv`, `pols_lacunar_size_by_group.csv` | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc`, `python src/pols.py all` |
-| `results/archive/` | old material of no one group: the ring proxy reports (`pols/`), its blinded review set (`blind_review/`), the format test (`format_test/`), the lacuna judge's run records, `dry_run/` and `review/` (`ai_judge/`), `MOVE_MAP.csv` (every file moved into this layout) and `REPORT_REORG.md` | see [`results/README.md`](results/README.md) |
+| `results/archive/` | old material of no one group: the ring proxy reports (`pols/`), its blinded review set (`blind_review/`), the format test (`format_test/`), the lacuna judge's run records, `dry_run/` and `review/` (`ai_judge/`), `MOVE_MAP.csv` (every file moved into this layout) and `REPORT_REORG.md`; the review loop (`REVIEW_LOOP.md`, `REPORT_LOOP.md`) and the bias audit (`audit/`) | see [`results/README.md`](results/README.md) |
 | `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (lacunar size), `pol_ring_proxy.py` (the retired ring proxy), `make_figures.py` (the figures), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the layout, the biological limits, shared settings and the switches (all off by default) | |
 | `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group -g GROUP -s SOURCE_FOLDER` |
@@ -283,7 +284,29 @@ chose this one and every earlier report are preserved at the git tag
 Python 3.9 with numpy, scipy, scikit-image, networkx, skan, openpyxl and
 tifffile (tested with numpy 2.0.2, scipy 1.13.1, scikit-image 0.24.0,
 networkx 3.2.1, skan 0.13.1, openpyxl 3.1.5, tifffile 2024.8.30). Run every
-command from the repository root, in this order.
+command from the repository root, in this order. `-w N` runs the images of
+`src/lacunae.py` and `src/canaliculi.py` N at a time (the same files).
+
+**If `venv\Scripts\python.exe` hangs at start.** Twice, every start of the
+venv's launcher took exactly 300 s while the base interpreter started in 1 s:
+on 2026-11-05 from about 14:00, and on 2026-11-06 from about 10:45 (between
+the two it started in 2 s). Both times the system log shows a removal of USB
+storage: on 2026-11-05 a second USB drive (E:) dropping off and back on the
+bus from 14:16 to 15:30 (NTFS events 140, "failed to flush data to the
+transaction log", and 98) and an eject at 15:14; on 2026-11-06 an eject at
+10:44; each eject refused by the programs running from the drives (Kernel-PnP
+event 225). The repository and the venv launcher are on the USB drive F: (WD
+easystore), the base interpreter on C:, so after such an event a program
+started from F: stalls and one started from C: does not; the venv itself is
+not broken. To avoid it: do not eject or unplug the USB drives during a run,
+or move the venv to C: (a new venv, packages installed again from
+requirements.txt). If it happens, run the base interpreter as the venv, which
+is how Python starts venv worker processes anyway (Git Bash):
+
+```
+export __PYVENV_LAUNCHER__='F:\lcn-quant\venv\Scripts\python.exe'
+"/c/Program Files/Carl Zeiss/ZeissPython/Py22042.2/env/python.exe" src/lacunae.py -d data/WT
+```
 
 ```
 python src/lacunae.py -d data/WT            # feature 1: find and label the lacunae
@@ -317,7 +340,7 @@ python src/diagnostics.py survey -d data/WT -o .cache/survey        # what it do
 python src/diagnostics.py shape-picture -d data/WT -o .cache/network_shape   # not tracked
 ```
 
-The AI judge method, archived in `results/WT/5_archive/ai_judge/canaliculi_judge/`,
+The AI judge method, kept in `results/WT/<section>/ai_judge_canaliculi/`,
 offline from the decision files already in the repository:
 
 ```
@@ -327,7 +350,7 @@ python src/diagnostics.py ai-compare -d data/WT          # judge off against jud
 python src/diagnostics.py compare-methods -d data/WT     # both sets side by side, csv and xlsx
 ```
 
-The AI lacuna judge, archived in `results/<group>/5_archive/ai_judge/lacuna_judge/`
+The AI lacuna judge, kept in `results/<group>/<section>/ai_judge/`
 and `results/archive/ai_judge/`, offline from its log (all four groups unless
 `-d` or `-i` names fewer):
 
@@ -336,7 +359,7 @@ python src/diagnostics.py ai-lacuna-judge -w 20            # dry run: the pictur
 python src/diagnostics.py ai-lacuna-judge -s               # self-test with a stub judge: 27 checks
 python src/diagnostics.py ai-lacuna-judge -r -w 20   # the log replays to the same verdicts
 python src/diagnostics.py ai-lacuna-review -w 20           # contact sheets and the table, results/archive/ai_judge/review/
-python src/diagnostics.py ai-lacuna-run -w 20              # the pipeline with its verdicts, each group's 5_archive/ai_judge/lacuna_judge/
+python src/diagnostics.py ai-lacuna-run -w 20              # the pipeline with its verdicts, each group's <section>/ai_judge/
 ```
 
 The lacuna stage these need is cached in `.cache/ai_lacuna_candidates/` once per
@@ -397,7 +420,7 @@ together. The table below is WT, the reference group.
 
 Interior means per cell; field density is skeleton px over analysed px. Both
 sets side by side, per lacuna and with the cell pairs whose tracing changed
-hands, are in `results/WT/5_archive/ai_judge/canaliculi_judge/compare/compare_methods.xlsx`. With the judge
+hands, are in `results/WT/2_canaliculi/ai_judge_canaliculi/compare/compare_methods.xlsx`. With the judge
 on, roots per cell are counted only from the pipeline's own attachments; a
 verdict's attachment splits the network but is not a root (`docs/METHODS.md`
 section 20).

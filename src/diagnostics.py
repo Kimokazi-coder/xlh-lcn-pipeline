@@ -621,13 +621,15 @@ def compare_json(ref_path: Path, new_path: Path, allowed: set | None = None, kin
 
 
 def compare_summary(ref_path: Path, new_path: Path) -> dict:
-    """Every column of the reference summary table, by name, row by image."""
+    """Every column of the reference summary table, by name, row by image. In
+    DEV mode the rows of held-out images are left out unread, as the run made
+    none (docs/HOLDOUT.md)."""
     import csv
 
     def rows(path):
         with open(path, newline="") as f:
             r = list(csv.reader(f))
-        return r[0], {row[0]: dict(zip(r[0], row)) for row in r[1:] if row}
+        return r[0], {row[0]: dict(zip(r[0], row)) for row in r[1:] if row and not lacunae.is_held_out(row[0])}
 
     hr, rr = rows(ref_path)
     hn, rn = rows(new_path)
