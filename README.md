@@ -13,6 +13,14 @@ run with the same settings. The pixels of all four groups are JPEG-decoded:
 the WT TIFFs were made from JPEGs, and the other groups' JPEGs are decoded into
 lossless TIFF the same way.
 
+**Key results** (2026-11-06): [`results/HOW_TO_READ.md`](results/HOW_TO_READ.md)
+says in half a page where the key pictures are (`results/<group>/0_key_results/`),
+what each shows and which numbers matter; every number is in one file,
+[`results/SUMMARY.xlsx`](results/SUMMARY.xlsx) (Read me, Per group, Per animal,
+Per image, Statistics); the genotype by diet statistics are in
+[`results/summary/STATISTICS.md`](results/summary/STATISTICS.md). The POL
+definition is a working one, to be confirmed by Dr. Murshed.
+
 **Two methods, and the choice between them is pending.**
 
 - The **deterministic method** is the pipeline as `config.py` ships it. Its

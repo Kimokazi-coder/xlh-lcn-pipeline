@@ -32,7 +32,8 @@ Where the figures go (names from config.py), in results/<group>/:
     5_archive/         not_used/ (S03, the coded contact sheet, and the low cut
                        overview layer) and variants_per_image_brightness/, kept
                        for history and not tracked
-Each output is skipped if its PNG and PDF exist; delete them to redraw.
+Each output is skipped if its PNG and PDF exist; the redraw option draws it
+again over the file there.
 
 The groups other than WT are drawn with the same code and settings, the WT
 display window (one window for every group, so the pictures compare), and the
@@ -241,9 +242,16 @@ def save(fig, name: str) -> None:
     plt.close(fig)
 
 
+# The redraw option of the command line: draw every output again over the
+# file there, instead of skipping the outputs that exist. Nothing is deleted
+# either way.
+REDRAW = False
+
+
 def done(name: str) -> bool:
     stem = fig_stem(name)
-    return stem.with_name(f"{name}.png").is_file() and stem.with_name(f"{name}.pdf").is_file()
+    return (not REDRAW and stem.with_name(f"{name}.png").is_file()
+            and stem.with_name(f"{name}.pdf").is_file())
 
 
 def write_json(path: Path, obj) -> None:
@@ -811,7 +819,7 @@ def save_to(fig, stem: Path, exts: tuple = ("png", "pdf")) -> None:
 
 
 def done_at(stem: Path, exts: tuple = ("png", "pdf")) -> bool:
-    return all(stem.with_name(f"{stem.name}.{ext}").is_file() for ext in exts)
+    return not REDRAW and all(stem.with_name(f"{stem.name}.{ext}").is_file() for ext in exts)
 
 
 # Display windows (P8). The main per-image figures use the fixed dataset
@@ -2173,6 +2181,9 @@ def main() -> int:
     p = argparse.ArgumentParser(description="Publication figures (pre-validation, px).")
     p.add_argument("-g", dest="group", default=config.REFERENCE_GROUP,
                    help=f"Group to draw (default {config.REFERENCE_GROUP}): {', '.join(config.GROUPS)}.")
+    p.add_argument("--redraw", action="store_true",
+                   help="Draw every output again over the file there (default: skip the outputs that exist). "
+                        "The display window is kept.")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("window", help="Compute the fixed display window.")
     q = sub.add_parser("image", help="Per-image overview figure.")
@@ -2213,6 +2224,8 @@ def main() -> int:
                    help="Output folder of field-summary (default: .cache/field_summary, and "
                         ".cache/field_summary/<group> for a group other than WT).")
     args = p.parse_args()
+    global REDRAW
+    REDRAW = args.redraw
     set_group(args.group)
     if getattr(args, "field_dir", "unset") is None:
         args.field_dir = DEFAULT_FIELD_DIR

@@ -107,18 +107,22 @@ IMPORT_INVENTORY_NAME = "image_inventory.csv"  # in DATA_DIR
 # folders and nothing else (results/README.md). Inside a section the files of
 # every image of the group sit side by side, each named <label>_<suffix>; there
 # is no folder per image.
+#   0_key_results     copies of the three key pictures of every image
+#                     (src/key_results.py); nothing is made there
 #   1_lacunae         the lacuna stage's files, and the group's contact sheet
 #   2_canaliculi      the network stage's files, and the network figures
-#   3_pols            the candidate POL measure, lacunar size (src/pols.py)
+#   3_pols            the POL footprints and lacunar size (src/pols.py)
 #   4_quantification  every measured number per image, the group table, the
 #                     cell gallery and overview figures, the group figures
 #   5_archive         everything no longer used, in named subfolders
+SECTION_KEY_RESULTS = "0_key_results"
 SECTION_LACUNAE = "1_lacunae"
 SECTION_CANALICULI = "2_canaliculi"
 SECTION_POLS = "3_pols"
 SECTION_QUANTIFICATION = "4_quantification"
 SECTION_ARCHIVE = "5_archive"
-SECTIONS = (SECTION_LACUNAE, SECTION_CANALICULI, SECTION_POLS, SECTION_QUANTIFICATION, SECTION_ARCHIVE)
+SECTIONS = (SECTION_KEY_RESULTS, SECTION_LACUNAE, SECTION_CANALICULI, SECTION_POLS, SECTION_QUANTIFICATION,
+            SECTION_ARCHIVE)
 # Where the figures of the figures script go: the network figure beside the
 # network it draws, the overview and the cell gallery beside the numbers, and
 # the group figures (Fig01 to Fig04, S01, S02) with the group table.

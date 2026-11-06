@@ -3,24 +3,32 @@
 Everything the pipeline and the figure code produce, for the four groups of
 `config.GROUPS`: WT (8 images, the reference), WT_HP, Hyp_RD and Hyp_HP (9
 each). Pre-validation: no number here has been checked against a manual count.
-The pipeline reports pixels (0.13 um/px); only `3_pols/` reports um2.
+The pipeline reports pixels (0.13 um/px); `3_pols/`, `SUMMARY.xlsx` and the
+statistics report um.
+
+**Start here:** [HOW_TO_READ.md](HOW_TO_READ.md) (half a page), the key
+pictures in `<group>/0_key_results/`, and every number in one file,
+[SUMMARY.xlsx](SUMMARY.xlsx). The statistics: [summary/STATISTICS.md](summary/STATISTICS.md).
 
 ## Layout
 
 ```
 results/
   README.md          this page
-  summary/           every table that sets the groups side by side
+  HOW_TO_READ.md     where the key pictures are and which numbers matter
+  SUMMARY.xlsx       every number in one file: Read me, Per group, Per animal, Per image, Statistics
+  summary/           every table that sets the groups side by side, and STATISTICS.md
   WT/  WT_HP/  Hyp_RD/  Hyp_HP/
+    0_key_results/     copies of the three key pictures of every image
     1_lacunae/         the lacuna stage, every image of the group side by side
     2_canaliculi/      the network stage, and the network figures
-    3_pols/            candidate POL measure: lacunar size, pending definition
+    3_pols/            the POL footprints (working definition) and lacunar size
     4_quantification/  every measured number, the group table, the figures
     5_archive/         what is no longer used, in named subfolders
   archive/           old material that belongs to no one group
 ```
 
-Every group folder holds exactly these five sections. Inside a section there
+Every group folder holds exactly these six sections. Inside a section there
 is no folder per image: each file is named after its image, `<image>_...`,
 where `<image>` is the short label of the image (`config.IMAGE_LABELS` for WT,
 the cleaned file name for the other groups).
@@ -41,12 +49,23 @@ Every file moved into this layout on 2026-11-04: [MOVE_MAP.csv](archive/MOVE_MAP
 
 ## What each section holds
 
+**0_key_results/**, written by `src/key_results.py` (2026-11-06): for every
+image, copies of `<image>_1_lacunae_outlines.png` (from `1_lacunae/`),
+`<image>_2_canaliculi_verification.png` (from `2_canaliculi/`) and
+`<image>_3_pols_outlines.png` (from `3_pols/`), and a README. The originals
+are not changed; `python src/key_results.py check` compares every copy with
+its original.
+
 **1_lacunae/**, written by `src/lacunae.py`:
 `<image>_lacunae_outlines.png` (the image with the kept lacunae outlined),
 `<image>_lacuna_labels.png` (16 bit, 0 outside a lacuna, its id 1..N inside;
 every lacuna measure is taken from it), `<image>_lacunae_detection.json` (what
-the stage did, with its parameters), and `contact_sheet.png`, every outlines
-picture of the group, small.
+the stage did, with its parameters), `<image>_excluded_region.png` (the
+excluded region shaded grey on the original, with the kept lacunae in green:
+saturated border regions and very large bright structures, with a 3 um
+margin, config section g9) and `<image>_excluded_region_mask.png` (the same
+region, 0 or 255, which quantification reads), and `contact_sheet.png`, every
+outlines picture of the group, small.
 
 **2_canaliculi/**, written by `src/canaliculi.py`:
 `<image>_canaliculi_mask.png`, `_skeleton.png`, `_verification.png` (each
@@ -55,13 +74,19 @@ lacuna and the threads it owns in one colour), `_vascular_mask.png`,
 script, `<image>_figure_network.png` and `.pdf` with
 `<image>_figure_network_checks.json` (drawn values against the pipeline).
 
-**3_pols/**, written by `src/pols.py`: the candidate POL measure, lacunar size,
-pending definition. `<image>_pols_lacunar_size.png` (each measured lacuna
+**3_pols/**, written by `src/pols.py`: the POL footprints of the working
+definition below, and lacunar size. `<image>_pols_outlines.png` (every
+footprint outlined on the original: green normal size, yellow above 2 x the
+WT median, cyan a cluster, grey touching the frame; excluded regions shaded
+grey; id and area beside each; the image's numbers in the legend; 10 um bar),
+`<image>_pols_lacunar_size.png` (each measured lacuna
 filled by its area relative to the WT median, one colour scale for every
 group, colour bar in um2, flagged lacunae outlined grey), `<image>_pols_lacunar_size.csv`
-(id, area_um2, ratio_to_WT_median, flag), `pols_all_images.csv` and `.xlsx`
-(per image n, mean, median, 90th percentile of area and ratio),
-`contact_sheet.png` and `README.md`. No lesion is called here.
+(id, area_um2, ratio_to_WT_median, flag, cluster), `pols_all_images.csv` and `.xlsx`
+(per image n, mean, median, 90th percentile of area and ratio, and the POL
+metrics: n lacunae, share above 2 x the WT median and above 100 um2, clusters,
+POL area per analysed area), `contact_sheet.png`, `contact_sheet_outlines.png`
+and `README.md`. No lesion is called here.
 
 **Working POL definition (2026-11-06; to be confirmed by Dr. Murshed).** In
 rhodamine confocal images the dye fills the lacuna and the unmineralized
@@ -97,8 +122,12 @@ group table and contact sheet). The figure script also writes `not_used/` and
 `variants_per_image_brightness/` here; they are not tracked.
 
 **summary/**: `group_overview.csv` and `.xlsx` (every image of every group,
-one row each), `group_qc.csv` (QC list of the groups other than WT), and
-`pols_lacunar_size_by_group.csv` (lacunar size per group).
+one row each), `group_qc.csv` (QC list of the groups other than WT),
+`pols_lacunar_size_by_group.csv` (lacunar size and the POL metrics per group),
+`pols_by_animal.csv` (the same per animal of `data/animals.csv`), and from
+`src/animal_stats.py`: `STATISTICS.md` (the genotype by diet statistics in
+plain words), `per_group.csv`, `per_animal.csv`, `per_image.csv` and
+`statistics_models.csv`.
 
 **archive/**: `blind_review/` (POL ring proxy pictures under shuffled codes),
 `format_test/` (TIFF against JPEG), `pols/` (the ring proxy reports: FINDINGS,
@@ -129,7 +158,9 @@ For WT the field summary goes to `.cache/field_summary` (no group folder).
 Across groups:
 
 ```
-python src/pols.py all                          # 3_pols of every group, and summary/pols_lacunar_size_by_group.csv
+python src/pols.py all                          # 3_pols of every group, summary/pols_lacunar_size_by_group.csv, pols_by_animal.csv
+python src/animal_stats.py run                  # summary/STATISTICS.md and the per group, animal, image tables
+python src/key_results.py all                   # <group>/0_key_results/ and SUMMARY.xlsx
 python src/diagnostics.py group-overview        # summary/group_overview.csv and .xlsx
 python src/diagnostics.py group-qc              # summary/group_qc.csv
 python src/diagnostics.py layout-check          # this layout, files per section, every group

@@ -2240,3 +2240,16 @@ animals per group the intervals are wide; read them, not the p values.
 synthetic animals. statsmodels 0.14.4 and patsy 1.0.3 were added to the venv
 and `requirements.txt` for this.
 
+### 27.5 The key results view
+
+`src/key_results.py all` adds a sixth section to every group,
+`results/<group>/0_key_results/` (`config.SECTION_KEY_RESULTS`), holding
+copies of the three key pictures of every image, named so they sort by image:
+`<image>_1_lacunae_outlines.png`, `<image>_2_canaliculi_verification.png` and
+`<image>_3_pols_outlines.png`, and a README. The originals are not changed;
+`check` compares every copy byte for byte with its original. It also writes
+`results/SUMMARY.xlsx` (Read me: every column in one plain line and the
+pre-validation status; Per group, Per animal, Per image; Statistics: the
+models of 27.4 in plain words). `results/HOW_TO_READ.md` is the half page that
+says where everything is; the top README links both.
+
