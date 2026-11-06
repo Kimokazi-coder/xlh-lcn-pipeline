@@ -7507,7 +7507,7 @@ def cmd_dim_rule_search(_args) -> int:
     return 0
 
 
-# cap-v2-audit -----------------------------------------------------------------------
+# cap-v2-audit: the structure rule against the band rule
 
 CAP_V2_DIR = AUDIT_DIR / "cap_v2"
 # The finishing brief (2026-11-06, phase 2): every object over 150 um2 is reviewed.
@@ -7522,7 +7522,7 @@ def _cap_v2_one(path_str: str) -> list:
     structure rule both off, and every smaller one the structure rule removes,
     each with what the 300 um2 band rule (before) and the structure rule
     (after) decide, as src/lacunae.py applies them to the same kept list."""
-    config.FAST_LACUNA_STAGE = True  # identical labels (dark-band-check --watershed)
+    config.FAST_LACUNA_STAGE = True  # identical labels (dark-band-check, watershed option)
     config.BAND_BLOB_RULE = False
     config.STRUCTURE_RULE = False
     path = Path(path_str)

@@ -2209,3 +2209,34 @@ shows them small. `python src/pols.py selftest` (17 checks) covers the
 metrics and the colours; `check` and `check-pictures` pass on the
 development images.
 
+### 27.4 Animals and the genotype by diet statistics
+
+`data/animals.csv` maps every image to an animal from its file name prefix
+(542, 543, 682, 872, 876, 877, 535, 536, I534, 548, 699, 701: 12 animals, 3 per
+group), with genotype and diet as separate columns, from the group folder,
+and `confirmed` = no. Animal 701 is flagged: its file names carry no diet
+label, so it is HP only because its images are in `data/Hyp_HP` (535, I534,
+543, 682 and 876 carry none either; the WT folder is taken as the regular
+diet). To be checked with Dr. Murshed.
+
+`src/animal_stats.py run` writes `results/summary/STATISTICS.md` and the tables
+beside it. The design is 2 x 2, the animal is the unit, and the question is
+the interaction, (Hyp HP minus Hyp RD) minus (WT HP minus WT RD). The primary
+analysis is one value per animal (pooled over its images) and least squares
+y ~ hyp * hp with t intervals on 8 degrees of freedom, for the median and 90th
+percentile of lacunar area, the shares above 2 x the WT median and above
+100 um2, the POL area per analysed area, and the headline canaliculi
+measures (roots per lacuna, ring length within 30 px, 3.9 um, field length
+density, median width), in um. Beside it, statsmodels MixedLM with the animal
+as a random intercept: lacunar area, roots and ring length per lacuna, and
+the image 90th percentile, share above 2 x the WT median and field density
+per image. Their Wald intervals do not correct for 12 groups and are too
+narrow; a fit whose Hessian is not positive definite is marked unusable (with
+the image nested in the animal as well, the per-lacuna fits were degenerate,
+so the image is not modelled). Each line says in plain words what it shows
+and the smallest interaction the design would find 4 times in 5. With 3
+animals per group the intervals are wide; read them, not the p values.
+`python src/animal_stats.py selftest` recovers a known interaction on
+synthetic animals. statsmodels 0.14.4 and patsy 1.0.3 were added to the venv
+and `requirements.txt` for this.
+
