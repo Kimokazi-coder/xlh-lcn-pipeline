@@ -2253,3 +2253,12 @@ pre-validation status; Per group, Per animal, Per image; Statistics: the
 models of 27.4 in plain words). `results/HOW_TO_READ.md` is the half page that
 says where everything is; the top README links both.
 
+### 27.6 Freeze and final run
+
+Tag `method-freeze-v2` (062a56e). The whole pipeline ran in FINAL mode on all
+35 images, figures redrawn over the old files (`make_figures.py` redraw
+option; nothing deleted), with no held-out output opened or reviewed. The
+checks and the results are in `results/archive/REPORT_FINAL.md`. After the
+tag only the group overview's consistency check changed, to count the
+skeleton of the analysed field as quantification does.
+

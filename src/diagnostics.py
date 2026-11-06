@@ -7021,14 +7021,17 @@ def group_summary_rows(group: str) -> list:
 def unowned_px(root: Path, label: str) -> tuple:
     """(skeleton px, unowned px) of one image from what detection saved: the
     skeleton png and the owner map rebuilt from the saved graph, the map the
-    pipeline built in memory (canaliculi.build_owner_pixel_map)."""
+    pipeline built in memory (canaliculi.build_owner_pixel_map). Both count
+    the analysed field only, outside the excluded region (config section g9),
+    as the field measures of src/quantification.py do."""
     from skan import Skeleton
 
     d = quantification.load_detection(root, label)
     skeleton = d["skeleton"]
     skel_obj = Skeleton(skeleton) if skeleton.any() else None
     owner_map = canaliculi.build_owner_pixel_map(skeleton.shape, skel_obj, d["graph"], d["edge_owner"], d["owner"])
-    return int(skeleton.sum()), int((skeleton & (owner_map == 0)).sum())
+    field = skeleton if d.get("excluded") is None else skeleton & ~d["excluded"]
+    return int(field.sum()), int((field & (owner_map == 0)).sum())
 
 
 def cmd_group_overview(args) -> int:
