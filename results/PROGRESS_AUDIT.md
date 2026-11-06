@@ -10,7 +10,7 @@ opened, printed or summarized.
 | 0 pull | done | already up to date at 12d4aae; the venv launcher starts in 2 s again |
 | 1 cap audit | done | 17 removed (WT 0, WT_HP 2, Hyp_RD 7, Hyp_HP 8): 15 band or tissue, 2 unsure, 0 real; not biased |
 | 2 dim audit | done | 60 added (11 real, 16 unsure, 33 not); lost real WT 5.6%, WT_HP 1.2%, Hyp_RD 4.0%, Hyp_HP 0.0%: spread 5.6 points, biased by the test |
-| 3 fix if biased | not started | |
-| 4 final rerun if changed | not started | |
+| 3 fix if biased | done | cap not biased; dim biased but no narrow rule exists (3 of 11 at no fragment): method not changed, no new tag (FIX_LOG.md) |
+| 4 final rerun if changed | skipped | the method did not change |
 | 5 leftovers | not started | |
 | report | not started | |
