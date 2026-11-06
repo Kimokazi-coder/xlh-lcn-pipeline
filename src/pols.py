@@ -78,11 +78,26 @@ GROUP_TABLE = "pols_all_images"  # .csv and .xlsx
 CONTACT_SHEET = "contact_sheet.png"
 SUMMARY_TABLE = config.SUMMARY_ROOT / "pols_lacunar_size_by_group.csv"
 
-LACUNA_COLUMNS = ["id", "area_um2", "ratio_to_WT_median", "flag"]
+LACUNA_COLUMNS = ["id", "area_um2", "ratio_to_WT_median", "flag", "cluster"]
 STAT_COLUMNS = ["n", "n_flagged", "area_um2_mean", "area_um2_median", "area_um2_p90",
                 "ratio_mean", "ratio_median", "ratio_p90"]
-IMAGE_COLUMNS = ["status", "group", "image"] + STAT_COLUMNS + ["WT_median_area_um2"]
-GROUP_COLUMNS = ["status", "group", "n_images"] + STAT_COLUMNS + ["WT_median_area_um2"]
+# The POL metrics (finishing brief of 2026-11-06, phase 4), appended so no
+# earlier column moves. Over the measured lacunae: the share above 2 times the
+# WT median and above POL_LARGE_AREA_UM2, and the clusters (config section
+# g9). Over every lacuna with an area, edge ones included (their part inside
+# the frame lies in the field): the summed area over the analysed area, the
+# image minus the excluded region (config section g9).
+POL_COLUMNS = ["n_lacunae", "share_above_2x_WT_median", "share_above_100_um2", "n_clusters",
+               "lacunar_area_um2", "analysed_area_um2", "excluded_area_um2", "pol_area_per_analysed_area"]
+IMAGE_COLUMNS = ["status", "group", "image"] + STAT_COLUMNS + ["WT_median_area_um2"] + POL_COLUMNS
+GROUP_COLUMNS = ["status", "group", "n_images"] + STAT_COLUMNS + ["WT_median_area_um2"] + POL_COLUMNS
+ANIMAL_COLUMNS = (["status", "animal", "genotype", "diet", "group", "confirmed", "n_images"] + STAT_COLUMNS
+                  + ["WT_median_area_um2"] + POL_COLUMNS)
+ANIMAL_TABLE = config.SUMMARY_ROOT / "pols_by_animal.csv"
+ANIMALS_FILE = config.DATA_DIR / "animals.csv"
+# The brief's fixed size line, beside the 2 x WT median one.
+POL_LARGE_AREA_UM2 = 100.0
+POL_RATIO_LINE = 2.0
 DIGITS = 4
 
 # Picture. One colour scale for every group: the ratio to the WT median on a
@@ -107,19 +122,40 @@ def image_files(group: str) -> list[Path]:
     return lacunae.without_held_out(sorted((config.DATA_DIR / group).glob("*.tif")))
 
 
+def quant_json(results_root: Path, label: str) -> dict:
+    return json.loads(quantification.quant_path(results_root, label, ".json").read_text(encoding="utf-8"))
+
+
 def lacuna_records(results_root: Path, label: str) -> list[dict]:
-    """The quantification json's lacunae of one image, as {id, area_px2, flag}."""
-    q = json.loads(quantification.quant_path(results_root, label, ".json").read_text(encoding="utf-8"))
+    """The quantification json's lacunae of one image, as {id, area_px2, flag,
+    cluster}. cluster is None in a json made before the flag existed."""
     out = []
-    for r in q["lacunae"]:
+    for r in quant_json(results_root, label)["lacunae"]:
         if r["area_px2"] is None:
             flag = "no_area"
         elif r["on_border"]:
             flag = "edge"
         else:
             flag = ""
-        out.append({"id": int(r["lacuna_id"]), "area_px2": r["area_px2"], "flag": flag})
+        out.append({"id": int(r["lacuna_id"]), "area_px2": r["area_px2"], "flag": flag,
+                    "cluster": r.get("cluster")})
     return out
+
+
+def field_areas_um2(results_root: Path, label: str) -> tuple[float, float]:
+    """(analysed area, excluded area) of one image in um2, from its
+    quantification json. A json made before the excluded region existed has
+    nothing excluded, so the analysed area is the whole image."""
+    q = quant_json(results_root, label)
+    field = q["field"]
+    if "analysed_field_area_px2" in field:
+        return field["analysed_field_area_px2"] * UM2_PER_PX2, field["excluded_area_px2"] * UM2_PER_PX2
+    labels = lacunae.result_path(results_root, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNA_LABELS)
+    from PIL import Image  # noqa: PLC0415
+
+    with Image.open(labels) as im:
+        w, h = im.size
+    return w * h * UM2_PER_PX2, 0.0
 
 
 def wt_median_um2() -> float:
@@ -132,13 +168,18 @@ def wt_median_um2() -> float:
     return float(np.median(areas))
 
 
+def cluster_word(value) -> str:
+    """The cluster flag as the tables write it: yes, no, or empty when unknown."""
+    return "" if value is None else ("yes" if value else "no")
+
+
 def lacuna_rows(records: list[dict], wt_median: float) -> list[dict]:
     rows = []
     for r in records:
         area = None if r["area_px2"] is None else r["area_px2"] * UM2_PER_PX2
         ratio = area / wt_median if (area is not None and not r["flag"]) else None
         rows.append({"id": r["id"], "area_um2": _round(area), "ratio_to_WT_median": _round(ratio),
-                     "flag": r["flag"]})
+                     "flag": r["flag"], "cluster": cluster_word(r.get("cluster"))})
     return rows
 
 
@@ -164,6 +205,31 @@ def with_raw(records: list[dict], wt_median: float) -> list[dict]:
         row["_area"] = None if r["area_px2"] is None else r["area_px2"] * UM2_PER_PX2
         row["_ratio"] = None if (row["_area"] is None or r["flag"]) else row["_area"] / wt_median
     return rows
+
+
+def pol_metrics(rows: list[dict], analysed_um2: float, excluded_um2: float) -> dict:
+    """The POL metrics (POL_COLUMNS) of a set of lacunae, rows as with_raw
+    makes them, over a field of analysed_um2 (the summed analysed areas when
+    the rows come from several images)."""
+    measured = [r for r in rows if not r["flag"]]
+    n = len(measured)
+    summed = float(sum(r["_area"] for r in rows if r["_area"] is not None))
+    return {
+        "n_lacunae": len(rows),
+        "share_above_2x_WT_median": _round(sum(r["_ratio"] > POL_RATIO_LINE for r in measured) / n) if n else None,
+        "share_above_100_um2": _round(sum(r["_area"] > POL_LARGE_AREA_UM2 for r in measured) / n) if n else None,
+        "n_clusters": sum(r["cluster"] == "yes" for r in measured),
+        "lacunar_area_um2": _round(summed),
+        "analysed_area_um2": _round(analysed_um2),
+        "excluded_area_um2": _round(excluded_um2),
+        "pol_area_per_analysed_area": _round(summed / analysed_um2) if analysed_um2 > 0 else None,
+    }
+
+
+def animal_map() -> dict:
+    """{(group, image label): its row of data/animals.csv}."""
+    with open(ANIMALS_FILE, newline="", encoding="utf-8") as f:
+        return {(r["group"], r["image_label"]): r for r in csv.DictReader(f)}
 
 
 # Files
@@ -199,6 +265,14 @@ def notes(wt_median: float) -> list[str]:
             f"({wt_median:.4f} um2, every measured WT lacuna pooled).",
             "Measured: interior lacunae with an area. Flagged and left out of every statistic: edge "
             "(touches the frame, area cut) and no_area (classes dim and out_of_focus have no area).",
+            "n_lacunae: every lacuna, edge ones included. share_above_2x_WT_median and share_above_100_um2: "
+            "of the measured lacunae. n_clusters: measured lacunae flagged cluster (two or more lacuna "
+            "bodies joined by a neck under 3 um, config section g9).",
+            "pol_area_per_analysed_area: the summed area of every lacuna with an area (edge ones included) "
+            "over the analysed area, the image minus the excluded region (saturated border regions and very "
+            "large structures, config section g9).",
+            "Working POL definition (to be confirmed by Dr. Murshed): the enlarged, irregular, dye-filled "
+            "lacunar space is the POL footprint (docs/METHODS.md, 24.0).",
             "Source: 4_quantification/<image>_quantification.json. No new detection. src/pols.py."]
 
 
@@ -233,7 +307,7 @@ def read_table(path: Path) -> list[dict]:
     with open(path, newline="", encoding="utf-8") as f:
         return [{"id": int(r["id"]), "area_um2": float(r["area_um2"]) if r["area_um2"] else None,
                  "ratio_to_WT_median": float(r["ratio_to_WT_median"]) if r["ratio_to_WT_median"] else None,
-                 "flag": r["flag"]} for r in csv.DictReader(f)]
+                 "flag": r["flag"], "cluster": r.get("cluster", "")} for r in csv.DictReader(f)]
 
 
 def label_text(row: dict) -> str:
@@ -315,6 +389,153 @@ def render_picture(display: np.ndarray, labels: np.ndarray, rows: list[dict], wt
 
 def picture_title(group: str, label: str) -> str:
     return f"{group} {label}: {LABEL}. Pre-validation, not a lesion call."
+
+
+# The POL outline picture (finishing brief, phase 4): every POL footprint, the
+# lacuna as the lacuna stage outlined it, outlined on the original image in
+# the 2 px style of the lacuna outline picture, its colour saying which kind
+# it is; excluded regions shaded grey. Display only.
+SUFFIX_OUTLINES = "pols_outlines.png"
+OUTLINES_CONTACT_SHEET = "contact_sheet_outlines.png"
+OUTLINE_NORMAL = (0, 255, 0)      # the green of the lacuna outline picture
+OUTLINE_ENLARGED = (255, 255, 0)
+OUTLINE_CLUSTER = (0, 255, 255)
+OUTLINE_EDGE = GREY
+OUTLINES_PANEL_W = 330
+
+
+def outline_kind(row: dict) -> str:
+    """edge, cluster, enlarged or normal: the colour of one footprint. Edge
+    and no-area lacunae are not measured, so they are neither of the others."""
+    if row["flag"]:
+        return "edge"
+    if row["cluster"] == "yes":
+        return "cluster"
+    if row["ratio_to_WT_median"] is not None and row["ratio_to_WT_median"] > POL_RATIO_LINE:
+        return "enlarged"
+    return "normal"
+
+
+OUTLINE_COLOURS = {"normal": OUTLINE_NORMAL, "enlarged": OUTLINE_ENLARGED, "cluster": OUTLINE_CLUSTER,
+                   "edge": OUTLINE_EDGE}
+
+
+def outline_label(row: dict) -> str:
+    """id: area, with the kind in words for a reader who cannot tell the
+    colours apart."""
+    kind = outline_kind(row)
+    if row["area_um2"] is None:
+        return f"{row['id']}: no area"
+    word = {"enlarged": " >2x", "cluster": " cluster", "edge": " edge"}.get(kind, "")
+    return f"{row['id']}: {row['area_um2']:.0f}{word}"
+
+
+def render_outlines(display: np.ndarray, labels: np.ndarray, rows: list[dict], excluded: np.ndarray,
+                    wt_median: float, title: str, metrics: dict) -> np.ndarray:
+    """The POL outline picture of one image as an array."""
+    from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
+    from skimage import segmentation  # noqa: PLC0415
+
+    h, w = labels.shape
+    region = lacunae.shade_excluded(display, excluded)
+    for r in rows:
+        # 2 px: the mask's own edge pixels, and the pixels just outside it that
+        # no other lacuna holds.
+        mask = labels == r["id"]
+        line = (segmentation.find_boundaries(mask, mode="inner")
+                | (segmentation.find_boundaries(mask, mode="outer") & (labels == 0)))
+        region[line] = OUTLINE_COLOURS[outline_kind(r)]
+    canvas = Image.new("RGB", (w + OUTLINES_PANEL_W, h + TITLE_H), (255, 255, 255))
+    canvas.paste(Image.fromarray(region), (0, TITLE_H))
+    draw = ImageDraw.Draw(canvas)
+    font = ImageFont.load_default(size=FONT_PX)
+    for r in rows:
+        ys, xs = np.nonzero(labels == r["id"])
+        if xs.size == 0:
+            continue
+        y = float(np.clip(ys.mean(), 10, h - 10)) + TITLE_H
+        colour = OUTLINE_COLOURS[outline_kind(r)]
+        if xs.max() + 80 < w:
+            x, anchor = int(xs.max()) + 4, "lm"
+        else:
+            x, anchor = int(xs.min()) - 4, "rm"
+        draw.text((x, y), outline_label(r), font=font, anchor=anchor, fill=colour, stroke_width=1,
+                  stroke_fill=(0, 0, 0))
+    x1, y0 = w - 20, h - 22 + TITLE_H
+    draw.rectangle([x1 - SCALE_BAR_PX, y0, x1 - 1, y0 + 3], fill=(255, 255, 255))
+    draw.text((x1 - SCALE_BAR_PX // 2, y0 - 3), f"{SCALE_BAR_UM:g} um", font=font, anchor="mb",
+              fill=(255, 255, 255), stroke_width=1, stroke_fill=(0, 0, 0))
+    draw.text((8, TITLE_H // 2), title, font=ImageFont.load_default(size=15), anchor="lm", fill=(0, 0, 0))
+
+    x, y = w + 12, TITLE_H + 14
+    black = (0, 0, 0)
+    draw.text((x, y), "POL footprints: each lacuna as outlined,", font=font, fill=black)
+    draw.text((x, y + 16), "the working POL definition (to be", font=font, fill=black)
+    draw.text((x, y + 32), "confirmed by Dr. Murshed). Pre-validation.", font=font, fill=black)
+    y += 64
+    legend = [(OUTLINE_NORMAL, "normal size: up to 2 x WT median",
+               f"(up to {POL_RATIO_LINE * wt_median:.1f} um2)"),
+              (OUTLINE_ENLARGED, "enlarged: above 2 x WT median", "(label says >2x)"),
+              (OUTLINE_CLUSTER, "cluster: two or more lacunae merged", "(label says cluster)"),
+              (OUTLINE_EDGE, "touches the frame: area cut,", "not measured (label says edge)")]
+    for colour, line1, line2 in legend:
+        draw.rectangle([x, y, x + 26, y + 12], fill=(40, 0, 0), outline=colour, width=3)
+        draw.text((x + 34, y), line1, font=font, fill=black)
+        draw.text((x + 34, y + 15), line2, font=font, fill=black)
+        y += 40
+    shade = tuple(int(v) for v in np.rint(0.4 * np.array([40, 0, 0]) + 0.6 * np.array(lacunae.EXCLUDED_SHADE_RGB)))
+    draw.rectangle([x, y, x + 26, y + 12], fill=shade, outline=(255, 255, 255), width=1)
+    draw.text((x + 34, y), "grey: excluded region, not analysed", font=font, fill=black)
+    draw.text((x + 34, y + 15), "(saturated border or large structure)", font=font, fill=black)
+    y += 48
+    draw.text((x, y), "labels: id: area in um2", font=font, fill=black)
+    y += 16
+    draw.text((x, y), f"WT median lacuna: {wt_median:.1f} um2", font=font, fill=black)
+    y += 32
+
+    def fmt(value, percent=False):
+        if value is None:
+            return "none"
+        return f"{100 * value:.1f}%" if percent else f"{value:.1f}"
+
+    lines = [f"lacunae: {metrics['n_lacunae']} ({metrics['n']} measured)",
+             f"median: {fmt(metrics['area_um2_median'])} um2",
+             f"90th percentile: {fmt(metrics['area_um2_p90'])} um2",
+             f"above 2 x WT median: {fmt(metrics['share_above_2x_WT_median'], True)}",
+             f"above 100 um2: {fmt(metrics['share_above_100_um2'], True)}",
+             f"clusters: {metrics['n_clusters']}",
+             f"POL area per analysed area: {fmt(metrics['pol_area_per_analysed_area'], True)}",
+             f"excluded: {fmt(metrics['excluded_area_um2'])} um2"]
+    draw.text((x, y), "this image (measured lacunae):", font=font, fill=black)
+    for i, line in enumerate(lines, start=1):
+        draw.text((x, y + 16 * i), line, font=font, fill=black)
+    out = np.asarray(canvas).copy()
+    canvas.close()
+    return out
+
+
+def read_excluded(results_root: Path, label: str, shape: tuple) -> np.ndarray:
+    """The saved excluded region of one image (config section g9); nothing
+    excluded when detection saved none."""
+    from skimage.io import imread  # noqa: PLC0415
+
+    path = lacunae.result_path(results_root, label, config.SECTION_LACUNAE, config.SUFFIX_EXCLUDED_MASK)
+    return np.asarray(imread(path)) > 0 if path.is_file() else np.zeros(shape, dtype=bool)
+
+
+def save_outlines(image_path: Path, labels: np.ndarray, table: Path, excluded: np.ndarray, wt_median: float,
+                  metrics: dict, path: Path) -> None:
+    """Draw the POL outline picture of one image from its table as written."""
+    from PIL import Image  # noqa: PLC0415
+
+    display, _channel = lacunae.load_channel(image_path)
+    label = lacunae.image_label(image_path)
+    picture = render_outlines(display, labels, read_table(table), excluded, wt_median,
+                              f"{image_path.parent.name} {label}: POL footprints. Pre-validation, "
+                              "not a lesion call.", metrics)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(picture).save(path)
+    del display, picture
 
 
 def save_picture(image_path: Path, labels: np.ndarray, table: Path, wt_median: float, path: Path) -> None:
@@ -435,7 +656,7 @@ def measure_group(group: str, results_root: Path | None = None, wt_median: float
 
     results_root = Path(results_root or config.RESULTS_ROOT / group)
     wt_median = wt_median_um2() if wt_median is None else wt_median
-    image_rows, tiles = [], []
+    image_rows, tiles, outline_tiles = [], [], []
     for image_path in image_files(group):
         label = lacunae.image_label(image_path)
         records = lacuna_records(results_root, label)
@@ -448,18 +669,27 @@ def measure_group(group: str, results_root: Path | None = None, wt_median: float
         write_csv(table, LACUNA_COLUMNS, rows)
         picture = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_PICTURE)
         save_picture(image_path, labels, table, wt_median, picture)
+        analysed, excluded_um2 = field_areas_um2(results_root, label)
+        image_rows.append({"status": LABEL, "group": group, "image": label, **stats(rows),
+                           "WT_median_area_um2": _round(wt_median), **pol_metrics(rows, analysed, excluded_um2)})
+        outlines = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_OUTLINES)
+        save_outlines(image_path, labels, table, read_excluded(results_root, label, labels.shape), wt_median,
+                      image_rows[-1], outlines)
         del labels
         gc.collect()
         tiles.append((label, picture))
-        image_rows.append({"status": LABEL, "group": group, "image": label, **stats(rows),
-                           "WT_median_area_um2": _round(wt_median)})
+        outline_tiles.append((label, outlines))
         print(f"{group}/{label}: {image_rows[-1]['n']} measured, {image_rows[-1]['n_flagged']} flagged, "
-              f"median {image_rows[-1]['area_um2_median']} um2")
+              f"median {image_rows[-1]['area_um2_median']} um2, POL area per analysed area "
+              f"{image_rows[-1]['pol_area_per_analysed_area']}")
     group_table = lacunae.group_path(results_root, config.SECTION_POLS, GROUP_TABLE)
     write_csv(group_table.with_suffix(".csv"), IMAGE_COLUMNS, image_rows)
     write_xlsx(group_table.with_suffix(".xlsx"), IMAGE_COLUMNS, image_rows, notes(wt_median))
     lacunae.save_contact_sheet(tiles, f"{group}: {LABEL}. Full size: 3_pols/<image>_{SUFFIX_PICTURE}.",
                                lacunae.group_path(results_root, config.SECTION_POLS, CONTACT_SHEET))
+    lacunae.save_contact_sheet(outline_tiles, f"{group}: POL footprints. Full size: 3_pols/<image>_"
+                                              f"{SUFFIX_OUTLINES}.",
+                               lacunae.group_path(results_root, config.SECTION_POLS, OUTLINES_CONTACT_SHEET))
     write_readme(results_root, group)
     return image_rows
 
@@ -470,13 +700,45 @@ def group_summary(groups=config.GROUPS, wt_median: float | None = None) -> list[
     wt_median = wt_median_um2() if wt_median is None else wt_median
     out = []
     for group in groups:
-        rows = []
+        rows, analysed, excluded = [], 0.0, 0.0
         files = image_files(group)
         for p in files:
-            rows += with_raw(lacuna_records(config.RESULTS_ROOT / group, lacunae.image_label(p)), wt_median)
+            label = lacunae.image_label(p)
+            rows += with_raw(lacuna_records(config.RESULTS_ROOT / group, label), wt_median)
+            a, e = field_areas_um2(config.RESULTS_ROOT / group, label)
+            analysed, excluded = analysed + a, excluded + e
         out.append({"status": LABEL, "group": group, "n_images": len(files), **stats(rows),
-                    "WT_median_area_um2": _round(wt_median)})
+                    "WT_median_area_um2": _round(wt_median), **pol_metrics(rows, analysed, excluded)})
     write_csv(SUMMARY_TABLE, GROUP_COLUMNS, out)
+    return out
+
+
+def animal_summary(groups=config.GROUPS, wt_median: float | None = None) -> list[dict]:
+    """results/summary/pols_by_animal.csv: per animal of data/animals.csv,
+    every measured lacuna of its images pooled, the analysed areas summed. In
+    DEV mode the held-out images are left out, so an animal may have fewer
+    images than it has."""
+    wt_median = wt_median_um2() if wt_median is None else wt_median
+    animals = animal_map()
+    pooled = {}
+    for group in groups:
+        for p in image_files(group):
+            label = lacunae.image_label(p)
+            a = animals[(group, label)]
+            entry = pooled.setdefault(a["animal"], {"meta": a, "group": group, "rows": [], "analysed": 0.0,
+                                                    "excluded": 0.0, "n_images": 0})
+            entry["rows"] += with_raw(lacuna_records(config.RESULTS_ROOT / group, label), wt_median)
+            area, excl = field_areas_um2(config.RESULTS_ROOT / group, label)
+            entry["analysed"] += area
+            entry["excluded"] += excl
+            entry["n_images"] += 1
+    out = []
+    for animal, e in pooled.items():
+        out.append({"status": LABEL, "animal": animal, "genotype": e["meta"]["genotype"],
+                    "diet": e["meta"]["diet"], "group": e["group"], "confirmed": e["meta"]["confirmed"],
+                    "n_images": e["n_images"], **stats(e["rows"]), "WT_median_area_um2": _round(wt_median),
+                    **pol_metrics(e["rows"], e["analysed"], e["excluded"])})
+    write_csv(ANIMAL_TABLE, ANIMAL_COLUMNS, out)
     return out
 
 
@@ -492,8 +754,9 @@ def check(groups=config.GROUPS) -> int:
             want = lacuna_rows(lacuna_records(root, label), wt_median)
             pic = lacunae.result_path(root, label, config.SECTION_POLS, SUFFIX_PICTURE)
             tab = lacunae.result_path(root, label, config.SECTION_POLS, SUFFIX_TABLE)
+            outl = lacunae.result_path(root, label, config.SECTION_POLS, SUFFIX_OUTLINES)
             problem = ""
-            if not pic.is_file() or not tab.is_file():
+            if not pic.is_file() or not tab.is_file() or not outl.is_file():
                 problem = "missing file"
             else:
                 with open(tab, newline="", encoding="utf-8") as f:
@@ -503,13 +766,14 @@ def check(groups=config.GROUPS) -> int:
                     problem = "table differs from the json"
             failed += bool(problem)
             print(f"{group:<7} {label:<26} {problem or 'PASS'}")
-        for name in (f"{GROUP_TABLE}.csv", f"{GROUP_TABLE}.xlsx", CONTACT_SHEET):
+        for name in (f"{GROUP_TABLE}.csv", f"{GROUP_TABLE}.xlsx", CONTACT_SHEET, OUTLINES_CONTACT_SHEET):
             if not lacunae.group_path(root, config.SECTION_POLS, name).is_file():
                 print(f"{group:<7} {name:<26} missing file")
                 failed += 1
-    if not SUMMARY_TABLE.is_file():
-        print(f"{SUMMARY_TABLE} missing")
-        failed += 1
+    for table in (SUMMARY_TABLE, ANIMAL_TABLE):
+        if not table.is_file():
+            print(f"{table} missing")
+            failed += 1
     print(f"\n{'FAIL' if failed else 'PASS'}: lacunar size check, {failed} problem(s).")
     return 1 if failed else 0
 
@@ -587,6 +851,40 @@ def selftest() -> int:
             checks.append(("a flagged lacuna is not filled inside its edge",
                            np.array_equal(region[401:409, 401:409], display[401:409, 401:409])))
             checks.append(("its edge is grey", bool(np.all(region[400, 400:410] == GREY))))
+
+            # The POL metrics and the outline picture (phase 4).
+            pol_records = [{"id": 1, "area_px2": 1000.0, "flag": "", "cluster": False},
+                           {"id": 2, "area_px2": 3000.0, "flag": "", "cluster": False},
+                           {"id": 3, "area_px2": 7000.0, "flag": "", "cluster": True},
+                           {"id": 4, "area_px2": 500.0, "flag": "edge", "cluster": False}]
+            pol_rows = with_raw(pol_records, median)
+            m = pol_metrics(pol_rows, 1000.0, 50.0)
+            checks.append(("POL metrics: n, shares above 2x and 100 um2, clusters",
+                           m["n_lacunae"] == 4 and m["share_above_2x_WT_median"] == round(2 / 3, DIGITS)
+                           and m["share_above_100_um2"] == round(1 / 3, DIGITS) and m["n_clusters"] == 1))
+            checks.append(("POL area per analysed area sums every lacuna with an area, edge included",
+                           m["lacunar_area_um2"] == round(11500 * UM2_PER_PX2, DIGITS)
+                           and m["pol_area_per_analysed_area"] == round(11500 * UM2_PER_PX2 / 1000.0, DIGITS)))
+            pol_labels = np.zeros(labels.shape, dtype=np.int32)
+            pol_labels[100:140, 100:125] = 1
+            pol_labels[200:260, 300:350] = 2
+            pol_labels[500:600, 500:570] = 3
+            pol_labels[0:20, 0:25] = 4
+            excluded = np.zeros(labels.shape, dtype=bool)
+            excluded[800:900, 800:900] = True
+            pol_table = Path(tmp) / "pol_table.csv"
+            write_csv(pol_table, LACUNA_COLUMNS, pol_rows)
+            pic = render_outlines(display, pol_labels, read_table(pol_table), excluded, median, "self-test",
+                                  {**stats(pol_rows), **m})
+            reg = pic[TITLE_H:TITLE_H + labels.shape[0], :labels.shape[1]]
+            checks.append(("outline colours: normal green, enlarged yellow, cluster cyan, edge grey",
+                           tuple(reg[100, 110]) == OUTLINE_NORMAL and tuple(reg[200, 320]) == OUTLINE_ENLARGED
+                           and tuple(reg[500, 530]) == OUTLINE_CLUSTER and tuple(reg[19, 10]) == OUTLINE_EDGE))
+            checks.append(("inside a footprint the image is unchanged",
+                           np.array_equal(reg[110:130, 105:120], display[110:130, 105:120])))
+            checks.append(("the excluded region is shaded, the image elsewhere is not",
+                           not np.array_equal(reg[850, 850], display[850, 850])
+                           and np.array_equal(reg[700:790, 700:790], display[700:790, 700:790])))
     for name, ok in checks:
         print(f"{'PASS' if ok else 'FAIL'}  {name}")
     ok = all(ok for _n, ok in checks)
@@ -601,8 +899,9 @@ def main() -> None:
     p.add_argument("-d", "--dir", type=Path, required=True, help="A group folder of .tif images, e.g. data/WT_HP.")
     p.add_argument("-r", "--results", type=Path, default=None,
                    help="The group's results folder (default: results/<name of the input folder>).")
-    sub.add_parser("all", help="Every group, then results/summary/pols_lacunar_size_by_group.csv.")
-    sub.add_parser("summary", help="Only results/summary/pols_lacunar_size_by_group.csv.")
+    sub.add_parser("all", help="Every group, then results/summary/pols_lacunar_size_by_group.csv and "
+                               "pols_by_animal.csv.")
+    sub.add_parser("summary", help="Only results/summary/pols_lacunar_size_by_group.csv and pols_by_animal.csv.")
     sub.add_parser("check", help="Every 3_pols file against the quantification jsons.")
     sub.add_parser("selftest", help="Checks on synthetic records.")
     sub.add_parser("check-pictures", help="Every 3_pols picture, one image at a time: drawn from its table, "
@@ -625,6 +924,8 @@ def main() -> None:
     print(f"-> {SUMMARY_TABLE}")
     for r in rows:
         print(f"  {r['group']:<7} n={r['n']:<4} median {r['area_um2_median']} um2, ratio median {r['ratio_median']}")
+    animal_summary()
+    print(f"-> {ANIMAL_TABLE}")
 
 
 if __name__ == "__main__":

@@ -2185,3 +2185,27 @@ region shaded grey on the original with the kept lacunae in green, and
 are not saturated, along the bone surface or the frame, and diffuse soft
 tissue; dark field outside the bone is not excluded either.
 
+### 27.3 The POL metrics and the POL outline picture
+
+`src/pols.py` adds, per image, per group (`summary/pols_lacunar_size_by_group.csv`)
+and per animal (`summary/pols_by_animal.csv`, the animals of `data/animals.csv`):
+`n_lacunae` (every lacuna, frame ones included), the median and 90th
+percentile of the measured lacunae (interior, with an area), the share above
+2 times the WT median and above 100 um2, `n_clusters` (measured lacunae
+flagged cluster), and the **POL area per analysed area**: the summed area of
+every lacuna with an area (frame ones included, their part in the frame lies
+in the field) over the analysed area of 27.2. A group or an animal pools its
+lacunae and sums its analysed areas. The per-lacuna table gains the column
+`cluster`.
+
+A new picture per image, `3_pols/<image>_pols_outlines.png`, in the style of
+the lacuna outline picture: every POL footprint outlined 2 px on the original
+image, green for normal size (up to 2 times the WT median), yellow above it,
+cyan a cluster, grey touching the frame (not measured); the excluded region
+shaded grey; id and area beside each, with the kind in words (`>2x`,
+`cluster`, `edge`) for a reader who cannot tell the colours apart; a legend in
+plain words with the image's own numbers; a 10 um bar. `contact_sheet_outlines.png`
+shows them small. `python src/pols.py selftest` (17 checks) covers the
+metrics and the colours; `check` and `check-pictures` pass on the
+development images.
+
