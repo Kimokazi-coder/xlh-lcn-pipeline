@@ -7,7 +7,9 @@
   "note": "Detection record: what feature 1 did, with no measured value in it. The lacunae it found are the 1..N labels of the label image, and every number measured from them is in the group's 4_quantification folder (src/quantification.py).",
   "outputs": {
     "label_image": "682_z29_lacuna_labels.png",
-    "outlines": "682_z29_lacunae_outlines.png"
+    "outlines": "682_z29_lacunae_outlines.png",
+    "excluded_region_mask": "682_z29_excluded_region_mask.png",
+    "excluded_region_picture": "682_z29_excluded_region.png"
   },
   "parameters": {
     "channel": 0,
@@ -29,7 +31,8 @@
     "fast_lacuna_stage": false,
     "lacuna_rescue_rules": false,
     "fragment_rule": true,
-    "band_blob_rule": true,
+    "band_blob_rule": false,
+    "structure_rule": true,
     "computed_threshold_t_hi": 0.5234375
   },
   "lacuna_classes": {
@@ -38,7 +41,7 @@
   },
   "no_shape_ids": [],
   "provenance": {
-    "git_commit": "d1e0b5ccc817dcd8796e5c06f26b93c00da0c42a",
+    "git_commit": "7b33ec47218e9aa2100a5a81d3dc52f5a1fd50da",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -49,8 +52,9 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "060d9e0d484fb636",
+    "config_hash": "6ef2fb54a3dcdfc6",
     "config_hash_covers": [
+      "AI_CANALICULI_SUBFOLDER",
       "AI_CANDIDATE_CUT_FRACTION",
       "AI_CONTRAST_RATIO_MAX",
       "AI_CROP_PX",
@@ -72,6 +76,7 @@
       "AI_LACUNA_MIN_CANDIDATE_AREA_PX2",
       "AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2",
       "AI_LACUNA_REVIEW_DIR",
+      "AI_LACUNA_SUBFOLDER",
       "AI_LOG_DIR",
       "AI_MAX_SEARCH_PX",
       "AI_MAX_SEGMENTS_PER_CASE",
@@ -97,6 +102,8 @@
       "CANALICULUS_LENGTH_RANGE_UM",
       "CHANNEL",
       "CHANNEL_AXIS",
+      "CLUSTER_CORE_MIN_UM2",
+      "CLUSTER_NECK_MAX_UM",
       "CONTACT_EVERY_TOUCHING_BODY",
       "CONTACT_REACH_PX",
       "CSV_FLOAT_PRECISION",
@@ -106,6 +113,8 @@
       "DIM_THREAD_CUT_FRACTION",
       "DIM_THREAD_REACH_UM",
       "DISPLAY_WINDOW_FILE",
+      "EXCLUDED_OBJECT_MAX_SHARE",
+      "EXCLUSION_MARGIN_UM",
       "FAILED_IMAGES_NAME",
       "FAST_LACUNA_STAGE",
       "FILL_ENCLOSED_HOLES_MAX_PX2",
@@ -146,6 +155,7 @@
       "LACUNA_ATTACH_MIN_SIGNAL_FRACTION",
       "LACUNA_ATTACH_REACH_UM",
       "LACUNA_RESCUE_RULES",
+      "LARGE_STRUCTURE_MIN_AREA_UM2",
       "MAX_CANALICULUS_LENGTH_UM",
       "MAX_COST_USD",
       "MERGE_MIN_DIP_FRACTION",
@@ -160,6 +170,9 @@
       "QUANT_SUMMARY_NAME",
       "RANDOM_SEED",
       "REFERENCE_GROUP",
+      "RESULT_SET_MARK",
+      "SATURATED_BORDER_MIN_AREA_UM2",
+      "SATURATED_CLOSING_UM",
       "SECTIONS",
       "SECTION_ARCHIVE",
       "SECTION_CANALICULI",
@@ -169,6 +182,7 @@
       "SECTION_NETWORK_FIGURES",
       "SECTION_POLS",
       "SECTION_QUANTIFICATION",
+      "STRUCTURE_RULE",
       "SUFFIX_CANALICULI_DETECTION",
       "SUFFIX_CANALICULI_GRAPH",
       "SUFFIX_CANALICULI_MASK",
@@ -176,6 +190,8 @@
       "SUFFIX_CANALICULI_UNATTACHED",
       "SUFFIX_CANALICULI_VASCULAR",
       "SUFFIX_CANALICULI_VERIFICATION",
+      "SUFFIX_EXCLUDED_MASK",
+      "SUFFIX_EXCLUDED_PICTURE",
       "SUFFIX_FIGURE_GALLERY",
       "SUFFIX_FIGURE_GALLERY_CHECKS",
       "SUFFIX_FIGURE_INSET",

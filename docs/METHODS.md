@@ -2168,3 +2168,20 @@ objects the new rule removes, 8 are not lacunae, 1 is unsure and 1 is a
 lacuna of 9.6 um2. The cluster flag agreed with the reviewer on 1 of 2
 clusters it named. Not validated.
 
+### 27.2 The excluded region and the analysed area
+
+The excluded region of 27.1 is also masked out of every area measure: the
+analysed area is the image minus the excluded region. The field measures of
+`src/quantification.py` leave out the skeleton, junctions, unattached threads
+and lacunae inside it and record `excluded_area_px2` and
+`analysed_field_area_px2`; with nothing excluded every number is as before.
+A picture per image, `1_lacunae/<image>_excluded_region.png`, shows the
+region shaded grey on the original with the kept lacunae in green, and
+`<image>_excluded_region_mask.png` holds it. On the development images 12 of
+27 have an excluded region (WT none; up to 24.9% of the field, in
+701_z26c1-2). The reviewer found no real lacuna under the grey on 11 of the
+12 and one borderline body at the rim on I534_z11c1-2
+(`results/archive/audit/EXCLUDED_REGIONS.md`). Not caught: bright bands that
+are not saturated, along the bone surface or the frame, and diffuse soft
+tissue; dark field outside the bone is not excluded either.
+
