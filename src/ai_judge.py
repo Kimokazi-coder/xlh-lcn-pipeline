@@ -18,7 +18,7 @@ Where the parts live:
 
   src/judge_prompt.md      the one fixed prompt, used for every image
   docs/judge_examples.md   Karim's worked examples, loaded into the prompt
-  results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/
+  results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/
                            every request and answer, the pictures that were
                            sent, the decision files, each named <label>_...
   config.py                the switch, the pinned model, the prices, the cost
@@ -1428,8 +1428,8 @@ def parse_answer(text: str, numbers: list, colours: dict, questions: dict) -> tu
 
 # The log, and the replay that reads it back
 
-# The log lives in config.AI_RESULTS_DIR/ai_log/ (results/WT/5_archive/ai_judge/
-# canaliculi_judge/ai_log/), one folder for every image, each file named after its
+# The log lives in config.AI_RESULTS_DIR/ai_log/ (results/WT/2_canaliculi/
+# ai_judge_canaliculi/ai_log/), one folder for every image, each file named after its
 # image. LOG_ROOT replaces that for one process, the
 # module-override idiom the sweep diagnostics use: the self-test sets it so that
 # a rehearsal with a stub judge can never leave verdicts in results/ for the
@@ -1919,7 +1919,7 @@ def estimate_case(system: str, user_text: str, png: bytes, segments: int) -> dic
 #
 #   src/judge_prompt_lacunae.md       the one fixed prompt, for every group
 #   docs/judge_examples_lacunae.md    worked examples, loaded into the prompt
-#   results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/  every request and
+#   results/<group>/1_lacunae/ai_judge/ai_log/  every request and
 #                                     answer, the picture that was sent, the
 #                                     decision file, each named <label>_...
 #   config.py                         the switch and the candidate rule

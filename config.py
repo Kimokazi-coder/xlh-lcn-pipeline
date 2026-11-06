@@ -141,13 +141,29 @@ RESULTS_DIR = RESULTS_ROOT / REFERENCE_GROUP
 SUMMARY_ROOT = RESULTS_ROOT / "summary"
 # Old material that belongs to no one group.
 ARCHIVE_ROOT = RESULTS_ROOT / "archive"
-# The AI thread judge (docs/EXPERIMENT_AI.md), archived: the same pipeline with
-# the judge switch on, WT only, with the same section layout, the comparison
-# against results/WT/ in compare/, and the judge log with the case pictures
-# that were sent in ai_log/. The deterministic sections of results/WT/ are
-# never written by the judge.
-AI_RESULTS_DIR = RESULTS_DIR / SECTION_ARCHIVE / ARCHIVE_AI_JUDGE_DIR / "canaliculi_judge"
-AI_RESULTS_ROOT = AI_RESULTS_DIR
+# The AI judges (docs/EXPERIMENT_AI.md). Since 2026-11-06 their results are part
+# of the method, not archive (brief of that day): each judge set sits inside the
+# sections of its group, in its own subfolder, its files named as the
+# deterministic files beside it. A set's root is result_set_root(group folder,
+# subfolder), the group folder with RESULT_SET_MARK and the subfolder appended,
+# which lacunae.result_path and group_path read as <section>/<subfolder>/. The
+# deterministic sections are never written by a judge.
+RESULT_SET_MARK = "@"
+AI_LACUNA_SUBFOLDER = "ai_judge"
+AI_CANALICULI_SUBFOLDER = "ai_judge_canaliculi"
+
+
+def result_set_root(group_root: Path, subfolder: str) -> Path:
+    """The root of a result set kept inside a group's sections."""
+    return Path(group_root) / (RESULT_SET_MARK + subfolder)
+
+
+# The AI thread judge, WT only: its set in results/WT/<section>/ai_judge_canaliculi/
+# (AI_RESULTS_ROOT), and in AI_RESULTS_DIR, results/WT/2_canaliculi/ai_judge_canaliculi/,
+# also its run records, the comparison against results/WT/ in compare/, and the
+# judge log with the case pictures that were sent in ai_log/.
+AI_RESULTS_DIR = RESULTS_DIR / SECTION_CANALICULI / AI_CANALICULI_SUBFOLDER
+AI_RESULTS_ROOT = result_set_root(RESULTS_DIR, AI_CANALICULI_SUBFOLDER)
 
 # Result layout. Every result file is named after its image. The label of an
 # image is its short name, from this table (key: the cleaned file name made by
@@ -895,19 +911,24 @@ AI_OUTPUT_TOKENS_FIXED = 20
 # unchanged. An image with no decision file is an error and not a silent pass.
 AI_LACUNA_JUDGE_ENABLED = False
 
-# Where this judge writes, archived. Per group, ai_lacuna_group_dir(group):
-# results/<group>/5_archive/ai_judge/lacuna_judge/, with the same section
-# layout as results/<group>/ and its log in ai_log/. What belongs to no one
-# group, in AI_LACUNA_RESULTS_ROOT (results/archive/ai_judge/): the run records,
-# the pictures a run would send in dry_run/ and the contact sheets in review/.
+# Where this judge writes. Per group, its set in results/<group>/<section>/ai_judge/
+# (ai_lacuna_set_root), and its log in ai_lacuna_group_dir(group)/ai_log/,
+# results/<group>/1_lacunae/ai_judge/ai_log/. What belongs to no one group, in
+# AI_LACUNA_RESULTS_ROOT (results/archive/ai_judge/): the run records, the
+# pictures a run would send in dry_run/ and the contact sheets in review/.
 AI_LACUNA_RESULTS_ROOT = ARCHIVE_ROOT / ARCHIVE_AI_JUDGE_DIR
 AI_LACUNA_DRY_RUN_DIR = "dry_run"
 AI_LACUNA_REVIEW_DIR = "review"
 
 
 def ai_lacuna_group_dir(group: str) -> Path:
-    """results/<group>/5_archive/ai_judge/lacuna_judge/."""
-    return RESULTS_ROOT / group / SECTION_ARCHIVE / ARCHIVE_AI_JUDGE_DIR / "lacuna_judge"
+    """results/<group>/1_lacunae/ai_judge/, where the judge's log lives."""
+    return RESULTS_ROOT / group / SECTION_LACUNAE / AI_LACUNA_SUBFOLDER
+
+
+def ai_lacuna_set_root(group: str) -> Path:
+    """The root of the lacuna judge's set of one group (results/<group>/<section>/ai_judge/)."""
+    return result_set_root(RESULTS_ROOT / group, AI_LACUNA_SUBFOLDER)
 
 # The candidates (deterministic, permissive). Every region of the lacuna stage's
 # label image before its filters decide, kept and rejected alike, plus the dim

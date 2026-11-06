@@ -76,7 +76,7 @@ Subcommands:
                       request and answer logged; --replay reruns from the log
                       offline and checks the verdicts come back the same
     ai-run            EXPERIMENT: detection, canaliculi and quantification with
-                      the judge switch on for that run only, into results/WT/5_archive/ai_judge/canaliculi_judge/,
+                      the judge switch on for that run only, into results/WT/<section>/ai_judge_canaliculi/,
                       proving every file under results/ is unchanged
     ai-compare        EXPERIMENT: judge off against judge on, per image: the
                       pictures side by side and what the verdicts moved
@@ -90,7 +90,7 @@ Subcommands:
                       twins checked against their TIFF, synthetic twins,
                       and every measure TIFF against JPEG
     compare-methods   both result sets side by side, results/WT/ and
-                      results/WT/5_archive/ai_judge/canaliculi_judge/: csv and xlsx per lacuna, per image and
+                      results/WT/<section>/ai_judge_canaliculi/: csv and xlsx per lacuna, per image and
                       overall, and the cell pairs whose segments changed hands
     pol-look          the phase 0 look of the POL section: contact sheets of
                       every field, 4x crop sheets with the radial profile
@@ -277,7 +277,7 @@ def result_labels(folder: Path) -> list[str]:
     """The labels of every image with a quantification json in a results
     folder: <folder>/4_quantification/<label>_quantification.json."""
     tail = "_" + config.SUFFIX_QUANTIFICATION + ".json"
-    section = Path(folder) / config.SECTION_QUANTIFICATION
+    section = lacunae.section_folder(folder, config.SECTION_QUANTIFICATION)
     return sorted(p.name[:-len(tail)] for p in section.glob("*" + tail)) if section.is_dir() else []
 
 
@@ -285,7 +285,8 @@ def load_numbers(folder: Path) -> dict:
     """{image label: canonical numbers} for a results folder. A folder
     holding <label>/numbers.json (a saved reference snapshot) is read as is."""
     out = {label: numbers_from_results(folder, label) for label in result_labels(folder)}
-    for sub in sorted(p for p in Path(folder).iterdir() if p.is_dir() and p.name not in config.SECTIONS):
+    subs = Path(folder).iterdir() if Path(folder).is_dir() else []
+    for sub in sorted(p for p in subs if p.is_dir() and p.name not in config.SECTIONS):
         if sub.name not in out and (sub / "numbers.json").is_file():
             out[sub.name] = json.load(open(sub / "numbers.json"))
     return out
@@ -6142,9 +6143,9 @@ def _ai_conflict_check(image_path: Path, label: str, run: dict, after: dict) -> 
 # ai-run -------------------------------------------------------------------------
 # EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). The pipeline itself,
 # detection, canaliculi and quantification, with config.AI_JUDGE_ENABLED on for
-# this one process, into results/WT/5_archive/ai_judge/canaliculi_judge/, the second labelled set. config.py
+# this one process, into results/WT/<section>/ai_judge_canaliculi/, the second labelled set. config.py
 # is not touched: the switch ships off and stays off. It reads only the decision
-# files already in results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/, makes no call and needs no key.
+# files already in results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/, makes no call and needs no key.
 # Every file under results/, and every file of the judge log, is hashed before
 # and after, so the run proves it changed nothing it was not asked to write.
 
@@ -6194,6 +6195,12 @@ def cmd_ai_run(args) -> int:
     images = images_from(args)
     out = Path(args.out)
     results_root = config.RESULTS_ROOT
+    # The set goes inside the sections of results/WT/ (config.AI_RESULTS_ROOT) when
+    # the output folder is the judge's own, else into the folder given; the run
+    # record and the log stay in the output folder.
+    root = config.AI_RESULTS_ROOT if out.resolve() == AI_RUN_DIR.resolve() else out
+    written = [lacunae.section_folder(root, s) for s in
+               (config.SECTION_LACUNAE, config.SECTION_CANALICULI, config.SECTION_QUANTIFICATION)] + [out]
     for image_path in images:
         label = lacunae.image_label(image_path)
         if not ai_judge.decisions_path(label).is_file():
@@ -6201,14 +6208,14 @@ def cmd_ai_run(args) -> int:
                   f"Run or replay the judge first.")
             return 2
     print(f"The pipeline with the AI judge switch on, for this process only, into {out}")
-    print("Reads results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/ only. No call is made and no key is read.")
-    before = _tree_manifest(results_root, out)
+    print("Reads results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/ only. No call is made and no key is read.")
+    before = _tree_manifest(results_root, written)
     log_root = ai_judge.log_root()
     log_before = _tree_manifest(log_root, log_root / "__nothing_excluded__")
     print(f"results/ before: {len(before)} files hashed; judge log: {len(log_before)} files hashed")
 
     out.mkdir(parents=True, exist_ok=True)
-    jobs = [(str(p), str(out)) for p in images]
+    jobs = [(str(p), str(root)) for p in images]
     workers = max(1, min(args.workers, len(jobs)))
     with ProcessPoolExecutor(max_workers=workers) as ex:
         detected = list(ex.map(_ai_run_detect, jobs))
@@ -6225,17 +6232,17 @@ def cmd_ai_run(args) -> int:
     quantified = []
     for image_path in images:
         label = lacunae.image_label(image_path)
-        detection = quantification.load_detection(out, label)
+        detection = quantification.load_detection(root, label)
         result = quantification.quantify(detection, image_path, None)
-        quantification.write_outputs(result, out)
+        quantification.write_outputs(result, root)
         quantified.append(result)
         print(f"  {label}: quantified, lacunae={result['lacuna_count']} "
               f"(interior {result['interior_lacuna_count']}), roots per cell="
               f"{result['summary']['roots_count']['mean']}")
-    quantification.write_summary_table(quantified, out)
+    quantification.write_summary_table(quantified, root)
     config.AI_JUDGE_ENABLED = False
 
-    after = _tree_manifest(results_root, out)
+    after = _tree_manifest(results_root, written)
     changed = sorted(k for k in before if k in after and before[k] != after[k])
     gone = sorted(k for k in before if k not in after)
     new = sorted(k for k in after if k not in before)
@@ -6244,7 +6251,7 @@ def cmd_ai_run(args) -> int:
     same = not (changed or gone or new) and log_same
     report = {
         "status": ("EXPERIMENT. The pipeline with config.AI_JUDGE_ENABLED on for this run "
-                   "only, from the decision files in results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/. Not validated."),
+                   "only, from the decision files in results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/. Not validated."),
         "written_at": ai_judge.utc_now(),
         "images": [lacunae.image_label(p) for p in images],
         "per_image": detected,
@@ -6275,7 +6282,7 @@ def cmd_ai_run(args) -> int:
 # EXPERIMENT (branch exp-ai-layer, docs/EXPERIMENT_AI.md). Judge off against
 # judge on, per image. Both runs are recomputed in memory and then checked
 # against the files on disk pixel for pixel, judge off against results/WT/
-# and judge on against results/WT/5_archive/ai_judge/canaliculi_judge/, so the numbers describe exactly
+# and judge on against results/WT/<section>/ai_judge_canaliculi/, so the numbers describe exactly
 # what was written. No call is made and no key is read.
 
 
@@ -6586,7 +6593,7 @@ def cmd_ai_compare(args) -> int:
     failed = [(o["image_label"], k) for o in out for k, ok in o["checks"].items() if not ok]
     report = {
         "status": ("EXPERIMENT. Judge off (results/WT/) against judge on "
-                   "(results/WT/5_archive/ai_judge/canaliculi_judge/), from the decision files in results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/. "
+                   "(results/WT/<section>/ai_judge_canaliculi/), from the decision files in results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/. "
                    "NOT VALIDATED: no verdict has been checked against a manual trace."),
         "written_at": __import__("ai_judge").utc_now(),
         "definitions": {
@@ -6647,14 +6654,14 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
         "",
         "**EXPERIMENT, branch `exp-ai-layer`. NOT VALIDATED: no verdict here has been checked "
         "against a manual trace.** Judge off is `results/WT/`, the pipeline as it stands. "
-        "Judge on is `results/WT/5_archive/ai_judge/canaliculi_judge/`, the same pipeline with `config.AI_JUDGE_ENABLED` "
-        "on for that run only, applying the decision files in `results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/`. No call was "
+        "Judge on is `results/WT/<section>/ai_judge_canaliculi/`, the same pipeline with `config.AI_JUDGE_ENABLED` "
+        "on for that run only, applying the decision files in `results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/`. No call was "
         "made and no key was read.",
         "",
         "Made by `python src/diagnostics.py ai-compare --dir data/WT`. Both runs are recomputed in "
         "memory and checked against the files on disk pixel for pixel before any number is "
         "reported: the judge-off skeleton against `results/WT/`, the judge-on skeleton against "
-        "`results/WT/5_archive/ai_judge/canaliculi_judge/`, the roots in memory against the judge-on jsons, and the attachments "
+        "`results/WT/<section>/ai_judge_canaliculi/`, the roots in memory against the judge-on jsons, and the attachments "
         "against the ones the switch made. "
         + ("**Every check passed.**" if not failed else
            "**CHECKS FAILED: " + ", ".join(f"{a} {b}" for a, b in failed) + ".**")
@@ -6801,10 +6808,10 @@ def _ai_compare_markdown(out: list, failed: list) -> str:
 
 # compare-methods ----------------------------------------------------------------
 # The two labelled result sets side by side: results/WT/ (the deterministic method)
-# and results/WT/5_archive/ai_judge/canaliculi_judge/ (the same pipeline with the AI judge switch on). The same
+# and results/WT/<section>/ai_judge_canaliculi/ (the same pipeline with the AI judge switch on). The same
 # measures for both, per lacuna, per image and over all images, and the cell
 # pairs whose segments changed hands. Reads files only: the quantification
-# jsons of both sets, and results/WT/5_archive/ai_judge/canaliculi_judge/compare/ai_compare.json for what
+# jsons of both sets, and results/WT/2_canaliculi/ai_judge_canaliculi/compare/ai_compare.json for what
 # needs the owner maps (owned and unowned px, the largest owner's share, the
 # pairs), which ai-compare measured and checked against both sets pixel for
 # pixel. It refuses if ai_compare.json no longer agrees with the jsons.
@@ -6831,7 +6838,7 @@ def cmd_compare_methods(args) -> int:
     import openpyxl
 
     images = images_from(args)
-    det_root, ai_root = config.RESULTS_DIR, config.AI_RESULTS_DIR
+    det_root, ai_root = config.RESULTS_DIR, config.AI_RESULTS_ROOT
     compare_json = Path(args.compare).resolve()
     out = Path(args.out).resolve()
     if not compare_json.is_file():
@@ -6926,7 +6933,7 @@ def cmd_compare_methods(args) -> int:
         overall.append(["all images", measure, a, b, round(float(b) - float(a), 6)])
 
     out.mkdir(parents=True, exist_ok=True)
-    header = ["image", "measure", "deterministic (results/)", "ai_judge (results/WT/5_archive/ai_judge/canaliculi_judge/)",
+    header = ["image", "measure", "deterministic (results/)", "ai_judge (results/WT/<section>/ai_judge_canaliculi/)",
               "difference, ai_judge minus deterministic"]
     lacuna_header = ["image", "lacuna_id", "interior", "roots deterministic", "roots ai_judge",
                      "roots difference", "ring length r30 px deterministic",
@@ -6944,8 +6951,8 @@ def cmd_compare_methods(args) -> int:
         ["EXPERIMENT. NOT VALIDATED: neither method has been checked against a manual trace, "
          "and which is used is a choice still pending."],
         ["deterministic: results/, the pipeline as config.py ships it, AI_JUDGE_ENABLED off."],
-        ["ai_judge: results/WT/5_archive/ai_judge/canaliculi_judge/, the same pipeline with AI_JUDGE_ENABLED on, from the "
-         "decision files in results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/."],
+        ["ai_judge: results/WT/<section>/ai_judge_canaliculi/, the same pipeline with AI_JUDGE_ENABLED on, from the "
+         "decision files in results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/."],
         ["Roots, ring length, field length density and skeleton px are read from each set's "
          "quantification json."],
         ["Owned px, unowned px, the largest owner's share and the cell pairs are read from "
@@ -7664,7 +7671,7 @@ def cmd_group_qc(args) -> int:
 # the WT images before any JPEG group is run. Measurement only: nothing is
 # decided here and no default changes. The images and pipeline runs go to
 # .cache/format_test/ (ignored); only the small tables of results/archive/format_test/ are
-# tracked. Nothing under results/WT/ or results/WT/5_archive/ai_judge/canaliculi_judge/ is read for writing.
+# tracked. Nothing under results/WT/ or results/WT/<section>/ai_judge_canaliculi/ is read for writing.
 #
 #   twins      copy the real JPEG twins of four WT fields (the source is only read)
 #              and check that each is the same field as its WT TIFF
@@ -9159,7 +9166,7 @@ def _ai_lacuna_review_markdown(by_group: dict, sheets: dict, run: dict | None) -
         "**EXPERIMENT, pre-validation. NOT VALIDATED: no verdict here has been checked against a "
         "manual count.** What the AI lacuna judge said about every candidate region, made by "
         "`python src/diagnostics.py ai-lacuna-review` from the decision files in "
-        "`results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/` and the candidates rebuilt from the cached lacuna "
+        "`results/<group>/1_lacunae/ai_judge/ai_log/` and the candidates rebuilt from the cached lacuna "
         "stage. No call was made to make it.",
         "",
         "On every thumbnail each candidate region is outlined in the colour of its verdict: "
@@ -9207,17 +9214,18 @@ def _ai_lacuna_run_detect(job: tuple) -> dict:
 
 
 def _lacuna_run_dir(out_root: Path, group: str) -> Path:
-    """Where ai-lacuna-run writes a group: config.ai_lacuna_group_dir(group) when
-    the output root is the default one, else <out_root>/<group>."""
+    """Where ai-lacuna-run writes a group: the judge's set root inside the
+    group's sections (config.ai_lacuna_set_root) when the output root is the
+    default one, else <out_root>/<group>."""
     if Path(out_root).resolve() == config.AI_LACUNA_RESULTS_ROOT.resolve():
-        return config.ai_lacuna_group_dir(group)
+        return config.ai_lacuna_set_root(group)
     return Path(out_root) / group
 
 
 def _lacuna_run_written(out_root: Path) -> list:
     """The section folders ai-lacuna-run writes, every group."""
     sections = (config.SECTION_LACUNAE, config.SECTION_CANALICULI, config.SECTION_QUANTIFICATION)
-    return [_lacuna_run_dir(out_root, g) / s for g in config.GROUPS for s in sections]
+    return [lacunae.section_folder(_lacuna_run_dir(out_root, g), s) for g in config.GROUPS for s in sections]
 
 
 def _protected_manifests(out_root: Path) -> dict:
@@ -9238,7 +9246,7 @@ def _protected_manifests(out_root: Path) -> dict:
 def cmd_ai_lacuna_run(args) -> int:
     """The pipeline with config.AI_LACUNA_JUDGE_ENABLED on for this process
     only, from the decision files in the judge's log, into
-    results/<group>/5_archive/ai_judge/lacuna_judge/ with the usual layout. config.py is not touched
+    results/<group>/<section>/ai_judge/ with the usual layout. config.py is not touched
     and no call is made."""
     from concurrent.futures import ProcessPoolExecutor
 
@@ -9288,7 +9296,7 @@ def cmd_ai_lacuna_run(args) -> int:
     same = not any(changed.values())
     report = {
         "status": ("EXPERIMENT. The pipeline with config.AI_LACUNA_JUDGE_ENABLED on for this run "
-                   "only, from the decision files in results/<group>/5_archive/ai_judge/lacuna_judge/ai_log/. Not "
+                   "only, from the decision files in results/<group>/1_lacunae/ai_judge/ai_log/. Not "
                    "validated. Which regions are lacunae was decided by an AI judge; every "
                    "boundary is the lacuna stage's own."),
         "written_at": ai_judge.utc_now(),
@@ -9912,10 +9920,10 @@ def main() -> None:
 
     p = sub.add_parser("ai-run",
                        help="EXPERIMENT: detection, canaliculi and quantification with the AI "
-                            "judge switch on for this run only, into results/WT/5_archive/ai_judge/canaliculi_judge/.")
+                            "judge switch on for this run only, into results/WT/<section>/ai_judge_canaliculi/.")
     add_images_arguments(p)
     p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR,
-                   help="Output folder (default: results/WT/5_archive/ai_judge/canaliculi_judge).")
+                   help="Output folder (default: results/WT/2_canaliculi/ai_judge_canaliculi; the set goes to results/WT/<section>/ai_judge_canaliculi/).")
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_ai_run)
@@ -9923,10 +9931,10 @@ def main() -> None:
     p = sub.add_parser("ai-compare",
                        help="EXPERIMENT: judge off against judge on per image, pictures and report.")
     add_images_arguments(p)
-    p.add_argument("--run", type=Path, default=AI_RUN_DIR,
-                   help="The judge-on output of ai-run (default: results/WT/5_archive/ai_judge/canaliculi_judge).")
+    p.add_argument("--run", type=Path, default=config.AI_RESULTS_ROOT,
+                   help="The judge-on output of ai-run (default: results/WT/2_canaliculi/ai_judge_canaliculi; the set goes to results/WT/<section>/ai_judge_canaliculi/).")
     p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR / "compare",
-                   help="Where the pictures and the report go (default: results/WT/5_archive/ai_judge/canaliculi_judge/compare).")
+                   help="Where the pictures and the report go (default: results/WT/2_canaliculi/ai_judge_canaliculi/compare).")
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
     p.set_defaults(func=cmd_ai_compare)
@@ -9936,16 +9944,16 @@ def main() -> None:
                             "overall, and the cell pairs that changed hands.")
     add_images_arguments(p)
     p.add_argument("--compare", type=Path, default=AI_RUN_DIR / "compare" / "ai_compare.json",
-                   help="ai-compare's record (default: results/WT/5_archive/ai_judge/canaliculi_judge/compare/ai_compare.json).")
+                   help="ai-compare's record (default: results/WT/2_canaliculi/ai_judge_canaliculi/compare/ai_compare.json).")
     p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR / "compare",
-                   help="Output folder (default: results/WT/5_archive/ai_judge/canaliculi_judge/compare).")
+                   help="Output folder (default: results/WT/2_canaliculi/ai_judge_canaliculi/compare).")
     p.set_defaults(func=cmd_compare_methods)
 
     p = sub.add_parser("ai-judge",
                        help="EXPERIMENT: run the AI judge on an image, or replay it from the log.")
     add_images_arguments(p)
     p.add_argument("-r", "--replay", action="store_true",
-                   help="No network: rerun from results/WT/5_archive/ai_judge/canaliculi_judge/ai_log/ and check the verdicts match.")
+                   help="No network: rerun from results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/ and check the verdicts match.")
     p.add_argument("-s", "--self-test", dest="self_test", action="store_true",
                    help="Rehearse the whole chain on one image with a stub judge, no network "
                         "and no key, writing only to .cache/ai_self_test.")
@@ -9978,11 +9986,11 @@ def main() -> None:
     p = sub.add_parser("ai-lacuna-run",
                        help="EXPERIMENT: detection, canaliculi and quantification with the AI "
                             "lacuna judge switch on for this run only, into "
-                            "results/<group>/5_archive/ai_judge/lacuna_judge/.")
+                            "results/<group>/<section>/ai_judge/.")
     add_images_arguments(p)
     p.add_argument("-o", dest="out", type=Path, default=config.AI_LACUNA_RESULTS_ROOT,
                    help="Output root (default: results/archive/ai_judge, the run record; each "
-                        "group then goes to results/<group>/5_archive/ai_judge/lacuna_judge/). "
+                        "group then goes to results/<group>/<section>/ai_judge/). "
                         "Any other root gets <root>/<group>/.")
     p.add_argument("-w", dest="workers", type=int, default=8,
                    help="Parallel processes, one image each (default 8).")

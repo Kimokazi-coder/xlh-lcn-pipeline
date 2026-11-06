@@ -215,11 +215,23 @@ def without_held_out(paths) -> list:
     return kept
 
 
+def section_folder(out_root: Path, section: str) -> Path:
+    """The folder of one section of a results root: <out_root>/<section>, or, for
+    a result set kept inside a group's sections (config.result_set_root, a root
+    ending in @<subfolder>), <group folder>/<section>/<subfolder>."""
+    out_root = Path(out_root)
+    mark = config.RESULT_SET_MARK
+    if out_root.name.startswith(mark):
+        return out_root.parent / section / out_root.name[len(mark):]
+    return out_root / section
+
+
 def result_path(out_root: Path, label: str, section: str, suffix: str, subfolder: str | None = None) -> Path:
     """Path of one result file of one image: <out_root>/<section>/[<subfolder>/]
-    <label>_<suffix>. There is no folder per image: the files of every image of
-    a group sit side by side in each section, told apart by their label."""
-    folder = Path(out_root) / section
+    <label>_<suffix> (see section_folder). There is no folder per image: the
+    files of every image of a group sit side by side in each section, told
+    apart by their label."""
+    folder = section_folder(out_root, section)
     if subfolder:
         folder = folder / subfolder
     return folder / f"{label}_{suffix}"
@@ -227,7 +239,7 @@ def result_path(out_root: Path, label: str, section: str, suffix: str, subfolder
 
 def group_path(out_root: Path, section: str, name: str, subfolder: str | None = None) -> Path:
     """Path of one file of the whole group: <out_root>/<section>/[<subfolder>/]<name>."""
-    folder = Path(out_root) / section
+    folder = section_folder(out_root, section)
     return (folder / subfolder / name) if subfolder else folder / name
 
 
