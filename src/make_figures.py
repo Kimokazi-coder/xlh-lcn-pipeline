@@ -368,8 +368,10 @@ REJECTED_MIN_DRAW_PX2 = 150
 # flagged_structures). Display only; the classification is unchanged.
 CANAL_MARK_MIN_SHARE = 0.5
 
-# One-letter reason for a rejected piece; the cuts are those of src/lacunae.py.
-REASON_LETTER = {"area": "a", "solidity": "S", "aspect": "A"}
+# One-letter reason for a rejected piece; the cuts are those of src/lacunae.py,
+# and "rule" is a piece that passes them and is dropped by the fragment or band
+# rule of the review loop (config sections g6 to g8).
+REASON_LETTER = {"area": "a", "solidity": "S", "aspect": "A", "rule": "R"}
 
 
 class AssertionFailed(Exception):
@@ -410,6 +412,8 @@ def rejection_reason(region, shape) -> str:
     aspect = major / minor if minor > 0 else float("inf")
     if aspect > lacunae.MAX_ASPECT_RATIO:
         return "aspect"
+    if config.FRAGMENT_RULE or config.BAND_BLOB_RULE:
+        return "rule"
     raise ValueError(f"piece {region.label} is rejected by no cut")
 
 
@@ -1399,7 +1403,7 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False, wind
 def draw_rejected(ax, d: dict, lw: float = V2_OUTLINE_PT, letters: bool = True, fs: float = FONT_SIZE - 2) -> None:
     """Rejected lacuna-scale candidates (at least REJECTED_MIN_DRAW_PX2) as
     grey dashed outlines with the one-letter reason beside them: A aspect,
-    S solidity, a area."""
+    S solidity, a area, R the fragment or band rule."""
     labels = d["labels"]
     H, W = labels.shape
     for r in d["rejected"]:
@@ -1448,7 +1452,7 @@ def lacuna_legend_items(d: dict, rejected: bool = True, low_cut: bool = False, c
     ]
     if rejected:
         items.append({"kind": "outline", "colour": PALETTE["rejected"], "ls": (0, (2.5, 1.5)),
-                      "label": "rejected candidate: A aspect, S solidity, a area"})
+                      "label": "rejected candidate: A aspect, S solidity, a area, R fragment or band rule"})
     if low_cut:
         items.append({"kind": "outline", "colour": PALETTE["low_cut"], "lw": 0.8, "ls": (0, (0.8, 1.2)),
                       "label": "kept only at 0.8 times t_hi"})

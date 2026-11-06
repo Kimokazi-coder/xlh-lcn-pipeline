@@ -240,11 +240,11 @@ bound and never as a threshold tuned to improve a result.
 | `UNATTACHED_MIN_LENGTH_UM` | 1.3 um (10 px) | shortest unattached thread kept |
 | `UNATTACHED_MIN_ASPECT` | 3.0 | how thread-shaped it must be |
 | `GLOW_TRIM_WIDTH_FRACTION` | 0.5 of the body's own width | trims a glow streak before judging shape |
-| `OUT_OF_FOCUS_MIN_AREA_UM2` | 2.5 um² (148 px) | smallest out-of-focus body |
+| `OUT_OF_FOCUS_MIN_AREA_UM2` | 2.5 um² (148 px) | smallest out-of-focus body (rescue rules off since 2026-11-05) |
 | `OUT_OF_FOCUS_MAX_ASPECT` / `MIN_SOLIDITY` / `MIN_CONTRAST` | 1.5 / 0.90 / 1.5 | round, and brighter than its surroundings |
-| `DIM_LACUNA_MIN_AREA_UM2` / `MIN_SOLIDITY` / `MAX_PEAK` | 2.7 um² / 0.80 / 0.82 | a dim sub-area lacuna: big enough, compact, and **not** saturated |
-| `BORDER_AREA_FRACTION` / `BORDER_MIN_SOLIDITY` | 0.75 / 0.85 | an object the frame cuts: scaled area floor, stricter shape |
-| `THICK_PROCESS_MIN_AREA_UM2` / `MIN_CONTRAST` / `MIN_SOLIDITY` | 16.9 um² / 2.5 / 0.40 | a large bright ragged body with a thick process |
+| `DIM_LACUNA_MIN_AREA_UM2` / `MIN_SOLIDITY` / `MAX_PEAK` | 2.7 um² / 0.80 / 0.82 | a dim sub-area lacuna: big enough, compact, and **not** saturated (off since 2026-11-05) |
+| `BORDER_AREA_FRACTION` / `BORDER_MIN_SOLIDITY` | 0.75 / 0.85 | an object the frame cuts: scaled area floor, stricter shape (off since 2026-11-05) |
+| `THICK_PROCESS_MIN_AREA_UM2` / `MIN_CONTRAST` / `MIN_SOLIDITY` | 16.9 um² / 2.5 / 0.40 | a large bright ragged body with a thick process (off since 2026-11-05) |
 | `MERGE_MIN_SHARED_PX` / `MERGE_MIN_DIP_FRACTION` | 150 px / 0.75 | one osteocyte split by a thin dark band becomes one again |
 | `CANALICULUS_LENGTH_RANGE_UM` | 25 to 50 um | report only |
 
@@ -367,6 +367,8 @@ frame; every per-cell mean uses these), area and shape per lacuna, ring length a
 measured in full. A `dim` or `out_of_focus` one is **counted and owns its
 threads** but carries **no area or shape**, because what would be measured is the
 blur or the frame and not the cell; the shape summary uses ordinary lacunae only.
+Since 2026-11-05 the rules that make these two classes are off
+(`config.LACUNA_RESCUE_RULES`, METHODS section 25), so both stay empty.
 docs/METHODS.md section 9 gives the rules and how each value was chosen.
 
 **Not headline measures:** owned length, edge count and mean edge length. They

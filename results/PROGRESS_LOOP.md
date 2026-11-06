@@ -11,8 +11,8 @@ run is, so it can be resumed after a crash. Logs of every command are in
 | 2 external data | done | docs/EXTERNAL_DATA.md; F:/external_data/ (not committed); no source has manual lacuna labels |
 | 3 reviewer | done | .claude/agents/image-reviewer.md (Read, Glob, Grep; sonnet); .gitignore tracks .claude/agents/ only |
 | 4 loop | done | rounds 1 to 4 kept (258 to 153, WT 12 to 8); round 5 tried and reverted |
-| 5 freeze and rerun | not started | |
-| report | not started | |
+| 5 freeze and rerun | done | tag method-freeze-v1 (d1e0b5c); FINAL run on 35 images; regression PASS (FINAL, 8 WT) |
+| report | done | results/archive/REPORT_LOOP.md |
 
 ## Phase 0, sync
 

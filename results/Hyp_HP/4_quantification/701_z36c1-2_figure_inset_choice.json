@@ -2,69 +2,55 @@
   "image": "701_z36c1-2",
   "overview": {
     "rule": "interior lacunae with the bounding box at least 60 px from the frame; roots closest to the interior median, then area closest to the interior median area, then the smallest id",
-    "interior_median_roots": 7.5,
-    "interior_median_area_px2": 804.0,
+    "interior_median_roots": 9.0,
+    "interior_median_area_px2": 897.0,
     "eligible": [
+      5,
+      6,
       7,
       8,
       9,
-      10,
-      11,
       12,
+      13,
+      14,
       16,
-      17,
-      19,
-      20,
-      22,
-      23,
-      24,
-      25,
-      28,
-      29,
-      30
+      17
     ],
     "inset": {
-      "lacuna_id": 7,
-      "roots": 8,
-      "area_px2": 804.0,
-      "frame_margin_px": 155
+      "lacuna_id": 17,
+      "roots": 9,
+      "area_px2": 433.0,
+      "frame_margin_px": 64
     }
   },
   "network": {
     "rule": "interior lacunae with the bounding box at least 60 px from the frame; fewest roots, roots closest to the interior median, most roots; ties to the smallest id; each lacuna once",
-    "interior_median_roots": 7.5,
+    "interior_median_roots": 9.0,
     "eligible": [
+      5,
+      6,
       7,
       8,
       9,
-      10,
-      11,
       12,
+      13,
+      14,
       16,
-      17,
-      19,
-      20,
-      22,
-      23,
-      24,
-      25,
-      28,
-      29,
-      30
+      17
     ],
     "insets": [
       {
-        "lacuna_id": 22,
-        "roots": 2,
+        "lacuna_id": 7,
+        "roots": 6,
         "role": "fewest roots"
       },
       {
-        "lacuna_id": 7,
-        "roots": 8,
+        "lacuna_id": 17,
+        "roots": 9,
         "role": "roots closest to the median"
       },
       {
-        "lacuna_id": 20,
+        "lacuna_id": 12,
         "roots": 17,
         "role": "most roots"
       }

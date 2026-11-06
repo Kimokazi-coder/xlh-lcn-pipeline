@@ -41,7 +41,7 @@ the hue was free to choose.
 |-|-|
 | cyan outline | interior lacuna: counted, and used in every per-cell mean |
 | yellow outline | lacuna touching the frame edge: counted, but left out of every per-cell mean |
-| grey dashed outline with a letter | lacuna-scale object rejected by a filter (A aspect ratio, S solidity, a area); at least 150 px² |
+| grey dashed outline with a letter | lacuna-scale object rejected by a filter (A aspect ratio, S solidity, a area, R the fragment or band rule of METHODS section 25); at least 150 px² |
 | vermillion line | skeleton pixel within 30 px of an interior lacuna, the pixels counted in ring length 30 px |
 | white line (70% opacity) | every other skeleton pixel, including the ring of a frame-edge lacuna |
 | magenta dot, black edge | one root: a distinct thread leaving a lacuna surface |
@@ -56,7 +56,7 @@ the hue was free to choose.
 
 **Lacunae, rejected candidates and the skeleton in one optical section.** (A) Red channel. (B) Kept
 lacunae with their numbers ("c": in a flagged canal region) and the rejected lacuna-scale candidates
-(grey dashed; A aspect, S solidity, a area). The count line gives the interior lacunae used in per-cell
+(grey dashed; A aspect, S solidity, a area, R fragment or band rule). The count line gives the interior lacunae used in per-cell
 means, the lacunae touching the frame and the rejected candidates. (C) The overlay of the network
 figure at small size: the image at 85%, every skeleton pixel as a vector line, vermillion within 30 px
 of an interior lacuna and white elsewhere, roots of interior lacunae as magenta dots. The white and

@@ -77,6 +77,11 @@ and is not used for this. METHODS section 9 has the detail.
 Lacunae found this way are the classes **dim** and **out_of_focus**: counted and
 owning their threads, but carrying no area or shape measure.
 
+**Off since 2026-11-05.** The review loop turned these rescue rules off
+(`config.LACUNA_RESCUE_RULES = False`, METHODS section 25): on all four groups
+nearly everything they added was a fragment. The classes stay in the code and
+are empty while the switch is off.
+
 ## What each folder holds
 
 The repository holds `README.md`, `config.py`, `requirements.txt`,

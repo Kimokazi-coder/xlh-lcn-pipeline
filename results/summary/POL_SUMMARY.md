@@ -1,5 +1,13 @@
 # POL summary: lacunar size, all four groups
 
+**Superseded numbers.** This text and its table were written on 2026-11-05
+before the review loop, with the lacuna stage of commit 0b0be38. The lacuna
+stage changed after it (tag `method-freeze-v1`, `results/archive/REVIEW_LOOP.md`)
+and `pols_lacunar_size_by_group.csv` was made again with the frozen method on
+every image; the numbers quoted below were not updated and are those of the
+old method. The problems listed under "Problems found" are the ones the loop
+worked on.
+
 **This is lacunar size, not a measured lesion boundary.** It is the area of
 each lacuna as the lacuna stage outlined it, set against the WT median. No
 lesion zone around a lacuna is measured or drawn, and nothing here calls a
