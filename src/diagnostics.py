@@ -107,6 +107,8 @@ Subcommands:
                       images: measures and a crop of each, results/archive/audit/
     dim-audit         the lacunae the rescue rules would add to the development
                       images: measures and a crop of each, results/archive/audit/
+    dim-rule-search   narrow rescue rules over the dim audit's objects: real
+                      lacunae back against non-lacunae back
     review-tally      the image reviewer's tables of one loop round
                       (results/archive/review_loop/round<N>/*.md) counted per
                       group and category, into problems.csv and tally.csv
@@ -7342,6 +7344,29 @@ def _cap_audit_one(path_str: str) -> list:
     return out
 
 
+DIM_CONTEXT_COLUMNS = ["contrast", "background", "over_background", "glow_um2", "glow_solidity",
+                       "to_lacuna_um"]
+
+
+def dim_context(region, labels: np.ndarray, channel: np.ndarray, to_ordinary: np.ndarray) -> dict:
+    """What lies around a rescued object: its contrast against the ring 2 to
+    6 px out (lacunae.region_contrast), the local background (the median of
+    the ring 10 to 20 px out, 0 to 255) and its mean over it, the glow
+    footprint (the connected region at half its peak: area, solidity), and the
+    distance to the nearest ordinary lacuna."""
+    piece = labels == region.label
+    annulus = morphology.dilation(piece, morphology.disk(20)) & ~morphology.dilation(piece, morphology.disk(10))
+    background = float(np.median(channel[annulus]))
+    half = measure.label(channel >= 0.5 * float(region.intensity_max), connectivity=2)
+    glow = measure.regionprops((half == np.bincount(half[piece]).argmax()).astype(np.int32))[0]
+    um2 = config.PIXEL_SIZE_UM_ACQUIRED ** 2
+    return {"contrast": round(lacunae.region_contrast(labels, channel, region), 3),
+            "background": round(background * 255, 1),
+            "over_background": round(float(region.intensity_mean) / max(background, 1e-6), 3),
+            "glow_um2": round(glow.area * um2, 1), "glow_solidity": round(float(glow.solidity), 3),
+            "to_lacuna_um": round(float(to_ordinary[piece].min()) * config.PIXEL_SIZE_UM_ACQUIRED, 2)}
+
+
 def _dim_audit_one(path_str: str) -> tuple:
     """(rows, detected): the lacunae the rescue rules add to one image, and how
     many lacunae it has with them off (the frozen method)."""
@@ -7356,6 +7381,9 @@ def _dim_audit_one(path_str: str) -> tuple:
     blob_area = np.bincount(blobs.ravel())
     regions = {r.label: r for r in measure.regionprops(labels, intensity_image=channel)}
     thick_min = config.area_px2(config.THICK_PROCESS_MIN_AREA_UM2)
+    n_added = len(classes["dim"]) + len(classes["out_of_focus"])
+    ordinary = np.isin(labels, [r.label for r, _b in kept[:len(kept) - n_added]])
+    to_ordinary = ndi.distance_transform_edt(~ordinary)
     out = []
     for cls in ("dim", "out_of_focus"):
         for pos in classes[cls]:
@@ -7366,7 +7394,7 @@ def _dim_audit_one(path_str: str) -> tuple:
             crop = AUDIT_DIR / "dim_added" / group / f"{label}_obj{lab}.png"
             save_audit_crop(display, labels, regions[lab], f"{group} {label} object {lab}", crop)
             out.append({**audit_row(group, label, regions[lab], channel, labels, blobs, blob_area, crop),
-                        "class": cls, "rule": rule})
+                        **dim_context(regions[lab], labels, channel, to_ordinary), "class": cls, "rule": rule})
     added = len(classes["dim"]) + len(classes["out_of_focus"])
     return out, {"group": group, "image": label, "detected": len(kept) - added, "added": added}
 
@@ -7395,12 +7423,70 @@ def cmd_dim_audit(args) -> int:
     parts = list(lacunae.map_images(_dim_audit_one, [str(p) for p in images], args.workers))
     rows = [r for part, _d in parts for r in part]
     detected = [d for _p, d in parts]
-    write_audit_csv(AUDIT_DIR / "dim_added.csv", AUDIT_COLUMNS + ["class", "rule"], rows)
+    write_audit_csv(AUDIT_DIR / "dim_added.csv", AUDIT_COLUMNS + DIM_CONTEXT_COLUMNS + ["class", "rule"], rows)
     write_audit_csv(AUDIT_DIR / "dim_detected.csv", ["group", "image", "detected", "added"], detected)
     print(f"{len(images)} development images; the rescue rules add {len(rows)} lacunae -> {AUDIT_DIR}")
     for group in config.GROUPS:
         n = sum(d["detected"] for d in detected if d["group"] == group)
         print(f"  {group}: {sum(r['group'] == group for r in rows)} added, {n} detected with them off")
+    return 0
+
+
+def audit_classes(pattern: str) -> dict:
+    """{crop file name: class} from the reviewer's tables in reviews/."""
+    out = {}
+    for path in sorted((AUDIT_DIR / "reviews").glob(pattern)):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) == 3 and cells[0].endswith(".png"):
+                out[cells[0]] = cells[1]
+    return out
+
+
+# Thresholds the search tries, each a lower or an upper bound on one measure.
+DIM_SEARCH_GRID = {
+    ("over_background", ">="): [1.5, 2.0, 2.3, 2.5, 2.8, 3.0, 3.5],
+    ("contrast", ">="): [1.4, 1.6, 1.8, 2.0, 2.1],
+    ("to_lacuna_um", ">="): [2, 3, 3.4, 5, 8, 10, 11],
+    ("solidity", ">="): [0.8, 0.85, 0.9],
+    ("mean_brightness", ">="): [150, 160, 170, 190],
+    ("glow_solidity", ">="): [0.6, 0.7, 0.75, 0.8],
+    ("eccentricity", "<="): [0.7, 0.8, 0.9, 0.95],
+    ("glow_um2", "<="): [20, 30, 60, 100],
+}
+
+
+def cmd_dim_rule_search(_args) -> int:
+    """Every rule of one to three bounds on the measures of dim_added.csv, over
+    the rescued objects the band rule would keep: how many the reviewer called
+    real lacunae it brings back for at most k objects it called not a lacuna."""
+    import itertools
+
+    classes = audit_classes("dim_*.md")
+    with open(AUDIT_DIR / "dim_added.csv", newline="", encoding="utf-8") as f:
+        rows = [r for r in csv.DictReader(f)
+                if float(r["mask_region_um2"]) <= config.BAND_BLOB_MAX_AREA_UM2]
+    verdict = [classes.get(r["crop"]) for r in rows]
+    conds = [(k, op, v) for (k, op), vs in DIM_SEARCH_GRID.items() for v in vs]
+    found = []
+    for n in (1, 2, 3):
+        for combo in itertools.combinations(conds, n):
+            if len({c[0] for c in combo}) < n:
+                continue
+            hit = [all((float(r[k]) >= v) if op == ">=" else (float(r[k]) <= v) for k, op, v in combo) for r in rows]
+            real = sum(h and c == "real lacuna" for h, c in zip(hit, verdict))
+            bad = sum(h and c == "not a lacuna" for h, c in zip(hit, verdict))
+            found.append((bad, real, -n, " and ".join(f"{k} {op} {v}" for k, op, v in combo)))
+    n_real = verdict.count("real lacuna")
+    out = []
+    for limit in (0, 1, 2, 3, 5, 8, 12):
+        bad, real, _n, rule = max((x for x in found if x[0] <= limit), key=lambda x: (x[1], x[2]))
+        out.append({"most non-lacunae back": limit, "real lacunae back": real, "of real": n_real,
+                    "non-lacunae back": bad, "best rule": rule})
+    write_audit_csv(AUDIT_DIR / "dim_rule_search.csv", list(out[0]), out)
+    print_table(list(out[0]), [list(r.values()) for r in out],
+                title=f"narrow rescue rules over {len(rows)} rescued objects ({n_real} real lacunae, "
+                      f"{verdict.count('not a lacuna')} not a lacuna)\n")
     return 0
 
 
@@ -9969,6 +10055,11 @@ def main() -> None:
                             "crops in results/archive/audit/.")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_dim_audit)
+
+    p = sub.add_parser("dim-rule-search",
+                       help="Narrow rescue rules over the dim audit's objects and the reviewer's classes: "
+                            "real lacunae back against non-lacunae back (results/archive/audit/).")
+    p.set_defaults(func=cmd_dim_rule_search)
 
     p = sub.add_parser("review-tally",
                        help="Count one loop round's reviewer tables per group and category.")
