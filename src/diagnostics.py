@@ -103,6 +103,10 @@ Subcommands:
                       its full-frame form, and with --watershed the fast
                       watershed against the original: identical labels, per
                       image, with the timing
+    cap-audit         the objects the band rule removes from the development
+                      images: measures and a crop of each, results/archive/audit/
+    dim-audit         the lacunae the rescue rules would add to the development
+                      images: measures and a crop of each, results/archive/audit/
     review-tally      the image reviewer's tables of one loop round
                       (results/archive/review_loop/round<N>/*.md) counted per
                       group and category, into problems.csv and tally.csv
@@ -7237,6 +7241,169 @@ def cmd_dark_band_check(args) -> int:
     return 1 if failed else 0
 
 
+# cap-audit and dim-audit ------------------------------------------------------------
+
+AUDIT_DIR = config.ARCHIVE_ROOT / "audit"
+# Display only. Context around an object in its crop (48 px, 6.2 um), the
+# largest enlargement, the largest panel side, and the outline colour.
+AUDIT_CROP_MARGIN_PX = 48
+AUDIT_CROP_MAX_ZOOM = 3
+AUDIT_CROP_MAX_PANEL_PX = 600
+AUDIT_OUTLINE_RGB = (0, 255, 255)
+# A pixel at the top of the 8 bit scale (255) is saturated.
+AUDIT_SATURATED = 1.0
+AUDIT_COLUMNS = ["group", "image", "object", "crop", "area_um2", "mean_brightness", "max_brightness",
+                 "solidity", "eccentricity", "saturated_share", "touches_saturated", "mask_region_um2",
+                 "on_border", "x", "y"]
+
+
+def audit_row(group: str, label: str, region, channel: np.ndarray, labels: np.ndarray, blobs: np.ndarray,
+              blob_area: np.ndarray, crop: Path) -> dict:
+    """The measurements of one audited object: its whole labelled region, the
+    brightness on the 0 to 255 scale, and whether it or the pixel ring around it
+    holds a saturated pixel."""
+    rows, cols = labels.shape
+    r0, c0, r1, c1 = region.bbox
+    win = (slice(max(r0 - 1, 0), min(r1 + 1, rows)), slice(max(c0 - 1, 0), min(c1 + 1, cols)))
+    piece = labels[win] == region.label
+    near = morphology.binary_dilation(piece, np.ones((3, 3), bool))
+    saturated = channel[win] >= AUDIT_SATURATED
+    ids = blobs[region.coords[:, 0], region.coords[:, 1]]
+    ids = ids[ids > 0]
+    blob = float(blob_area[int(np.bincount(ids).argmax())]) if ids.size else 0.0
+    cy, cx = region.centroid
+    return {"group": group, "image": label, "object": int(region.label), "crop": crop.name,
+            "area_um2": round(region.area * config.PIXEL_SIZE_UM_ACQUIRED ** 2, 2),
+            "mean_brightness": round(float(region.intensity_mean) * 255, 1),
+            "max_brightness": round(float(region.intensity_max) * 255, 1),
+            "solidity": round(float(region.solidity), 3), "eccentricity": round(float(region.eccentricity), 3),
+            "saturated_share": round(float(saturated[piece].mean()), 3),
+            "touches_saturated": bool((saturated & near).any()),
+            "mask_region_um2": round(blob * config.PIXEL_SIZE_UM_ACQUIRED ** 2, 1),
+            "on_border": bool(r0 == 0 or c0 == 0 or r1 == rows or c1 == cols),
+            "x": int(round(cx)), "y": int(round(cy))}
+
+
+def save_audit_crop(display: np.ndarray, labels: np.ndarray, region, title: str, path: Path) -> None:
+    """Two panels of the original image around one object, the second with its
+    outline, enlarged, with a 10 um scale bar. Display only."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    rows, cols = labels.shape
+    r0, c0, r1, c1 = region.bbox
+    m = AUDIT_CROP_MARGIN_PX
+    y0, y1, x0, x1 = max(r0 - m, 0), min(r1 + m, rows), max(c0 - m, 0), min(c1 + m, cols)
+    raw = display[y0:y1, x0:x1].copy()
+    piece = labels[y0:y1, x0:x1] == region.label
+    outlined = raw.copy()
+    outlined[piece & ~ndi.binary_erosion(piece)] = AUDIT_OUTLINE_RGB
+    zoom = max(1, min(AUDIT_CROP_MAX_ZOOM, AUDIT_CROP_MAX_PANEL_PX // max(raw.shape[:2])))
+    size = (raw.shape[1] * zoom, raw.shape[0] * zoom)
+    gap, title_h = 8, 24
+    canvas = Image.new("RGB", (2 * size[0] + 3 * gap, size[1] + title_h + 2 * gap), (0, 0, 0))
+    for k, panel in enumerate((raw, outlined)):
+        canvas.paste(Image.fromarray(panel).resize(size, Image.NEAREST), (gap + k * (size[0] + gap), title_h + gap))
+    draw = ImageDraw.Draw(canvas)
+    font = ImageFont.load_default(size=13)
+    draw.text((gap, title_h // 2), title, font=font, fill=(255, 255, 255), anchor="lm")
+    bar = int(round(config.px(10.0) * zoom))
+    by = title_h + gap + size[1] - 10
+    draw.rectangle([gap + 6, by, gap + 6 + bar, by + 3], fill=(255, 255, 255))
+    draw.text((gap + 6 + bar // 2, by - 3), "10 um", font=font, fill=(255, 255, 255), anchor="mb")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(path)
+
+
+def development_images() -> list[Path]:
+    """Every image of every group that DEV mode lets through."""
+    return [p for g in config.GROUPS
+            for p in lacunae.image_paths(argparse.Namespace(image=None, dir=config.DATA_DIR / g))]
+
+
+def _cap_audit_one(path_str: str) -> list:
+    """The objects the band rule removes from one image: detect with the rule
+    off, then apply it to the same kept list, as src/lacunae.py does."""
+    config.FAST_LACUNA_STAGE = True  # identical labels (dark-band-check --watershed)
+    config.BAND_BLOB_RULE = False
+    path = Path(path_str)
+    group, label = path.parent.name, lacunae.image_label(path)
+    display, channel = lacunae.load_channel(path)
+    labels, kept, _t_hi, _classes = lacunae.segment(channel)
+    mask, _ = lacunae.multiotsu_lacuna_mask(channel)
+    after = {r.label for r, _b in lacunae.band_blob_filter(mask, labels, kept)}
+    blobs = measure.label(mask, connectivity=2)
+    blob_area = np.bincount(blobs.ravel())
+    regions = {r.label: r for r in measure.regionprops(labels, intensity_image=channel)}
+    out = []
+    for lab in sorted({r.label for r, _b in kept} - after):
+        crop = AUDIT_DIR / "cap_removed" / group / f"{label}_obj{lab}.png"
+        save_audit_crop(display, labels, regions[lab], f"{group} {label} object {lab}", crop)
+        out.append(audit_row(group, label, regions[lab], channel, labels, blobs, blob_area, crop))
+    return out
+
+
+def _dim_audit_one(path_str: str) -> tuple:
+    """(rows, detected): the lacunae the rescue rules add to one image, and how
+    many lacunae it has with them off (the frozen method)."""
+    config.FAST_LACUNA_STAGE = True  # identical labels (dark-band-check --watershed)
+    config.LACUNA_RESCUE_RULES = True
+    path = Path(path_str)
+    group, label = path.parent.name, lacunae.image_label(path)
+    display, channel = lacunae.load_channel(path)
+    labels, kept, _t_hi, classes = lacunae.segment(channel)
+    mask, _ = lacunae.multiotsu_lacuna_mask(channel)
+    blobs = measure.label(mask, connectivity=2)
+    blob_area = np.bincount(blobs.ravel())
+    regions = {r.label: r for r in measure.regionprops(labels, intensity_image=channel)}
+    thick_min = config.area_px2(config.THICK_PROCESS_MIN_AREA_UM2)
+    out = []
+    for cls in ("dim", "out_of_focus"):
+        for pos in classes[cls]:
+            region, on_border = kept[pos - 1]
+            lab = region.label
+            rule = ("f out of focus" if cls == "out_of_focus" else "g2 frame" if on_border
+                    else "g3 thick process" if regions[lab].area >= thick_min else "g1 dim")
+            crop = AUDIT_DIR / "dim_added" / group / f"{label}_obj{lab}.png"
+            save_audit_crop(display, labels, regions[lab], f"{group} {label} object {lab}", crop)
+            out.append({**audit_row(group, label, regions[lab], channel, labels, blobs, blob_area, crop),
+                        "class": cls, "rule": rule})
+    added = len(classes["dim"]) + len(classes["out_of_focus"])
+    return out, {"group": group, "image": label, "detected": len(kept) - added, "added": added}
+
+
+def write_audit_csv(path: Path, columns: list, rows: list) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=columns, lineterminator="\n")
+        w.writeheader()
+        w.writerows(rows)
+
+
+def cmd_cap_audit(args) -> int:
+    images = development_images()
+    rows = [r for part in lacunae.map_images(_cap_audit_one, [str(p) for p in images], args.workers) for r in part]
+    out = AUDIT_DIR / "cap_removed.csv"
+    write_audit_csv(out, AUDIT_COLUMNS, rows)
+    print(f"{len(images)} development images; the band rule removes {len(rows)} objects -> {out}")
+    for group in config.GROUPS:
+        print(f"  {group}: {sum(r['group'] == group for r in rows)}")
+    return 0
+
+
+def cmd_dim_audit(args) -> int:
+    images = development_images()
+    parts = list(lacunae.map_images(_dim_audit_one, [str(p) for p in images], args.workers))
+    rows = [r for part, _d in parts for r in part]
+    detected = [d for _p, d in parts]
+    write_audit_csv(AUDIT_DIR / "dim_added.csv", AUDIT_COLUMNS + ["class", "rule"], rows)
+    write_audit_csv(AUDIT_DIR / "dim_detected.csv", ["group", "image", "detected", "added"], detected)
+    print(f"{len(images)} development images; the rescue rules add {len(rows)} lacunae -> {AUDIT_DIR}")
+    for group in config.GROUPS:
+        n = sum(d["detected"] for d in detected if d["group"] == group)
+        print(f"  {group}: {sum(r['group'] == group for r in rows)} added, {n} detected with them off")
+    return 0
+
+
 # review-tally -----------------------------------------------------------------------
 
 REVIEW_LOOP_DIR = config.ARCHIVE_ROOT / "review_loop"
@@ -9790,6 +9957,18 @@ def main() -> None:
     p.add_argument("-c", dest="csv", type=Path, default=None, help="Also write the table to this CSV file.")
     p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
     p.set_defaults(func=cmd_dark_band_check)
+
+    p = sub.add_parser("cap-audit",
+                       help="The objects the band rule removes from the development images: measures and crops "
+                            "in results/archive/audit/.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_cap_audit)
+
+    p = sub.add_parser("dim-audit",
+                       help="The lacunae the rescue rules would add to the development images: measures and "
+                            "crops in results/archive/audit/.")
+    p.add_argument("-w", dest="workers", type=int, default=8, help="Parallel processes (default 8).")
+    p.set_defaults(func=cmd_dim_audit)
 
     p = sub.add_parser("review-tally",
                        help="Count one loop round's reviewer tables per group and category.")
