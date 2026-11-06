@@ -307,7 +307,7 @@ without it a run writes to `results/<name of the input folder>/`, so
 Check it:
 
 ```
-python src/diagnostics.py reference-check    # must PASS: 161.00 / 21.63 / 8.50 on 543-2
+python src/diagnostics.py reference-check    # must PASS: 166.40 / 23.19 / 7.70 on 543_3
 python src/diagnostics.py regression         # every number against results/WT/, tolerance 0
 python src/diagnostics.py switch-check       # what each switch in config.py changes
 python src/diagnostics.py format-test -t "SOURCE_FOLDER/22.04.25/wt"   # TIFF against JPEG on WT

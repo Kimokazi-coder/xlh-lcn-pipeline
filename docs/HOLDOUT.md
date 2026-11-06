@@ -50,9 +50,10 @@ method is frozen (tag `method-freeze-v1`).
   701), and the sections of one stack lie a few micrometres apart, so some cells
   may appear in both. The held-out set tests the method on unseen fields, not
   on unseen animals. An animal-level hold-out would need more animals per group.
-- The draw fell on `543-2`, the image of `python src/diagnostics.py
-  reference-check` and the default image of two self-tests; in DEV mode those
-  commands refuse it. Both Hyp_HP images come from animal 701.
+- The draw fell on `543-2`, then the image of `python src/diagnostics.py
+  reference-check` and the default image of two self-tests. Since 2026-11-06
+  `reference-check` runs on 543_3; the AI lacuna judge self-test refuses 543-2
+  in DEV mode and is run with `-i data/WT/543_3.tif`. Both Hyp_HP images come from animal 701.
 - The outputs already in `results/` for the held-out images were made before
   the lock. During development they are left as they are, and the FINAL run
   replaces them.

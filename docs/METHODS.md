@@ -929,8 +929,9 @@ With all off, `results/WT/` is reproduced exactly
 
 ## 13. Checks (`src/diagnostics.py`)
 
-- `reference-check`: 161.00 edges per cell, 21.63 px mean edge length and 8.50 roots per cell on
-  543-2. The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
+- `reference-check`: 166.40 edges per cell, 23.19 px mean edge length and 7.70 roots per cell on
+  543_3, with the frozen method (tag `method-freeze-v1`), since 2026-11-06. Until then it ran on
+  543-2 (161.00 / 21.63 / 8.50), which became a held-out image (section 25). The third number was the gap bridge count, which no longer exists; roots per cell replaces it,
   being a headline measure that does not depend on ownership.
 - `regression`: regenerate every image into an ignored folder and compare every json and summary number
   with `results/WT/` at tolerance 0 (provenance ignored), with and without the fast stage.

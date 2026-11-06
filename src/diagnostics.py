@@ -3,7 +3,7 @@
 Read-only: nothing here writes pipeline outputs. PRE-VALIDATION, PIXEL units.
 
 Subcommands:
-    reference-check   run 543-2 and check the three regression numbers
+    reference-check   run 543_3 and check the three reference numbers
     compare-outputs   compare two results folders number by number
     reach             how far through the network each cell's owned threads
                       reach (median, p90, max per cell)
@@ -197,9 +197,14 @@ def images_from(args) -> list[Path]:
 
 # reference-check ---------------------------------------------------------------
 
-REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
+REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543_3.tif"
 
-# The quick check that the default pipeline still gives what it gave. Fixed on
+# The quick check that the default pipeline still gives what it gave. Moved on
+# 2026-11-06 from 543-2 to 543_3: 543-2 became a held-out image
+# (docs/HOLDOUT.md) and may not be run in DEV mode, and the lacuna stage changed
+# in the review loop (tag method-freeze-v1, METHODS section 25). The values below
+# are those of the frozen method on 543_3, default path; on 543-2 the last
+# values, before the loop, were 161.00 / 21.63 / 8.50. Before that, fixed on
 # 2026-10-16, after the zone from the hole and its radial gain (METHODS section
 # 19); before that, on 2026-10-14, they were 146.42 / 21.99 / 7.67 with the glow
 # zone of section 18, and the three numbers moved with that rule and with the
@@ -209,9 +214,9 @@ REFERENCE_IMAGE = DEFAULT_IMAGE_DIR / "543-2.tif"
 # a headline measure that does not depend on ownership and the one a manual
 # count will be compared against.
 REFERENCE_VALUES = [
-    ("edges per interior cell (mean edge_count)", 161.00),
-    ("mean edge length, px (interior mean of mean_edge_length_px)", 21.63),
-    ("roots per interior cell (mean roots_count)", 8.50),
+    ("edges per interior cell (mean edge_count)", 166.40),
+    ("mean edge length, px (interior mean of mean_edge_length_px)", 23.19),
+    ("roots per interior cell (mean roots_count)", 7.70),
 ]
 
 
@@ -9650,7 +9655,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="LCN pipeline diagnostics (read-only, pre-validation, px).")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("reference-check", help="Run 543-2 and check 161.00 / 21.63 / 8.50.")
+    p = sub.add_parser("reference-check", help="Run 543_3 and check 166.40 / 23.19 / 7.70.")
     p.add_argument("--image", type=Path, default=REFERENCE_IMAGE, help=argparse.SUPPRESS)
     p.set_defaults(func=cmd_reference_check)
 

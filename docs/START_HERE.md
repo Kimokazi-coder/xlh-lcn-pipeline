@@ -147,7 +147,7 @@ python src/pols.py measure -d data/G             # 3_pols (every group at once: 
 python src/diagnostics.py group-overview         # results/summary/group_overview.csv and .xlsx
 python src/diagnostics.py group-qc               # results/summary/group_qc.csv
 python src/diagnostics.py layout-check           # the five sections of every group, files per section
-python src/diagnostics.py reference-check        # must PASS: 161.00 / 21.63 / 8.50 on 543-2
+python src/diagnostics.py reference-check        # must PASS: 166.40 / 23.19 / 7.70 on 543_3
 python src/diagnostics.py regression             # every WT number against results/WT/, tolerance 0
 python src/diagnostics.py switch-check           # what each switch changes
 python src/diagnostics.py import-group -g G -s F # copy a group's images, or say why not
