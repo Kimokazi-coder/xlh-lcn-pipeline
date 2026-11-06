@@ -63,6 +63,16 @@ group, colour bar in um2, flagged lacunae outlined grey), `<image>_pols_lacunar_
 (per image n, mean, median, 90th percentile of area and ratio),
 `contact_sheet.png` and `README.md`. No lesion is called here.
 
+**Working POL definition (2026-11-06; to be confirmed by Dr. Murshed).** In
+rhodamine confocal images the dye fills the lacuna and the unmineralized
+pericellular matrix around the osteocyte together, so a periosteocytic lesion
+shows as an enlarged, irregular, dye-filled lacunar space: that space is the
+POL footprint. No separate halo is visible around it (the look of 2026-10-29,
+`results/archive/pols/FINDINGS.md`), so the footprint is the lacuna as the
+lacuna stage outlines it, and the POL measures are measures of that outline:
+its area, against the WT median, and the share of the analysed area it covers.
+Status: working definition, not confirmed.
+
 **4_quantification/**, written by `src/quantification.py` and the figure script:
 `<image>_quantification.json`, `.xlsx` and `.pdf` (every measured number of the
 image), `quantification_all_images.csv`, `.xlsx` and `.pdf` (one row per

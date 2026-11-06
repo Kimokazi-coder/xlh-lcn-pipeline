@@ -1952,6 +1952,18 @@ study.
 
 ## 24. The POL section
 
+### 24.0 Working definition of a POL
+
+**Working POL definition (2026-11-06; to be confirmed by Dr. Murshed).** In
+rhodamine confocal images the dye fills the lacuna and the unmineralized
+pericellular matrix around the osteocyte together, so a periosteocytic lesion
+shows as an enlarged, irregular, dye-filled lacunar space: that space is the
+POL footprint. No separate halo is visible around it (the look of 2026-10-29,
+`results/archive/pols/FINDINGS.md`), so the footprint is the lacuna as the
+lacuna stage outlines it, and the POL measures are measures of that outline:
+its area, against the WT median, and the share of the analysed area it covers.
+Status: working definition, not confirmed.
+
 ### 24.1 Candidate POL measure: lacunar size, pending definition
 
 **Since 2026-11-04 the POL section, `results/<group>/3_pols/` of every group,
