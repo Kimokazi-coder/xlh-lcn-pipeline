@@ -2262,3 +2262,32 @@ checks and the results are in `results/archive/REPORT_FINAL.md`. After the
 tag only the group overview's consistency check changed, to count the
 skeleton of the analysed field as quantification does.
 
+## 28. Cleanup (2026-11-09)
+
+At the user's request, everything that is neither measured in quantification
+nor needed by the pipeline was deleted. Tracked files stay in git history (tag
+`method-freeze-v2` holds all of them); no measure, rule or default of the
+measuring pipeline changed. Where an older section of this file names one of
+these files, it describes what was done then.
+
+- `results/<group>/5_archive/` in every group: the outputs of the retired ring
+  proxy (`pol_ring_proxy/`), the old low cut overview of 543_3 and the
+  untracked brightness variants of the figures.
+- The old per-image folders left in `results/WT/` on one machine
+  (`<image>/4_archive_not_used/`, untracked figure variants of 2026-10-20).
+- Figure files the final run did not redraw: the Fig02 overlays of
+  I534_z25c1-2 (Hyp_RD) and 699_HYP_HP_z20c1-2 (Hyp_HP), whose image the
+  figure rule no longer picks, and the two-page cell gallery of
+  699_HYP_HP_z11c1-2, now one page.
+- In `results/archive/`: `blind_review/` (the ring proxy's blinded set), the
+  ring proxy's own reports in `pols/` (DEFINITION, SUMMARY, REPORT,
+  REPORT_LAYOUT, PROGRESS, `summary_by_group.csv`, `layout_check.csv`), and
+  the notes of the layout move (`REPORT_REORG.md`, `PROGRESS_LAYOUT.md`).
+  `pols/FINDINGS.md` and `pols/phase0_look/` stay: the POL definition of 24.0
+  rests on them.
+
+Kept although not measured: the AI judge sets and their logs (the judge is a
+pipeline switch, its replay and self tests read the logs, and its rerun is
+still to come), the reports, audits and review records that the frozen rules
+rest on, and the format test of the input TIFFs.
+

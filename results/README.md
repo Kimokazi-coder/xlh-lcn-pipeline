@@ -134,16 +134,19 @@ one row each), `group_qc.csv` (QC list of the groups other than WT),
 plain words), `per_group.csv`, `per_animal.csv`, `per_image.csv` and
 `statistics_models.csv`.
 
-**archive/**: `blind_review/` (POL ring proxy pictures under shuffled codes),
-`format_test/` (TIFF against JPEG), `pols/` (the ring proxy reports: FINDINGS,
-DEFINITION, SUMMARY, REPORT, REPORT_LAYOUT, PROGRESS, the phase 0 look,
-layout_check), `ai_judge/` (run records of the lacuna judge, its `dry_run/`
-and `review/`, and the README of each judge), `MOVE_MAP.csv` (every file moved
-into this layout, old path and new path), `REPORT_REORG.md` (what the move
-did) and `PROGRESS_LAYOUT.md` (its working log); `REVIEW_LOOP.md` and
-`REPORT_LOOP.md` with `review_loop/` (the review loop of 2026-11-05) and
+**archive/**: `REPORT_FINAL.md` (the report of 2026-11-06), `format_test/`
+(TIFF against JPEG), `pols/` (`FINDINGS.md` and `phase0_look/`, the look the
+POL definition rests on), `ai_judge/` (run records of the lacuna judge, its
+`dry_run/` and `review/`, and the README of each judge), `MOVE_MAP.csv` (every
+file moved into this layout, old path and new path), `REVIEW_LOOP.md` and
+`REPORT_LOOP.md` with `review_loop/` (the review loop of 2026-11-05),
 `audit/` (the bias audit of 2026-11-06: `CAP_AUDIT.md`, `DIM_AUDIT.md`,
-`FIX_LOG.md`, `REPORT_AUDIT.md`, the crops and the reviewer's tables).
+`FIX_LOG.md`, `REPORT_AUDIT.md`, and of the final run: `CAP_V2.md`,
+`EXCLUDED_REGIONS.md`, the crops and the reviewer's tables), and the POL
+picture checks (`POL_PICTURE_CHECK.csv`, `POL_VISUAL_CHECK.md`). Deleted on
+2026-11-09 as no longer used, in git history: `blind_review/` (the ring proxy
+pictures under shuffled codes), the ring proxy's own reports in `pols/`,
+`REPORT_REORG.md` and `PROGRESS_LAYOUT.md`.
 
 ## How to regenerate
 

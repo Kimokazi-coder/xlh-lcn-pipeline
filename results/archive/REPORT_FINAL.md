@@ -107,10 +107,13 @@ No method or measure changed.
   current detection; the rules rest on an AI reviewer, not on manual counts.
 - The held-out images were run but not reviewed, as the rules require.
 - Nothing is deleted, so figure files the final run did not redraw stay beside
-  the new ones: the old Fig02 overlays of WT (543-2, png), WT_HP
-  (877_wt_z081c1-2), Hyp_RD (I534_z25c1-2) and Hyp_HP (699_HYP_HP_z20c1-2),
-  whose image the figure rule no longer picks, and the two-page cell gallery
-  of 699_HYP_HP_z11c1-2, now one page. They predate `method-freeze-v2`.
+  the new ones: the old Fig02 overlays of Hyp_RD (I534_z25c1-2) and Hyp_HP
+  (699_HYP_HP_z20c1-2), whose image the figure rule no longer picks, and the
+  two-page cell gallery of 699_HYP_HP_z11c1-2, now one page. They predate
+  `method-freeze-v2`. (Correction of 2026-11-09: the WT and WT_HP Fig02 files
+  listed here before are current, byte for byte the network figures of the
+  final run; the files above were deleted on 2026-11-09 and are in git
+  history.)
 
 ## To confirm with Dr. Murshed
 
