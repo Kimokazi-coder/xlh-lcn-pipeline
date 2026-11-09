@@ -2883,3 +2883,559 @@ def same_lacuna_decisions(a: dict, b: dict) -> list:
     if len(a["regions"]) != len(b["regions"]):
         found.append("a different number of regions")
     return found
+
+
+# The POL judge
+#
+# A third judge (user brief of 2026-11-09, docs/METHODS.md section 30), acting
+# only on the lacunae the lacuna judge accepted. Its candidates are those
+# lacunae that may be a POL, a cluster or one body cut in pieces: every lacuna
+# with an area above config.AI_POL_MIN_AREA_UM2, every lacuna the cluster rule
+# flags, and both lacunae of every pair closer than config.AI_POL_PAIR_GAP_UM.
+# Lacunae linked by such pairs form one case: one crop, one call. The judge says
+# per number: pol, cluster, split (with the pieces to merge), lacuna,
+# not_lacuna (band, tissue, border) or unsure. It never draws a boundary.
+#
+#   src/judge_prompt_pols.md            the one fixed prompt
+#   docs/judge_examples_pols.md         the rules in words
+#   results/<group>/3_pols/ai_judge/ai_log/  every request and answer, the
+#                                       pictures sent, the decision file per image
+
+POL_LOG_SCHEMA = "lcn-ai-pol-judge-log-1"
+POL_DECISIONS_SCHEMA = "lcn-ai-pol-judge-decisions-1"
+POL_STATUS = ("EXPERIMENT, pre-validation, not validated. Which lacunae are POLs, clusters, pieces of one "
+              "body or no lacunae was decided by an AI judge; every boundary is the lacuna stage's own.")
+POL_PROMPT_FILES = ("judge_prompt_pols.md", "judge_examples_pols.md")
+POL_VERDICTS = ("pol", "cluster", "split", "lacuna", "not_lacuna", "unsure")
+POL_REASONS = ("band", "tissue", "border")
+# A lacuna in the crop that is not in the case is outlined in this grey, with
+# no number: context the judge is not asked about.
+POL_CONTEXT_COLOUR = (150, 150, 150)
+# The normal lacuna the request text quotes: half the candidate line, so the
+# same fixed number (config.AI_POL_MIN_AREA_UM2).
+POL_NORMAL_AREA_UM2 = config.AI_POL_MIN_AREA_UM2 / 2.0
+# POL_LOG_ROOT replaces the log folder with POL_LOG_ROOT/<group>/ai_log/ for one
+# process, as LACUNA_LOG_ROOT does for the lacuna judge.
+POL_LOG_ROOT = None
+
+
+def load_pol_prompt() -> dict:
+    return load_prompt(*POL_PROMPT_FILES)
+
+
+def pol_log_dir(group: str) -> Path:
+    if POL_LOG_ROOT:
+        return Path(POL_LOG_ROOT) / group / config.AI_LOG_DIR
+    return config.ai_pol_group_dir(group) / config.AI_LOG_DIR
+
+
+def pol_attempt_path(group: str, label: str, case_id: str, attempt: int) -> Path:
+    return pol_log_dir(group) / f"{label}_{case_id}_attempt{attempt}.json"
+
+
+def pol_picture_path(group: str, label: str, case_id: str) -> Path:
+    return pol_log_dir(group) / "pictures" / f"{label}_{case_id}.png"
+
+
+def pol_decisions_path(group: str, label: str) -> Path:
+    return pol_log_dir(group) / f"{label}_ai_pols.json"
+
+
+def pol_state(image_path: Path) -> dict:
+    """The lacunae the lacuna judge accepted for one image: the label image of
+    the kept lacunae (ids 1..N, what quantification reads), their classes and
+    the channel. Built from the cached lacuna stage and the lacuna judge's
+    decision file through apply_lacuna_verdicts, the same call
+    lacunae.analyse_image makes with that switch on, so it is exactly the
+    lacuna judge's set."""
+    image_path = Path(image_path)
+    state = cached_lacuna_state(image_path)
+    labels = state["labels"]
+    if "kept" in state:
+        kept = state["kept"]
+    else:
+        regions = {int(r.label): r for r in measure.regionprops(labels)}
+        kept = [(regions[int(v)], bool(b)) for v, b in zip(state["kept_labels"], state["kept_on_border"])]
+    labels, kept, classes, _record = apply_lacuna_verdicts(image_path, state["channel"], labels, kept,
+                                                           state["t_hi"], state["classes"], state["excluded"])
+    return {"image_path": image_path, "label": state["label"], "group": state["group"],
+            "channel": state["channel"], "id_map": lacunae.label_image_of_kept(labels, kept),
+            "classes": {k: [int(i) for i in v] for k, v in classes.items()}}
+
+
+def _pixel_hash(rows: np.ndarray, cols: np.ndarray, width: int) -> str:
+    return sha256_bytes(np.sort(rows.astype(np.int64) * int(width) + cols.astype(np.int64)).tobytes())
+
+
+def pol_candidates(id_map: np.ndarray, classes: dict) -> dict:
+    """The cases of one image. Deterministic: no network and no judge."""
+    id_map = id_map.astype(np.int32)
+    height, width = id_map.shape
+    no_shape = {int(i) for name in ("dim", "out_of_focus", "judged") for i in classes.get(name, [])}
+    um2 = config.PIXEL_SIZE_UM_ACQUIRED ** 2
+    info = {}
+    for region in measure.regionprops(id_map):
+        lid = int(region.label)
+        shaped = lid not in no_shape
+        area = float(region.area) * um2
+        info[lid] = {
+            "lacuna_id": lid,
+            "area_um2": round(area, 2) if shaped else None,
+            "large": bool(shaped and area > config.AI_POL_MIN_AREA_UM2),
+            "cluster_rule": bool(shaped and lacunae.is_cluster(region.image)),
+            "bbox_rc": [int(v) for v in region.bbox],
+            "centroid_xy": [round(float(region.centroid[1]), 1), round(float(region.centroid[0]), 1)],
+            "pixels": _pixel_hash(region.coords[:, 0], region.coords[:, 1], width),
+        }
+    # Pairs whose outlines come within the gap, centre to centre of the nearest
+    # pixels; each pair found once, from its lower id.
+    gap = config.px(config.AI_POL_PAIR_GAP_UM)
+    reach = int(np.ceil(gap)) + 1
+    pairs = set()
+    for lid, item in info.items():
+        r0, c0, r1, c1 = item["bbox_rc"]
+        win = (slice(max(r0 - reach, 0), min(r1 + reach, height)),
+               slice(max(c0 - reach, 0), min(c1 + reach, width)))
+        sub = id_map[win]
+        others = [int(v) for v in np.unique(sub) if v > lid]
+        if not others:
+            continue
+        distance = ndi.distance_transform_edt(sub != lid)
+        for other in others:
+            if float(distance[sub == other].min()) <= gap:
+                pairs.add((lid, other))
+    chosen = {lid for lid, item in info.items() if item["large"] or item["cluster_rule"]}
+    chosen |= {i for pair in pairs for i in pair}
+    parent = {lid: lid for lid in chosen}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for a, b in sorted(pairs):
+        parent[find(a)] = find(b)
+    groups: dict = {}
+    for lid in chosen:
+        groups.setdefault(find(lid), []).append(lid)
+
+    def reading(lid):
+        return (info[lid]["centroid_xy"][1], info[lid]["centroid_xy"][0])
+
+    cases = []
+    for members in sorted(groups.values(), key=lambda m: min(reading(i) for i in m)):
+        members = sorted(members, key=reading)
+        number_of = {lid: n for n, lid in enumerate(members, start=1)}
+        entries = []
+        for lid in members:
+            why = (["large"] if info[lid]["large"] else []) + (["cluster rule"] if info[lid]["cluster_rule"] else [])
+            close = sorted(number_of[b if a == lid else a] for a, b in pairs if lid in (a, b))
+            if close:
+                why.append("close to " + ", ".join(str(n) for n in close))
+            entries.append(dict({k: v for k, v in info[lid].items() if k != "pixels"},
+                                n=number_of[lid], why_candidate=why))
+        cases.append({"case_id": f"case_{len(cases) + 1:03d}", "members": entries})
+    geometry = sha256_text(canonical_json([[height, width],
+                                           [[[e["n"], e["lacuna_id"], info[e["lacuna_id"]]["pixels"],
+                                              e["why_candidate"]] for e in c["members"]] for c in cases]]))
+    counts = {"lacunae": len(info), "cases": len(cases), "numbered": sum(len(c["members"]) for c in cases),
+              "large": sum(1 for v in info.values() if v["large"]),
+              "cluster_rule": sum(1 for v in info.values() if v["cluster_rule"]), "close_pairs": len(pairs)}
+    return {"cases": cases, "counts": counts, "geometry_sha256": geometry,
+            "rule": {"min_area_um2": config.AI_POL_MIN_AREA_UM2, "pair_gap_um": config.AI_POL_PAIR_GAP_UM,
+                     "pair_gap_px": round(gap, 3)}}
+
+
+def pol_case_picture(channel: np.ndarray, id_map: np.ndarray, case: dict) -> tuple:
+    """The picture of one case as png bytes, and what was drawn: the crop twice,
+    enlarged by whole pixels, left nothing drawn, right the case's lacunae in
+    yellow with their numbers and every other lacuna in the crop in grey."""
+    height, width = id_map.shape
+    r0 = min(e["bbox_rc"][0] for e in case["members"])
+    c0 = min(e["bbox_rc"][1] for e in case["members"])
+    r1 = max(e["bbox_rc"][2] for e in case["members"])
+    c1 = max(e["bbox_rc"][3] for e in case["members"])
+    size = max(r1 - r0, c1 - c0) + 2 * int(config.AI_POL_CROP_MARGIN_PX)
+    size = min(max(size, int(config.AI_POL_CROP_MIN_PX)), height, width)
+    window = crop_window(id_map.shape, [(c0 + c1) / 2.0, (r0 + r1) / 2.0], size)
+    wr0, wr1, wc0, wc1 = window
+    factor = max(1, int(config.AI_POL_CROP_RENDER_PX) // max(wr1 - wr0, wc1 - wc0))
+    raw = _enlarge(raw_uint8(channel[wr0:wr1, wc0:wc1]), factor)
+    ids = _enlarge(id_map[wr0:wr1, wc0:wc1].astype(np.int32), factor)
+    number_of = {e["lacuna_id"]: e["n"] for e in case["members"]}
+    case_map = np.zeros(ids.shape, dtype=np.int32)
+    for lid, n in number_of.items():
+        case_map[ids == lid] = n
+    context = np.where((ids > 0) & (case_map == 0), ids, 0)
+    panel = np.stack([raw] * 3, axis=-1)
+    right = panel.copy()
+    right[segmentation.find_boundaries(context, mode="outer") & (case_map == 0)] = POL_CONTEXT_COLOUR
+    outline = segmentation.find_boundaries(case_map, mode="outer")
+    right[outline] = LACUNA_OUTLINE_COLOUR
+    blocked = (case_map > 0) | outline
+    taken: list = []
+    not_clear = []
+    for e in case["members"]:
+        rows, cols = np.nonzero(case_map == e["n"])
+        if rows.size == 0:
+            not_clear.append(e["n"])
+            continue
+        bbox = [int(rows.min()), int(cols.min()), int(rows.max()) + 1, int(cols.max()) + 1]
+        row, col, clear = _place_lacuna_number(blocked, taken, str(e["n"]), bbox)
+        _draw_digits(right, str(e["n"]), row, col)
+        if not clear:
+            not_clear.append(e["n"])
+    gap = np.full((panel.shape[0], PANEL_GAP_PX, 3), PANEL_GAP_COLOUR, dtype=np.uint8)
+    canvas = np.concatenate([panel, gap, right], axis=1)
+    buffer = io.BytesIO()
+    Image.fromarray(canvas).save(buffer, format="PNG")
+    return buffer.getvalue(), {"window": [int(v) for v in window], "factor": factor,
+                               "crop_px": [int(wc1 - wc0), int(wr1 - wr0)],
+                               "picture_px": [int(canvas.shape[1]), int(canvas.shape[0])],
+                               "numbers": [e["n"] for e in case["members"]], "numbers_not_placed_clear": not_clear}
+
+
+def pol_user_text(code: str, case: dict, index: int, total: int, drawn: dict) -> str:
+    n = len(case["members"])
+    width, height = drawn["crop_px"]
+    areas = "; ".join(f"{e['n']}: {e['area_um2']:.1f} um2" if e["area_um2"] is not None
+                      else f"{e['n']}: no area measured" for e in case["members"])
+    return (f"Image {code}, case {index} of {total}. The picture is two panels of the same crop, "
+            f"{width} x {height} px of the image enlarged {drawn['factor']} times (one image pixel is "
+            f"0.13 um): LEFT nothing drawn, RIGHT the {n} lacunae of this case outlined in yellow and "
+            f"numbered 1 to {n}, other lacunae in grey.\n\nAreas: {areas}. A normal lacuna here is about "
+            f"{POL_NORMAL_AREA_UM2:.0f} um2.\n\nFor every number from 1 to {n}, give its verdict, and list "
+            f"the pieces to merge. Answer in one json object.")
+
+
+def parse_pol_answer(text: str, numbers: list) -> tuple:
+    """(answer, why it was refused), strict as the other two parsers: every
+    number once, a verdict of POL_VERDICTS, the reason that goes with it, and
+    merge groups of two or more numbers that hold exactly the split ones."""
+    if not text or not text.strip():
+        return None, "the answer was empty"
+    body = text.strip()
+    if body.startswith("```"):
+        body = re.sub(r"^```[a-zA-Z]*\s*", "", body)
+        body = re.sub(r"\s*```$", "", body)
+    start, end = body.find("{"), body.rfind("}")
+    if start < 0 or end <= start:
+        return None, "no json object in the answer"
+    try:
+        parsed = json.loads(body[start:end + 1])
+    except json.JSONDecodeError as error:
+        return None, f"the json did not parse: {error.msg}"
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("lacunae"), list):
+        return None, "no lacunae list"
+    seen = {}
+    for item in parsed["lacunae"]:
+        if not isinstance(item, dict):
+            return None, "an entry is not an object"
+        try:
+            number = int(item.get("n"))
+        except (TypeError, ValueError):
+            return None, "an entry has no number"
+        if number in seen:
+            return None, f"number {number} answered twice"
+        if number not in numbers:
+            return None, f"number {number} is not in the picture"
+        verdict = str(item.get("verdict", "")).strip().lower()
+        if verdict not in POL_VERDICTS:
+            return None, f"number {number} has verdict {item.get('verdict')!r}"
+        reason = str(item.get("reason") or "").strip().lower()
+        if (verdict == "not_lacuna") != (reason in POL_REASONS) or (verdict != "not_lacuna" and reason):
+            return None, f"number {number} has reason {item.get('reason')!r} with verdict {verdict!r}"
+        seen[number] = {"n": number, "verdict": verdict, "reason": reason,
+                        "why": str(item.get("why", "")).strip()[:300]}
+    missing = [n for n in numbers if n not in seen]
+    if missing:
+        return None, f"no answer for number(s) {missing}"
+    merge = parsed.get("merge", [])
+    if not isinstance(merge, list):
+        return None, "merge is not a list"
+    groups, in_group = [], set()
+    for group in merge:
+        if not isinstance(group, list) or len(group) < 2:
+            return None, "a merge group holds fewer than two numbers"
+        try:
+            group = sorted({int(n) for n in group})
+        except (TypeError, ValueError):
+            return None, "a merge group holds something that is not a number"
+        if len(group) < 2 or any(n not in seen for n in group):
+            return None, f"merge group {group} names a number not in the picture"
+        if any(seen[n]["verdict"] != "split" for n in group):
+            return None, f"merge group {group} holds a number whose verdict is not split"
+        if in_group & set(group):
+            return None, f"merge group {group} shares a number with another group"
+        in_group |= set(group)
+        groups.append(group)
+    split = {n for n, v in seen.items() if v["verdict"] == "split"}
+    if split != in_group:
+        return None, f"split numbers {sorted(split - in_group)} are in no merge group"
+    return {"lacunae": [seen[n] for n in numbers], "merge": groups}, ""
+
+
+def prepare_pol_image(image_path: Path) -> dict:
+    """Everything the calls of one image need, as plain data: the cases, their
+    pictures and request texts and the estimate. Deterministic, no network."""
+    state = pol_state(image_path)
+    cand = pol_candidates(state["id_map"], state["classes"])
+    prompt = load_pol_prompt()
+    code = image_code(state["channel"])
+    cases = []
+    for index, case in enumerate(cand["cases"], start=1):
+        png, drawn = pol_case_picture(state["channel"], state["id_map"], case)
+        text = pol_user_text(code, case, index, len(cand["cases"]), drawn)
+        cases.append(dict(case, png=png, drawn=drawn, user_text=text,
+                          estimate=estimate_case(prompt["system"], text, png, len(case["members"]))))
+    return {"image_path": str(image_path), "group": state["group"], "label": state["label"],
+            "image_code": code, "cases": cases, "counts": cand["counts"], "rule": cand["rule"],
+            "geometry_sha256": cand["geometry_sha256"],
+            "estimate": {k: sum(c["estimate"][k] for c in cases) for k in ("input_tokens", "output_tokens",
+                                                                          "cost_usd")}}
+
+
+def judge_pol_image(prepared: dict, mode: str, out_path: Path | None = None, answerer=None,
+                    spent_usd: float = 0.0, budget_usd: float | None = None) -> dict:
+    """Judge every case of one image, or replay it from the log, as
+    judge_lacuna_image does for one picture: each case one call, retried once
+    if the answer does not validate, every attempt logged with its request hash;
+    no call once the run has spent `budget_usd` (default
+    config.AI_POL_MAX_COST_USD); a billing, credit or authentication error is
+    raised as FatalApiError carrying what the image had cost so far."""
+    group, label = prepared["group"], prepared["label"]
+    prompt = load_pol_prompt()
+    budget = float(config.AI_POL_MAX_COST_USD if budget_usd is None else budget_usd)
+    totals = {"cases": 0, "cases_valid": 0, "calls": 0, "attempts": 0, "invalid_attempts": 0,
+              "call_errors": 0, "refusals": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0,
+              "replay_request_mismatches": 0, "replay_picture_mismatches": 0, "stopped_on_cost": False}
+    out_cases = []
+    for case in prepared["cases"]:
+        totals["cases"] += 1
+        case_id, png = case["case_id"], case["png"]
+        numbers = case["drawn"]["numbers"]
+        picture = pol_picture_path(group, label, case_id)
+        picture.parent.mkdir(parents=True, exist_ok=True)
+        if mode != "replay":
+            picture.write_bytes(png)
+        payload, canonical, request_sha = build_request(prompt["system"], case["user_text"], png)
+        answer, reasons, cost, attempts = None, [], 0.0, 0
+        for attempt in (1, 2):
+            if mode != "replay" and spent_usd + totals["cost_usd"] >= budget:
+                totals["stopped_on_cost"] = True
+                break
+            record = {"schema": POL_LOG_SCHEMA, "written_at": utc_now(), "mode": mode, "image_label": label,
+                      "group": group, "image_code": prepared["image_code"], "case_id": case_id,
+                      "attempt": attempt, "picture": _relative(picture), "picture_sha256": sha256_bytes(png),
+                      "prompt_sha256": prompt["prompt_sha256"], "examples_sha256": prompt["examples_sha256"],
+                      "geometry_sha256": prepared["geometry_sha256"], "request_sha256": request_sha,
+                      "request": canonical}
+            path = pol_attempt_path(group, label, case_id, attempt)
+            if mode == "replay":
+                if not path.exists():
+                    reasons.append(f"attempt {attempt}: no log record")
+                    break
+                logged = json.loads(path.read_text(encoding="utf-8"))
+                totals["replay_request_mismatches"] += int(logged.get("request_sha256") != request_sha)
+                totals["replay_picture_mismatches"] += int(logged.get("picture_sha256") != sha256_bytes(png))
+                response = logged.get("response")
+                if response is None:
+                    totals["attempts"] += 1
+                    totals["invalid_attempts"] += 1
+                    attempts += 1
+                    reasons.append(f"attempt {attempt}: {logged.get('invalid_reason')}")
+                    continue
+                cost += float(logged.get("cost_usd", 0.0))
+                totals["cost_usd"] = round(totals["cost_usd"] + float(logged.get("cost_usd", 0.0)), 6)
+            else:
+                if answerer is None:
+                    allowed, why = external_calls_allowed()
+                    if not allowed:
+                        raise RuntimeError(f"a real call was asked for but {why}")
+                try:
+                    response = (answerer or call_anthropic)(payload)
+                except Exception as error:  # noqa: BLE001
+                    fatal = fatal_api_reason(error)
+                    record.update({"response": None, "valid": False, "parsed": None,
+                                   "invalid_reason": scrub(str(error))[:500], "cost_usd": 0.0})
+                    if fatal:
+                        record["fatal"] = fatal
+                        write_log_to(path, record)
+                        stop = FatalApiError(f"{fatal}. Stopped at {case_id} of {group}/{label} after "
+                                             f"${spent_usd + totals['cost_usd']} in this run. No decision file "
+                                             f"was written for this image.")
+                        stop.cost_usd = totals["cost_usd"]
+                        raise stop from error
+                    write_log_to(path, record)
+                    totals["attempts"] += 1
+                    totals["invalid_attempts"] += 1
+                    totals["call_errors"] += 1
+                    attempts += 1
+                    reasons.append(f"attempt {attempt}: the call failed, {type(error).__name__}")
+                    continue
+                record["response"] = response
+                record["cost_usd"] = round(cost_usd(response["usage"]["input_tokens"],
+                                                    response["usage"]["output_tokens"]), 6)
+                totals["calls"] += 1
+                totals["refusals"] += int(response.get("stop_reason") == "refusal")
+                totals["input_tokens"] += response["usage"]["input_tokens"]
+                totals["output_tokens"] += response["usage"]["output_tokens"]
+                totals["cost_usd"] = round(totals["cost_usd"] + record["cost_usd"], 6)
+                cost += record["cost_usd"]
+            totals["attempts"] += 1
+            attempts += 1
+            parsed, why_not = parse_pol_answer(response.get("text", ""), numbers)
+            record["valid"] = parsed is not None
+            record["invalid_reason"] = why_not or None
+            record["parsed"] = parsed
+            if mode != "replay":
+                write_log_to(path, record)
+            if parsed is None:
+                totals["invalid_attempts"] += 1
+                reasons.append(f"attempt {attempt}: {why_not}")
+                continue
+            answer = parsed
+            break
+        lacuna_of = {e["n"]: e["lacuna_id"] for e in case["members"]}
+        verdicts = [dict(v, lacuna_id=lacuna_of[v["n"]]) for v in (answer or {}).get("lacunae", [])]
+        totals["cases_valid"] += int(answer is not None)
+        out_cases.append({"case_id": case_id,
+                          "members": case["members"],
+                          "picture": _relative(picture), "picture_sha256": sha256_bytes(png),
+                          "request_sha256": request_sha, "answer_valid": answer is not None,
+                          "attempts": attempts, "cost_usd": round(cost, 6), "invalid_reasons": reasons,
+                          "verdicts": verdicts,
+                          "merge": [[lacuna_of[n] for n in g] for g in (answer or {}).get("merge", [])]})
+        if totals["stopped_on_cost"]:
+            break
+    counts = {v: sum(1 for c in out_cases for x in c["verdicts"] if x["verdict"] == v) for v in POL_VERDICTS}
+    counts["unjudged"] = sum(len(c["members"]) for c in out_cases if not c["answer_valid"])
+    decisions = {"schema": POL_DECISIONS_SCHEMA,
+                 "status": POL_STATUS + " Applied only when config.AI_POL_JUDGE_ENABLED is True.",
+                 "written_at": utc_now(), "mode": mode, "image_label": label, "group": group,
+                 "image_code": prepared["image_code"], "provider": config.AI_JUDGE_PROVIDER,
+                 "model": config.AI_JUDGE_MODEL, "prompt_sha256": prompt["prompt_sha256"],
+                 "examples_sha256": prompt["examples_sha256"], "candidate_rule": prepared["rule"],
+                 "candidate_counts": prepared["counts"], "geometry_sha256": prepared["geometry_sha256"],
+                 "totals": totals, "verdicts": counts, "cases": out_cases}
+    out = Path(out_path) if out_path is not None else pol_decisions_path(group, label)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(decisions, indent=2) + "\n", encoding="utf-8")
+    return decisions
+
+
+def apply_pol_verdicts(image_path: Path, labels: np.ndarray, kept: list, classes: dict) -> tuple:
+    """The switch (config.AI_POL_JUDGE_ENABLED). Returns (labels, kept, classes,
+    record) for the lacuna stage to carry on with, from the lacuna judge's
+    result. Per verdict:
+      not_lacuna   the lacuna is removed
+      cluster      the lacuna is flagged cluster, whatever the shape rule says
+      pol, lacuna  the lacuna is one lacuna: not flagged cluster
+      split        the pieces named in one merge group become one lacuna, the
+                   union of their own pixels, in the place of the first piece,
+                   not flagged cluster; no pixel is added
+      unsure       nothing changes, nor for a case with no valid answer
+    The cluster decisions go to quantification as record["cluster_override"],
+    {lacuna id after this step: flag}, and replace the shape rule's flag of a
+    lacuna with a shape measure."""
+    group, label = image_group(image_path), lacunae.image_label(Path(image_path))
+    path = pol_decisions_path(group, label)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"config.AI_POL_JUDGE_ENABLED is on but there is no POL judge decision file for {label} at "
+            f"{path}. Run the POL judge for this image, or turn the switch off.")
+    if not config.AI_LACUNA_JUDGE_ENABLED:
+        raise ValueError("the POL judge acts on the lacuna judge's set: config.AI_LACUNA_JUDGE_ENABLED must be on")
+    decisions = json.loads(path.read_text(encoding="utf-8"))
+    id_map = lacunae.label_image_of_kept(labels, kept)
+    cand = pol_candidates(id_map, classes)
+    if decisions["geometry_sha256"] != cand["geometry_sha256"]:
+        raise ValueError(f"the POL judge decision file for {label} was written for other cases "
+                         f"(geometry {decisions['geometry_sha256'][:12]}, now {cand['geometry_sha256'][:12]}). "
+                         f"Rerun the POL judge for this image.")
+    rule = {e["lacuna_id"]: e["cluster_rule"] for c in cand["cases"] for e in c["members"]}
+    remove, flags, groups = set(), {}, []
+    counts = {v: 0 for v in POL_VERDICTS}
+    counts["unjudged"] = 0
+    for case in decisions["cases"]:
+        if not case["answer_valid"]:
+            counts["unjudged"] += len(case["members"])
+            continue
+        for v in case["verdicts"]:
+            counts[v["verdict"]] += 1
+            lid = int(v["lacuna_id"])
+            if v["verdict"] == "not_lacuna":
+                remove.add(lid)
+            elif v["verdict"] == "cluster":
+                flags[lid] = True
+            elif v["verdict"] in ("pol", "lacuna"):
+                flags[lid] = False
+        groups += [sorted(int(i) for i in g) for g in case["merge"]]
+    raw_label = {i: int(region.label) for i, (region, _b) in enumerate(kept, start=1)}
+    new_labels = labels.copy()
+    absorbed, target_of = {}, {}
+    for g in groups:
+        for piece in g[1:]:
+            new_labels[labels == raw_label[piece]] = raw_label[g[0]]
+            absorbed[piece] = g[0]
+        target_of[g[0]] = g
+        flags[g[0]] = False
+    class_of = {int(i): name for name, ids in classes.items() for i in ids}
+    new_kept, new_classes, new_id = [], {name: [] for name in classes}, {}
+    for old_id, (region, on_border) in enumerate(kept, start=1):
+        if old_id in remove or old_id in absorbed:
+            continue
+        if old_id in target_of:
+            source = raw_label[old_id]
+            region = measure.regionprops(np.where(new_labels == source, source, 0))[0]
+            on_border = any(kept[i - 1][1] for i in target_of[old_id])
+        new_kept.append((region, on_border))
+        new_id[old_id] = len(new_kept)
+        if old_id in class_of:
+            new_classes[class_of[old_id]].append(len(new_kept))
+    override = {str(new_id[i]): bool(flag) for i, flag in sorted(flags.items()) if i in new_id}
+    record = {
+        "status": POL_STATUS, "decision_file": _relative(path), "model": decisions["model"],
+        "decisions_written_at": decisions["written_at"], "prompt_sha256": decisions["prompt_sha256"],
+        "examples_sha256": decisions["examples_sha256"], "geometry_sha256": cand["geometry_sha256"],
+        "counts": dict(counts, cases=len(decisions["cases"]), removed=len(remove), merge_groups=len(groups),
+                       pieces_merged=sum(len(g) for g in groups),
+                       cluster_flags_set=sum(1 for i, f in flags.items() if f and not rule.get(i, False)
+                                             and i not in remove),
+                       cluster_flags_cleared=sum(1 for i, f in flags.items() if not f and rule.get(i, False)
+                                                 and i not in remove),
+                       lacunae_before=len(kept), lacunae_after=len(new_kept)),
+        "removed_ids_before": sorted(remove), "merge_groups_ids_before": groups,
+        "cluster_override": override,
+    }
+    return new_labels, new_kept, new_classes, record
+
+
+def stub_pol_answerer():
+    """A stand-in POL judge for the self-test: no network, no key, no cost.
+    A case of two or more numbers: 1 and 2 are split and merged, the rest
+    lacuna. A case of one number: the single cases in the order they are
+    asked are, in turn, not_lacuna (band), cluster, pol and unsure, so even an
+    image with two of them exercises a removal and a cluster flag. Means
+    nothing biologically. Returns a fresh callable with its own counter."""
+    singles: dict = {}
+
+    def answer(payload: dict) -> dict:
+        text = payload["messages"][0]["content"][1]["text"]
+        count = int(re.search(r"numbered 1 to (\d+)", text).group(1))
+        if count >= 2:
+            items = [{"n": n, "verdict": "split" if n <= 2 else "lacuna", "reason": "", "why": "self-test"}
+                     for n in range(1, count + 1)]
+            merge = [[1, 2]]
+        else:
+            order = singles.setdefault(text, len(singles))
+            verdict = ("not_lacuna", "cluster", "pol", "unsure")[order % 4]
+            items = [{"n": 1, "verdict": verdict, "reason": "band" if verdict == "not_lacuna" else "",
+                      "why": "self-test"}]
+            merge = []
+        return {"text": json.dumps({"lacunae": items, "merge": merge}), "id": "self-test",
+                "model": f"{config.AI_JUDGE_MODEL} (NOT CALLED: self-test stub)", "stop_reason": "end_turn",
+                "thinking_fallback": False, "usage": {"input_tokens": 0, "output_tokens": 0}}
+
+    return answer

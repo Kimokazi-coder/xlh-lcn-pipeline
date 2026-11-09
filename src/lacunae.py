@@ -953,6 +953,14 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
         import ai_judge  # noqa: PLC0415 (deliberate: see above)
         labels, kept, classes, judged = ai_judge.apply_lacuna_verdicts(
             image_path, channel, labels, kept, t_hi, classes, excluded)
+    # The AI POL judge (config.AI_POL_JUDGE_ENABLED, docs/METHODS.md 30), off by
+    # default, on the lacuna judge's result only: it removes lacunae that are
+    # none, merges the pieces of one body (the union of their own pixels) and
+    # decides the cluster flag of the lacunae it judged.
+    pol_judged = None
+    if config.AI_POL_JUDGE_ENABLED:
+        import ai_judge  # noqa: PLC0415 (deliberate, as above)
+        labels, kept, classes, pol_judged = ai_judge.apply_pol_verdicts(image_path, labels, kept, classes)
     border = sum(1 for _r, on_border in kept if on_border)
     no_shape = set(classes["dim"]) | set(classes["out_of_focus"]) | set(classes.get("judged", ()))
     result = {
@@ -979,6 +987,8 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
     }
     if judged is not None:
         result["ai_lacuna_judge"] = judged
+    if pol_judged is not None:
+        result["ai_pol_judge"] = pol_judged
     return result
 
 
@@ -1136,6 +1146,10 @@ def save_detection_json(result: dict, out_path: Path) -> None:
         # The AI lacuna judge is switched on. Recorded here so that no result
         # file can be mistaken for one the pipeline made alone.
         payload["ai_lacuna_judge"] = result["ai_lacuna_judge"]
+    if result.get("ai_pol_judge") is not None:
+        # The AI POL judge is on as well; its cluster decisions are read by
+        # quantification from here.
+        payload["ai_pol_judge"] = result["ai_pol_judge"]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2)

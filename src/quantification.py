@@ -1207,6 +1207,13 @@ def quantify(detection: dict, image_path: Path, roi_mask: np.ndarray | None = No
                               class_of.get(lacuna_id, "ordinary"))
         for lacuna_id, (region, on_border) in enumerate(kept, start=1)
     ]
+    # The AI POL judge (config.AI_POL_JUDGE_ENABLED, docs/METHODS.md 30): where it
+    # decided whether a lacuna with a shape measure is a cluster, that decision
+    # replaces the shape rule's flag. Absent unless the judge was on.
+    override = ((detection.get("lacunae_detection") or {}).get("ai_pol_judge") or {}).get("cluster_override") or {}
+    for row in shape_rows:
+        if row["cluster"] is not None and str(row["lacuna_id"]) in override:
+            row["cluster"] = bool(override[str(row["lacuna_id"])])
     border = sum(1 for _region, on_border in kept if on_border)
 
     # Network measures per lacuna, then the appended families.
@@ -1327,6 +1334,7 @@ def detection_in_memory(result: dict) -> dict:
         "edge_owner": result["edge_owner"],
         "lacunae_detection": {
             "parameters": {**lacunae.parameters(), "computed_threshold_t_hi": lac["t_hi"]},
+            **({"ai_pol_judge": lac["ai_pol_judge"]} if lac.get("ai_pol_judge") is not None else {}),
         },
         "no_shape_ids": list(lac.get("no_shape_ids") or ()),
         "lacuna_classes": lac.get("lacuna_classes") or {},

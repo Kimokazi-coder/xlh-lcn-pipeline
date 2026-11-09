@@ -1034,3 +1034,41 @@ AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2 = 300
 # refuses above this, and stops if what the answers actually cost passes it.
 # The thread judge keeps its own MAX_COST_USD above.
 AI_LACUNA_MAX_COST_USD = 3.0
+
+# The AI POL judge (user brief of 2026-11-09, docs/METHODS.md section 30)
+# A third judge, acting only on the lacunae the AI lacuna judge accepted. Every
+# candidate POL among them is shown in a crop, and the judge says per lacuna
+# whether it is an enlarged lacuna (a POL), a cluster of merged lacunae, a piece
+# of one POL wrongly split (and which pieces to merge), an ordinary lacuna, or
+# not a lacuna (band, tissue or border). It never draws a boundary: a merge is
+# the union of the pieces' own outlines. Prompt src/judge_prompt_pols.md, rules
+# in words docs/judge_examples_pols.md. Model, prices, thinking and answer
+# length are the thread judge's own, above. Nothing below changes any number
+# while AI_POL_JUDGE_ENABLED is False, which is how it ships; it needs
+# AI_LACUNA_JUDGE_ENABLED on as well.
+AI_POL_JUDGE_ENABLED = False
+# The candidates. Every lacuna with an area larger than AI_POL_MIN_AREA_UM2,
+# every lacuna the cluster rule (section g9) flags, and both lacunae of every
+# pair whose outlines come closer than AI_POL_PAIR_GAP_UM; lacunae linked by
+# such pairs are one case, one picture and one call. 76.6 um2 is 2 x 38.31 um2,
+# the median measured WT lacuna of the lacuna judge's set over the 6 development
+# WT images (judge rerun of 2026-11-09): the brief's "above 2 times the WT
+# median", fixed as a number so the rule does not move with the hold-out mode
+# and never reads a held-out output. 3 um is the user's value.
+AI_POL_MIN_AREA_UM2 = 76.6
+AI_POL_PAIR_GAP_UM = 3.0
+# The picture: the case's bounding box plus AI_POL_CROP_MARGIN_PX on every
+# side, at least AI_POL_CROP_MIN_PX square, enlarged by whole pixels up to
+# AI_POL_CROP_RENDER_PX, as the thread judge's crops are. Display choices, not
+# biology; 40 px is the thread judge's reference band.
+AI_POL_CROP_MARGIN_PX = 40
+AI_POL_CROP_MIN_PX = 128
+AI_POL_CROP_RENDER_PX = 512
+# The cost ceiling of one run of this judge over every image, in dollars (the
+# user's budget for the POL judge, 2026-11-09).
+AI_POL_MAX_COST_USD = 10.0
+
+
+def ai_pol_group_dir(group: str) -> Path:
+    """results/<group>/3_pols/ai_judge/, where the POL judge's log lives."""
+    return RESULTS_ROOT / group / SECTION_POLS / AI_LACUNA_SUBFOLDER

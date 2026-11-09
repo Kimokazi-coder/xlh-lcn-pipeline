@@ -9540,17 +9540,21 @@ def _ai_lacuna_run_detect(job: tuple) -> dict:
     written exactly as src/lacunae.py and src/canaliculi.py write them. The
     network stage is given the judged lacuna result itself, so the slow lacuna
     stage runs once."""
-    path_str, out_str = job
+    path_str, out_str = job[0], job[1]
     config.AI_LACUNA_JUDGE_ENABLED = True
+    config.AI_POL_JUDGE_ENABLED = bool(job[2]) if len(job) > 2 else False
     image_path, out_root = Path(path_str), Path(out_str)
     lac = lacunae.analyse_image(image_path)
     lacunae.write_outputs(lac, out_root)
     _display, channel = lacunae.load_channel(image_path)
     net = canaliculi.analyse_network(image_path, lac, channel)
     canaliculi.write_outputs(net, out_root)
-    return {"image_label": lacunae.image_label(image_path), "group": image_path.parent.name,
-            "lacunae": len(lac["kept"]), "skeleton_px": int(net["skeleton"].sum()),
-            "ai_lacuna_judge": lac["ai_lacuna_judge"]["counts"]}
+    row = {"image_label": lacunae.image_label(image_path), "group": image_path.parent.name,
+           "lacunae": len(lac["kept"]), "skeleton_px": int(net["skeleton"].sum()),
+           "ai_lacuna_judge": lac["ai_lacuna_judge"]["counts"]}
+    if lac.get("ai_pol_judge") is not None:
+        row["ai_pol_judge"] = lac["ai_pol_judge"]["counts"]
+    return row
 
 
 def _lacuna_run_dir(out_root: Path, group: str) -> Path:
@@ -9594,18 +9598,23 @@ def cmd_ai_lacuna_run(args) -> int:
 
     images = lacuna_judge_images(args)
     out_root = Path(args.out)
+    with_pol = bool(getattr(args, "with_pol_judge", False))
     for image_path in images:
         group, label = image_path.parent.name, lacunae.image_label(image_path)
         if not ai_judge.lacuna_decisions_path(group, label).is_file():
             print(f"Refused: no lacuna judge decision file for {label} at "
                   f"{ai_judge.lacuna_decisions_path(group, label)}. Run or replay the judge first.")
             return 2
+        if with_pol and not ai_judge.pol_decisions_path(group, label).is_file():
+            print(f"Refused: no POL judge decision file for {label} at "
+                  f"{ai_judge.pol_decisions_path(group, label)}. Run or replay the POL judge first.")
+            return 2
     print(f"The pipeline with the AI lacuna judge switch on, for this process only, into "
           f"{_lacuna_run_dir(out_root, '<group>')}. Reads the judge's decision files only; no call is made.")
     before = _protected_manifests(out_root)
     print("hashed before: " + ", ".join(f"{k} {len(v)} files" for k, v in before.items()))
 
-    jobs = [(str(p), str(_lacuna_run_dir(out_root, p.parent.name))) for p in images]
+    jobs = [(str(p), str(_lacuna_run_dir(out_root, p.parent.name)), with_pol) for p in images]
     workers = max(1, min(args.workers, len(jobs)))
     with ProcessPoolExecutor(max_workers=workers) as ex:
         detected = list(ex.map(_ai_lacuna_run_detect, jobs))
@@ -9622,6 +9631,7 @@ def cmd_ai_lacuna_run(args) -> int:
     # Quantification exactly as src/quantification.py runs it: from the files
     # detection has just written, then one cross-image table per group.
     config.AI_LACUNA_JUDGE_ENABLED = True
+    config.AI_POL_JUDGE_ENABLED = with_pol
     by_group: dict = {}
     for image_path in images:
         group, label = image_path.parent.name, lacunae.image_label(image_path)
@@ -9632,6 +9642,7 @@ def cmd_ai_lacuna_run(args) -> int:
     for group, results in by_group.items():
         quantification.write_summary_table(results, _lacuna_run_dir(out_root, group))
     config.AI_LACUNA_JUDGE_ENABLED = False
+    config.AI_POL_JUDGE_ENABLED = False
 
     after = _protected_manifests(out_root)
     changed = {name: sorted(k for k in set(before[name]) | set(after.get(name, {}))
@@ -9644,6 +9655,7 @@ def cmd_ai_lacuna_run(args) -> int:
                    "validated. Which regions are lacunae was decided by an AI judge; every "
                    "boundary is the lacuna stage's own."),
         "written_at": ai_judge.utc_now(),
+        "with_pol_judge": with_pol,
         "images": [f"{p.parent.name}/{lacunae.image_label(p)}" for p in images],
         "per_image": [row if row["image_label"] not in held_out else
                       {"image_label": row["image_label"], "group": row["group"], "held_out": True}
@@ -9679,6 +9691,388 @@ def _ai_same_decisions(a: dict, b: dict) -> bool:
     return same
 
 
+# ai-pol-judge
+# The AI POL judge (user brief of 2026-11-09, docs/METHODS.md section 30), on
+# the lacunae the lacuna judge accepted. Default: a dry run, the pictures and
+# the estimate, nothing sent. --live calls the API, --replay reruns the log
+# offline, -s rehearses the whole chain with a stub. A held-out image is
+# judged like any other; what the judge said about it is never printed or put
+# in a run summary, only its cost.
+
+AI_POL_REPLAY_DIR = config.PROJECT_ROOT / ".cache" / "ai_pol_replay"
+AI_POL_SELF_TEST_DIR = config.PROJECT_ROOT / ".cache" / "ai_pol_self_test"
+# The self-test image: a development image with large lacunae, clusters and
+# close pairs in the lacuna judge's set, as for the lacuna judge's v2 checks.
+AI_POL_SELF_TEST_IMAGE = config.DATA_DIR / "Hyp_RD" / "I534_z25c1-2.tif"
+# The quality gate of a run, over cases: once this many cases have been asked,
+# a share of unreadable answers above config.AI_MAX_UNJUDGED_SHARE stops it.
+AI_POL_MIN_CASES_BEFORE_QUALITY_GATE = 20
+
+
+def _ai_pol_prepare(path_str: str) -> dict:
+    import ai_judge
+
+    return ai_judge.prepare_pol_image(Path(path_str))
+
+
+def ai_pol_prepare_all(images: list, workers: int) -> list:
+    """Cases, pictures, request texts and estimates of every image, in parallel
+    processes, in the order given. Deterministic and offline."""
+    from concurrent.futures import ProcessPoolExecutor
+
+    with ProcessPoolExecutor(max_workers=max(1, min(workers, len(images)))) as ex:
+        return list(ex.map(_ai_pol_prepare, [str(p) for p in images]))
+
+
+def _ai_pol_image_row(p: dict, held_out: frozenset) -> dict:
+    row = {"group": p["group"], "image": p["label"], "cases": len(p["cases"]),
+           "estimated input tokens": int(p["estimate"]["input_tokens"]),
+           "estimated output tokens": int(p["estimate"]["output_tokens"]),
+           "estimated cost USD": round(p["estimate"]["cost_usd"], 4)}
+    if p["label"] not in held_out:
+        row.update({"numbered": p["counts"]["numbered"], "lacunae": p["counts"]["lacunae"],
+                    "large": p["counts"]["large"], "cluster rule": p["counts"]["cluster_rule"],
+                    "close pairs": p["counts"]["close_pairs"]})
+    return row
+
+
+def ai_pol_dry_run(images: list, out: Path, workers: int) -> int:
+    """What a real run would send and cost, every picture as the judge would see
+    it, into <out>/<group>/. Nothing is sent and no environment variable is read."""
+    held_out = lacunae.held_out_labels()
+    prepared = ai_pol_prepare_all(images, workers)
+    for p in prepared:
+        if p["label"] in held_out:
+            continue
+        for case in p["cases"]:
+            path = out / p["group"] / f"{p['label']}_{case['case_id']}.png"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(case["png"])
+    rows = [_ai_pol_image_row(p, held_out) for p in prepared]
+    total = {"images": len(prepared), "calls": sum(r["cases"] for r in rows),
+             "estimated_cost_usd": round(sum(r["estimated cost USD"] for r in rows), 4),
+             "max_cost_usd": config.AI_POL_MAX_COST_USD}
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "dry_run_pols.json").write_text(json.dumps({"status": "pre-validation, estimate only: nothing "
+                                                       "was sent", "total": total, "per_image": rows},
+                                                      indent=2) + "\n", encoding="utf-8")
+    print_table(list(rows[0]) if rows else [], [list(r.values()) for r in rows],
+                title="AI POL judge, dry run: nothing was sent")
+    print(f"\n{total['calls']} calls, estimated ${total['estimated_cost_usd']} (an estimate), ceiling "
+          f"${config.AI_POL_MAX_COST_USD}; pictures of the development images in {out}/<group>/")
+    return 0
+
+
+def ai_pol_live(images: list, out_root: Path, workers: int, ceiling: float) -> int:
+    """The real run, every case one call, every request and answer logged."""
+    import ai_judge
+
+    allowed, why = ai_judge.external_calls_allowed()
+    if not allowed:
+        print(f"Refused: a real run needs a connection and {why}. Nothing was computed or sent.")
+        return 2
+    held_out = lacunae.held_out_labels()
+    prepared = ai_pol_prepare_all(images, workers)
+    estimate = round(sum(p["estimate"]["cost_usd"] for p in prepared), 4)
+    calls = sum(len(p["cases"]) for p in prepared)
+    print(f"{calls} calls, estimated ${estimate}, ceiling ${ceiling}")
+    if estimate > ceiling:
+        print(f"Refused: the estimate ${estimate} is above the ceiling ${ceiling}. Nothing was sent.")
+        return 2
+    spent, per_image, rc, stopped = 0.0, [], 0, None
+    asked = unreadable = 0
+    for p in prepared:
+        try:
+            decisions = ai_judge.judge_pol_image(p, "live", spent_usd=spent, budget_usd=ceiling)
+        except ai_judge.FatalApiError as error:
+            spent = round(spent + float(getattr(error, "cost_usd", 0.0)), 6)
+            stopped, rc = f"billing, credit or authentication error: {error}", 5
+            print(f"\nSTOPPED: {error}\nNo further image was run.")
+            break
+        t = decisions["totals"]
+        spent = round(spent + t["cost_usd"], 6)
+        cost = {k: t[k] for k in ("cases", "calls", "attempts", "input_tokens", "output_tokens", "cost_usd")}
+        if p["label"] in held_out:
+            per_image.append({"group": p["group"], "image": p["label"], "held_out": True, **cost})
+            print(f"  {p['group']}/{p['label']}: judged (held out, verdicts not shown), ${t['cost_usd']}, "
+                  f"running ${spent}")
+        else:
+            per_image.append({"group": p["group"], "image": p["label"], **cost, "verdicts": decisions["verdicts"]})
+            v = decisions["verdicts"]
+            print(f"  {p['group']}/{p['label']}: {t['cases']} cases, " + ", ".join(f"{v[k]} {k}" for k in v)
+                  + f", ${t['cost_usd']}, running ${spent}")
+        if t["stopped_on_cost"]:
+            stopped, rc = f"the running total reached the ceiling ${ceiling}", 3
+            print(f"\nSTOPPED: {stopped}. No further image was run.")
+            break
+        asked += t["cases"]
+        unreadable += t["cases"] - t["cases_valid"]
+        if asked >= AI_POL_MIN_CASES_BEFORE_QUALITY_GATE and unreadable / asked > config.AI_MAX_UNJUDGED_SHARE:
+            stopped, rc = f"{unreadable} of {asked} cases had no readable answer", 6
+            print(f"\nSTOPPED: {stopped}. No further image was run.")
+            break
+    summary = {"status": ai_judge.POL_STATUS, "written_at": ai_judge.utc_now(), "model": config.AI_JUDGE_MODEL,
+               "estimate_usd": estimate, "ceiling_usd": ceiling, "spent_usd": spent, "stopped": stopped,
+               "images_run": len(per_image), "images": len(prepared), "per_image": per_image}
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "ai_pol_judge_run.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    print(f"\nrun total: {len(per_image)} of {len(prepared)} images, ${spent} spent"
+          + (f"; STOPPED: {stopped}" if stopped else "") + f". Summary -> {out_root / 'ai_pol_judge_run.json'}")
+    return rc
+
+
+def _same_pol_decisions(a: dict, b: dict) -> list:
+    if a.get("geometry_sha256") != b.get("geometry_sha256"):
+        return ["the cases differ"]
+    found = []
+    for ca, cb in zip(a["cases"], b["cases"]):
+        if ([(v["n"], v["verdict"], v["reason"]) for v in ca["verdicts"]] !=
+                [(v["n"], v["verdict"], v["reason"]) for v in cb["verdicts"]] or ca["merge"] != cb["merge"]):
+            found.append(f"{ca['case_id']} differs")
+    if len(a["cases"]) != len(b["cases"]):
+        found.append("a different number of cases")
+    return found
+
+
+def ai_pol_replay(images: list, out_root: Path, workers: int) -> int:
+    """Every image again from the log, no network: requests and pictures
+    rebuilt and their hashes compared, the logged answers parsed again, and the
+    verdicts compared with the logged run. Writes to .cache/ai_pol_replay/."""
+    import ai_judge
+
+    prepared = ai_pol_prepare_all(images, workers)
+    rows, ok = [], True
+    for p in prepared:
+        live = ai_judge.pol_decisions_path(p["group"], p["label"])
+        replay = ai_judge.judge_pol_image(p, "replay", out_path=AI_POL_REPLAY_DIR / p["group"] /
+                                          f"{p['label']}_ai_pols.json")
+        t = replay["totals"]
+        diffs = _same_pol_decisions(json.loads(live.read_text(encoding="utf-8")), replay) if live.is_file() \
+            else ["no logged run"]
+        same = not diffs and not t["replay_request_mismatches"] and not t["replay_picture_mismatches"]
+        ok &= same
+        rows.append({"group": p["group"], "image": p["label"], "identical": same})
+    print(f"{sum(r['identical'] for r in rows)} of {len(rows)} images replay to identical verdicts")
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "ai_pol_replay.json").write_text(json.dumps({"identical": ok, "per_image": rows}, indent=2)
+                                                 + "\n", encoding="utf-8")
+    print(f"{'IDENTICAL verdicts on every image' if ok else 'DIFFERENT, see the summary'}; summary -> "
+          f"{out_root / 'ai_pol_replay.json'}")
+    return 0 if ok else 4
+
+
+def _ai_pol_self_test(image_path: Path) -> int:
+    """The whole chain of the POL judge with a stub judge, no network and no
+    key, on one development image: the candidate rule, the picture, the log and
+    the replay, the switch (removal, merge as the union of the pieces' own
+    pixels, the cluster flag in quantification), and the guards. Writes only to
+    .cache/ai_pol_self_test. The stub means nothing biologically."""
+    import os
+    import re
+
+    import ai_judge
+
+    image_path = Path(image_path)
+    label, group = lacunae.image_label(image_path), image_path.parent.name
+    if lacunae.image_label(image_path) in lacunae.held_out_labels():
+        print("Refused: the self-test runs on a development image only.")
+        return 2
+    if AI_POL_SELF_TEST_DIR.exists():
+        shutil.rmtree(AI_POL_SELF_TEST_DIR)
+    saved = (ai_judge.POL_LOG_ROOT, config.AI_LACUNA_JUDGE_ENABLED, config.AI_POL_JUDGE_ENABLED)
+    checks = []
+
+    def use_log(name: str) -> None:
+        ai_judge.POL_LOG_ROOT = AI_POL_SELF_TEST_DIR / name
+
+    try:
+        print(f"AI POL judge self-test on {group}/{label} (stub judge, nothing is sent)")
+        use_log("log")
+        state = ai_judge.pol_state(image_path)
+        cand = ai_judge.pol_candidates(state["id_map"], state["classes"])
+        print(f"  {cand['counts']}")
+        # The candidate rule, recomputed here the slow way.
+        ids = [int(v) for v in np.unique(state["id_map"]) if v]
+        no_shape = {int(i) for n in ("dim", "out_of_focus", "judged") for i in state["classes"].get(n, [])}
+        regions = {int(r.label): r for r in measure.regionprops(state["id_map"].astype(np.int32))}
+        um2 = config.PIXEL_SIZE_UM_ACQUIRED ** 2
+        want = {i for i in ids if i not in no_shape and (regions[i].area * um2 > config.AI_POL_MIN_AREA_UM2
+                                                         or lacunae.is_cluster(regions[i].image))}
+        gap = config.px(config.AI_POL_PAIR_GAP_UM)
+        for i in ids:
+            dist = ndi.distance_transform_edt(state["id_map"] != i)
+            for j in ids:
+                if j > i and float(dist[state["id_map"] == j].min()) <= gap:
+                    want |= {i, j}
+        got = {e["lacuna_id"] for c in cand["cases"] for e in c["members"]}
+        multi = [c for c in cand["cases"] if len(c["members"]) >= 2]
+        checks.append(("the candidates are every large lacuna, every cluster and both lacunae of every close "
+                       "pair, and nothing else", got == want and bool(multi)))
+        prepared = ai_judge.prepare_pol_image(image_path)
+        again = ai_judge.prepare_pol_image(image_path)
+        checks.append(("the pictures are the same every time",
+                       [c["png"] for c in prepared["cases"]] == [c["png"] for c in again["cases"]]))
+        sent = "\n".join(c["user_text"] for c in prepared["cases"]) + ai_judge.load_pol_prompt()["system"]
+        names = [label, image_path.stem, lacunae.clean_name(image_path), *config.GROUPS]
+        checks.append(("the requests name no file, image or group",
+                       not [n for n in names if re.search(rf"(?<![A-Za-z0-9_]){re.escape(n)}(?![A-Za-z0-9_])",
+                                                          sent)]))
+        ok, _ = ai_judge.parse_pol_answer(json.dumps({"lacunae": [
+            {"n": 1, "verdict": "split", "reason": "", "why": ""}, {"n": 2, "verdict": "split", "reason": "",
+                                                                    "why": ""}], "merge": [[1, 2]]}), [1, 2])
+        bad = [ai_judge.parse_pol_answer(json.dumps(a), [1, 2])[0] for a in (
+            {"lacunae": [{"n": 1, "verdict": "split", "reason": ""}, {"n": 2, "verdict": "lacuna", "reason": ""}],
+             "merge": []},
+            {"lacunae": [{"n": 1, "verdict": "pol", "reason": ""}, {"n": 2, "verdict": "lacuna", "reason": ""}],
+             "merge": [[1, 2]]},
+            {"lacunae": [{"n": 1, "verdict": "not_lacuna", "reason": ""}, {"n": 2, "verdict": "lacuna",
+                                                                          "reason": ""}], "merge": []})]
+        checks.append(("the parser takes a split with its merge, and refuses a split with no merge, a merge of "
+                       "non-split numbers and a not_lacuna with no reason", ok is not None and bad == [None] * 3))
+
+        run = ai_judge.judge_pol_image(prepared, "self-test", answerer=ai_judge.stub_pol_answerer())
+        print(f"  stub verdicts: {run['verdicts']}")
+        logged = [json.loads(p.read_text(encoding="utf-8")) for p in
+                  sorted(ai_judge.pol_log_dir(group).glob(f"{label}_case_*_attempt1.json"))]
+        checks.append(("every case was answered and logged with its hash, no key and no image bytes in the log",
+                       run["totals"]["cases_valid"] == len(prepared["cases"]) == len(logged)
+                       and all(r.get("request_sha256") and "ANTHROPIC_API_KEY" not in json.dumps(r)
+                               and "data" not in r["request"]["image"] for r in logged)))
+        replay = ai_judge.judge_pol_image(prepared, "replay", out_path=AI_POL_SELF_TEST_DIR / "replay.json")
+        checks.append(("the replay gives identical verdicts", not _same_pol_decisions(run, replay)
+                       and not replay["totals"]["replay_request_mismatches"]
+                       and not replay["totals"]["replay_picture_mismatches"]))
+
+        # The switch, through every later stage, on files.
+        config.AI_LACUNA_JUDGE_ENABLED = True
+        before = lacunae.analyse_image(image_path)
+        config.AI_POL_JUDGE_ENABLED = True
+        run_dir = AI_POL_SELF_TEST_DIR / "run" / group
+        lac = lacunae.analyse_image(image_path)
+        lacunae.write_outputs(lac, run_dir)
+        _display, channel = lacunae.load_channel(image_path)
+        net = canaliculi.analyse_network(image_path, lac, channel)
+        canaliculi.write_outputs(net, run_dir)
+        q = quantification.quantify(quantification.load_detection(run_dir, label), image_path, None)
+        rec = lac["ai_pol_judge"]
+        c = rec["counts"]
+        print(f"  the switch: lacunae {c['lacunae_before']} -> {c['lacunae_after']}, {c['removed']} removed, "
+              f"{c['merge_groups']} merge group(s) of {c['pieces_merged']} pieces, cluster flags set "
+              f"{c['cluster_flags_set']}, cleared {c['cluster_flags_cleared']}")
+        old = lacunae.label_image_of_kept(before["labels"], before["kept"])
+        new = lacunae.label_image_of_kept(lac["labels"], lac["kept"])
+        width = old.shape[1]
+
+        def key(mask):
+            r, cc = np.nonzero(mask)
+            return _pixel_key(r, cc, width)
+
+        merged_ok = all(key(np.isin(old, g)) in {key(new == i) for i in range(1, len(lac["kept"]) + 1)}
+                        for g in rec["merge_groups_ids_before"])
+        checks.append(("a merge is the union of the pieces' own pixels, and no pixel is added anywhere",
+                       c["merge_groups"] > 0 and merged_ok and not ((new > 0) & (old == 0)).any()))
+        checks.append(("a not_lacuna is removed", c["removed"] > 0 and
+                       not any(((new > 0) & (old == i)).any() for i in rec["removed_ids_before"])))
+        flags = {r["lacuna_id"]: r["cluster"] for r in q["rows"]}
+        override = rec["cluster_override"]
+        checks.append(("quantification flags cluster exactly as the judge decided, where it decided",
+                       bool(override) and any(override.values()) and
+                       all(flags[int(i)] is None or flags[int(i)] == f for i, f in override.items())))
+        checks.append(("every record says the POL judge was on", "ai_pol_judge" in json.loads(
+            lacunae.result_path(run_dir, label, config.SECTION_LACUNAE, config.SUFFIX_LACUNAE_DETECTION)
+            .read_text(encoding="utf-8"))))
+
+        use_log("empty")
+        try:
+            lacunae.analyse_image(image_path)
+            refused = False
+        except FileNotFoundError:
+            refused = True
+        checks.append(("an image with no decision file is refused", refused))
+        use_log("log")
+        config.AI_LACUNA_JUDGE_ENABLED = False
+        try:
+            lacunae.analyse_image(image_path)
+            refused = False
+        except (ValueError, FileNotFoundError):
+            refused = True
+        checks.append(("the POL judge without the lacuna judge is refused", refused))
+        config.AI_LACUNA_JUDGE_ENABLED = True
+        other = dict(run, geometry_sha256="0" * 64)
+        use_log("other")
+        path = ai_judge.pol_decisions_path(group, label)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(other), encoding="utf-8")
+        try:
+            lacunae.analyse_image(image_path)
+            refused = False
+        except ValueError:
+            refused = True
+        checks.append(("a decision file written for other cases is refused", refused))
+        config.AI_POL_JUDGE_ENABLED = saved[2]
+        config.AI_LACUNA_JUDGE_ENABLED = saved[1]
+
+        class BadRequestError(Exception):
+            pass
+
+        calls = {"n": 0}
+
+        def broke(payload):
+            calls["n"] += 1
+            if calls["n"] > 1:
+                raise BadRequestError("Your credit balance is too low to access the Anthropic API.")
+            return ai_judge.stub_pol_answerer()(payload) | {"usage": {"input_tokens": 1000, "output_tokens": 100}}
+
+        use_log("fatal")
+        try:
+            ai_judge.judge_pol_image(prepared, "self-test", answerer=broke)
+            raised, cost = False, 0.0
+        except ai_judge.FatalApiError as error:
+            raised, cost = True, float(getattr(error, "cost_usd", 0.0))
+        checks.append(("a billing error stops at once, with no decision file, and carries what was spent",
+                       raised and cost > 0 and not ai_judge.pol_decisions_path(group, label).exists()))
+        use_log("cost")
+        spent = ai_judge.judge_pol_image(prepared, "self-test", answerer=ai_judge.stub_pol_answerer(),
+                                         spent_usd=1.0, budget_usd=1.0)
+        checks.append(("no call is made once a run has spent its ceiling",
+                       spent["totals"]["stopped_on_cost"] and spent["totals"]["attempts"] == 0))
+        flag = os.environ.get("ALLOW_EXTERNAL_API")
+        os.environ["ALLOW_EXTERNAL_API"] = "0"
+        try:
+            rc = ai_pol_live([image_path], AI_POL_SELF_TEST_DIR / "live", 1, config.AI_POL_MAX_COST_USD)
+        finally:
+            if flag is None:
+                os.environ.pop("ALLOW_EXTERNAL_API", None)
+            else:
+                os.environ["ALLOW_EXTERNAL_API"] = flag
+        checks.append(("a live run without ALLOW_EXTERNAL_API=1 is refused", rc == 2))
+    finally:
+        ai_judge.POL_LOG_ROOT, config.AI_LACUNA_JUDGE_ENABLED, config.AI_POL_JUDGE_ENABLED = saved
+    print()
+    print_table(["check", "result"], [[name, "PASS" if ok else "FAIL"] for name, ok in checks])
+    failed = [name for name, ok in checks if not ok]
+    print(f"\n{len(checks) - len(failed)} of {len(checks)} checks pass" + (f"; FAILED: {failed}" if failed else ""))
+    return 1 if failed else 0
+
+
+def cmd_ai_pol_judge(args) -> int:
+    import ai_judge
+
+    if args.self_test:
+        return _ai_pol_self_test(args.image or AI_POL_SELF_TEST_IMAGE)
+    images = lacuna_judge_images(args)
+    out_root = Path(args.out)
+    if args.log_root is not None:
+        ai_judge.POL_LOG_ROOT = Path(args.log_root).resolve() / "pols"
+        ai_judge.LACUNA_LOG_ROOT = None
+    if args.live:
+        return ai_pol_live(images, out_root, args.workers,
+                           float(config.AI_POL_MAX_COST_USD if args.max_cost is None else args.max_cost))
+    if args.replay:
+        return ai_pol_replay(images, out_root, args.workers)
+    return ai_pol_dry_run(images, out_root / "dry_run_pols", args.workers)
+
+
 # judge-cost
 # The cost of the judge rerun (brief of 2026-11-09, phase 2). Both judges were
 # run live on the first development image of each group in name order, the
@@ -9704,7 +10098,65 @@ def _seconds_between(stamps: list) -> float:
     return (times[-1] - times[0]).total_seconds() if len(times) > 1 else 0.0
 
 
+def _judge_cost_pols() -> int:
+    """judge-cost --pols: the cost of the POL judge. It was run live on the
+    first development image of each group in name order (logs and records in
+    results/archive/judge/dry_run_pols/), and offline over every development
+    image (dry_run_pols.json under .cache/pol_dry/<group>/, the case counts).
+    Per group: the live cost per case, times the group's development cases,
+    times the group's images over its development images. Writes
+    results/archive/judge/COST_POL.md and cost_pol.json."""
+    dry = JUDGE_DIR / "dry_run_pols"
+    rows, total, total_calls, spent = [], 0.0, 0, 0.0
+    for group in config.GROUPS:
+        live = json.loads((dry / group / "ai_pol_judge_run.json").read_text(encoding="utf-8"))
+        offline = json.loads((config.PROJECT_ROOT / ".cache" / "pol_dry" / group / "dry_run_pols"
+                              / "dry_run_pols.json").read_text(encoding="utf-8"))
+        image = live["per_image"][0]
+        dev_cases = sum(r["cases"] for r in offline["per_image"])
+        n_dev = len(offline["per_image"])
+        n_all = len(sorted((config.DATA_DIR / group).glob("*.tif")))
+        per_case = image["cost_usd"] / image["cases"] if image["cases"] else 0.0
+        estimate = per_case * dev_cases * n_all / n_dev if n_dev else 0.0
+        spent += image["cost_usd"]
+        total += estimate
+        total_calls += round(dev_cases * n_all / n_dev) if n_dev else 0
+        rows.append({"group": group, "image": image["image"], "cases": image["cases"], "calls": image["calls"],
+                     "input tokens": image["input_tokens"], "output tokens": image["output_tokens"],
+                     "USD": round(image["cost_usd"], 5), "USD per case": round(per_case, 5),
+                     "development images": n_dev, "their cases": dev_cases, "images in group": n_all,
+                     "group estimate USD": round(estimate, 4)})
+    budget = float(config.AI_POL_MAX_COST_USD)
+    within = total * JUDGE_COST_MARGIN <= budget
+    record = {"status": "pre-validation; cost of the AI POL judge, from the API's token counts",
+              "model": config.AI_JUDGE_MODEL, "dry_run_spent_usd": round(spent, 5),
+              "estimate_35_images_usd": round(total, 4), "estimate_calls": total_calls,
+              "margin": JUDGE_COST_MARGIN, "estimate_with_margin_usd": round(total * JUDGE_COST_MARGIN, 4),
+              "budget_usd": budget, "within_budget": within, "per_group": rows}
+    (JUDGE_DIR / "cost_pol.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    lines = ["# Cost of the AI POL judge (dry run, 2026-11-09)", "",
+             "Pre-validation. The POL judge was run live on one development image per group (the first in "
+             "name order), on the lacunae the lacuna judge accepted, DEV mode; every number is from the token "
+             f"counts the API reported, at `{config.AI_JUDGE_MODEL}` list price. The case counts of every "
+             "development image come from the offline dry run (nothing sent). Logs and run records: "
+             "`results/archive/judge/dry_run_pols/`; made by `python src/diagnostics.py judge-cost --pols`.", "",
+             "| " + " | ".join(rows[0]) + " |", "| " + " | ".join("-" for _ in rows[0]) + " |"]
+    lines += ["| " + " | ".join(str(v) for v in r.values()) + " |" for r in rows]
+    lines += ["", f"- Spent on this dry run: **${spent:.4f}**.",
+              f"- Estimate for all 35 images (per group, the cost per case of the dry-run image times the cases "
+              f"of the group's development images, scaled to all its images): **${total:.2f}**, about "
+              f"{total_calls} calls; at {JUDGE_COST_MARGIN} times, ${total * JUDGE_COST_MARGIN:.2f}.",
+              f"- Budget for the POL judge: ${budget:.0f}. The estimate at {JUDGE_COST_MARGIN} times is "
+              + ("**within it**, so the full run goes ahead." if within else "**above it**, so the run stops here."),
+              "- The full run stops by itself if what it spends reaches the budget.", ""]
+    (JUDGE_DIR / "COST_POL.md").write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines))
+    return 0 if within else 3
+
+
 def cmd_judge_cost(args) -> int:
+    if getattr(args, "pols", False):
+        return _judge_cost_pols()
     dry = JUDGE_DIR / "dry_run"
     rows, total, total_calls = [], 0.0, 0
     for group in config.GROUPS:
@@ -9815,6 +10267,36 @@ JUDGE_LACUNA_REASONS = ("fragment", "band", "tissue", "saturated_border")
 JUDGE_ADD_REASONS = ("lacuna", "enlarged", "cluster")
 
 
+
+JUDGE_BEFORE_POL_TABLE = JUDGE_DIR / "judge_on_vs_off_before_pol_judge.csv"
+
+
+def _pol_judge_applied() -> bool:
+    """Does the lacuna judge's set carry the POL judge? Read from the detection
+    record of its first development image."""
+    import pols
+
+    for group in config.GROUPS:
+        for image_path in pols.image_files(group):
+            path = lacunae.result_path(pols.set_root(group, config.AI_LACUNA_SUBFOLDER),
+                                       lacunae.image_label(image_path), config.SECTION_LACUNAE,
+                                       config.SUFFIX_LACUNAE_DETECTION)
+            return path.is_file() and "ai_pol_judge" in json.loads(path.read_text(encoding="utf-8"))
+    return False
+
+
+def _judge_before_pol() -> dict:
+    """{(group or contrast, measure): the lacuna judge on value} of the table
+    written before the POL judge; empty when there is none."""
+    import csv as _csv
+
+    if not JUDGE_BEFORE_POL_TABLE.is_file():
+        return {}
+    with open(JUDGE_BEFORE_POL_TABLE, newline="", encoding="utf-8") as f:
+        return {(r["group"], r["measure"]): (float(r["lacuna judge on"]) if r["lacuna judge on"] not in ("", None)
+                                             else None) for r in _csv.DictReader(f)}
+
+
 def _judge_group_values(set_name) -> dict:
     """{group: the row of animal_stats.pooled} for one set, development images;
     a group is left out when the set does not hold every one of its
@@ -9871,6 +10353,21 @@ def _judge_changes(group: str, image_path: Path, wt_median_off: float) -> dict:
     row["removed clusters"] = sum(1 for r in gone if not r["flag"] and r["cluster"] == "yes")
     thread = ai_judge.decisions_path(label)
     t = json.loads(thread.read_text(encoding="utf-8"))["totals"] if thread.is_file() else {}
+    # The POL judge, where it was applied: what it did, from the detection
+    # record of the lacuna judge's set.
+    det = lacunae.result_path(pols.set_root(group, config.AI_LACUNA_SUBFOLDER), label, config.SECTION_LACUNAE,
+                              config.SUFFIX_LACUNAE_DETECTION)
+    pol = (json.loads(det.read_text(encoding="utf-8")).get("ai_pol_judge") or {}).get("counts") \
+        if det.is_file() else None
+    if pol is not None:
+        row.update({"POL judge: cases": pol["cases"], "POL judge: pol": pol["pol"],
+                    "POL judge: cluster": pol["cluster"], "POL judge: split": pol["split"],
+                    "POL judge: lacuna": pol["lacuna"], "POL judge: not_lacuna": pol["not_lacuna"],
+                    "POL judge: unsure": pol["unsure"], "POL judge: unjudged": pol["unjudged"],
+                    "POL judge: removed": pol["removed"], "POL judge: merge groups": pol["merge_groups"],
+                    "POL judge: pieces merged": pol["pieces_merged"],
+                    "POL judge: cluster flags set": pol["cluster_flags_set"],
+                    "POL judge: cluster flags cleared": pol["cluster_flags_cleared"]})
     row.update({"images the canaliculi judge finished": int(thread.is_file()),
                 "canaliculi cases": t.get("cases", 0), "canaliculi cases unjudged": t.get("cases_unjudged", 0),
                 "segments offered": t.get("segments", 0), "segments real": t.get("segments_real", 0),
@@ -9973,21 +10470,35 @@ def cmd_judge_compare(args) -> int:
         totals.append({"group": group, "image": f"all {len(mine)} development images",
                        **{k: sum(c.get(k, 0) for c in mine) for k in count_keys}})
 
+    # With the POL judge applied to the lacuna judge's set (docs/METHODS.md 30),
+    # that set is the lacuna and POL judges on, and the lacuna judge alone is
+    # the column of the table written before (JUDGE_BEFORE_POL_TABLE).
+    lacuna_col, before_col = "lacuna judge on", None
+    if _pol_judge_applied():
+        lacuna_col, before_col = "lacuna and POL judges on", "lacuna judge alone (before the POL judge)"
+        before = _judge_before_pol()
+        for r in rows + contrast_rows:
+            r[lacuna_col] = r.pop("lacuna judge on")
+            if r["judge on from"] == "lacuna judge on":
+                r["judge on from"] = lacuna_col
+            r[before_col] = before.get((r["group"], r["measure"]))
     JUDGE_DIR.mkdir(parents=True, exist_ok=True)
-    columns = ["group", "measure", "what it is", "judge off", "lacuna judge on", "both judges on",
-               "judge on minus off", "judge on from", "direction off", "direction on", "direction changes"]
+    columns = (["group", "measure", "what it is", "judge off"] + ([before_col] if before_col else [])
+               + [lacuna_col, "both judges on", "judge on minus off", "judge on from", "direction off",
+                  "direction on", "direction changes"])
     write_rows_csv(JUDGE_DIR / "judge_on_vs_off.csv", columns,
                    [{c: ("" if r.get(c) is None else r.get(c, "")) for c in columns} for r in rows + contrast_rows])
     write_rows_csv(JUDGE_DIR / "judge_changes.csv", ["group", "image"] + count_keys, changes + totals)
     (JUDGE_DIR / "JUDGE_ON_VS_OFF.md").write_text(
-        _judge_compare_markdown(rows, contrast_rows, totals, flips), encoding="utf-8")
+        _judge_compare_markdown(rows, contrast_rows, totals, flips, lacuna_col, before_col), encoding="utf-8")
     key_results.add_judge_sheet()
     print(f"-> {JUDGE_DIR / 'judge_on_vs_off.csv'}, judge_changes.csv, JUDGE_ON_VS_OFF.md")
     print(f"group contrasts whose direction changes with the judge on: {flips or 'none'}")
     return 0
 
 
-def _judge_compare_markdown(rows: list, contrast_rows: list, totals: list, flips: list) -> str:
+def _judge_compare_markdown(rows: list, contrast_rows: list, totals: list, flips: list,
+                            lacuna_col: str = "lacuna judge on", before_col: str | None = None) -> str:
     def fmt(v):
         if v is None or v == "":
             return ""
@@ -10010,22 +10521,30 @@ def _judge_compare_markdown(rows: list, contrast_rows: list, totals: list, flips
         "incomplete for the group.",
         "",
     ]
+    if before_col:
+        lines += ["**The POL judge** (docs/METHODS.md 30) was applied after the lacuna judge: the lacuna "
+                  "judge's set is now the lacuna and POL judges on, and the column before it is the lacuna "
+                  "judge alone, from the table written before the POL judge "
+                  "(`judge_on_vs_off_before_pol_judge.csv`). The both judges on set keeps the lacunae of the "
+                  "lacuna judge alone.", ""]
     for group in config.GROUPS:
         lines += [f"## {group}", "",
-                  "| measure | judge off | lacuna judge on | both judges on | judge on minus off | judge on from |",
-                  "| - | - | - | - | - | - |"]
+                  f"| measure | judge off | {before_col + ' | ' if before_col else ''}{lacuna_col} | both judges on | "
+                  "judge on minus off | judge on from |",
+                  "| - | - | - | - | - | - |" + (" - |" if before_col else "")]
         for r in rows:
             if r["group"] == group:
-                lines.append(f"| {r['what it is']} | {fmt(r['judge off'])} | {fmt(r['lacuna judge on'])} | "
-                             f"{fmt(r['both judges on'])} | {fmt(r['judge on minus off'])} | "
-                             f"{r['judge on from']} |")
+                lines.append(f"| {r['what it is']} | {fmt(r['judge off'])} | "
+                             + (f"{fmt(r[before_col])} | " if before_col else "")
+                             + f"{fmt(r[lacuna_col])} | {fmt(r['both judges on'])} | "
+                             f"{fmt(r['judge on minus off'])} | {r['judge on from']} |")
         lines.append("")
     lines += ["## Group contrasts: does any direction change?", "",
               "Differences of the pooled group values, no statistics. A change of direction is a change of "
               "sign between judge off and judge on.", "",
               "| contrast | measure | judge off | judge on | direction changes |", "| - | - | - | - | - |"]
     for r in contrast_rows:
-        on = r["both judges on"] if r["judge on from"] == "both judges on" else r["lacuna judge on"]
+        on = r["both judges on"] if r["judge on from"] == "both judges on" else r[lacuna_col]
         lines.append(f"| {r['group']} | {r['measure']} | {fmt(r['judge off'])} | {fmt(on)} | "
                      f"{r['direction changes']} |")
     lines += ["", "Contrasts whose direction changes: "
@@ -10729,6 +11248,9 @@ def main() -> None:
                         "Any other root gets <root>/<group>/.")
     p.add_argument("-w", dest="workers", type=int, default=8,
                    help="Parallel processes, one image each (default 8).")
+    p.add_argument("--with-pol-judge", dest="with_pol_judge", action="store_true",
+                   help="The AI POL judge's switch on as well, for this process only (its decision files "
+                        "in results/<group>/3_pols/ai_judge/ai_log/ must exist).")
     p.set_defaults(func=cmd_ai_lacuna_run)
 
     p = sub.add_parser("ai-lacuna-review",
@@ -10745,6 +11267,9 @@ def main() -> None:
     p = sub.add_parser("judge-cost",
                        help="The cost of the AI judge rerun from its dry run in results/archive/judge/dry_run/: "
                             "results/archive/judge/COST.md and cost.json. No call is made.")
+    p.add_argument("--pols", action="store_true",
+                   help="The POL judge's cost instead, from results/archive/judge/dry_run_pols/: COST_POL.md "
+                        "and cost_pol.json.")
     p.set_defaults(func=cmd_judge_cost)
 
     p = sub.add_parser("judge-compare",
@@ -10752,6 +11277,31 @@ def main() -> None:
                             "results/archive/judge/judge_on_vs_off.csv and .md, judge_changes.csv, and the "
                             "sheet Judge on vs off of results/SUMMARY.xlsx.")
     p.set_defaults(func=cmd_judge_compare)
+
+    p = sub.add_parser("ai-pol-judge",
+                       help="EXPERIMENT: the AI POL judge on the lacunae the lacuna judge accepted. Default: a "
+                            "dry run, pictures and cost, nothing sent. --live calls the API, --replay reruns "
+                            "the log offline, -s rehearses with a stub.")
+    add_images_arguments(p)
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("-l", "--live", action="store_true",
+                      help="Real calls (needs ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY).")
+    mode.add_argument("-r", "--replay", action="store_true",
+                      help="No network: rerun from the log and check the verdicts match.")
+    mode.add_argument("-s", "--self-test", dest="self_test", action="store_true",
+                      help="Rehearse the whole chain on one development image (default Hyp_RD I534_z25c1-2) "
+                           "with a stub judge, writing only to .cache/ai_pol_self_test.")
+    p.add_argument("-o", dest="out", type=Path, default=config.ARCHIVE_ROOT / "judge",
+                   help="Where the run record goes (default: results/archive/judge; the dry run writes "
+                        "dry_run_pols/ inside it).")
+    p.add_argument("-w", dest="workers", type=int, default=8,
+                   help="Parallel processes for the cases, one image each (default 8).")
+    p.add_argument("--max-cost", dest="max_cost", type=float, default=None,
+                   help="The cost ceiling of this run in USD (default: config.AI_POL_MAX_COST_USD).")
+    p.add_argument("--log-root", dest="log_root", type=Path, default=None,
+                   help="Write and read the POL judge's log under <this>/pols/<group>/ai_log/ instead of "
+                        "results/<group>/3_pols/ai_judge/ai_log/ (the cost dry run).")
+    p.set_defaults(func=cmd_ai_pol_judge)
 
     p = sub.add_parser("group-overview",
                        help="One table over every group, one row per image: results/summary/group_overview.csv "

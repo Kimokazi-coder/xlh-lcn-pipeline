@@ -2428,3 +2428,66 @@ of `results/SUMMARY.xlsx`):
   the wrong outline in the crowded full-field picture.
 
 Not validated. Report: `results/archive/judge/REPORT_JUDGE.md`.
+
+## 30. The AI POL judge (2026-11-09)
+
+**Status: pre-validation, NOT VALIDATED.** A third judge, added at the
+user's request after the rerun of section 29. It acts only on the lacuna
+judge's set (`<section>/ai_judge/`): the deterministic method, and the both
+judges set (`<section>/ai_judge_canaliculi/`), are not changed by it. Switch
+`config.AI_POL_JUDGE_ENABLED`, off by default; it needs the lacuna judge's
+switch on as well. Prompt `src/judge_prompt_pols.md`, rules in words
+`docs/judge_examples_pols.md`, both built on the working POL definition (24.0).
+The model, prices and answer settings are the other judges' own.
+
+**Candidates.** Among the lacunae the lacuna judge accepted:
+
+- every lacuna with an area above `config.AI_POL_MIN_AREA_UM2` = 76.6 um2;
+- every lacuna the cluster rule (27.1) flags;
+- both lacunae of every pair whose outlines come within
+  `config.AI_POL_PAIR_GAP_UM` = 3 um, centre to centre of the nearest pixels.
+
+76.6 um2 is 2 x 38.31 um2, the median measured WT lacuna of the lacuna
+judge's set over the 6 development WT images: the brief's "2 times the WT
+median", fixed as a number so that the rule does not move with the hold-out
+mode and never reads a held-out output. Lacunae linked by close pairs form one
+case.
+
+**The picture.** One call per case: the crop of the case (its bounding box
+plus 40 px, at least 128 px) twice, enlarged by whole pixels up to 512 px.
+Left nothing drawn; right the case's lacunae outlined in yellow and numbered,
+the other lacunae in the crop outlined in grey. The text gives each numbered
+lacuna's area and a normal lacuna's (38 um2).
+
+**The answer.** Per number:
+
+- `pol`: one enlarged lacuna;
+- `cluster`: several lacunae merged in one outline;
+- `split`: a piece of one body, named with its other pieces in a `merge`
+  group;
+- `lacuna`: an ordinary lacuna;
+- `not_lacuna`, with `band`, `tissue` or `border`;
+- `unsure`.
+
+The parser is strict like the others' (each number once, the reason with
+`not_lacuna` only, every `split` in exactly one merge group of at least two,
+and nothing else in one), with one retry.
+
+**What a verdict does (`ai_judge.apply_pol_verdicts`, inside the lacuna stage
+after the lacuna judge).**
+
+- `not_lacuna`: removes the lacuna.
+- A `merge` group: becomes one lacuna, the union of the pieces' own pixels,
+  in the place of the first piece. No pixel is added: the gap between pieces
+  stays outside.
+- `cluster`: the lacuna is flagged cluster.
+- `pol`, `lacuna`, and a merged lacuna: not flagged cluster.
+- `unsure`, and a case with no valid answer: change nothing.
+
+The cluster decisions reach quantification through the detection record
+(`ai_pol_judge.cluster_override`) and replace the shape rule's flag of a
+lacuna with a shape measure. The later stages (network, quantification,
+3_pols) run unchanged on the result. The decision file is checked against a
+hash of the cases, as for the other judges. Self-test
+`python src/diagnostics.py ai-pol-judge -s` (16 checks, stub judge, on
+I534_z25c1-2); the log is in `results/<group>/3_pols/ai_judge/ai_log/`.

@@ -27,7 +27,11 @@ never printed, logged, written or committed.
 | 4 compare | done | diagnostics judge-compare (DEV, development images only): JUDGE_ON_VS_OFF.md, judge_on_vs_off.csv, judge_changes.csv, sheet "Judge on vs off" added to results/SUMMARY.xlsx (other sheets untouched, Read me line updated); README in all 24 judge set folders; note in results/HOW_TO_READ.md. Checks: animal_stats selftest 4/4, pols selftest 19/19, key_results check 81/81 (DEV) |
 | report | done | results/archive/judge/REPORT_JUDGE.md; METHODS 29.4 |
 
-Queued after this task is pushed (user message of 2026-11-09): a POL judge
-(src/judge_prompt_pols.md), budget 10 USD, applied to the judge-on results
-only; dry run on 1 development image per group first; then all 35 images;
-update the "Judge on vs off" sheet, REPORT_JUDGE.md and HOW_TO_READ.md.
+POL judge (user message of 2026-11-09, after the rerun was pushed; budget $10):
+
+| step | state | note |
+| - | - | - |
+| code | done | config AI_POL_* (switch off), src/judge_prompt_pols.md, docs/judge_examples_pols.md, ai_judge "The POL judge", lacunae/quantification hooks (only with the switch on), diagnostics ai-pol-judge (dry run default, --live, --replay, -s), ai-lacuna-run --with-pol-judge, judge-cost --pols, judge-compare with the POL judge; METHODS 30. Checks: ai-pol-judge -s 16/16, ai-lacuna-judge -s 32/32, ai-judge -s 15/15, pols selftest 19/19, reference-check 3/3, regression PASS. judge_on_vs_off_before_pol_judge.csv is the comparison table before the POL judge |
+| dry run and cost | to do | offline over the 27 development images: 64 cases. Live on the first development image with at least one case in each group: 542_z06, 876_z89c1-2, 535_z13c1-2, 548_hyp_HP_z08c1-2 |
+| full run | to do | |
+| compare, report | to do | |
