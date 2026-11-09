@@ -89,7 +89,7 @@ The repository holds `README.md`, `config.py`, `requirements.txt`,
 
 | folder | contents |
 |-|-|
-| `src/` | all code: `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `pols.py` (the POL section, lacunar size), `make_figures.py` (the figures), `pol_ring_proxy.py` (the retired ring proxy), `ai_judge.py` (both AI judges), `diagnostics.py` (every check, as subcommands) |
+| `src/` | all code: `lacunae.py` and `canaliculi.py` (detection), `quantification.py` (every measure), `pols.py` (the POL section, lacunar size), `make_figures.py` (the figures), `ai_judge.py` (both AI judges), `diagnostics.py` (every check, as subcommands) |
 | `config.py` | paths, the results layout, the biological limits, shared settings and the switches (all off) |
 | `data/` | one folder per group: `WT/` with the 8 input images, `WT_HP/`, `Hyp_RD/`, `Hyp_HP/` with 9 each, decoded from JPEG; `image_inventory.csv` records every file |
 | `results/` | every result; guide: [`results/README.md`](../results/README.md) |
@@ -105,7 +105,6 @@ it named after its image:
 | `2_canaliculi/` | the network of each image (mask, skeleton, verification picture, vascular mask, graph, record) and its network figure |
 | `3_pols/` | candidate POL measure: lacunar size, pending definition (a picture and a table per image, a group table, a contact sheet) |
 | `4_quantification/` | every measured number per image, the group table, the overview and cell gallery figures, and the group figures Fig01 to Fig04, S01, S02 |
-| `5_archive/` | deleted on 2026-11-09; the retired POL ring proxy it held is in git history (tag `method-freeze-v2`) |
 | `<section>/ai_judge/` | the AI lacuna judge's set in each section it writes (its log in `1_lacunae/ai_judge/ai_log/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/`. Made before `method-freeze-v1`, so they do not match the current results until rerun (a README in each) |
 
 Beside them, `results/summary/` holds the tables that set the groups side by

@@ -24,12 +24,10 @@ results/
     2_canaliculi/      the network stage, and the network figures
     3_pols/            the POL footprints (working definition) and lacunar size
     4_quantification/  every measured number, the group table, the figures
-    5_archive/         deleted on 2026-11-09 (see below)
-  archive/           old material that belongs to no one group
+  archive/           the reports and records that belong to no one group
 ```
 
-Every group folder holds these sections; `5_archive/` only when a script has
-written to it again since it was deleted. Inside a section there
+Every group folder holds exactly these five sections. Inside a section there
 is no folder per image: each file is named after its image, `<image>_...`,
 where `<image>` is the short label of the image (`config.IMAGE_LABELS` for WT,
 the cleaned file name for the other groups).
@@ -117,14 +115,12 @@ and `4_quantification/ai_judge_canaliculi/`. Both were made with the detector
 before `method-freeze-v1` and do not match the current results until rerun
 (a README in each folder). Not validated.
 
-**5_archive/**: deleted in every group on 2026-11-09. It held
-`pol_ring_proxy/` (the retired ring proxy of the POL section: per image
-overlay, measured and outlines pictures, csv and json, the group table and
-contact sheet), now only in git history (for instance at tag
-`method-freeze-v2`), and the untracked `not_used/` and
-`variants_per_image_brightness/` of the figure script. `make_figures.py all`
-and `pol_ring_proxy.py` still write here, so the folder comes back when they
-run.
+**5_archive/** was deleted in every group on 2026-11-09, with the code that
+wrote it (`docs/METHODS.md` 28). It held `pol_ring_proxy/` (the retired ring
+proxy of the POL section and `src/pol_ring_proxy.py`, now only in git history,
+for instance at tag `method-freeze-v2`) and the untracked figures that were
+not used: the coded contact sheet S03, the low cut overview layer and the
+per-image brightness variants.
 
 **summary/**: `group_overview.csv` and `.xlsx` (every image of every group,
 one row each), `group_qc.csv` (QC list of the groups other than WT),

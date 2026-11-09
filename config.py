@@ -114,24 +114,22 @@ IMPORT_INVENTORY_NAME = "image_inventory.csv"  # in DATA_DIR
 #   3_pols            the POL footprints and lacunar size (src/pols.py)
 #   4_quantification  every measured number per image, the group table, the
 #                     cell gallery and overview figures, the group figures
-#   5_archive         everything no longer used, in named subfolders
+# The sixth section, 5_archive (what was no longer used), was deleted with its
+# contents on 2026-11-09 (docs/METHODS.md 28).
 SECTION_KEY_RESULTS = "0_key_results"
 SECTION_LACUNAE = "1_lacunae"
 SECTION_CANALICULI = "2_canaliculi"
 SECTION_POLS = "3_pols"
 SECTION_QUANTIFICATION = "4_quantification"
-SECTION_ARCHIVE = "5_archive"
-SECTIONS = (SECTION_KEY_RESULTS, SECTION_LACUNAE, SECTION_CANALICULI, SECTION_POLS, SECTION_QUANTIFICATION,
-            SECTION_ARCHIVE)
+SECTIONS = (SECTION_KEY_RESULTS, SECTION_LACUNAE, SECTION_CANALICULI, SECTION_POLS, SECTION_QUANTIFICATION)
 # Where the figures of the figures script go: the network figure beside the
 # network it draws, the overview and the cell gallery beside the numbers, and
 # the group figures (Fig01 to Fig04, S01, S02) with the group table.
 SECTION_NETWORK_FIGURES = SECTION_CANALICULI
 SECTION_FIGURES = SECTION_QUANTIFICATION
 SECTION_GROUP_FIGURES = SECTION_QUANTIFICATION
-# Named subfolders of 5_archive.
-ARCHIVE_NOT_USED_DIR = "not_used"
-ARCHIVE_POL_RING_PROXY_DIR = "pol_ring_proxy"
+# The run records of the AI lacuna judge, in results/archive/ai_judge/
+# (AI_LACUNA_RESULTS_ROOT).
 ARCHIVE_AI_JUDGE_DIR = "ai_judge"
 
 # RESULTS_DIR is the reference group's folder, results/WT/: the deterministic
@@ -219,9 +217,6 @@ SUFFIX_FIGURE_OVERVIEW = "figure_overview"  # .png and .pdf
 SUFFIX_FIGURE_NETWORK_CHECKS = "figure_network_checks.json"
 SUFFIX_FIGURE_GALLERY_CHECKS = "figure_cell_gallery_checks.json"
 SUFFIX_FIGURE_INSET = "figure_inset_choice.json"
-VARIANTS_DIR = "variants_per_image_brightness"  # in SECTION_ARCHIVE
-SUFFIX_VARIANT = "_per_image_brightness"  # appended to a figure suffix, .png
-VARIANT_WINDOW_FILE = "display_window_this_image.json"
 # One row per image, in SECTION_QUANTIFICATION: the only cross-image table.
 QUANT_SUMMARY_NAME = "quantification_all_images"  # .csv, .xlsx and .pdf
 # A run lists every image it could not process, one file per stage, in the

@@ -74,18 +74,19 @@ every file is [`results/README.md`](results/README.md).
 | `results/G/3_pols/` | **candidate POL measure: lacunar size, pending definition**: per image a picture of each lacuna's area against the WT median and a table, per group a table and a contact sheet | `python src/pols.py measure -d data/G` (all groups: `python src/pols.py all`) |
 | `results/G/4_quantification/` | every measured number of each image (json, xlsx, pdf), the group table `quantification_all_images`, the overview and cell gallery of each image, and the group figures Fig01 to Fig04, S01, S02 | `python src/quantification.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
 | `results/G/<section>/ai_judge/` | the AI lacuna judge's set of the group, in each section it writes (`1_lacunae/ai_judge/` with its log in `ai_log/`, `2_canaliculi/ai_judge/`, `4_quantification/ai_judge/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/` (log, `compare/` and run records in `2_canaliculi/ai_judge_canaliculi/`). Made with the detector before `method-freeze-v1`: a README in each folder says they do not match the current results until rerun | `python src/diagnostics.py ai-lacuna-run`, `ai-run`; `docs/EXPERIMENT_AI.md` |
-| `results/G/5_archive/` | deleted on 2026-11-09; what it held (`pol_ring_proxy/`, the retired POL ring proxy) is in git history, for instance at tag `method-freeze-v2`. The scripts in the next column still write here, so it comes back when they run | `python src/pol_ring_proxy.py measure -d data/G` (its own options in the file); `python -u src/make_figures.py -g G all` (`not_used/`, `variants_per_image_brightness/`) |
 | `results/summary/` | every group side by side: `group_overview.csv` and `.xlsx`, `group_qc.csv`, `pols_lacunar_size_by_group.csv` | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc`, `python src/pols.py all` |
 | `results/archive/` | records of no one group: the final report (`REPORT_FINAL.md`), the look that the POL definition rests on (`pols/FINDINGS.md`, `pols/phase0_look/`), the format test (`format_test/`), the lacuna judge's run records, `dry_run/` and `review/` (`ai_judge/`), `MOVE_MAP.csv` (every file moved into this layout); the review loop (`REVIEW_LOOP.md`, `REPORT_LOOP.md`) and the bias audit (`audit/`). The ring proxy reports and its blinded review set were deleted on 2026-11-09 (in git history) | see [`results/README.md`](results/README.md) |
-| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (lacunar size), `pol_ring_proxy.py` (the retired ring proxy), `make_figures.py` (the figures), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
+| `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (lacunar size), `make_figures.py` (the figures), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the layout, the biological limits, shared settings and the switches (all off by default) | |
 | `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group -g GROUP -s SOURCE_FOLDER` |
 | `docs/` | [`START_HERE.md`](docs/START_HERE.md), [`METHODS.md`](docs/METHODS.md), [`EXPERIMENT_AI.md`](docs/EXPERIMENT_AI.md), the judges' worked examples, and `docs/figures/` (captions, review notes, inset overrides) | |
 
 `python src/diagnostics.py layout-check` checks this layout for every group.
-Not tracked: `.cache/` and `venv/`, where the diagnostics also write by default,
-and two archive subfolders the figure script rewrites
-(`results/<group>/5_archive/not_used/`, `variants_per_image_brightness/`).
+Not tracked: `.cache/` and `venv/`, where the diagnostics also write by default.
+On 2026-11-09 everything neither measured nor needed by the pipeline was
+deleted: the `5_archive/` section of every group, the retired ring proxy
+(`src/pol_ring_proxy.py` and its outputs) and the figures that were not used
+(`docs/METHODS.md` 28; all of it is in git history).
 
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
 confirmed for all 8 images and rounded to two decimals

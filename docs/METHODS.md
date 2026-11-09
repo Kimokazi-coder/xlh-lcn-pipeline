@@ -1730,8 +1730,8 @@ between the two methods, and none has been made.
 
 **The groups.** `config.GROUPS`: WT, WT_HP, Hyp_RD and Hyp_HP; RD is regular
 diet and HP high phosphorus. Each has its own folder in `data/` and in
-`results/`, with the same five sections inside (1_lacunae, 2_canaliculi,
-3_pols, 4_quantification, 5_archive; `results/README.md`), every file named
+`results/`, with the same five sections inside (0_key_results, 1_lacunae,
+2_canaliculi, 3_pols, 4_quantification since 28; `results/README.md`), every file named
 after its image; the AI judge set holds WT only, archived in
 `results/WT/<section>/ai_judge_canaliculi/`.
 
@@ -2285,6 +2285,15 @@ these files, it describes what was done then.
   the notes of the layout move (`REPORT_REORG.md`, `PROGRESS_LAYOUT.md`).
   `pols/FINDINGS.md` and `pols/phase0_look/` stay: the POL definition of 24.0
   rests on them.
+- The code that only made what was deleted: `src/pol_ring_proxy.py`; in
+  `src/make_figures.py` the per-image brightness variants (`variants`), the
+  low cut overview layer (`image -r`) and the coded contact sheet S03
+  (`contact -b`, `all -b`), with the per-image window behind them; in
+  `config.py` `SECTION_ARCHIVE` and the names of its subfolders, so
+  `config.SECTIONS`, and the layout check, hold the five sections 0 to 4.
+  The figures still drawn are unchanged: 542_z06's overview, network and
+  gallery redrawn with the new code are byte for byte the committed PNGs, and
+  the PDFs differ only in their creation date.
 
 Kept although not measured: the AI judge sets and their logs (the judge is a
 pipeline switch, its replay and self tests read the logs, and its rerun is

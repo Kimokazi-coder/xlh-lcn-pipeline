@@ -4,8 +4,8 @@ Drafts for every figure in `results/` (PNG at 300 dpi and PDF; see `results/READ
 and holding for every group, which is drawn with the same code (`python -u src/make_figures.py -g GROUP all`):
 the network figure of each image in `results/<group>/2_canaliculi/`, the overview and cell gallery of each
 image and the group figures in `results/<group>/4_quantification/`. Main
-figures are Fig01 to Fig04, supplementary figures S01 and S02 (the coded contact sheet S03 is kept in
-`results/WT/5_archive/not_used/`, not a result and not tracked: regenerate with `python -u src/make_figures.py all -b KEY`); fields are called Field 1 to Field 4, so no field name looks like a
+figures are Fig01 to Fig04, supplementary figures S01 and S02 (the coded contact sheet S03, the low cut
+overview layer and the per-image brightness variants were removed on 2026-11-09, `docs/METHODS.md` 28); fields are called Field 1 to Field 4, so no field name looks like a
 figure name. Every caption applies these common
 facts: **pre-validation** (nothing has been checked against manual counts); **pixel units** (the images
 carry no spatial calibration, so lengths are px, areas px² and densities px⁻¹, and every scale bar is
@@ -19,18 +19,10 @@ lie partly outside the focal plane are not detected by the pipeline and are not 
 
 **Fixed dataset window** (every main figure): the 1st and 99.8th percentile of the pooled red channel
 of all 8 WT images, 20 to 255 grey levels of 255 (`results/<group>/4_quantification/display_window.json`). Images are not
-stretched one by one, so their brightness can be compared by eye. The comparison figures (Fig01, S02,
-S03 contact sheets, Fig03 threshold figure, S01 switch examples; Fig04 shows no image) use only this
-window, and so do the main per-image figures (`<label>_figure_overview`, `_figure_network`, `_figure_cell_gallery`).
-
-**Per-image window** (only in `results/<group>/5_archive/variants_per_image_brightness/`, not tracked: regenerate with `python -u src/make_figures.py all`; kept
-for history): the same overview, network and
-gallery drawn with the 1st and 99.8th percentile of that image's own red channel
-(`display_window_this_image.json` there), PNG only, with "Display window: this image only, display
-only" printed in the figure. These show faint structure in dark images better, but their brightness
-cannot be compared between images.
-
-Either window is for display only; no measurement uses it.
+stretched one by one, so their brightness can be compared by eye. Every figure that shows an image uses
+only this window: the comparison figures (Fig01 and S02 contact sheets, Fig03 threshold figure, S01
+switch examples; Fig04 shows no image) and the per-image figures (`<label>_figure_overview`,
+`_figure_network`, `_figure_cell_gallery`). The window is for display only; no measurement uses it.
 
 ## Colours
 
@@ -69,9 +61,6 @@ id. `docs/figures/inset_overrides.csv` (image, lacuna_id; empty by default) or o
 lacuna. The choice is logged in `<label>_figure_inset_choice.json` ("overview"). Scale bar 200 px (uncalibrated). Fixed
 display window. Pre-validation, pixel units, WT.
 
-`543_3_figure_overview_low_cut_layer` (in `results/WT/5_archive/not_used/`, not tracked: regenerate with `python -u src/make_figures.py all`) is the same figure with option `-r`: objects that the lacuna stage keeps only
-at 0.8 times t_hi are added in light blue dotted outlines. This layer is not the default output.
-
 ## <label>_figure_network (8 figures) and Fig02_network_overlay_543-2
 
 `Fig02_network_overlay_543-2` is a copy of `543-2_figure_network`.
@@ -96,14 +85,13 @@ flagged canal region), roots, ring length 30 px, area. The header gives the coun
 `<label>_figure_cell_gallery_checks.json`). Lacunae touching the frame are not shown; the footnote gives how many. Scale bar
 50 px. Fixed display window. Pre-validation, pixel units, WT.
 
-## Fig01_contact_sheet (and S02_contact_sheet_with_rejected_candidates, S03_contact_sheet_coded)
+## Fig01_contact_sheet (and S02_contact_sheet_with_rejected_candidates)
 
 **All 8 WT sections with the kept lacunae.** Red channel with lacuna outlines (cyan interior, yellow
 frame edge; "c" beside a lacuna in a flagged canal region) and two count lines under each panel. One
 fixed display window for all panels, so the brighter background of the 543 sections is real. Scale bar
 200 px (uncalibrated). `S02_contact_sheet_with_rejected_candidates` adds the rejected lacuna-scale candidates (grey
-dashed, with A, S or a). The coded version (`S03_contact_sheet_coded`, a blinding test, kept in `results/WT/5_archive/not_used/`, not tracked: regenerate with `python -u src/make_figures.py all -b KEY`) labels the panels S001 to S008 from a blinding key and
-orders them by code; it hides the names, not the appearance. Pre-validation, pixel units.
+dashed, with A, S or a). Pre-validation, pixel units.
 
 ## Fig03_threshold_sensitivity
 

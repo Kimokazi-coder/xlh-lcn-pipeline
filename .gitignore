@@ -1,6 +1,5 @@
-# Local environment and cache files are excluded, and so are the diagnostic and
-# archive folders listed at the end, which commands rerun into results/ but which
-# are not results. Code, data, both result sets and the reports are tracked.
+# Local environment and cache files are excluded; the diagnostics write to
+# .cache/ by default. Code, data, both result sets and the reports are tracked.
 venv/
 __pycache__/
 .cache/
@@ -24,11 +23,3 @@ code_key*
 # ignored here as a second guard, as the blinding keys are above.
 .env
 .env.*
-
-# Written again whenever its command reruns, so ignored rather than tracked: the
-# per-image brightness variants, the low cut overview layer and the coded contact
-# sheet of the figures script (results/<group>/5_archive/), and the diagnostic
-# folders, which the diagnostics write to .cache/ by default. The files as they
-# were on 2026-10-20 are at commit bf3b982.
-results/*/5_archive/not_used/
-results/*/5_archive/variants_per_image_brightness/

@@ -12,13 +12,10 @@ Usage (from the repo root; -g GROUP picks the group, WT by default):
     python -u src/make_figures.py check                 # drawing data against results/, all images
     python -u src/make_figures.py image -i 543-2        # per-image overview
     python -u src/make_figures.py image -i 543-2 -c 6   # the same, inset on lacuna 6
-    python -u src/make_figures.py image -i 543_3 -r     # with objects kept only at 0.8 t_hi
     python -u src/make_figures.py network -a            # network overlay per image (and Fig02)
     python -u src/make_figures.py gallery -a            # cell gallery per image
-    python -u src/make_figures.py variants -a           # per-image display window variants
     python -u src/make_figures.py contact               # contact sheet (Fig01)
     python -u src/make_figures.py contact -r            # with rejected candidates (S02)
-    python -u src/make_figures.py contact -b -k KEY     # labelled with blinding codes (S03)
     python -u src/make_figures.py thresholds            # lacuna cut sensitivity (Fig03)
     python -u src/make_figures.py fields -f FIELD_DIR   # per-field plot (Fig04; -m merged, WT only)
     python -u src/make_figures.py switches              # crumb rule and hole fill (S01)
@@ -29,9 +26,8 @@ Where the figures go (names from config.py), in results/<group>/:
                        .pdf), their checks and inset choice; the group figures
                        Fig01 to Fig04, S01 and S02 with their value files; and
                        display_window.json
-    5_archive/         not_used/ (S03, the coded contact sheet, and the low cut
-                       overview layer) and variants_per_image_brightness/, kept
-                       for history and not tracked
+The coded contact sheet (S03), the low cut overview layer (image -r) and the
+per-image brightness variants were removed on 2026-11-09 (docs/METHODS.md 28).
 Each output is skipped if its PNG and PDF exist; the redraw option draws it
 again over the file there.
 
@@ -127,7 +123,6 @@ PALETTE = {
     "root": "#FF00FF",  # magenta dot with a thin black edge: one root
     "rejected": "#A6A6A6",  # grey, dashed: lacuna-scale object rejected by a shape or area filter
     "box": "#FFFFFF",  # white rectangle: region shown in an inset
-    "low_cut": "#56B4E9",  # Okabe-Ito sky blue, dotted: object kept only at 0.8 t_hi (option -r)
     "field_mean": "#0072B2",  # Okabe-Ito blue: field mean bar in the per-field plot
 }
 SKELETON_ALPHA = 0.7  # the white skeleton at 70% opacity
@@ -207,11 +202,7 @@ def scale_bar(ax, image_width_px: int, length_px: int = SCALE_BAR_PX, colour: st
 
 def fig_stem(name: str) -> Path:
     """Where a numbered figure of the group lives: the main figures (Fig01, ...)
-    and the supplementary ones (S01, S02) in results/<group>/4_quantification/,
-    and the coded contact sheet (S03, kept for history) in
-    results/<group>/5_archive/not_used/."""
-    if name.startswith("S03_contact_sheet_coded"):
-        return lacunae.group_path(RESULTS, config.SECTION_ARCHIVE, name, config.ARCHIVE_NOT_USED_DIR)
+    and the supplementary ones (S01, S02) in results/<group>/4_quantification/."""
     return lacunae.group_path(RESULTS, config.SECTION_GROUP_FIGURES, name)
 
 
@@ -673,14 +664,14 @@ def draw_roots(ax, d: dict, ids, size: float = 7.0, edge_lw: float = 0.3) -> int
     return len(pts)
 
 
-def overlay_image(d: dict, window=None) -> np.ndarray:
+def overlay_image(d: dict) -> np.ndarray:
     """The raw red channel in the display window at 85% brightness."""
-    return windowed_with(d["channel"], window) * OVERLAY_BRIGHTNESS
+    return windowed_with(d["channel"]) * OVERLAY_BRIGHTNESS
 
 
-def windowed_with(channel: np.ndarray, window=None) -> np.ndarray:
-    """The channel in the fixed dataset window, or in `window` (lo, hi)."""
-    lo, hi = window if window is not None else display_window()
+def windowed_with(channel: np.ndarray) -> np.ndarray:
+    """The channel in the fixed dataset window."""
+    lo, hi = display_window()
     return np.clip((channel - lo) / (hi - lo), 0, 1)
 
 
@@ -822,22 +813,9 @@ def done_at(stem: Path, exts: tuple = ("png", "pdf")) -> bool:
     return not REDRAW and all(stem.with_name(f"{stem.name}.{ext}").is_file() for ext in exts)
 
 
-# Display windows (P8). The main per-image figures use the fixed dataset
-# window; their variants in results/<group>/5_archive/
-# variants_per_image_brightness/ use the 1st
-# and 99.8th percentile of that image's own red channel (PNG only, to keep
-# the repository small). Display only; no measurement uses either window.
+# The per-image figures use the fixed dataset window. Display only; no
+# measurement uses it.
 FIXED_WINDOW_NOTE = "Fixed display window for the dataset."
-IMAGE_WINDOW_NOTE = "Display window: this image only, display only."
-
-
-def image_window(d: dict) -> tuple[float, float]:
-    lo, hi = (float(v) for v in np.percentile(d["channel"], WINDOW_PERCENTILES))
-    return lo, hi
-
-
-def exts_for(window) -> tuple:
-    return ("png", "pdf") if window is None else ("png",)
 
 
 def update_inset_log(name: str, key: str, entry: dict) -> None:
@@ -940,8 +918,7 @@ def network_values(d: dict) -> dict:
             "lacunae": out}
 
 
-def figure_network(name: str, cells: list | None = None, window=None, stem: Path | None = None,
-                   window_note: str | None = None) -> None:
+def figure_network(name: str, cells: list | None = None) -> None:
     """N1: (A) raw red channel; (B) the overlay: raw at 85%, interior
     lacunae cyan, frame-edge lacunae yellow, skeleton within 30 px of an
     interior lacuna vermillion, the rest white at 70%, roots magenta; (C to
@@ -949,9 +926,8 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
     contour of the inset lacuna."""
     d = image_data(name)
     name = d["short"]
-    stem = stem or fig_path(name, config.SUFFIX_FIGURE_NETWORK)
-    window_note = window_note or (FIXED_WINDOW_NOTE if window is None else IMAGE_WINDOW_NOTE)
-    if done_at(stem, exts_for(window)):
+    stem = fig_path(name, config.SUFFIX_FIGURE_NETWORK)
+    if done_at(stem):
         print(stem.relative_to(ROOT), "exists, skipped")
         return
     if cells is None:
@@ -961,9 +937,8 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
     for i in cells:
         if i not in d["interior_ids"]:
             raise ValueError(f"{name}: lacuna {i} is not an interior lacuna")
-    if window is None:
-        update_inset_log(name, "network", log)
-        write_json(fig_path(name, config.SUFFIX_FIGURE_NETWORK_CHECKS), network_values(d))
+    update_inset_log(name, "network", log)
+    write_json(fig_path(name, config.SUFFIX_FIGURE_NETWORK_CHECKS), network_values(d))
     H, W = d["lacuna_id_map"].shape
 
     margin, gap_ab, panel, gap_in = 1.0, 2.0, 88.0, 3.0
@@ -977,11 +952,11 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
     axA = mm_axes(fig, margin, y_panel, panel, panel, FIG_WIDTH_MM, fig_h)
     axB = mm_axes(fig, margin + panel + gap_ab, y_panel, panel, panel, FIG_WIDTH_MM, fig_h)
 
-    show_image(axA, windowed_with(d["channel"], window))
+    show_image(axA, windowed_with(d["channel"]))
     axA.set_title(f"{name}, red channel", pad=2)
     scale_bar_at(axA, SCALE_BAR_PX)
 
-    show_image(axB, overlay_image(d, window))
+    show_image(axB, overlay_image(d))
     draw_skeleton(axB, d["segments"])
     draw_lacunae(axB, d, numbers=True)
     n_dots = draw_roots(axB, d, d["interior_ids"], size=3.0, edge_lw=0.25)
@@ -1007,7 +982,7 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
         axB.text(lx, ly, letters[k], color=PALETTE["box"], ha=ha, va=va,
                  fontsize=FONT_SIZE, fontweight="bold", path_effects=halo(1.6), zorder=7)
         ax = mm_axes(fig, margin + k * (inset + gap_in), y_inset, inset, inset, FIG_WIDTH_MM, fig_h)
-        img = overlay_image(d, window)[y0:y0 + side, x0:x0 + side]
+        img = overlay_image(d)[y0:y0 + side, x0:x0 + side]
         show_image(ax, img, x0, y0, interpolation="nearest")
         draw_skeleton(ax, d["segments"], window=(x0, x0 + side, y0, y0 + side), lw=0.5)
         draw_lacunae(ax, d, lw=V2_OUTLINE_PT)
@@ -1028,9 +1003,9 @@ def figure_network(name: str, cells: list | None = None, window=None, stem: Path
 
     legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h,
                  network_legend_items(d))
-    fig.text(margin / FIG_WIDTH_MM, 1.6 / fig_h, NETWORK_CAPTION + "\n" + window_note,
+    fig.text(margin / FIG_WIDTH_MM, 1.6 / fig_h, NETWORK_CAPTION + "\n" + FIXED_WINDOW_NOTE,
              ha="left", va="bottom", fontsize=FONT_SIZE - 0.5)
-    save_to(fig, stem, exts_for(window))
+    save_to(fig, stem)
     print(stem.relative_to(ROOT), "written; insets", cells)
 
 
@@ -1039,13 +1014,12 @@ GALLERY_ZOOM = 3  # 3 output pixels per image pixel at 300 dpi
 GALLERY_COLS, GALLERY_PER_PAGE = 4, 16
 
 
-def gallery_tiles(d: dict, ids: list, fig, x_mm: float, top_mm: float, fig_w: float, fig_h: float,
-                  window=None) -> list:
+def gallery_tiles(d: dict, ids: list, fig, x_mm: float, top_mm: float, fig_w: float, fig_h: float) -> list:
     """Draw one tile per lacuna id in a 4 column grid. Returns the per-tile
     check rows."""
     tile = GALLERY_TILE_PX * GALLERY_ZOOM / 300 * 25.4
     gap, title_h = 3.0, 4.5
-    img = overlay_image(d, window)
+    img = overlay_image(d)
     checks = []
     cells = {c["lacuna_id"]: c for c in d["cell_rows"]}
     areas = {r["lacuna_id"]: r["area_px2"] for r in d["lacuna_rows"]}
@@ -1088,18 +1062,17 @@ def gallery_tiles(d: dict, ids: list, fig, x_mm: float, top_mm: float, fig_w: fl
     return checks
 
 
-def figure_gallery(name: str, window=None, stem: Path | None = None, window_note: str | None = None) -> None:
+def figure_gallery(name: str) -> None:
     """N2: one tile per interior lacuna, a fixed 240 px crop centred on it
     (zero padded outside the frame), all at 3x, with the N1 colours, its
     roots and the dashed contour of its 30 px ring."""
     d = image_data(name)
     name = d["short"]
-    stem = stem or fig_path(name, config.SUFFIX_FIGURE_GALLERY)
+    stem = fig_path(name, config.SUFFIX_FIGURE_GALLERY)
     ids = list(d["interior_ids"])
     pages = [ids[i:i + GALLERY_PER_PAGE] for i in range(0, len(ids), GALLERY_PER_PAGE)]
     stems = [stem] if len(pages) == 1 else [stem.with_name(f"{stem.name}_p{k + 1}") for k in range(len(pages))]
-    window_note = window_note or (FIXED_WINDOW_NOTE if window is None else IMAGE_WINDOW_NOTE)
-    if all(done_at(s, exts_for(window)) for s in stems):
+    if all(done_at(s) for s in stems):
         print(stem.relative_to(ROOT), "exists, skipped")
         return
     tile = GALLERY_TILE_PX * GALLERY_ZOOM / 300 * 25.4
@@ -1120,44 +1093,19 @@ def figure_gallery(name: str, window=None, stem: Path | None = None, window_note
         fig.text(margin / fig_w, 1 - 1.5 / fig_h, f"{name}: interior lacunae at 3x (240 px tiles)", ha="left", va="top",
                  fontsize=FONT_SIZE + 1, fontweight="bold")
         fig.text(1 - margin / fig_w, 1 - 1.5 / fig_h, count_line(d), ha="right", va="top", fontsize=FONT_SIZE)
-        all_checks += gallery_tiles(d, page, fig, margin, head, fig_w, fig_h, window)
+        all_checks += gallery_tiles(d, page, fig, margin, head, fig_w, fig_h)
         legend_strip(fig, margin, foot_h, fig_w - 2 * margin, legend_h, fig_w, fig_h, items)
         n_edge = len(d["edge_ids"])
         note = (f"{n_edge} lacuna{'e' if n_edge != 1 else ''} touching the frame not shown (left out of per-cell means). "
                 "Tiles: 240 px squares centred on each interior lacuna, zero padded outside the frame, one scale. "
-                + NETWORK_CAPTION + " " + window_note)
+                + NETWORK_CAPTION + " " + FIXED_WINDOW_NOTE)
         fig.text(margin / fig_w, 1.5 / fig_h, note, ha="left", va="bottom", fontsize=FONT_SIZE - 0.5, wrap=True)
-        save_to(fig, s, exts_for(window))
+        save_to(fig, s)
         print(s.relative_to(ROOT), "written")
-    if window is None:
-        write_json(fig_path(name, config.SUFFIX_FIGURE_GALLERY_CHECKS),
-                   {"image": name, "status": "pre-validation", "units": "px",
-                    "check": "per tile: magenta_dots == roots_count and vermillion_px == ring_length_r30_px",
-                    "tiles": all_checks})
-
-
-def figure_display_variants(name: str) -> None:
-    """P8: the overview, network and gallery of one image with the image's own
-    display window, PNG only, in results/<group>/5_archive/
-    variants_per_image_brightness/ (kept for history, not tracked)."""
-    d = image_data(name)
-    name = d["short"]
-    win = image_window(d)
-
-    def variant(suffix):
-        return fig_path(name, suffix + config.SUFFIX_VARIANT, config.SECTION_ARCHIVE, config.VARIANTS_DIR)
-
-    window_file = fig_path(name, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR)
-    if not window_file.is_file():  # skipped when it exists, like every other output
-        write_json(window_file,
-                   {"image": name, "lo": win[0], "hi": win[1], "lo_8bit": win[0] * 255, "hi_8bit": win[1] * 255,
-                    "percentiles": list(WINDOW_PERCENTILES),
-                    "note": "Display window of this image only: the 1st and 99.8th percentile of its red channel. "
-                            "Display only; no measurement uses it. The main figures use the fixed dataset window "
-                            "(results/<group>/4_quantification/display_window.json)."})
-    figure_image(name, window=win, stem=variant(config.SUFFIX_FIGURE_OVERVIEW))
-    figure_network(name, window=win, stem=variant(config.SUFFIX_FIGURE_NETWORK))
-    figure_gallery(name, window=win, stem=variant(config.SUFFIX_FIGURE_GALLERY))
+    write_json(fig_path(name, config.SUFFIX_FIGURE_GALLERY_CHECKS),
+               {"image": name, "status": "pre-validation", "units": "px",
+                "check": "per tile: magenta_dots == roots_count and vermillion_px == ring_length_r30_px",
+                "tiles": all_checks})
 
 
 # WT: 543-2, the reference image. Another group: the rule of fig02_image.
@@ -1298,20 +1246,16 @@ def choose_overview_inset(d: dict) -> tuple[int, dict]:
                             "frame_margin_px": frame_margin(d, best)}}
 
 
-def figure_image(name: str, cell: int | None = None, low_cut: bool = False, window=None,
-                 stem: Path | None = None) -> None:
+def figure_image(name: str, cell: int | None = None) -> None:
     """The per-image overview (F1): (A) red channel; (B) kept lacunae with
     numbers ("c": in a flagged canal region) and the rejected lacuna-scale
     candidates, grey dashed with their reason; (C) the skeleton with the
-    inset box; and the inset lacuna at 3x. With low_cut, objects kept only at
-    0.8 t_hi are added to B (dotted), written to a separate file."""
+    inset box; and the inset lacuna at 3x."""
     d = image_data(name)
     name = d["short"]
-    fig_name = "overview" + ("_low_cut_layer" if low_cut else "")
-    # The low-cut layer (-r) is not the default output: kept in the archive section.
-    stem = stem or (fig_path(name, config.SUFFIX_FIGURE_OVERVIEW + "_low_cut_layer", config.SECTION_ARCHIVE)
-                    if low_cut else fig_path(name, config.SUFFIX_FIGURE_OVERVIEW))
-    if done_at(stem, exts_for(window)):
+    fig_name = "overview"
+    stem = fig_path(name, config.SUFFIX_FIGURE_OVERVIEW)
+    if done_at(stem):
         print(stem.relative_to(ROOT), "exists, skipped")
         return
     if cell is not None:
@@ -1323,8 +1267,7 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False, wind
         cell, log = choose_overview_inset(d)
     if cell not in d["interior_ids"]:
         raise ValueError(f"{name}: inset lacuna {cell} is not an interior lacuna")
-    if not low_cut and window is None:
-        update_inset_log(name, "overview", log)
+    update_inset_log(name, "overview", log)
     print(f"{fig_name}: inset lacuna {cell} ({log['rule']})")
 
     # Inset crop: a square around the lacuna's bounding box plus a margin.
@@ -1340,7 +1283,7 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False, wind
     margin, gap = 1.0, 2.5
     panel = (FIG_WIDTH_MM - 2 * margin - 3 * gap) / (3 + INSET_ZOOM * side / W)
     inset = INSET_ZOOM * side / W * panel
-    items = lacuna_legend_items(d, rejected=True, low_cut=low_cut) + [
+    items = lacuna_legend_items(d, rejected=True) + [
         {"kind": "line", "colour": PALETTE["ring"], "lw": 1.2, "label": "skeleton within 30 px of an interior lacuna"},
         {"kind": "line", "colour": PALETTE["skeleton"], "alpha": SKELETON_ALPHA, "lw": 1.2,
          "label": "rest of the skeleton"},
@@ -1357,7 +1300,7 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False, wind
     axC = mm_axes(fig, margin + 2 * (panel + gap), bottom, panel, panel, FIG_WIDTH_MM, fig_h)
     axI = mm_axes(fig, margin + 3 * (panel + gap), bottom + panel - inset, inset, inset, FIG_WIDTH_MM, fig_h)
 
-    raw = windowed_with(d["channel"], window)
+    raw = windowed_with(d["channel"])
     image_axes(axA, raw)
     axA.set_title(f"{name}, red channel", pad=2)
     scale_bar(axA, W)
@@ -1365,13 +1308,12 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False, wind
     show_image(axB, raw)
     draw_lacunae(axB, d, numbers=True, number_size=FONT_SIZE - 2)
     draw_rejected(axB, d)
-    low = draw_low_cut(axB, d) if low_cut else 0
     axB.set_title("lacunae and rejected candidates", pad=2)
     axB.text(0.0, -0.02, count_line(d), transform=axB.transAxes, ha="left", va="top", fontsize=FONT_SIZE - 0.5)
 
     # C: the network overlay of the network figure at small size. Every
     # skeleton pixel is drawn, not only the threads attached to counted cells.
-    over = overlay_image(d, window)
+    over = overlay_image(d)
     show_image(axC, over)
     draw_skeleton(axC, d["segments"], lw=0.25)
     draw_lacunae(axC, d, lw=0.5)
@@ -1400,11 +1342,9 @@ def figure_image(name: str, cell: int | None = None, low_cut: bool = False, wind
     legend_strip(fig, margin, cap_h, FIG_WIDTH_MM - 2 * margin, legend_h, FIG_WIDTH_MM, fig_h, items)
     cap = ("White and vermillion lines in C are all skeleton pixels, not only the threads attached to counted cells.\n"
            "Dim out-of-plane cells are not detected and are not drawn. "
-           + (f"Dotted: {low} object{'s' if low != 1 else ''} kept only at 0.8 times t_hi (not the default output). "
-              if low_cut else "")
-           + (FIXED_WINDOW_NOTE if window is None else IMAGE_WINDOW_NOTE) + " Pre-validation, pixel units.")
+           + FIXED_WINDOW_NOTE + " Pre-validation, pixel units.")
     fig.text(margin / FIG_WIDTH_MM, 1.5 / fig_h, cap, ha="left", va="bottom", fontsize=FONT_SIZE - 0.5)
-    save_to(fig, stem, exts_for(window))
+    save_to(fig, stem)
     print(stem.relative_to(ROOT), "written")
 
 
@@ -1426,34 +1366,7 @@ def draw_rejected(ax, d: dict, lw: float = V2_OUTLINE_PT, letters: bool = True, 
                     fontweight="bold", path_effects=halo(1.2), zorder=6)
 
 
-LOW_CUT_SCALE = 0.8
-
-
-def low_cut_objects(d: dict) -> np.ndarray:
-    """Label image of the objects that the lacuna stage keeps at 0.8 t_hi and
-    that overlap no lacuna kept at the default cut (option -r only)."""
-    lac = lacunae.analyse_image(d["path"], d["t_hi"] * LOW_CUT_SCALE)
-    out = np.zeros(lac["labels"].shape, dtype=np.int32)
-    k = 0
-    for region, _b in lac["kept"]:
-        rr, cc = region.coords[:, 0], region.coords[:, 1]
-        if (d["lacuna_id_map"][rr, cc] > 0).any():
-            continue
-        k += 1
-        out[rr, cc] = k
-    return out
-
-
-def draw_low_cut(ax, d: dict) -> int:
-    lab = low_cut_objects(d)
-    for k in range(1, int(lab.max()) + 1):
-        for c in region_contours(lab == k):
-            ax.plot(c[:, 0], c[:, 1], color=PALETTE["low_cut"], lw=0.8, ls=(0, (0.8, 1.2)), zorder=3.6,
-                    path_effects=[patheffects.withStroke(linewidth=1.7, foreground="black")])
-    return int(lab.max())
-
-
-def lacuna_legend_items(d: dict, rejected: bool = True, low_cut: bool = False, canal: bool | None = None) -> list:
+def lacuna_legend_items(d: dict, rejected: bool = True, canal: bool | None = None) -> list:
     items = [
         {"kind": "outline", "colour": PALETTE["interior"], "label": "interior lacuna (in per-cell means)"},
         {"kind": "outline", "colour": PALETTE["edge"], "label": "lacuna touching the frame (not in per-cell means)"},
@@ -1461,9 +1374,6 @@ def lacuna_legend_items(d: dict, rejected: bool = True, low_cut: bool = False, c
     if rejected:
         items.append({"kind": "outline", "colour": PALETTE["rejected"], "ls": (0, (2.5, 1.5)),
                       "label": "rejected candidate: A aspect, S solidity, a area, R fragment or band rule"})
-    if low_cut:
-        items.append({"kind": "outline", "colour": PALETTE["low_cut"], "lw": 0.8, "ls": (0, (0.8, 1.2)),
-                      "label": "kept only at 0.8 times t_hi"})
     if (d["canal_ids"] if canal is None else canal):
         items.append({"kind": "text", "text": "c", "colour": PALETTE["interior"],
                       "label": "inside a flagged canal region, may be vascular"})
@@ -1496,29 +1406,17 @@ def draw_canal_marks(ax, d: dict, fs: float = FONT_SIZE - 2) -> None:
                 path_effects=halo(1.2), zorder=6)
 
 
-def figure_contact(key_path: Path | None = None, rejected: bool = False) -> None:
+def figure_contact(rejected: bool = False) -> None:
     """All images, 2 rows by 4 columns, raw with thin outlines ("c" beside
     a lacuna in a flagged canal region) and the count lines under each, one
-    display window. With rejected, the rejected candidates are drawn too.
-    With a blinding key, panels are labelled with the codes and ordered by
-    code."""
-    import csv
-
-    # Figure ids (figures v2, P3): Fig01 main; S02 with rejected candidates; S03 coded.
-    if key_path:
-        fig_name = "S03_contact_sheet_coded" + ("_with_rejected_candidates" if rejected else "")
-    else:
-        fig_name = "S02_contact_sheet_with_rejected_candidates" if rejected else "Fig01_contact_sheet"
+    display window. With rejected, the rejected candidates are drawn too."""
+    # Figure ids (figures v2, P3): Fig01 main; S02 with rejected candidates.
+    fig_name = "S02_contact_sheet_with_rejected_candidates" if rejected else "Fig01_contact_sheet"
     if done(fig_name):
         print(fig_name, "exists, skipped")
         return
     paths = image_paths()
     labels = {p: short(p) for p in paths}
-    if key_path:
-        with open(key_path, newline="") as f:
-            code_of = {row["original_name"]: row["code"] for row in csv.DictReader(f)}
-        labels = {p: code_of[p.name] for p in paths}
-        paths = sorted(paths, key=lambda p: labels[p])
     n_cols, n_rows = 4, int(np.ceil(len(paths) / 4))
     data = {p: image_data(short(p)) for p in paths}
     any_canal = any(data[p]["canal_ids"] for p in paths)
@@ -2088,7 +1986,7 @@ def set_group(group: str) -> None:
         DEFAULT_FIELD_DIR = ROOT / ".cache" / "field_summary" / group
 
 
-def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DIR) -> int:
+def figure_all(field_dir: Path = DEFAULT_FIELD_DIR) -> int:
     """O4: regenerate every figure in the results layout. Every step
     skips outputs that exist; delete a file to redraw it. Prints one row per
     output: written, skipped, failed or missing. Returns 1 if any step failed."""
@@ -2104,31 +2002,18 @@ def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DI
     steps = [("display window", display_window, (), [display_window_path()])]
     for n in names:
         steps.append((f"overview {n}", figure_image, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_OVERVIEW))))
-    if wt:
-        steps.append(("overview 543_3 -r", figure_image, ("543_3", None, True),
-                      pair(fig_path("543_3", config.SUFFIX_FIGURE_OVERVIEW + "_low_cut_layer", config.SECTION_ARCHIVE,
-                                    config.ARCHIVE_NOT_USED_DIR))))
     for n in names:
         steps.append((f"network {n}", figure_network, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_NETWORK))))
     steps.append(("Fig02 copy", copy_fig02, (), pair(fig_stem("Fig02").with_name(f"Fig02_network_overlay_{FIG02_IMAGE}"))))
     for n in names:
         steps.append((f"gallery {n}", figure_gallery, (n,), pair(fig_path(n, config.SUFFIX_FIGURE_GALLERY))))
-    for n in names:
-        steps.append((f"variants {n}", figure_display_variants, (n,),
-                      [fig_path(n, k + config.SUFFIX_VARIANT + ".png", config.SECTION_ARCHIVE, config.VARIANTS_DIR)
-                       for k in (config.SUFFIX_FIGURE_OVERVIEW, config.SUFFIX_FIGURE_NETWORK,
-                                 config.SUFFIX_FIGURE_GALLERY)]
-                      + [fig_path(n, config.VARIANT_WINDOW_FILE, config.SECTION_ARCHIVE, config.VARIANTS_DIR)]))
-    steps += [("Fig01", figure_contact, (None, False), pair(fig_stem("Fig01_contact_sheet"))),
+    steps += [("Fig01", figure_contact, (False,), pair(fig_stem("Fig01_contact_sheet"))),
               ("Fig03", figure_thresholds, (), pair(fig_stem("Fig03_threshold_sensitivity"))),
               ("Fig04", figure_fields, (field_dir, False), pair(fig_stem("Fig04_per_field")))]
     if wt:
         steps.append(("Fig04 merged", figure_fields, (field_dir, True), pair(fig_stem("Fig04_per_field_merged"))))
     steps += [("S01", figure_switches, (), pair(fig_stem("S01_switch_examples"))),
-              ("S02", figure_contact, (None, True), pair(fig_stem("S02_contact_sheet_with_rejected_candidates")))]
-    s03 = pair(fig_stem("S03_contact_sheet_coded"))
-    if blind_key is not None:
-        steps.append(("S03", figure_contact, (blind_key, False), s03))
+              ("S02", figure_contact, (True,), pair(fig_stem("S02_contact_sheet_with_rejected_candidates")))]
 
     def stamp(paths):
         return {p: p.stat().st_mtime_ns if p.is_file() else None for p in paths}
@@ -2147,8 +2032,6 @@ def figure_all(blind_key: Path | None = None, field_dir: Path = DEFAULT_FIELD_DI
                 status = "written" if before[p] != after[p] else "skipped"
             rows.append((label, p, status))
         failed += bool(code)
-    if blind_key is None:
-        rows += [("S03", p, "kept (needs -b KEY)" if p.is_file() else "missing (needs -b KEY)") for p in s03]
 
     width = max(len(r[0]) for r in rows)
     print(f"\n{'step':<{width}}  {'status':<10}  file")
@@ -2191,12 +2074,8 @@ def main() -> int:
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q.add_argument("-c", dest="cell", type=int, default=None, help="Lacuna id for the inset (default: the rule).")
-    q.add_argument("-r", dest="low_cut", action="store_true",
-                   help="Also draw objects kept only at 0.8 t_hi (dotted), into a separate file. Off by default.")
-    q = sub.add_parser("contact", help="Contact sheet of all images (Fig01; S02 with -r; S03 with -b).")
+    q = sub.add_parser("contact", help="Contact sheet of all images (Fig01; S02 with -r).")
     q.add_argument("-r", dest="rejected", action="store_true", help="Also draw the rejected candidates.")
-    q.add_argument("-b", dest="blind", action="store_true", help="Label with blinding codes instead of names.")
-    q.add_argument("-k", dest="key", type=Path, default=None, help="Blinding key (needed with -b).")
     sub.add_parser("thresholds", help="Lacuna cut sensitivity figure (Fig03).")
     q = sub.add_parser("fields", help="Per-field plot (Fig04).")
     q.add_argument("-f", dest="field_dir", type=Path, required=True, help="Output folder of field-summary.")
@@ -2213,13 +2092,7 @@ def main() -> int:
     g = q.add_mutually_exclusive_group(required=True)
     g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
     g.add_argument("-a", dest="all", action="store_true", help="All images.")
-    q = sub.add_parser("variants", help="Per-image figures with the image's own display window (PNG).")
-    g = q.add_mutually_exclusive_group(required=True)
-    g.add_argument("-i", dest="image", help="Image short name, for example 543-2.")
-    g.add_argument("-a", dest="all", action="store_true", help="All images.")
     q = sub.add_parser("all", help="Regenerate every figure in results/; prints what was written or skipped.")
-    q.add_argument("-b", dest="blind_key", type=Path, default=None,
-                   help="Blinding key for S03 (outside the repository); without it S03 is kept.")
     q.add_argument("-f", dest="field_dir", type=Path, default=None,
                    help="Output folder of field-summary (default: .cache/field_summary, and "
                         ".cache/field_summary/<group> for a group other than WT).")
@@ -2232,10 +2105,7 @@ def main() -> int:
     if args.cmd == "check":
         return run("N0", _selftest_n0)
     if args.cmd == "all":
-        return figure_all(args.blind_key, args.field_dir)
-    if args.cmd == "variants":
-        names = [short(x) for x in image_paths()] if args.all else [args.image]
-        return max(run("P8", figure_display_variants, n) for n in names)
+        return figure_all(args.field_dir)
     if args.cmd == "gallery":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
         return max(run("N2", figure_gallery, n) for n in names)
@@ -2250,12 +2120,9 @@ def main() -> int:
         return run("F0", lambda: print(display_window()))
     if args.cmd == "image":
         names = [short(x) for x in image_paths()] if args.all else [args.image]
-        return max(run("F1", figure_image, n, args.cell, args.low_cut) for n in names)
+        return max(run("F1", figure_image, n, args.cell) for n in names)
     if args.cmd == "contact":
-        if args.blind and not args.key:
-            print("-b needs the blinding key: -k KEY")
-            return 2
-        return run("F2", figure_contact, args.key if args.blind else None, args.rejected)
+        return run("F2", figure_contact, args.rejected)
     if args.cmd == "thresholds":
         return run("F3", figure_thresholds)
     if args.cmd == "fields":

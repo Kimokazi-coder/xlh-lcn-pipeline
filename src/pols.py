@@ -6,10 +6,10 @@ one candidate that needs no new detection: the size of each lacuna, set against
 the WT median. It is not a lesion call, and every output says
 "candidate POL measure: lacunar size, pending definition".
 
-The ring proxy that this section showed before (src/pol_ring_proxy.py) is
-retired: it measured the dye glow around every lacuna, the same width in WT,
-and not lesions. Its outputs were in results/<group>/5_archive/pol_ring_proxy/,
-deleted on 2026-11-09; they are in git history (tag method-freeze-v2).
+The ring proxy that this section showed before is retired: it measured the dye
+glow around every lacuna, the same width in WT, and not lesions. Its code
+(src/pol_ring_proxy.py) and outputs were deleted on 2026-11-09; they are in
+git history (tag method-freeze-v2).
 
 Nothing is detected again. Per image it reads what the pipeline saved in
 results/<group>/: each lacuna's area, frame flag and class from
