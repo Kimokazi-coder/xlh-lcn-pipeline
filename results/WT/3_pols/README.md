@@ -23,5 +23,6 @@ Made by `python src/pols.py all` (every group) or
 `python src/pols.py measure -d data/WT` (this group only).
 
 The ring proxy this folder held before is retired, because it measured the dye
-glow around every lacuna, the same width in WT, and not lesions. Its files are
-in `../5_archive/pol_ring_proxy/`.
+glow around every lacuna, the same width in WT, and not lesions. Its files were
+in `../5_archive/pol_ring_proxy/`, deleted on 2026-11-09; they are in git
+history (tag `method-freeze-v2`).

@@ -105,7 +105,7 @@ it named after its image:
 | `2_canaliculi/` | the network of each image (mask, skeleton, verification picture, vascular mask, graph, record) and its network figure |
 | `3_pols/` | candidate POL measure: lacunar size, pending definition (a picture and a table per image, a group table, a contact sheet) |
 | `4_quantification/` | every measured number per image, the group table, the overview and cell gallery figures, and the group figures Fig01 to Fig04, S01, S02 |
-| `5_archive/` | what is no longer used: the retired POL ring proxy |
+| `5_archive/` | deleted on 2026-11-09; the retired POL ring proxy it held is in git history (tag `method-freeze-v2`) |
 | `<section>/ai_judge/` | the AI lacuna judge's set in each section it writes (its log in `1_lacunae/ai_judge/ai_log/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/`. Made before `method-freeze-v1`, so they do not match the current results until rerun (a README in each) |
 
 Beside them, `results/summary/` holds the tables that set the groups side by

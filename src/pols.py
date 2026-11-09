@@ -8,7 +8,8 @@ the WT median. It is not a lesion call, and every output says
 
 The ring proxy that this section showed before (src/pol_ring_proxy.py) is
 retired: it measured the dye glow around every lacuna, the same width in WT,
-and not lesions. Its outputs are in results/<group>/5_archive/pol_ring_proxy/.
+and not lesions. Its outputs were in results/<group>/5_archive/pol_ring_proxy/,
+deleted on 2026-11-09; they are in git history (tag method-freeze-v2).
 
 Nothing is detected again. Per image it reads what the pipeline saved in
 results/<group>/: each lacuna's area, frame flag and class from
@@ -637,8 +638,9 @@ Made by `python src/pols.py all` (every group) or
 `python src/pols.py measure -d data/{group}` (this group only).
 
 The ring proxy this folder held before is retired, because it measured the dye
-glow around every lacuna, the same width in WT, and not lesions. Its files are
-in `../5_archive/pol_ring_proxy/`.
+glow around every lacuna, the same width in WT, and not lesions. Its files were
+in `../5_archive/pol_ring_proxy/`, deleted on 2026-11-09; they are in git
+history (tag `method-freeze-v2`).
 """
 
 
