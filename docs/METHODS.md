@@ -2399,3 +2399,32 @@ of the judge-on set, so each method is measured against its own reference
 group; no summary across groups is written for the set. A region the judge
 added has no area (class `judged`), so it counts in `n_lacunae` and nowhere
 else.
+
+### 29.4 The run, and what it changed
+
+FINAL mode, all 35 images, at tag `method-freeze-v2`. Lacuna judge: 35
+images, 36 calls, $1.08. Canaliculi judge: about 600 calls, $6.88. With the
+cost dry run, **$8.87 in all**, against a budget of $50. The canaliculi run
+was stopped once by the API's billing error ("credit balance too low"),
+partway through two images. After the user topped up the credit, the four
+unfinished images were run (about $0.36 paid twice). Both judges replay
+offline to identical verdicts on all 35 images. Judge-on sets:
+`<section>/ai_judge/` (lacuna judge) and `<section>/ai_judge_canaliculi/`
+(both judges), in every group, and `3_pols/ai_judge/`.
+
+On the 27 development images (`python src/diagnostics.py judge-compare`,
+`results/archive/judge/JUDGE_ON_VS_OFF.md` and the sheet "Judge on vs off"
+of `results/SUMMARY.xlsx`):
+
+- **Lacunae:** the lacuna judge removes 2, 10, 32 and 49 lacunae and adds 4,
+  5, 0 and 10 (WT, WT_HP, Hyp_RD, Hyp_HP). The removals are mostly band,
+  tissue and saturated border pieces in the Hyp groups, so the POL area per
+  analysed area falls most there (Hyp_HP 6.0% to 3.4%).
+- **Canaliculi:** the canaliculi judge adds 9 to 13% ring length per lacuna in
+  every group.
+- **Directions:** four small group differences change sign; the genotype by
+  diet interaction keeps its sign for every measure.
+- **Numbering:** some removals of enlarged lacunae are numbers read against
+  the wrong outline in the crowded full-field picture.
+
+Not validated. Report: `results/archive/judge/REPORT_JUDGE.md`.
