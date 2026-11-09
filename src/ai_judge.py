@@ -3115,19 +3115,25 @@ def parse_pol_answer(text: str, numbers: list) -> tuple:
     merge groups of two or more numbers that hold exactly the split ones."""
     if not text or not text.strip():
         return None, "the answer was empty"
-    body = text.strip()
-    if body.startswith("```"):
-        body = re.sub(r"^```[a-zA-Z]*\s*", "", body)
-        body = re.sub(r"\s*```$", "", body)
-    start, end = body.find("{"), body.rfind("}")
-    if start < 0 or end <= start:
-        return None, "no json object in the answer"
-    try:
-        parsed = json.loads(body[start:end + 1])
-    except json.JSONDecodeError as error:
-        return None, f"the json did not parse: {error.msg}"
-    if not isinstance(parsed, dict) or not isinstance(parsed.get("lacunae"), list):
-        return None, "no lacunae list"
+    # The answer is the LAST complete json object with a lacunae list in the
+    # text: an answer that corrects itself ("Corrected answer: {...}", seen in
+    # the dry run of 2026-11-09) is read as corrected. Everything below is as
+    # strict as the other two parsers.
+    decoder, parsed, at = json.JSONDecoder(), None, 0
+    while True:
+        at = text.find("{", at)
+        if at < 0:
+            break
+        try:
+            found, end = decoder.raw_decode(text, at)
+        except json.JSONDecodeError:
+            at += 1
+            continue
+        if isinstance(found, dict) and isinstance(found.get("lacunae"), list):
+            parsed = found
+        at = end
+    if parsed is None:
+        return None, "no json object with a lacunae list in the answer"
     seen = {}
     for item in parsed["lacunae"]:
         if not isinstance(item, dict):

@@ -9929,6 +9929,14 @@ def _ai_pol_self_test(image_path: Path) -> int:
                                                                           "reason": ""}], "merge": []})]
         checks.append(("the parser takes a split with its merge, and refuses a split with no merge, a merge of "
                        "non-split numbers and a not_lacuna with no reason", ok is not None and bad == [None] * 3))
+        corrected, _ = ai_judge.parse_pol_answer(
+            json.dumps({"lacunae": [{"n": 1, "verdict": "pol", "reason": ""}, {"n": 2, "verdict": "split",
+                                                                              "reason": ""}], "merge": [[1, 2]]})
+            + "\nCorrected answer:\n" + json.dumps({"lacunae": [{"n": 1, "verdict": "split", "reason": ""},
+                                                               {"n": 2, "verdict": "split", "reason": ""}],
+                                                   "merge": [[1, 2]]}), [1, 2])
+        checks.append(("an answer that corrects itself is read from its last json object",
+                       corrected is not None and corrected["lacunae"][0]["verdict"] == "split"))
 
         run = ai_judge.judge_pol_image(prepared, "self-test", answerer=ai_judge.stub_pol_answerer())
         print(f"  stub verdicts: {run['verdicts']}")

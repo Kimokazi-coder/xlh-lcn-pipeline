@@ -1,0 +1,69 @@
+{
+  "status": "pre-validation; cost of the AI POL judge, from the API's token counts",
+  "model": "claude-sonnet-5-5",
+  "dry_run_spent_usd": 0.08804,
+  "estimate_35_images_usd": 0.5907,
+  "estimate_calls": 82,
+  "margin": 1.5,
+  "estimate_with_margin_usd": 0.886,
+  "budget_usd": 10.0,
+  "within_budget": true,
+  "per_group": [
+    {
+      "group": "WT",
+      "image": "542_z06",
+      "cases": 2,
+      "calls": 2,
+      "input tokens": 5232,
+      "output tokens": 165,
+      "USD": 0.01211,
+      "USD per case": 0.00606,
+      "development images": 6,
+      "their cases": 5,
+      "images in group": 8,
+      "group estimate USD": 0.0404
+    },
+    {
+      "group": "WT_HP",
+      "image": "876_z89c1-2",
+      "cases": 1,
+      "calls": 1,
+      "input tokens": 2362,
+      "output tokens": 78,
+      "USD": 0.0055,
+      "USD per case": 0.0055,
+      "development images": 7,
+      "their cases": 8,
+      "images in group": 9,
+      "group estimate USD": 0.0566
+    },
+    {
+      "group": "Hyp_RD",
+      "image": "535_z13c1-2",
+      "cases": 3,
+      "calls": 4,
+      "input tokens": 9565,
+      "output tokens": 687,
+      "USD": 0.026,
+      "USD per case": 0.00867,
+      "development images": 7,
+      "their cases": 26,
+      "images in group": 9,
+      "group estimate USD": 0.2897
+    },
+    {
+      "group": "Hyp_HP",
+      "image": "548_hyp_HP_z08c1-2",
+      "cases": 7,
+      "calls": 7,
+      "input tokens": 18232,
+      "output tokens": 796,
+      "USD": 0.04442,
+      "USD per case": 0.00635,
+      "development images": 7,
+      "their cases": 25,
+      "images in group": 9,
+      "group estimate USD": 0.204
+    }
+  ]
+}

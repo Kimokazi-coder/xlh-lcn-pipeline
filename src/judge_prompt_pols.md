@@ -60,7 +60,9 @@ WHAT TO DECIDE, PER NUMBER
     outlines. Use it only when two or more numbered outlines together are one
     body; name them together in "merge" (below), and they will be joined into
     one lacuna. Pieces of the same body that are separated only by a thin dark
-    line or a small gap, with no bone between them, are a split.
+    line or a small gap, with no bone between them, are a split. Every piece
+    of that body gets "split", the largest piece too, even when the joined
+    body is an enlarged lacuna: say so in its "why".
   - "lacuna": an ordinary lacuna of normal size, correctly outlined on its own.
     A close neighbour of another lacuna that is a separate cell is "lacuna".
   - "not_lacuna": not a lacuna at all. Give the reason: "band" (part of a
@@ -76,7 +78,8 @@ what a POL looks like. Reject only what is not a lacuna.
 HOW TO ANSWER
 
 Answer with one json object and nothing else: no explanation before or after
-it, no markdown fence.
+it, no markdown fence. Check your answer against the rules below before you
+give it, and give it once.
 
 {"lacunae": [
   {"n": 1, "verdict": "split", "reason": "", "why": "one short line"},

@@ -32,6 +32,6 @@ POL judge (user message of 2026-11-09, after the rerun was pushed; budget $10):
 | step | state | note |
 | - | - | - |
 | code | done | config AI_POL_* (switch off), src/judge_prompt_pols.md, docs/judge_examples_pols.md, ai_judge "The POL judge", lacunae/quantification hooks (only with the switch on), diagnostics ai-pol-judge (dry run default, --live, --replay, -s), ai-lacuna-run --with-pol-judge, judge-cost --pols, judge-compare with the POL judge; METHODS 30. Checks: ai-pol-judge -s 16/16, ai-lacuna-judge -s 32/32, ai-judge -s 15/15, pols selftest 19/19, reference-check 3/3, regression PASS. judge_on_vs_off_before_pol_judge.csv is the comparison table before the POL judge |
-| dry run and cost | to do | offline over the 27 development images: 64 cases. Live on the first development image with at least one case in each group: 542_z06, 876_z89c1-2, 535_z13c1-2, 548_hyp_HP_z08c1-2 |
+| dry run and cost | done | offline over the 27 development images: 64 cases. Live on the first development image with at least one case in each group (542_z06, 876_z89c1-2, 535_z13c1-2, 548_hyp_HP_z08c1-2): 13 cases, 14 calls, $0.09; estimate for 35 images $0.59 ($0.89 at 1.5 times), within the $10 budget (COST_POL.md). One case had no valid answer: the model called a large body pol and its piece split, then corrected itself with prose around the json; the prompt now says every piece of a split body is split, and the parser reads the last json object (ai-pol-judge -s 17/17). The full run uses the corrected prompt |
 | full run | to do | |
 | compare, report | to do | |
