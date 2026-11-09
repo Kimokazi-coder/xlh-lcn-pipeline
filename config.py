@@ -160,12 +160,25 @@ def result_set_root(group_root: Path, subfolder: str) -> Path:
     return Path(group_root) / (RESULT_SET_MARK + subfolder)
 
 
-# The AI thread judge, WT only: its set in results/WT/<section>/ai_judge_canaliculi/
-# (AI_RESULTS_ROOT), and in AI_RESULTS_DIR, results/WT/2_canaliculi/ai_judge_canaliculi/,
-# also its run records, the comparison against results/WT/ in compare/, and the
-# judge log with the case pictures that were sent in ai_log/.
+# The AI thread judge (the canaliculi judge). WT only until 2026-11-09, every
+# group since: its set in results/<group>/<section>/ai_judge_canaliculi/
+# (ai_canaliculi_set_root) and its log, with the case pictures that were sent,
+# in results/<group>/2_canaliculi/ai_judge_canaliculi/ai_log/
+# (ai_canaliculi_group_dir). AI_RESULTS_DIR and AI_RESULTS_ROOT are the WT
+# ones, which the WT-only commands (ai-compare, compare-methods) and the
+# self-tests read.
 AI_RESULTS_DIR = RESULTS_DIR / SECTION_CANALICULI / AI_CANALICULI_SUBFOLDER
 AI_RESULTS_ROOT = result_set_root(RESULTS_DIR, AI_CANALICULI_SUBFOLDER)
+
+
+def ai_canaliculi_group_dir(group: str) -> Path:
+    """results/<group>/2_canaliculi/ai_judge_canaliculi/, where the canaliculi judge's log lives."""
+    return RESULTS_ROOT / group / SECTION_CANALICULI / AI_CANALICULI_SUBFOLDER
+
+
+def ai_canaliculi_set_root(group: str) -> Path:
+    """The root of the canaliculi judge's set of one group (results/<group>/<section>/ai_judge_canaliculi/)."""
+    return result_set_root(RESULTS_ROOT / group, AI_CANALICULI_SUBFOLDER)
 
 # Result layout. Every result file is named after its image. The label of an
 # image is its short name, from this table (key: the cleaned file name made by

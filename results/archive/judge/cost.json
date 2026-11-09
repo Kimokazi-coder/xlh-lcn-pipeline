@@ -1,0 +1,81 @@
+{
+  "status": "pre-validation; cost of the AI judge rerun, from the API's token counts",
+  "model": "claude-sonnet-5-5",
+  "prices_usd_per_mtok": {
+    "input": 2.0,
+    "output": 10.0
+  },
+  "dry_run_spent_usd": 0.90974,
+  "estimate_35_images_usd": 7.9592,
+  "estimate_calls": 601,
+  "margin": 1.5,
+  "estimate_with_margin_usd": 11.9387,
+  "budget_usd": 50.0,
+  "within_budget": true,
+  "per_group": [
+    {
+      "group": "WT",
+      "image": "542_z06",
+      "images in group": 8,
+      "lacuna judge calls": 1,
+      "lacuna judge input tokens": 5245,
+      "lacuna judge output tokens": 2108,
+      "lacuna judge USD": 0.03157,
+      "canaliculi judge calls": 19,
+      "canaliculi judge input tokens": 70397,
+      "canaliculi judge output tokens": 5616,
+      "canaliculi judge USD": 0.19695,
+      "canaliculi seconds, first to last call": 58,
+      "image USD": 0.22852,
+      "group estimate USD": 1.8282
+    },
+    {
+      "group": "WT_HP",
+      "image": "872_wt_hp_z03",
+      "images in group": 9,
+      "lacuna judge calls": 1,
+      "lacuna judge input tokens": 5246,
+      "lacuna judge output tokens": 827,
+      "lacuna judge USD": 0.01876,
+      "canaliculi judge calls": 11,
+      "canaliculi judge input tokens": 45620,
+      "canaliculi judge output tokens": 8042,
+      "canaliculi judge USD": 0.17166,
+      "canaliculi seconds, first to last call": 60,
+      "image USD": 0.19042,
+      "group estimate USD": 1.7138
+    },
+    {
+      "group": "Hyp_RD",
+      "image": "535_z13c1-2",
+      "images in group": 9,
+      "lacuna judge calls": 1,
+      "lacuna judge input tokens": 5245,
+      "lacuna judge output tokens": 2218,
+      "lacuna judge USD": 0.03267,
+      "canaliculi judge calls": 15,
+      "canaliculi judge input tokens": 59704,
+      "canaliculi judge output tokens": 8195,
+      "canaliculi judge USD": 0.20136,
+      "canaliculi seconds, first to last call": 66,
+      "image USD": 0.23403,
+      "group estimate USD": 2.1063
+    },
+    {
+      "group": "Hyp_HP",
+      "image": "548_hyp_HP_z08c1-2",
+      "images in group": 9,
+      "lacuna judge calls": 1,
+      "lacuna judge input tokens": 5243,
+      "lacuna judge output tokens": 2207,
+      "lacuna judge USD": 0.03256,
+      "canaliculi judge calls": 20,
+      "canaliculi judge input tokens": 75646,
+      "canaliculi judge output tokens": 7292,
+      "canaliculi judge USD": 0.22421,
+      "canaliculi seconds, first to last call": 65,
+      "image USD": 0.25677,
+      "group estimate USD": 2.3109
+    }
+  ]
+}

@@ -2356,6 +2356,39 @@ image is over the cap and fails only when one leaves a kept lacuna
 unnumbered (it failed as 26 of 27 because, with the cache keyed on the old
 settings, no image was found over the cap). It never reads a held-out image.
 
+### 29.2 The canaliculi judge on every group, on the accepted lacunae
+
+The canaliculi (thread) judge of section 20 ran on WT only. Since 2026-11-09
+it runs on every group, unchanged (same prompt, `src/judge_prompt.md`, same
+candidates, pictures and assembly), with its log per group in
+`results/<group>/2_canaliculi/ai_judge_canaliculi/ai_log/` (the group of an
+image is the data folder that holds it). It is run **on the lacunae the lacuna
+judge accepted** (`ai-judge --with-lacuna-judge`): the lacuna judge's switch is
+on in that process, so the cases and pictures are built around the judged
+lacunae, and `ai-run -a --with-lacuna-judge` assembles the set with both
+switches on. So the judge-on result is the whole judge layer:
+
+| set | lacunae | threads |
+| - | - | - |
+| `<section>/ai_judge/` | lacuna judge | deterministic, traced on the accepted lacunae |
+| `<section>/ai_judge_canaliculi/` | lacuna judge (the same lacunae) | canaliculi judge |
+
+The cost ceiling of a canaliculi judge run is now over the whole run, not per
+image (`--max-cost`, default `config.MAX_COST_USD` = $5): an image whose
+estimate would pass it is not started, and the run stops once what the answers
+cost reaches it. For this rerun the brief set one budget, $50 for both judges
+together; the four groups ran in parallel, each with a quarter of what was left
+after the dry run and the lacuna judge, so together they could not pass it. A
+held-out image is judged like any other, but no command prints, or puts in its
+run summary, what the judges said about it: only its cost.
+
+**Cost dry run (phase 2).** Both judges, live, on the first development image
+of each group in name order (542_z06, 872_wt_hp_z03, 535_z13c1-2,
+548_hyp_HP_z08c1-2), logs in `results/archive/judge/dry_run/`: 8 judge runs,
+69 calls, $0.91 from the API's token counts. Estimate for all 35 images $7.96
+(about 600 calls), $11.94 at 1.5 times; within the budget
+(`results/archive/judge/COST.md`, `python src/diagnostics.py judge-cost`).
+
 ### 29.3 The judge-on POL section
 
 `results/<group>/3_pols/ai_judge/` holds the POL section of the judge-on set:

@@ -5936,9 +5936,10 @@ def _ai_self_test(images: list) -> int:
 def cmd_ai_judge(args) -> int:
     import ai_judge
 
-    images = images_from(args)
     if args.self_test:
-        return _ai_self_test(images[:1])
+        return _ai_self_test(images_from(args)[:1])
+    every_group = args.all_groups and args.image is None and args.dir is None
+    images = lacuna_judge_images(args) if every_group else images_from(args)
     mode = "replay" if args.replay else "live"
     # Only a live run asks whether it may call out. A replay never looks at
     # either environment variable, the key least of all: it has no use for it.
@@ -5948,14 +5949,31 @@ def cmd_ai_judge(args) -> int:
             print(f"Refused: a real run needs a connection and {why}.")
             print("Set ALLOW_EXTERNAL_API=1 and ANTHROPIC_API_KEY, or run with --replay.")
             return 2
+    if args.with_lacuna_judge:
+        # The canaliculi judge on the lacunae the lacuna judge accepted
+        # (2026-11-09): the lacuna switch is on for this process only, so the
+        # cases and the pictures are built on the judged lacunae, as
+        # ai-run --with-lacuna-judge then assembles them.
+        config.AI_LACUNA_JUDGE_ENABLED = True
+    if args.log_root is not None:
+        ai_judge.LOG_ROOT = Path(args.log_root).resolve() / "canaliculi"
+        ai_judge.LACUNA_LOG_ROOT = Path(args.log_root).resolve() / "lacuna"
+    ceiling = float(config.MAX_COST_USD if args.max_cost is None else args.max_cost)
+    # A held-out image is judged like any other, but what the judge said about
+    # it is not printed (docs/HOLDOUT.md); only its cost is.
+    held_out = lacunae.held_out_labels()
 
     # The quality gate, over the whole run and not one image: it stops the run
     # if too many answers cannot be read, and one counter watches every image.
+    # The cost ceiling is over the whole run too: what every image before
+    # spent is carried into the next.
     gate = ai_judge.quality_gate()
-    rc = 0
+    rc, spent, per_image, stopped = 0, 0.0, [], None
     for image_path in images:
         label = lacunae.image_label(image_path)
-        print(f"\n== {label} ({mode}) ==")
+        group = image_path.parent.name
+        shown = label not in held_out
+        print(f"\n== {group}/{label} ({mode}) ==")
         state = ai_judge.pipeline_state(image_path)
         candidates = ai_judge.image_candidates(state)
         prompt = ai_judge.load_prompt()
@@ -5969,12 +5987,14 @@ def cmd_ai_judge(args) -> int:
                                               len(drawn["segments_drawn"]))
             estimated += estimate["cost_usd"]
         estimated = round(estimated, 4)
-        print(f"{len(candidates['cases'])} calls, estimated ${estimated}, "
-              f"ceiling ${config.MAX_COST_USD}")
-        if mode == "live" and estimated > config.MAX_COST_USD:
-            print(f"Refused: the estimate ${estimated} is above config.MAX_COST_USD "
-                  f"${config.MAX_COST_USD}.")
-            return 2
+        print(f"{len(candidates['cases'])} calls, estimated ${estimated}; spent before it "
+              f"${spent}, ceiling ${ceiling}")
+        if mode == "live" and spent + estimated > ceiling:
+            stopped = (f"the estimate for {group}/{label}, ${estimated}, on top of the ${spent} "
+                       f"already spent, is above the ceiling ${ceiling}")
+            print(f"STOPPED: {stopped}. Nothing more was sent.")
+            rc = 3
+            break
 
         def show(case_record, totals):
             kept = sum(1 for s in case_record["segments"] if s["verdict"] == "real")
@@ -5991,44 +6011,62 @@ def cmd_ai_judge(args) -> int:
             # what it cost is never replaced by a replay's zeros.
             out_root = AI_REPLAY_DIR if mode == "replay" else None
         try:
-            decisions = ai_judge.judge_image(state, candidates, mode, out_root, progress=show,
-                                             stop_check=gate if mode == "live" else None)
+            decisions = ai_judge.judge_image(state, candidates, mode, out_root,
+                                             progress=show if shown else None,
+                                             stop_check=gate if mode == "live" else None,
+                                             budget_usd=ceiling, spent_usd=spent)
         except ai_judge.FatalApiError as error:
             # A billing, credit or authentication error: stop the whole run
             # here, report it, and run nothing else. Nothing is marked unjudged
             # and no decision file is written, because nothing was asked.
             print(f"\nSTOPPED: {error}")
             print("No decision file was written for this image and no further image was run.")
-            return 5
+            stopped, rc = f"billing, credit or authentication error: {error}", 5
+            break
         totals = decisions["totals"]
+        if mode == "live":
+            spent = round(spent + totals["cost_usd"], 6)
+        cost = {k: totals[k] for k in ("calls", "attempts", "input_tokens", "output_tokens", "cost_usd")}
+        per_image.append({"group": group, "image": label, **cost,
+                          **({k: totals[k] for k in ("cases", "cases_valid", "cases_unjudged", "segments",
+                                                     "segments_real", "segments_artifact",
+                                                     "segments_unjudged", "invalid_attempts",
+                                                     "owner_moved_by_a_verdict")} if shown else
+                             {"held_out": True})})
         offered = max(1, totals["segments"])
-        print(f"segments: {totals['segments']} offered, "
-              f"{totals['segments_real']} real ({100.0 * totals['segments_real'] / offered:.1f}%), "
-              f"{totals['segments_artifact']} artifact "
-              f"({100.0 * totals['segments_artifact'] / offered:.1f}%), "
-              f"{totals['segments_unjudged']} unjudged")
-        given = [s for c in decisions["cases"] for s in c["segments"]
-                 if s["verdict"] != "unjudged" and s["owner_lacuna_id"]]
-        kept_owner = sum(1 for s in given if s["owner_lacuna_id"] == s["owner_lacuna_id_before"])
-        from_none = sum(1 for s in given if not s["owner_lacuna_id_before"])
-        between = len(given) - kept_owner - from_none
-        print(f"owners: {len(given)} segments given one: {kept_owner} the cell that already "
-              f"owned it, {from_none} a segment nobody owned, {between} moved from one cell to "
-              f"another; {totals['segments_given_no_owner']} given none")
-        print(f"json failures: {totals['invalid_attempts']} of {totals['attempts']} attempts "
-              f"({totals['call_errors']} of them a failed call, "
-              f"{totals['refusals']} a refusal), "
-              f"{totals['cases_unjudged']} of {totals['cases']} cases left unjudged")
+        if shown:
+            print(f"segments: {totals['segments']} offered, "
+                  f"{totals['segments_real']} real ({100.0 * totals['segments_real'] / offered:.1f}%), "
+                  f"{totals['segments_artifact']} artifact "
+                  f"({100.0 * totals['segments_artifact'] / offered:.1f}%), "
+                  f"{totals['segments_unjudged']} unjudged")
+            given = [s for c in decisions["cases"] for s in c["segments"]
+                     if s["verdict"] != "unjudged" and s["owner_lacuna_id"]]
+            kept_owner = sum(1 for s in given if s["owner_lacuna_id"] == s["owner_lacuna_id_before"])
+            from_none = sum(1 for s in given if not s["owner_lacuna_id_before"])
+            between = len(given) - kept_owner - from_none
+            print(f"owners: {len(given)} segments given one: {kept_owner} the cell that already "
+                  f"owned it, {from_none} a segment nobody owned, {between} moved from one cell to "
+                  f"another; {totals['segments_given_no_owner']} given none")
+            print(f"json failures: {totals['invalid_attempts']} of {totals['attempts']} attempts "
+                  f"({totals['call_errors']} of them a failed call, "
+                  f"{totals['refusals']} a refusal), "
+                  f"{totals['cases_unjudged']} of {totals['cases']} cases left unjudged")
+        else:
+            print("held-out image: judged, its verdicts are not shown")
         print(f"cost: ${totals['cost_usd']} for {totals['calls']} calls "
-              f"({totals['input_tokens']} input, {totals['output_tokens']} output tokens)")
+              f"({totals['input_tokens']} input, {totals['output_tokens']} output tokens); "
+              f"run total ${spent}")
         if totals["stopped_early"]:
             print(f"\nSTOPPED: {totals['stopped_early']}.")
             print("The rest of this image and every image after it were not run.")
-            return 6
+            stopped, rc = totals["stopped_early"], 6
+            break
         if totals["stopped_on_cost"]:
-            print(f"STOPPED: the running total passed config.MAX_COST_USD "
-                  f"${config.MAX_COST_USD}. The rest of the image was not judged.")
+            stopped = f"the running total reached the ceiling ${ceiling}"
+            print(f"STOPPED: {stopped}. The rest of the image and every image after it were not judged.")
             rc = 3
+            break
         if mode == "replay":
             if not totals["attempts"]:
                 print("replay against the log: the log holds no answers for this image yet, "
@@ -6043,8 +6081,22 @@ def cmd_ai_judge(args) -> int:
                                           decisions)
                 print(f"replay against the logged run: "
                       f"{'IDENTICAL verdicts' if same else 'DIFFERENT, see below'}")
+                per_image[-1]["replay_identical"] = bool(same and not totals["replay_request_mismatches"]
+                                                        and not totals["replay_picture_mismatches"])
                 if not same:
                     rc = 4
+    if args.record:
+        record = {"status": ("EXPERIMENT, pre-validation. The canaliculi judge" +
+                             (" on the lacunae the lacuna judge accepted" if args.with_lacuna_judge else "")),
+                  "written_at": ai_judge.utc_now(), "mode": mode, "model": config.AI_JUDGE_MODEL,
+                  "with_lacuna_judge": bool(args.with_lacuna_judge), "ceiling_usd": ceiling,
+                  "spent_usd": spent, "stopped": stopped, "images_run": len(per_image),
+                  "images": len(images), "per_image": per_image}
+        Path(args.record).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.record).write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        print(f"record -> {args.record}")
+    print(f"\nrun total: {len(per_image)} of {len(images)} images, ${spent} spent"
+          + (f"; STOPPED: {stopped}" if stopped else ""))
     return rc
 
 
@@ -6175,16 +6227,19 @@ def _tree_manifest(root: Path, exclude) -> dict:
 
 def _ai_run_detect(job: tuple) -> dict:
     """Both detection stages for one image with the switch on, written exactly
-    as src/lacunae.py and src/canaliculi.py write them."""
-    path_str, out_str = job
+    as src/lacunae.py and src/canaliculi.py write them; with the lacuna judge's
+    switch on as well when asked (the third item of the job)."""
+    path_str, out_str = job[0], job[1]
+    with_lacuna = bool(job[2]) if len(job) > 2 else False
     config.AI_JUDGE_ENABLED = True
+    config.AI_LACUNA_JUDGE_ENABLED = with_lacuna
     image_path, out_root = Path(path_str), Path(out_str)
     lac = lacunae.analyse_image(image_path)
     lacunae.write_outputs(lac, out_root)
     net = canaliculi.analyse_image(image_path)
     canaliculi.write_outputs(net, out_root)
     counts = net["ai_judge"]["counts"]
-    return {"image_label": lacunae.image_label(image_path),
+    return {"image_label": lacunae.image_label(image_path), "group": image_path.parent.name,
             "skeleton_px": int(net["skeleton"].sum()),
             "ai_judge": {k: counts[k] for k in sorted(counts)}}
 
@@ -6194,89 +6249,121 @@ def cmd_ai_run(args) -> int:
 
     import ai_judge
 
-    images = images_from(args)
+    every_group = args.all_groups and args.image is None and args.dir is None
+    images = lacuna_judge_images(args) if every_group else images_from(args)
     out = Path(args.out)
     results_root = config.RESULTS_ROOT
-    # The set goes inside the sections of results/WT/ (config.AI_RESULTS_ROOT) when
-    # the output folder is the judge's own, else into the folder given; the run
-    # record and the log stay in the output folder.
-    root = config.AI_RESULTS_ROOT if out.resolve() == AI_RUN_DIR.resolve() else out
-    written = [lacunae.section_folder(root, s) for s in
+    with_lacuna = bool(args.with_lacuna_judge)
+    groups = sorted({p.parent.name for p in images}, key=config.GROUPS.index)
+    # The set goes inside the sections of each group (config.ai_canaliculi_set_root)
+    # when the output folder is the judge's own, else into the folder given
+    # (<out>/<group> for a run over several groups); the log stays where it is.
+    default_out = out.resolve() == AI_RUN_DIR.resolve()
+
+    def root_of(group: str) -> Path:
+        if default_out:
+            return config.ai_canaliculi_set_root(group)
+        return out / group if len(groups) > 1 else out
+
+    record = Path(args.record) if args.record else (
+        config.ARCHIVE_ROOT / "judge" / "ai_canaliculi_run.json" if len(groups) > 1 else out / "ai_run.json")
+    written = [lacunae.section_folder(root_of(g), s) for g in groups for s in
                (config.SECTION_LACUNAE, config.SECTION_CANALICULI, config.SECTION_QUANTIFICATION)] + [out]
     for image_path in images:
-        label = lacunae.image_label(image_path)
+        label, group = lacunae.image_label(image_path), image_path.parent.name
         if not ai_judge.decisions_path(label).is_file():
             print(f"Refused: no decision file for {label} at {ai_judge.decisions_path(label)}. "
                   f"Run or replay the judge first.")
             return 2
-    print(f"The pipeline with the AI judge switch on, for this process only, into {out}")
-    print("Reads results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/ only. No call is made and no key is read.")
+        if with_lacuna and not ai_judge.lacuna_decisions_path(group, label).is_file():
+            print(f"Refused: no lacuna judge decision file for {label} at "
+                  f"{ai_judge.lacuna_decisions_path(group, label)}.")
+            return 2
+    print(f"The pipeline with the AI judge switch on"
+          + (" and the lacuna judge's switch on" if with_lacuna else "")
+          + f", for this process only, into {', '.join(str(root_of(g)) for g in groups)}")
+    print("Reads the judges' decision files only. No call is made and no key is read.")
     before = _tree_manifest(results_root, written)
-    log_root = ai_judge.log_root()
-    log_before = _tree_manifest(log_root, log_root / "__nothing_excluded__")
-    print(f"results/ before: {len(before)} files hashed; judge log: {len(log_before)} files hashed")
+    log_roots = {g: ai_judge.log_root(g) for g in groups}
+    log_before = {g: _tree_manifest(r, r / "__nothing_excluded__") for g, r in log_roots.items()}
+    print(f"results/ before: {len(before)} files hashed; judge logs: "
+          f"{sum(len(v) for v in log_before.values())} files hashed")
 
     out.mkdir(parents=True, exist_ok=True)
-    jobs = [(str(p), str(root)) for p in images]
+    jobs = [(str(p), str(root_of(p.parent.name)), with_lacuna) for p in images]
     workers = max(1, min(args.workers, len(jobs)))
     with ProcessPoolExecutor(max_workers=workers) as ex:
         detected = list(ex.map(_ai_run_detect, jobs))
+    held_out = lacunae.held_out_labels()
     for row in detected:
         c = row["ai_judge"]
-        print(f"  {row['image_label']}: detection written, skeleton {row['skeleton_px']} px, "
+        if row["image_label"] in held_out:
+            print(f"  {row['group']}/{row['image_label']}: detection written (held out, not shown)")
+            continue
+        print(f"  {row['group']}/{row['image_label']}: detection written, skeleton {row['skeleton_px']} px, "
               f"{c['real']} real and {c['artifact']} artifact verdicts applied, "
               f"{c['attached_segments']} attached, {c['conflicting']} conflicting, "
               f"{c['ownership_moved_px']} px changed hands")
 
     # Quantification exactly as src/quantification.py runs it: from the files
-    # detection has just written, then the cross-image table.
+    # detection has just written, then the cross-image table of each group.
     config.AI_JUDGE_ENABLED = True
-    quantified = []
+    config.AI_LACUNA_JUDGE_ENABLED = with_lacuna
+    quantified: dict = {}
     for image_path in images:
-        label = lacunae.image_label(image_path)
-        detection = quantification.load_detection(root, label)
+        label, group = lacunae.image_label(image_path), image_path.parent.name
+        detection = quantification.load_detection(root_of(group), label)
         result = quantification.quantify(detection, image_path, None)
-        quantification.write_outputs(result, root)
-        quantified.append(result)
-        print(f"  {label}: quantified, lacunae={result['lacuna_count']} "
-              f"(interior {result['interior_lacuna_count']}), roots per cell="
-              f"{result['summary']['roots_count']['mean']}")
-    quantification.write_summary_table(quantified, root)
+        quantification.write_outputs(result, root_of(group))
+        quantified.setdefault(group, []).append(result)
+        if label not in held_out:
+            print(f"  {group}/{label}: quantified, lacunae={result['lacuna_count']} "
+                  f"(interior {result['interior_lacuna_count']}), roots per cell="
+                  f"{result['summary']['roots_count']['mean']}")
+    for group, results in quantified.items():
+        quantification.write_summary_table(results, root_of(group))
     config.AI_JUDGE_ENABLED = False
+    config.AI_LACUNA_JUDGE_ENABLED = False
 
     after = _tree_manifest(results_root, written)
     changed = sorted(k for k in before if k in after and before[k] != after[k])
     gone = sorted(k for k in before if k not in after)
     new = sorted(k for k in after if k not in before)
-    log_after = _tree_manifest(log_root, log_root / "__nothing_excluded__")
+    log_after = {g: _tree_manifest(r, r / "__nothing_excluded__") for g, r in log_roots.items()}
     log_same = log_after == log_before
     same = not (changed or gone or new) and log_same
     report = {
-        "status": ("EXPERIMENT. The pipeline with config.AI_JUDGE_ENABLED on for this run "
-                   "only, from the decision files in results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/. Not validated."),
+        "status": ("EXPERIMENT. The pipeline with config.AI_JUDGE_ENABLED on"
+                   + (" and config.AI_LACUNA_JUDGE_ENABLED on" if with_lacuna else "")
+                   + " for this run only, from the decision files in results/<group>/2_canaliculi/"
+                     "ai_judge_canaliculi/ai_log/" + (" and results/<group>/1_lacunae/ai_judge/ai_log/"
+                                                      if with_lacuna else "") + ". Not validated."),
         "written_at": ai_judge.utc_now(),
-        "images": [lacunae.image_label(p) for p in images],
-        "per_image": detected,
+        "with_lacuna_judge": with_lacuna,
+        "images": [f"{p.parent.name}/{lacunae.image_label(p)}" for p in images],
+        "per_image": [row if row["image_label"] not in held_out else
+                      {"image_label": row["image_label"], "group": row["group"], "held_out": True}
+                      for row in detected],
         "results_outside_this_folder": {
             "files_hashed": len(before),
             "byte_identical_afterwards": not (changed or gone or new),
             "changed": changed, "removed": gone, "added": new,
         },
-        "judge_log": {
-            "folder": log_root.relative_to(config.PROJECT_ROOT).as_posix(),
-            "files_hashed": len(log_before),
-            "byte_identical_afterwards": log_same,
-        },
+        "judge_logs": {g: {"folder": log_roots[g].relative_to(config.PROJECT_ROOT).as_posix()
+                           if log_roots[g].is_absolute() else str(log_roots[g]),
+                           "files_hashed": len(log_before[g]),
+                           "byte_identical_afterwards": log_after[g] == log_before[g]} for g in groups},
     }
-    (out / "ai_run.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(f"\nresults/ after: {len(after)} files hashed; "
           + ("BYTE IDENTICAL to before" if not (changed or gone or new) else
              f"CHANGED: {len(changed)} changed, {len(gone)} removed, {len(new)} added"))
-    print(f"judge log after: {len(log_after)} files hashed; "
+    print(f"judge logs after: {sum(len(v) for v in log_after.values())} files hashed; "
           + ("BYTE IDENTICAL to before" if log_same else "CHANGED"))
     for k in (changed + gone + new)[:20]:
         print(f"  {k}")
-    print(f"report -> {out / 'ai_run.json'}")
+    print(f"report -> {record}")
     return 0 if same else 1
 
 
@@ -8679,6 +8766,9 @@ def ai_lacuna_live(images: list, out_root: Path, workers: int) -> int:
         return 2
     gate = ai_judge.lacuna_quality_gate()
     spent, per_image, rc, stopped = 0.0, [], 0, None
+    # A held-out image is judged like any other; what the judge said about it is
+    # neither printed nor put in the run summary, only its cost (docs/HOLDOUT.md).
+    held_out = lacunae.held_out_labels()
     for p in prepared:
         try:
             decisions = ai_judge.judge_lacuna_image(p, "live", spent_usd=spent)
@@ -8691,11 +8781,18 @@ def ai_lacuna_live(images: list, out_root: Path, workers: int) -> int:
         t = decisions["totals"]
         spent = round(spent + t["cost_usd"], 6)
         v = decisions["verdicts"]
-        per_image.append({"group": p["group"], "image": p["label"], "answer_valid":
-                          decisions["answer_valid"], "verdicts": v, "totals": t})
-        print(f"  {p['group']}/{p['label']}: {v['yes']} yes, {v['no']} no, {v['unsure']} unsure, "
-              f"{v['unjudged']} unjudged, {t['attempts']} attempt(s), ${t['cost_usd']}, "
-              f"running ${spent}")
+        if p["label"] in held_out:
+            per_image.append({"group": p["group"], "image": p["label"], "held_out": True,
+                              "totals": {k: t[k] for k in ("calls", "attempts", "input_tokens",
+                                                           "output_tokens", "cost_usd")}})
+            print(f"  {p['group']}/{p['label']}: judged (held out, verdicts not shown), "
+                  f"{t['attempts']} attempt(s), ${t['cost_usd']}, running ${spent}")
+        else:
+            per_image.append({"group": p["group"], "image": p["label"], "answer_valid":
+                              decisions["answer_valid"], "verdicts": v, "totals": t})
+            print(f"  {p['group']}/{p['label']}: {v['yes']} yes, {v['no']} no, {v['unsure']} unsure, "
+                  f"{v['unjudged']} unjudged, {t['attempts']} attempt(s), ${t['cost_usd']}, "
+                  f"running ${spent}")
         if t["stopped_on_cost"]:
             stopped = f"the running total reached config.AI_LACUNA_MAX_COST_USD ${config.AI_LACUNA_MAX_COST_USD}"
             print(f"\nSTOPPED: {stopped}. No further image was run.")
@@ -9219,8 +9316,12 @@ def _ai_lacuna_self_test(images: list, v2_image: Path) -> int:
 
 
 def cmd_ai_lacuna_judge(args) -> int:
+    import ai_judge
+
     images = lacuna_judge_images(args)
     out_root = Path(args.out)
+    if getattr(args, "log_root", None) is not None:
+        ai_judge.LACUNA_LOG_ROOT = Path(args.log_root).resolve() / "lacuna"
     if args.self_test:
         return _ai_lacuna_self_test(images[:1] if (args.image or args.dir)
                                     else [AI_LACUNA_SELF_TEST_IMAGE], AI_LACUNA_SELF_TEST_V2_IMAGE)
@@ -9505,8 +9606,12 @@ def cmd_ai_lacuna_run(args) -> int:
     workers = max(1, min(args.workers, len(jobs)))
     with ProcessPoolExecutor(max_workers=workers) as ex:
         detected = list(ex.map(_ai_lacuna_run_detect, jobs))
+    held_out = lacunae.held_out_labels()
     for row in detected:
         c = row["ai_lacuna_judge"]
+        if row["image_label"] in held_out:
+            print(f"  {row['group']}/{row['image_label']}: written (held out, not shown)")
+            continue
         print(f"  {row['group']}/{row['image_label']}: lacunae {c['lacunae_before']} -> "
               f"{c['lacunae_after']} (+{c['added']} -{c['removed']}), {c['yes']} yes, "
               f"{c['no']} no, {c['unsure']} unsure, {c['unjudged']} unjudged")
@@ -9537,7 +9642,9 @@ def cmd_ai_lacuna_run(args) -> int:
                    "boundary is the lacuna stage's own."),
         "written_at": ai_judge.utc_now(),
         "images": [f"{p.parent.name}/{lacunae.image_label(p)}" for p in images],
-        "per_image": detected,
+        "per_image": [row if row["image_label"] not in held_out else
+                      {"image_label": row["image_label"], "group": row["group"], "held_out": True}
+                      for row in detected],
         "left_unchanged": {name: {"files_hashed": len(before[name]),
                                   "byte_identical_afterwards": not changed[name],
                                   "changed": changed[name]} for name in before},
@@ -9567,6 +9674,105 @@ def _ai_same_decisions(a: dict, b: dict) -> bool:
                       f"{seg_b['verdict']}/{seg_b['owner']}")
                 same = False
     return same
+
+
+# judge-cost ---------------------------------------------------------------------
+# The cost of the judge rerun (brief of 2026-11-09, phase 2). Both judges were
+# run live on the first development image of each group in name order, the
+# canaliculi judge on the lacunae the lacuna judge accepted, with their logs
+# and run records in results/archive/judge/dry_run/. From the token counts the
+# API reported: the cost per image, and the estimate for all 35 images, per
+# group the dry-run image's cost times the group's images. No call is made.
+# Writes results/archive/judge/COST.md and cost.json.
+
+JUDGE_DIR = config.ARCHIVE_ROOT / "judge"
+# The brief's BUDGET_USD (2026-11-09): both judges together, over the full run.
+JUDGE_BUDGET_USD = 50.0
+# Report only: the estimate is also given at this multiple, because one image
+# per group stands for nine and images differ (the WT dry-run images of
+# 2026-10 cost up to 1.34 times their estimate). Chosen, not measured.
+JUDGE_COST_MARGIN = 1.5
+
+
+def _seconds_between(stamps: list) -> float:
+    from datetime import datetime
+
+    times = sorted(datetime.fromisoformat(s.replace("Z", "+00:00")) for s in stamps if s)
+    return (times[-1] - times[0]).total_seconds() if len(times) > 1 else 0.0
+
+
+def cmd_judge_cost(args) -> int:
+    dry = JUDGE_DIR / "dry_run"
+    rows, total, total_calls = [], 0.0, 0
+    for group in config.GROUPS:
+        lac = json.loads((dry / group / "ai_lacuna_judge_run.json").read_text(encoding="utf-8"))
+        can = json.loads((dry / group / "canaliculi_run.json").read_text(encoding="utf-8"))
+        li, ci = lac["per_image"][0], can["per_image"][0]
+        lt = li["totals"]
+        stamps = [json.loads(p.read_text(encoding="utf-8")).get("written_at")
+                  for p in sorted((dry / "canaliculi").glob(f"{ci['image']}_case_*_attempt*.json"))]
+        n_images = len(sorted((config.DATA_DIR / group).glob("*.tif")))
+        image_cost = lt["cost_usd"] + ci["cost_usd"]
+        rows.append({
+            "group": group, "image": li["image"], "images in group": n_images,
+            "lacuna judge calls": lt["calls"], "lacuna judge input tokens": lt["input_tokens"],
+            "lacuna judge output tokens": lt["output_tokens"], "lacuna judge USD": round(lt["cost_usd"], 5),
+            "canaliculi judge calls": ci["calls"], "canaliculi judge input tokens": ci["input_tokens"],
+            "canaliculi judge output tokens": ci["output_tokens"],
+            "canaliculi judge USD": round(ci["cost_usd"], 5),
+            "canaliculi seconds, first to last call": round(_seconds_between(stamps)),
+            "image USD": round(image_cost, 5),
+            "group estimate USD": round(image_cost * n_images, 4),
+        })
+        total += image_cost * n_images
+        total_calls += (lt["calls"] + ci["calls"]) * n_images
+    spent = sum(r["image USD"] for r in rows)
+    within = total * JUDGE_COST_MARGIN <= JUDGE_BUDGET_USD
+    record = {"status": "pre-validation; cost of the AI judge rerun, from the API's token counts",
+              "model": config.AI_JUDGE_MODEL,
+              "prices_usd_per_mtok": {"input": config.AI_PRICE_INPUT_USD_PER_MTOK,
+                                      "output": config.AI_PRICE_OUTPUT_USD_PER_MTOK},
+              "dry_run_spent_usd": round(spent, 5), "estimate_35_images_usd": round(total, 4),
+              "estimate_calls": total_calls, "margin": JUDGE_COST_MARGIN,
+              "estimate_with_margin_usd": round(total * JUDGE_COST_MARGIN, 4),
+              "budget_usd": JUDGE_BUDGET_USD, "within_budget": within, "per_group": rows}
+    (JUDGE_DIR / "cost.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    seconds = sum(r["canaliculi seconds, first to last call"] * r["images in group"] for r in rows)
+    lines = [
+        "# Cost of the AI judge rerun (dry run, 2026-11-09)",
+        "",
+        "Pre-validation. Both judges were run live on one development image per group (the first",
+        "in name order), the canaliculi judge on the lacunae the lacuna judge accepted, DEV mode.",
+        "Every number below is from the token counts the API reported, priced at the pinned",
+        f"model's list price (`{config.AI_JUDGE_MODEL}`, ${config.AI_PRICE_INPUT_USD_PER_MTOK:.2f} input and "
+        f"${config.AI_PRICE_OUTPUT_USD_PER_MTOK:.2f} output per million tokens). Logs and run records:",
+        "`results/archive/judge/dry_run/`; made by `python src/diagnostics.py judge-cost`.",
+        "",
+        "| group | image | lacuna judge: calls, tokens in / out, USD | canaliculi judge: calls, tokens in / out, USD | USD for the image | images in group | group estimate USD |",
+        "| - | - | - | - | - | - | - |",
+    ]
+    for r in rows:
+        lines.append(f"| {r['group']} | {r['image']} | {r['lacuna judge calls']}, {r['lacuna judge input tokens']:,} / "
+                     f"{r['lacuna judge output tokens']:,}, ${r['lacuna judge USD']:.4f} | "
+                     f"{r['canaliculi judge calls']}, {r['canaliculi judge input tokens']:,} / "
+                     f"{r['canaliculi judge output tokens']:,}, ${r['canaliculi judge USD']:.4f} | "
+                     f"${r['image USD']:.4f} | {r['images in group']} | ${r['group estimate USD']:.2f} |")
+    lines += [
+        "",
+        f"- Spent on this dry run: **${spent:.4f}**.",
+        f"- Estimate for all 35 images (per group, the dry-run image's cost times the group's images): "
+        f"**${total:.2f}**, about {total_calls} calls; at {JUDGE_COST_MARGIN} times, ${total * JUDGE_COST_MARGIN:.2f}.",
+        f"- Budget (BUDGET_USD of the brief): ${JUDGE_BUDGET_USD:.0f}. The estimate at {JUDGE_COST_MARGIN} times is "
+        + ("**within it**, so the full run goes ahead." if within else "**above it**, so the run stops here."),
+        f"- Time: the canaliculi judge's calls ran one after another, about {seconds / 3600:.1f} h for all 35 "
+        "images at the dry run's pace, plus the lacuna and network stages of each image.",
+        "- One image per group stands for eight or nine, so this is an estimate. The full run stops by itself "
+        "if the running total reaches the budget.",
+        "",
+    ]
+    (JUDGE_DIR / "COST.md").write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines))
+    return 0 if within else 3
 
 
 # pol-look
@@ -10159,9 +10365,17 @@ def main() -> None:
                             "judge switch on for this run only, into results/WT/<section>/ai_judge_canaliculi/.")
     add_images_arguments(p)
     p.add_argument("-o", dest="out", type=Path, default=AI_RUN_DIR,
-                   help="Output folder (default: results/WT/2_canaliculi/ai_judge_canaliculi; the set goes to results/WT/<section>/ai_judge_canaliculi/).")
+                   help="Output folder (default: results/WT/2_canaliculi/ai_judge_canaliculi; the set goes to results/<group>/<section>/ai_judge_canaliculi/).")
     p.add_argument("-w", dest="workers", type=int, default=4,
                    help="Parallel processes, one image each.")
+    p.add_argument("-a", "--all-groups", dest="all_groups", action="store_true",
+                   help="Every image of every group (without -i or -d); the run record goes to "
+                        "results/archive/judge/ai_canaliculi_run.json.")
+    p.add_argument("--with-lacuna-judge", dest="with_lacuna_judge", action="store_true",
+                   help="The lacuna judge's switch on as well, for this process only: the canaliculi "
+                        "judge on the lacunae the lacuna judge accepted.")
+    p.add_argument("--record", default=None,
+                   help="Where the run record goes (default: see --all-groups, else <out>/ai_run.json).")
     p.set_defaults(func=cmd_ai_run)
 
     p = sub.add_parser("ai-compare",
@@ -10196,6 +10410,20 @@ def main() -> None:
     p.add_argument("-o", dest="out", type=Path, default=None,
                    help="Where a replay writes its decision file (default: beside the log, "
                         "which overwrites it with the same content).")
+    p.add_argument("-a", "--all-groups", dest="all_groups", action="store_true",
+                   help="Every image of every group (without -i or -d).")
+    p.add_argument("--with-lacuna-judge", dest="with_lacuna_judge", action="store_true",
+                   help="The lacuna judge's switch on, for this process only: the cases are built on "
+                        "the lacunae the lacuna judge accepted (its decision files must exist).")
+    p.add_argument("--max-cost", dest="max_cost", type=float, default=None,
+                   help="The cost ceiling of this run in USD, over every image (default: "
+                        "config.MAX_COST_USD). The run refuses an image whose estimate would pass it "
+                        "and stops once what the answers cost reaches it.")
+    p.add_argument("--log-root", dest="log_root", type=Path, default=None,
+                   help="Write and read the logs under this folder instead of results/: canaliculi/ "
+                        "for this judge, lacuna/<group>/ai_log/ for the lacuna judge's decision files.")
+    p.add_argument("--record", default=None,
+                   help="Write the run record (cost per image, totals, why it stopped) to this json.")
     p.set_defaults(func=cmd_ai_judge)
 
     p = sub.add_parser("ai-lacuna-judge",
@@ -10217,6 +10445,9 @@ def main() -> None:
                         "inside it).")
     p.add_argument("-w", dest="workers", type=int, default=8,
                    help="Parallel processes for the candidates, one image each (default 8).")
+    p.add_argument("--log-root", dest="log_root", type=Path, default=None,
+                   help="Write and read the log under <this>/lacuna/<group>/ai_log/ instead of "
+                        "results/<group>/1_lacunae/ai_judge/ai_log/ (the cost dry run of 2026-11-09).")
     p.set_defaults(func=cmd_ai_lacuna_judge)
 
     p = sub.add_parser("ai-lacuna-run",
@@ -10242,6 +10473,11 @@ def main() -> None:
     p.add_argument("-w", dest="workers", type=int, default=8,
                    help="Parallel processes, one image each (default 8).")
     p.set_defaults(func=cmd_ai_lacuna_review)
+
+    p = sub.add_parser("judge-cost",
+                       help="The cost of the AI judge rerun from its dry run in results/archive/judge/dry_run/: "
+                            "results/archive/judge/COST.md and cost.json. No call is made.")
+    p.set_defaults(func=cmd_judge_cost)
 
     p = sub.add_parser("group-overview",
                        help="One table over every group, one row per image: results/summary/group_overview.csv "

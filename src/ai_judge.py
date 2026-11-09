@@ -1428,23 +1428,37 @@ def parse_answer(text: str, numbers: list, colours: dict, questions: dict) -> tu
 
 # The log, and the replay that reads it back
 
-# The log lives in config.AI_RESULTS_DIR/ai_log/ (results/WT/2_canaliculi/
-# ai_judge_canaliculi/ai_log/), one folder for every image, each file named after its
-# image. LOG_ROOT replaces that for one process, the
-# module-override idiom the sweep diagnostics use: the self-test sets it so that
-# a rehearsal with a stub judge can never leave verdicts in results/ for the
-# pipeline to pick up.
+# The log lives in config.ai_canaliculi_group_dir(group)/ai_log/
+# (results/<group>/2_canaliculi/ai_judge_canaliculi/ai_log/), one folder for every
+# image of the group, each file named after its image; the group is the data
+# folder that holds the image (label_group). LOG_ROOT replaces that with one
+# folder for one process, the module-override idiom the sweep diagnostics use:
+# the self-test sets it so that a rehearsal with a stub judge can never leave
+# verdicts in results/ for the pipeline to pick up.
 LOG_ROOT = None
+_LABEL_GROUPS: dict = {}
 
 
-def log_root() -> Path:
-    return Path(LOG_ROOT) if LOG_ROOT else config.AI_RESULTS_DIR / config.AI_LOG_DIR
+def label_group(label: str) -> str:
+    """The group of the image with this label: the data folder that holds it
+    (labels are unique over config.GROUPS), else the reference group."""
+    if not _LABEL_GROUPS:
+        for group in config.GROUPS:
+            for path in sorted((config.DATA_DIR / group).glob("*.tif")):
+                _LABEL_GROUPS.setdefault(lacunae.image_label(path), group)
+    return _LABEL_GROUPS.get(label, config.REFERENCE_GROUP)
+
+
+def log_root(group: str | None = None) -> Path:
+    if LOG_ROOT:
+        return Path(LOG_ROOT)
+    return config.ai_canaliculi_group_dir(group or config.REFERENCE_GROUP) / config.AI_LOG_DIR
 
 
 def log_dir(label: str) -> Path:
-    """The folder of one image's log: the log folder itself, shared by every
-    image; the files are told apart by their label prefix."""
-    return log_root()
+    """The folder of one image's log: the log folder of its group, shared by
+    every image of the group; the files are told apart by their label prefix."""
+    return log_root(label_group(label))
 
 
 def log_path(label: str, case_id: str, attempt: int) -> Path:
@@ -1477,7 +1491,7 @@ def read_log(label: str, case_id: str, attempt: int) -> dict | None:
 
 def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None = None,
                 budget_usd: float | None = None, progress=None, answerer=None,
-                stop_check=None) -> dict:
+                stop_check=None, spent_usd: float = 0.0) -> dict:
     """Judge every case of one image, or replay every case from the log.
 
     mode "live"   one call per case, retried once if the answer does not
@@ -1497,9 +1511,11 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
     a prompt the model cannot answer.
 
     The cost ceiling is checked before the first call and again after every
-    answer; passing it stops the run where it is and says so. A billing, credit
-    or authentication error stops it at once and raises, because nothing was
-    asked and nothing may be recorded as unjudged.
+    answer; passing it stops the run where it is and says so. `spent_usd` is
+    what the run spent before this image, so `budget_usd` (default
+    config.MAX_COST_USD) is a ceiling for the whole run and not per image. A
+    billing, credit or authentication error stops it at once and raises,
+    because nothing was asked and nothing may be recorded as unjudged.
     """
     label = state["label"]
     prompt = load_prompt()
@@ -1536,7 +1552,7 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
             "segments_offered": len(case["decide"]),
             "segments_not_offered": case["segments_not_offered"],
             "context_segments": len(case["context"]),
-            "picture": picture.relative_to(config.PROJECT_ROOT).as_posix(),
+            "picture": _relative(picture),
             "colours": drawn["colours"],
             "bodies_with_no_colour": drawn["bodies_with_no_colour"],
             "kinds_drawn": drawn["kinds_drawn"],
@@ -1571,7 +1587,7 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
         payload, canonical, request_sha = build_request(prompt["system"], user_text, png)
         answer = None
         for attempt in (1, 2):
-            if totals["cost_usd"] >= budget:
+            if mode != "replay" and spent_usd + totals["cost_usd"] >= budget:
                 totals["stopped_on_cost"] = True
                 break
             record = {
@@ -1582,7 +1598,7 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
                 "lacuna_id": case["lacuna_id"],
                 "case_id": case["case_id"],
                 "attempt": attempt,
-                "picture": picture.relative_to(config.PROJECT_ROOT).as_posix(),
+                "picture": _relative(picture),
                 "picture_sha256": sha256_bytes(png),
                 "prompt_sha256": prompt["prompt_sha256"],
                 "examples_sha256": prompt["examples_sha256"],
