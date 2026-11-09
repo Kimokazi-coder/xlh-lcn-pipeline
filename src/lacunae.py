@@ -952,7 +952,7 @@ def analyse_image(image_path: Path, t_hi: float | None = None) -> dict:
     if config.AI_LACUNA_JUDGE_ENABLED:
         import ai_judge  # noqa: PLC0415 (deliberate: see above)
         labels, kept, classes, judged = ai_judge.apply_lacuna_verdicts(
-            image_path, channel, labels, kept, t_hi, classes)
+            image_path, channel, labels, kept, t_hi, classes, excluded)
     border = sum(1 for _r, on_border in kept if on_border)
     no_shape = set(classes["dim"]) | set(classes["out_of_focus"]) | set(classes.get("judged", ()))
     result = {

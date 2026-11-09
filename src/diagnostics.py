@@ -8429,6 +8429,13 @@ def lacuna_judge_images(args) -> list:
 
 AI_LACUNA_REPLAY_DIR = config.PROJECT_ROOT / ".cache" / "ai_lacuna_replay"
 AI_LACUNA_SELF_TEST_DIR = config.PROJECT_ROOT / ".cache" / "ai_lacuna_self_test"
+# The self-test's images. 543_3 since 2026-11-09 (it was 543-2, which became a
+# held-out image on 2026-11-05 and is refused in DEV mode; 543_3 is also the
+# reference-check image). The v2 checks run on I534_z25c1-2, a development
+# image with an excluded region and two clusters in the method-freeze-v2
+# results; chosen for those, not for what the judge says about it.
+AI_LACUNA_SELF_TEST_IMAGE = DEFAULT_IMAGE_DIR / "543_3.tif"
+AI_LACUNA_SELF_TEST_V2_IMAGE = config.DATA_DIR / "Hyp_RD" / "I534_z25c1-2.tif"
 # What the thread judge's real run cost against its own dry run estimate
 # (docs/EXPERIMENT_AI.md, step 7: $1.60 against $1.19, nearly all of it input
 # tokens). Report only: printed beside this judge's estimate so it is read as a
@@ -8763,14 +8770,96 @@ def _lacuna_set(labels: np.ndarray, kept: list, candidates: list) -> tuple:
     return id_map, [bool((id_map[e["rows"], e["cols"]] > 0).all()) for e in candidates]
 
 
-def _ai_lacuna_self_test(images: list) -> int:
+def _ai_lacuna_self_test_v2(image_path: Path, use_log) -> list:
+    """The rules of method-freeze-v2 (config section g9) with the judge on, on
+    a development image that has an excluded region and clusters: no area cap,
+    an object mostly in the excluded region is never offered and never comes
+    back whatever the verdict, and the cluster flag stays on every cluster the
+    judge keeps. Every verdict is "yes" here, the one answer that could break
+    the first two rules. Runs the whole chain, network and quantification
+    included, on files in .cache/ai_lacuna_self_test/v2_run."""
+    import ai_judge
+
+    image_path = Path(image_path)
+    group, label = image_path.parent.name, lacunae.image_label(image_path)
+    share = float(config.EXCLUDED_OBJECT_MAX_SHARE)
+    checks = []
+    print(f"  method-freeze-v2 rules on {group}/{label} (every verdict yes):")
+    use_log("v2")
+    prepared = ai_judge.prepare_lacuna_image(image_path)
+    state = ai_judge.cached_lacuna_state(image_path)
+    cand = ai_judge.lacuna_candidates(state)
+    excluded = state["excluded"]
+    offered = cand["candidates"] + cand["not_numbered"]
+    left_out = cand["in_excluded_region"]
+    print(f"    excluded region {float(excluded.mean()) * 100:.1f}% of the field; {len(offered)} "
+          f"candidates offered, {len(left_out)} mostly inside it not offered "
+          f"({cand['counts']['in_excluded_region_dim']} of them dim candidates)")
+    checks.append(("v2: no region mostly in the excluded region is offered to the judge, and those "
+                   "left out are no lacunae", bool(excluded.any()) and bool(left_out)
+                   and all(e["excluded_share"] <= share for e in offered)
+                   and all(e["deterministic"] != "lacuna" and e["n"] is None for e in left_out)))
+
+    run = ai_judge.judge_lacuna_image(prepared, "self-test",
+                                      answerer=ai_judge.stub_lacuna_answerer(break_first=False,
+                                                                             every="yes"))
+    off = lacunae.analyse_image(image_path)
+    run_dir = AI_LACUNA_SELF_TEST_DIR / "v2_run" / group
+    saved = config.AI_LACUNA_JUDGE_ENABLED
+    config.AI_LACUNA_JUDGE_ENABLED = True
+    try:
+        lac = lacunae.analyse_image(image_path)
+        lacunae.write_outputs(lac, run_dir)
+        _display, channel = lacunae.load_channel(image_path)
+        net = canaliculi.analyse_network(image_path, lac, channel)
+        canaliculi.write_outputs(net, run_dir)
+        detection = quantification.load_detection(run_dir, label)
+        q = quantification.quantify(detection, image_path, None)
+    finally:
+        config.AI_LACUNA_JUDGE_ENABLED = saved
+    id_on, now = _lacuna_set(lac["labels"], lac["kept"], offered + left_out)
+    numbered = cand["candidates"]
+    biggest = max(numbered, key=lambda e: e["area_px2"])
+    big_um2 = biggest["area_px2"] * config.PIXEL_SIZE_UM_ACQUIRED ** 2
+    print(f"    every verdict yes: lacunae {len(off['kept'])} -> {len(lac['kept'])}; the largest "
+          f"numbered region {big_um2:.0f} um2 ({biggest['deterministic']} before)")
+    checks.append(("v2: no area cap, every numbered region judged yes is a lacuna whatever its "
+                   f"size (the largest {big_um2:.0f} um2), and the band rule g8 is off",
+                   not config.BAND_BLOB_RULE and run["answer_valid"]
+                   and all(now[i] for i in range(len(numbered)))))
+    inside = [float(excluded[id_on == i].mean()) for i in range(1, len(lac["kept"]) + 1)]
+    checks.append(("v2: a yes never brings back an object mostly in the excluded region",
+                   all(s <= share for s in inside)
+                   and not any(now[len(offered) + i] for i in range(len(left_out)))))
+
+    def cluster_keys(label_image: np.ndarray) -> set:
+        width = label_image.shape[1]
+        return {_pixel_key(r.coords[:, 0], r.coords[:, 1], width)
+                for r in measure.regionprops(label_image.astype(np.int32)) if lacunae.is_cluster(r.image)}
+
+    off_clusters = cluster_keys(lacunae.label_image_of_kept(off["labels"], off["kept"]))
+    on_clusters = cluster_keys(lacunae.label_image_of_kept(lac["labels"], lac["kept"]))
+    flagged = sum(1 for r in q["rows"] if r.get("cluster"))
+    shaped = [r for r in q["rows"] if r["lacuna_class"] not in ("judged", "dim", "out_of_focus")]
+    print(f"    clusters: {len(off_clusters)} with the judge off, {len(on_clusters)} with it on, "
+          f"{flagged} flagged by quantification with it on")
+    checks.append(("v2: every cluster the deterministic method flags is still a lacuna and still "
+                   "flagged with the judge on", bool(off_clusters) and off_clusters <= on_clusters
+                   and all(r.get("cluster") is not None for r in shaped)
+                   and flagged >= len(off_clusters)))
+    return checks
+
+
+def _ai_lacuna_self_test(images: list, v2_image: Path) -> int:
     """The whole chain of the lacuna judge with no network and no key: a picture
     becomes a request, a stub answer becomes verdicts, the log replays to the
     same verdicts, and the switch then decides the lacunae and runs every later
     stage on them. The stub's rule means nothing biologically
     (ai_judge.stub_lacuna_answerer), so this checks the machinery and never the
-    judgement. Everything it writes goes to .cache/ai_lacuna_self_test, which
-    is git-ignored, and never to results/archive/ai_judge/."""
+    judgement. Then the rules of method-freeze-v2 on `v2_image`
+    (_ai_lacuna_self_test_v2). Everything it writes goes to
+    .cache/ai_lacuna_self_test, which is git-ignored, and never to
+    results/archive/ai_judge/."""
     import os
     import re
 
@@ -8801,7 +8890,8 @@ def _ai_lacuna_self_test(images: list) -> int:
         prepared = ai_judge.prepare_lacuna_image(image_path)
         state = ai_judge.lacuna_state(image_path)
         cand = ai_judge.lacuna_candidates(state)
-        everything = cand["candidates"] + cand["not_numbered"]
+        offered = cand["candidates"] + cand["not_numbered"]
+        everything = offered + cand["in_excluded_region"]
         c0 = prepared["counts"]
         print(f"  {c0['numbered']} numbered candidates: {c0['numbered_kept_by_the_filters']} kept by "
               f"the filters, {c0['numbered_rejected_by_the_filters']} regions they rejected, "
@@ -8817,7 +8907,8 @@ def _ai_lacuna_self_test(images: list) -> int:
                        and bool((cached["labels"] == state["labels"]).all())
                        and cached["t_hi"] == state["t_hi"]
                        and cached["classes"] == state["classes"]
-                       and cached["kept_labels"] == ai_judge.kept_labels(state)))
+                       and cached["kept_labels"] == ai_judge.kept_labels(state)
+                       and bool((cached["excluded"] == state["excluded"]).all())))
 
         # The numbering order. On this image with the cap lowered below its
         # candidate count but above its kept count: every kept lacuna is
@@ -8827,7 +8918,7 @@ def _ai_lacuna_self_test(images: list) -> int:
         width = state["labels"].shape[1]
         n_kept, n_found = c0["deterministic_lacunae"], c0["candidates_found"]
         order = [_pixel_key(e["rows"], e["cols"], width)
-                 for e in sorted(everything, key=ai_judge.lacuna_priority_key)]
+                 for e in sorted(offered, key=ai_judge.lacuna_priority_key)]
         cap = min(n_found - 1, n_kept + max(1, (n_found - n_kept) // 2))
         config.AI_LACUNA_MAX_NUMBERED = cap
         low = ai_judge.lacuna_candidates(state)
@@ -8855,8 +8946,13 @@ def _ai_lacuna_self_test(images: list) -> int:
                            [{"group": group, "label": label, "counts": lw}])) == 1))
 
         # The same on every real image with more candidates than the cap, read
-        # from the cache only, so the slow stage is not run here.
-        every_image = lacuna_judge_images(argparse.Namespace())
+        # from the cache only, so the slow stage is not run here. In DEV mode
+        # the held-out images are left out in either mode (docs/HOLDOUT.md). Since
+        # the structure rule (method-freeze-v2) leaves the regions in the excluded
+        # region out of the candidates, an image may have none over the cap:
+        # the check then says so and fails only if nothing was cached at all.
+        every_image = [p for p in lacuna_judge_images(argparse.Namespace())
+                       if lacunae.image_label(p) not in lacunae.held_out_labels()]
         cached_count, over_cap = 0, []
         for other in every_image:
             held = ai_judge.cached_lacuna_state(other, build=False)
@@ -8872,8 +8968,8 @@ def _ai_lacuna_self_test(images: list) -> int:
               f"cached): {len(over_cap)} over the cap of {config.AI_LACUNA_MAX_NUMBERED}, up to "
               f"{max((oc['candidates_found'] for _n, oc in over_cap), default=0)} candidates; kept "
               f"lacunae left unnumbered: {left_out or 'none'}")
-        checks.append((f"on every real image over the cap ({len(over_cap)}), every kept lacuna is "
-                       "numbered", bool(over_cap) and not left_out))
+        checks.append((f"on every real image over the cap ({len(over_cap)} of {cached_count} cached), "
+                       "every kept lacuna is numbered", cached_count > 0 and not left_out))
 
         prompt = ai_judge.load_lacuna_prompt()
         sent = prompt["system"] + "\n" + prepared["user_text"]
@@ -9082,11 +9178,16 @@ def _ai_lacuna_self_test(images: list) -> int:
                 os.environ["ALLOW_EXTERNAL_API"] = flag
         checks.append(("a live run without ALLOW_EXTERNAL_API=1 is refused", rc == 2))
 
+        checks += _ai_lacuna_self_test_v2(v2_image, use_log)
+
         # The thread judge is untouched: its prompt hashes are still the ones its
-        # real run logged.
+        # real run logged. The record read is a development image's, never a
+        # held-out one's (docs/HOLDOUT.md).
         thread = ai_judge.load_prompt()
-        logged_thread = config.AI_RESULTS_DIR / config.AI_LOG_DIR / "543-2_case_0001_attempt1.json"
-        if logged_thread.is_file():
+        logged_thread = next(
+            (p for p in sorted((config.AI_RESULTS_DIR / config.AI_LOG_DIR).glob("*_case_0001_attempt1.json"))
+             if p.name.split("_case_")[0] not in lacunae.held_out_labels()), None)
+        if logged_thread is not None:
             entry = json.loads(logged_thread.read_text(encoding="utf-8"))
             checks.append(("the thread judge's prompt is unchanged",
                            entry["prompt_sha256"] == thread["prompt_sha256"]
@@ -9111,7 +9212,7 @@ def cmd_ai_lacuna_judge(args) -> int:
     out_root = Path(args.out)
     if args.self_test:
         return _ai_lacuna_self_test(images[:1] if (args.image or args.dir)
-                                    else [DEFAULT_IMAGE_DIR / "543-2.tif"])
+                                    else [AI_LACUNA_SELF_TEST_IMAGE], AI_LACUNA_SELF_TEST_V2_IMAGE)
     if args.live:
         return ai_lacuna_live(images, out_root, args.workers)
     if args.replay:
@@ -9147,7 +9248,7 @@ def _ai_lacuna_review_image(path_str: str) -> dict:
                          f"than the lacuna stage gives now; the review refuses to draw it")
     verdict_of = {int(r["n"]): r for r in decisions["regions"]} if decisions else {}
 
-    entries = cand["candidates"] + cand["not_numbered"]
+    entries = cand["candidates"] + cand["not_numbered"] + cand["in_excluded_region"]
     shape = state["labels"].shape
     index = np.zeros(shape, dtype=np.int32)
     colours = np.zeros((len(entries) + 1, 3), dtype=np.uint8)
@@ -10096,7 +10197,7 @@ def main() -> None:
     mode.add_argument("-r", "--replay", action="store_true",
                       help="No network: rerun from the log and check the verdicts match.")
     mode.add_argument("-s", "--self-test", dest="self_test", action="store_true",
-                      help="Rehearse the whole chain on one image (default WT 543-2) with a stub "
+                      help="Rehearse the whole chain on one image (default WT 543_3, then the v2 rules on Hyp_RD I534_z25c1-2) with a stub "
                            "judge, no network and no key, writing only to "
                            ".cache/ai_lacuna_self_test.")
     p.add_argument("-o", dest="out", type=Path, default=config.AI_LACUNA_RESULTS_ROOT,

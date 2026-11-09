@@ -1938,10 +1938,12 @@ def image_group(image_path: Path) -> str:
 
 def lacuna_state(image_path: Path) -> dict:
     """The lacuna stage of one image exactly as the pipeline runs it, before any
-    verdict: lacunae.segment_image never applies this judge, whatever the
-    switch says, so the judge is never asked about a set it has already
-    changed."""
-    _display, channel, labels, kept, t_hi, classes = lacunae.segment_image(image_path)
+    verdict: lacunae.segment_with_exclusion never applies this judge, whatever
+    the switch says, so the judge is never asked about a set it has already
+    changed. The excluded region (config section g9) comes with it, because a
+    region mostly inside it is not offered to the judge (lacuna_candidates)."""
+    _display, channel = lacunae.load_channel(image_path)
+    labels, kept, t_hi, classes, excluded = lacunae.segment_with_exclusion(channel)
     return {
         "image_path": Path(image_path),
         "label": lacunae.image_label(Path(image_path)),
@@ -1951,6 +1953,7 @@ def lacuna_state(image_path: Path) -> dict:
         "kept": kept,
         "t_hi": float(t_hi),
         "classes": {k: list(v) for k, v in classes.items()},
+        "excluded": excluded,
     }
 
 
@@ -1981,7 +1984,8 @@ def kept_labels(state: dict) -> list:
 # nothing a fresh stage would not: the self-test checks that the candidates and
 # the picture made from it are byte for byte the ones made from a fresh run.
 LACUNA_CACHE_DIR = config.PROJECT_ROOT / ".cache" / "ai_lacuna_candidates"
-LACUNA_CACHE_SCHEMA = "lcn-ai-lacuna-stage-cache-1"
+# 2 since 2026-11-09: the entry holds the excluded region too.
+LACUNA_CACHE_SCHEMA = "lcn-ai-lacuna-stage-cache-2"
 LACUNA_CACHE_PACKAGES = ("numpy", "scipy", "scikit-image")
 
 
@@ -2033,6 +2037,7 @@ def cached_lacuna_state(image_path: Path, build: bool = True) -> dict | None:
                     "kept_on_border": [bool(v) for v in held["kept_on_border"]],
                     "t_hi": float(meta["t_hi"]),
                     "classes": {k: [int(i) for i in v] for k, v in meta["classes"].items()},
+                    "excluded": np.array(held["excluded"], dtype=bool),
                     "cache": "hit",
                 }
     if not build:
@@ -2047,6 +2052,7 @@ def cached_lacuna_state(image_path: Path, build: bool = True) -> dict | None:
     np.savez_compressed(part, labels=state["labels"],
                         kept_labels=np.array(kept_labels(state), dtype=np.int64),
                         kept_on_border=np.array([b for _r, b in state["kept"]], dtype=bool),
+                        excluded=state["excluded"].astype(bool),
                         meta=np.array(json.dumps(meta)))
     os.replace(part, path)
     state["cache"] = "built"
@@ -2096,6 +2102,14 @@ def lacuna_candidates(state: dict) -> dict:
     Nothing is merged and nothing is split. Every kept lacuna is a region of the
     first kind, because the smallest kept class is larger than the floor.
 
+    A candidate of either kind with more than config.EXCLUDED_OBJECT_MAX_SHARE
+    of its area in the excluded region (config section g9) is not offered: the
+    structure rule decides it, and no verdict may bring back an object that
+    lies mostly in a band, a bloom or a very large structure. Such regions are
+    listed in "in_excluded_region", with no number, and keep the
+    deterministic decision (not a lacuna). No size limit applies: an enlarged
+    lacuna or a cluster is offered like any other.
+
     With more than config.AI_LACUNA_MAX_NUMBERED, which are numbered goes by
     lacuna_numbering_tier and the cap drops from the end of that order; the
     rest are listed with no number and keep the deterministic decision. The
@@ -2105,6 +2119,10 @@ def lacuna_candidates(state: dict) -> dict:
     min_area = int(config.AI_LACUNA_MIN_CANDIDATE_AREA_PX2)
     kept_at = {label: lacuna_id for lacuna_id, label in enumerate(kept_labels(state), start=1)}
     class_of = {int(i): name for name, ids in state["classes"].items() for i in ids}
+    excluded = state.get("excluded")
+    if excluded is None:
+        excluded = np.zeros(shape, dtype=bool)
+    max_share = float(config.EXCLUDED_OBJECT_MAX_SHARE)
 
     found = []
     for region in measure.regionprops(labels):
@@ -2136,6 +2154,18 @@ def lacuna_candidates(state: dict) -> dict:
         entry.update(source_label=None, deterministic="not a lacuna", lacuna_id=None,
                      lacuna_class=None, rejected_by="under the lacuna cut")
         found.append(entry)
+
+    # The excluded region. A kept lacuna is never mostly inside it (the
+    # structure rule dropped those), so only rejected regions and dim
+    # candidates leave the list here.
+    in_excluded = []
+    for entry in found:
+        entry["excluded_share"] = round(float(excluded[entry["rows"], entry["cols"]].mean()), 4)
+        if entry["deterministic"] != "lacuna" and entry["excluded_share"] > max_share:
+            entry["rejected_by"] = "excluded region"
+            entry["n"] = None
+            in_excluded.append(entry)
+    found = [e for e in found if not (e["deterministic"] != "lacuna" and e["excluded_share"] > max_share)]
 
     # The cap drops from the end of the order of priority, within a tier the
     # largest first, ties broken by position so the choice never depends on the
@@ -2175,12 +2205,15 @@ def lacuna_candidates(state: dict) -> dict:
         # could never be judged, whatever the cap.
         "kept_lacunae_that_are_no_candidate":
             n_kept - sum(1 for e in found if e["deterministic"] == "lacuna"),
+        "in_excluded_region": len(in_excluded),
+        "in_excluded_region_dim": sum(1 for e in in_excluded if e["kind"] == "dim"),
     }
     return {
         "image_code": image_code(channel),
         "shape": tuple(int(s) for s in shape),
         "candidates": numbered,
         "not_numbered": left,
+        "in_excluded_region": in_excluded,
         "counts": counts,
         "rule": {
             "lacuna_cut_t_hi": round(state["t_hi"], 8),
@@ -2190,6 +2223,8 @@ def lacuna_candidates(state: dict) -> dict:
             "max_numbered": cap,
             "numbering_order": list(LACUNA_NUMBERING_TIERS),
             "priority_rejected_min_area_px2": int(config.AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2),
+            "not_offered_above_excluded_share": max_share,
+            "area_cap": None,
         },
         "geometry_sha256": lacuna_geometry_hash(numbered, shape),
     }
@@ -2240,7 +2275,7 @@ def lacuna_candidate_record(entry: dict) -> dict:
     list, which the geometry hash pins down instead."""
     return {k: entry[k] for k in ("n", "kind", "area_px2", "centroid_xy", "bbox_rc", "on_border",
                                   "deterministic", "lacuna_id", "lacuna_class", "rejected_by",
-                                  "source_label")}
+                                  "source_label", "excluded_share")}
 
 
 # The picture the lacuna judge sees (step 2)
@@ -2431,7 +2466,7 @@ def _relative(path: Path) -> str:
 # The assembly (step 3): what the lacuna stage does with the verdicts
 
 def apply_lacuna_verdicts(image_path: Path, channel: np.ndarray, labels: np.ndarray, kept: list,
-                          t_hi: float, classes: dict) -> tuple:
+                          t_hi: float, classes: dict, excluded: np.ndarray | None = None) -> tuple:
     """The switch. Returns (labels, kept, classes, record) for the lacuna stage
     to carry on with.
 
@@ -2457,7 +2492,7 @@ def apply_lacuna_verdicts(image_path: Path, channel: np.ndarray, labels: np.ndar
             f"with the switch on must not mix judged and unjudged images in one summary.")
     decisions = json.loads(path.read_text(encoding="utf-8"))
     state = {"channel": channel, "labels": labels, "kept": kept, "t_hi": float(t_hi),
-             "classes": classes}
+             "classes": classes, "excluded": excluded}
     candidates = lacuna_candidates(state)
     if decisions["geometry_sha256"] != candidates["geometry_sha256"]:
         raise ValueError(
@@ -2555,6 +2590,7 @@ def prepare_lacuna_image(image_path: Path) -> dict:
         "estimate": estimate_case(prompt["system"], user_text, png, len(drawn["numbers"])),
         "candidates": [lacuna_candidate_record(e) for e in candidates["candidates"]],
         "not_numbered": [lacuna_candidate_record(e) for e in candidates["not_numbered"]],
+        "in_excluded_region": [lacuna_candidate_record(e) for e in candidates["in_excluded_region"]],
         "counts": candidates["counts"],
         "rule": candidates["rule"],
         "geometry_sha256": candidates["geometry_sha256"],
@@ -2743,6 +2779,7 @@ def judge_lacuna_image(prepared: dict, mode: str, out_path: Path | None = None,
         "verdicts": verdict_counts,
         "regions": regions,
         "not_numbered_keep_the_deterministic_decision": prepared["not_numbered"],
+        "in_excluded_region_not_offered": prepared.get("in_excluded_region", []),
     }
     out = Path(out_path) if out_path is not None else lacuna_decisions_path(group, label)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -2750,7 +2787,7 @@ def judge_lacuna_image(prepared: dict, mode: str, out_path: Path | None = None,
     return decisions
 
 
-def stub_lacuna_answerer(break_first: bool = True):
+def stub_lacuna_answerer(break_first: bool = True, every: str | None = None):
     """A stand-in lacuna judge for the self-test: no network, no key, no cost.
 
     It reads how many numbers the picture holds from the request text and
@@ -2759,11 +2796,20 @@ def stub_lacuna_answerer(break_first: bool = True):
     no. Over a few dozen candidates that says yes to some region the filters
     rejected and no to some region they kept, which is what the switch has to
     be shown to act on. With `break_first` its first answer to a request is
-    prose, so the retry is exercised too.
+    prose, so the retry is exercised too. With `every` ("yes", "no" or
+    "unsure") it gives that one verdict to every number instead, which is how
+    the self-test shows what no verdict can do (bring back an object in the
+    excluded region) and what every verdict must leave alone (the size of a
+    lacuna, the cluster flag).
 
     Returns a fresh callable with its own counter, so a self-test is the same
     every time."""
     tries: dict = {}
+
+    def verdict_of(n: int) -> str:
+        if every:
+            return every
+        return "unsure" if n % 5 == 0 else ("yes" if n % 2 else "no")
 
     def answer(payload: dict) -> dict:
         text = payload["messages"][0]["content"][1]["text"]
@@ -2773,7 +2819,7 @@ def stub_lacuna_answerer(break_first: bool = True):
             body = "I looked at the picture and here is what I think, in prose."
         else:
             body = json.dumps({"regions": [
-                {"n": n, "verdict": "unsure" if n % 5 == 0 else ("yes" if n % 2 else "no"),
+                {"n": n, "verdict": verdict_of(n),
                  "why": "self-test, no judgement was made"} for n in range(1, count + 1)]})
         return {"text": body, "id": f"self-test-{tries[text]}",
                 "model": f"{config.AI_JUDGE_MODEL} (NOT CALLED: self-test stub)",
