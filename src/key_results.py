@@ -10,7 +10,9 @@ Per group, results/<group>/0_key_results/ holds, for every image, copies of
     <image>_3_pols_outlines.png            3_pols/<image>_pols_outlines.png
 named so they sort by image, and a README.md.
 results/SUMMARY.xlsx: sheets Read me, Per group, Per animal, Per image and
-Statistics, from src/animal_stats.py.
+Statistics, from src/animal_stats.py, and Judge on vs off, from
+results/archive/judge/judge_on_vs_off.csv (python src/diagnostics.py
+judge-compare).
 
 In DEV mode the held-out images are left out (docs/HOLDOUT.md).
 
@@ -102,7 +104,8 @@ READ_ME = [
                "label in its file names. The POL definition is a working definition, to be confirmed by "
                "Dr. Murshed."),
     ("mode", None),
-    ("sheets", "Per group, Per animal, Per image: one row each; Statistics: the genotype by diet models."),
+    ("sheets", "Per group, Per animal, Per image: one row each; Statistics: the genotype by diet models; "
+               "Judge on vs off: the AI judge layer against the method, development images only."),
     ("", ""),
     ("COLUMN", "WHAT IT MEANS"),
     ("group", "WT (wild type, regular diet), WT_HP (wild type, high phosphate diet), Hyp_RD (Hyp, regular "
@@ -151,6 +154,49 @@ READ_ME = [
 ]
 
 
+# The judge comparison (2026-11-09): judge off against judge on, development
+# images only, written by python src/diagnostics.py judge-compare. Its table
+# is kept beside the judge's report and copied into SUMMARY.xlsx as one sheet,
+# so a later write_summary_xlsx keeps it.
+JUDGE_SHEET = "Judge on vs off"
+JUDGE_TABLE = config.ARCHIVE_ROOT / "judge" / "judge_on_vs_off.csv"
+
+
+def write_judge_sheet(xw, table: Path = JUDGE_TABLE) -> bool:
+    """The sheet "Judge on vs off" from its table, into an open ExcelWriter;
+    False when the table does not exist yet."""
+    import pandas as pd  # noqa: PLC0415
+
+    if not Path(table).is_file():
+        return False
+    pd.read_csv(table, keep_default_na=False).to_excel(xw, sheet_name=JUDGE_SHEET, index=False)
+    return True
+
+
+def add_judge_sheet(path: Path = SUMMARY_XLSX, table: Path = JUDGE_TABLE) -> Path:
+    """Replace only the sheet "Judge on vs off" of an existing SUMMARY.xlsx,
+    leaving every other sheet as it is (so a DEV mode comparison never
+    rewrites the FINAL mode sheets)."""
+    import pandas as pd  # noqa: PLC0415
+    from openpyxl.utils import get_column_letter  # noqa: PLC0415
+
+    with pd.ExcelWriter(path, engine="openpyxl", mode="a", if_sheet_exists="replace") as xw:
+        if not write_judge_sheet(xw, table):
+            raise FileNotFoundError(f"{table} is missing: run python src/diagnostics.py judge-compare first")
+        sheet = xw.sheets[JUDGE_SHEET]
+        for i, _col in enumerate(sheet.iter_cols(min_row=1, max_row=1), start=1):
+            sheet.column_dimensions[get_column_letter(i)].width = 34 if i <= 2 else 18
+        sheet.freeze_panes = "C2"
+        # The Read me sheet's line that names the sheets, so it names this one too.
+        read_me = xw.book["Read me"] if "Read me" in xw.book.sheetnames else None
+        if read_me is not None:
+            for row in read_me.iter_rows(min_row=2):
+                if row[0].value == "sheets":
+                    row[1].value = dict(READ_ME)["sheets"]
+    print(f"-> {path.relative_to(config.PROJECT_ROOT)}, sheet {JUDGE_SHEET!r}")
+    return path
+
+
 def write_summary_xlsx(path: Path = SUMMARY_XLSX) -> Path:
     import pandas as pd  # noqa: PLC0415
     from openpyxl.utils import get_column_letter  # noqa: PLC0415
@@ -172,11 +218,14 @@ def write_summary_xlsx(path: Path = SUMMARY_XLSX) -> Path:
         t["animals"].to_excel(xw, sheet_name="Per animal", index=False)
         t["images"].to_excel(xw, sheet_name="Per image", index=False)
         models.to_excel(xw, sheet_name="Statistics", index=False)
+        write_judge_sheet(xw)
         for name, sheet in xw.sheets.items():
             for i, col in enumerate(sheet.iter_cols(min_row=1, max_row=1), start=1):
                 width = 90 if (name == "Read me" and i == 2) else 34 if i == 1 and name == "Read me" else 18
+                if name == JUDGE_SHEET:
+                    width = 34 if i <= 2 else 18
                 sheet.column_dimensions[get_column_letter(i)].width = width
-            sheet.freeze_panes = "A2"
+            sheet.freeze_panes = "C2" if name == JUDGE_SHEET else "A2"
     print(f"-> {path.relative_to(config.PROJECT_ROOT)}")
     return path
 

@@ -1,0 +1,7 @@
+# AI lacuna judge on: quantification (Hyp_HP)
+
+Pre-validation, not validated: no verdict of either judge has been checked against a manual count. Made on 2026-11-09 with the method at tag `method-freeze-v2` and the judge rerun of that day (docs/METHODS.md section 29; report `results/archive/judge/REPORT_JUDGE.md`). The deterministic results beside this folder are not changed by it.
+
+Every measured number of Hyp_HP from the lacunae accepted by the AI lacuna judge: shown every candidate region of the lacuna stage, numbered, it said per region yes, no or unsure with a reason code, under the working POL definition (enlarged lacunae and clusters kept; only fragments, band, tissue and saturated border pieces rejected). It never draws a boundary, so every lacuna has the lacuna stage's own outline. A region mostly in the excluded region is not offered to it. A region it added that the filters had rejected is the class `judged`, with no area or shape measure. The POL section of this set is `3_pols/ai_judge/`.
+
+Made from the logs, offline: `LCN_HOLDOUT_MODE=FINAL python src/diagnostics.py ai-lacuna-run`. The calls: `ai-lacuna-judge --live`. Held-out images are in the set, judged as part of the method, but their judge outputs were not opened, reviewed or summarized (docs/HOLDOUT.md). The comparison with the judge off, on the development images, is in `results/archive/judge/JUDGE_ON_VS_OFF.md` and the sheet "Judge on vs off" of `results/SUMMARY.xlsx`.

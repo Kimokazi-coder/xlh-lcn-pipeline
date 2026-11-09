@@ -84,16 +84,18 @@ def interior_network_rows(q: dict) -> list[dict]:
     return [r for r in q["lacunae"] if not r["on_border"] and r.get("lacuna_class", "ordinary") == "ordinary"]
 
 
-def collect() -> tuple[list, list]:
+def collect(set_name: str | None = None, groups=None) -> tuple[list, list]:
     """(lacuna rows, image rows): every measured lacuna and every image the
-    mode lets through, with its animal, genotype and diet."""
+    mode lets through, with its animal, genotype and diet. With `set_name`, of
+    that result set (pols.SETS, or the canaliculi judge's set), its ratios
+    against the WT median of the same set; with `groups`, of those groups only."""
     import pandas as pd  # noqa: PLC0415
 
     animals = pols.animal_map()
-    wt_median = pols.wt_median_um2()
+    wt_median = pols.wt_median_um2(set_name)
     lac_rows, img_rows = [], []
-    for group in config.GROUPS:
-        root = config.RESULTS_ROOT / group
+    for group in groups or config.GROUPS:
+        root = pols.set_root(group, set_name)
         for path in pols.image_files(group):
             label = lacunae.image_label(path)
             meta = animals[(group, label)]

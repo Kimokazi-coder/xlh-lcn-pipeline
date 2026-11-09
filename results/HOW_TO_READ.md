@@ -40,3 +40,21 @@ genotype by diet models. The numbers that matter most:
   read the interval, not the p value.
 
 The full statistics are in `results/summary/STATISTICS.md`.
+
+**The AI judge (a second, optional reading).** Everything above is the
+method itself. Beside it, in subfolders named `ai_judge` (and
+`ai_judge_canaliculi`) inside the sections, is the same pipeline with an AI
+judge on: an AI model looked at every outline the pipeline drew and said
+which are real lacunae (keeping enlarged lacunae and clusters, rejecting
+fragments, bands, tissue and saturated border pieces), and then which
+threads are real canaliculi. It never draws an outline itself. The sheet
+**Judge on vs off** of `SUMMARY.xlsx` puts the two side by side for the
+development images, per group: in plain words, the judge removes many more
+outlines in the Hyp groups (32 and 39 fewer lacunae there, 5 in WT_HP, 2
+more in WT), mostly band, tissue and saturated border pieces and fragments,
+so the POL area per analysed area falls most in Hyp; the canaliculi judge
+adds a little canalicular length around every lacuna. Some group differences
+are small enough that the judge changes their direction (see
+`results/archive/judge/REPORT_JUDGE.md`). The judge is not validated: read it
+as a check on how much the result depends on which outlines count, not as
+the result.

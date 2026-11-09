@@ -1154,7 +1154,10 @@ def external_calls_allowed() -> tuple:
 
 class FatalApiError(RuntimeError):
     """An error that must stop the whole run where it is, not cost one case its
-    answer: no credit, no money, or no permission to call at all.
+    answer: no credit, no money, or no permission to call at all. `cost_usd`
+    is what the answers of the stopped image had cost before it, so a run's
+    total still counts them (added 2026-11-09, after a billing stop left them
+    out of the run records).
 
     A bad answer is retried once and a case that never validates is left
     unjudged, which is right for a bad answer and wrong for this. A run that
@@ -1642,11 +1645,12 @@ def judge_image(state: dict, candidates: dict, mode: str, out_root: Path | None 
                                        "invalid_reason": scrub(str(error))[:500],
                                        "fatal": fatal, "cost_usd": 0.0})
                         write_log(label, record)
-                        raise FatalApiError(
+                        stop = FatalApiError(
                             f"{fatal}. Stopped at {case['case_id']} of {label} after "
                             f"{totals['calls']} calls and ${totals['cost_usd']}. Nothing was "
-                            f"marked unjudged and no decision file was written."
-                        ) from error
+                            f"marked unjudged and no decision file was written.")
+                        stop.cost_usd = totals["cost_usd"]
+                        raise stop from error
                     # Any other failed call is one bad attempt and not the end
                     # of the image: it is logged, retried once like any other
                     # bad answer, and the case is left unjudged if it fails
@@ -2741,9 +2745,11 @@ def judge_lacuna_image(prepared: dict, mode: str, out_path: Path | None = None,
                 if fatal:
                     record["fatal"] = fatal
                     write_log_to(lacuna_attempt_path(group, label, attempt), record)
-                    raise FatalApiError(
+                    stop = FatalApiError(
                         f"{fatal}. Stopped at {group}/{label} after ${spent_usd + totals['cost_usd']} "
-                        f"in this run. No decision file was written for this image.") from error
+                        f"in this run. No decision file was written for this image.")
+                    stop.cost_usd = totals["cost_usd"]
+                    raise stop from error
                 reason = scrub(f"the call failed, {type(error).__name__}: {error}")
                 record["invalid_reason"] = reason
                 write_log_to(lacuna_attempt_path(group, label, attempt), record)

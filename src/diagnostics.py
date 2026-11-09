@@ -6022,6 +6022,8 @@ def cmd_ai_judge(args) -> int:
             print(f"\nSTOPPED: {error}")
             print("No decision file was written for this image and no further image was run.")
             stopped, rc = f"billing, credit or authentication error: {error}", 5
+            # What the stopped image's answers had already cost still counts.
+            spent = round(spent + float(getattr(error, "cost_usd", 0.0)), 6)
             break
         totals = decisions["totals"]
         if mode == "live":
@@ -8777,6 +8779,7 @@ def ai_lacuna_live(images: list, out_root: Path, workers: int) -> int:
             print(f"\nSTOPPED: {error}")
             print("No further image was run.")
             rc = 5
+            spent = round(spent + float(getattr(error, "cost_usd", 0.0)), 6)
             break
         t = decisions["totals"]
         spent = round(spent + t["cost_usd"], 6)
@@ -9676,7 +9679,7 @@ def _ai_same_decisions(a: dict, b: dict) -> bool:
     return same
 
 
-# judge-cost ---------------------------------------------------------------------
+# judge-cost
 # The cost of the judge rerun (brief of 2026-11-09, phase 2). Both judges were
 # run live on the first development image of each group in name order, the
 # canaliculi judge on the lacunae the lacuna judge accepted, with their logs
@@ -9773,6 +9776,271 @@ def cmd_judge_cost(args) -> int:
     (JUDGE_DIR / "COST.md").write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines))
     return 0 if within else 3
+
+
+# judge-compare
+# The AI judge layer against the method (brief of 2026-11-09, phase 4), on the
+# development images only: the command refuses FINAL mode, so no held-out image
+# and no judge output of one is read. From the saved results of three sets,
+# the method itself (results/<group>/<section>/), the lacuna judge on
+# (<section>/ai_judge/) and both judges on (<section>/ai_judge_canaliculi/), the
+# group values exactly as SUMMARY.xlsx computes them (animal_stats.collect and
+# pooled), each set against the WT median of its own development images; and
+# from the judges' decision files, what the judges changed and why. Writes
+# results/archive/judge/judge_on_vs_off.csv and .md and judge_changes.csv, and
+# the sheet "Judge on vs off" of results/SUMMARY.xlsx.
+
+# (column, result set): None is the method itself.
+JUDGE_COMPARE_SETS = (("judge off", None), ("lacuna judge on", config.AI_LACUNA_SUBFOLDER),
+                      ("both judges on", config.AI_CANALICULI_SUBFOLDER))
+# (column of animal_stats.pooled, what it is). The lacuna measures are the
+# same in both judge-on sets (the canaliculi judge decides threads, not
+# lacunae); the canaliculi measures differ.
+JUDGE_COMPARE_MEASURES = [
+    ("n_images", "development images"),
+    ("n_lacunae", "lacunae, every one (frame ones included)"),
+    ("n", "measured lacunae (inside the frame, with an area)"),
+    ("area_um2_median", "median lacunar area, um2"),
+    ("area_um2_p90", "90th percentile of lacunar area, um2"),
+    ("WT_median_area_um2", "the WT median the share is against, um2 (development WT images of the same set)"),
+    ("share_above_2x_WT_median", "share of measured lacunae above 2 x the WT median"),
+    ("pol_area_per_analysed_area", "POL area per analysed area"),
+    ("n_clusters", "clusters (measured lacunae flagged cluster)"),
+    ("roots_per_lacuna", "roots per lacuna"),
+    ("ring_length_30_um", "ring length within 3.9 um per lacuna, um"),
+    ("field_length_density_um_per_um2", "field length density, um per um2"),
+    ("width_median_um", "median canalicular width, um"),
+]
+JUDGE_LACUNA_REASONS = ("fragment", "band", "tissue", "saturated_border")
+JUDGE_ADD_REASONS = ("lacuna", "enlarged", "cluster")
+
+
+def _judge_group_values(set_name) -> dict:
+    """{group: the row of animal_stats.pooled} for one set, development images;
+    a group is left out when the set does not hold every one of its
+    development images (a judge run stopped before it was complete)."""
+    import animal_stats
+    import pols
+    import quantification
+
+    complete = [g for g in config.GROUPS
+                if all(quantification.quant_path(pols.set_root(g, set_name), lacunae.image_label(p), ".json").is_file()
+                       for p in pols.image_files(g))]
+    if not complete:
+        return {}
+    _lac, img_rows = animal_stats.collect(set_name, complete)
+    return {r["group"]: r for r in animal_stats.pooled(img_rows, "group")}
+
+
+def _judge_changes(group: str, image_path: Path, wt_median_off: float) -> dict:
+    """What the lacuna judge and the canaliculi judge changed on one
+    development image, from their decision files and the judge-off
+    quantification."""
+    import ai_judge
+    import pols
+
+    label = lacunae.image_label(image_path)
+    row = {"group": group, "image": label}
+    lac = json.loads(ai_judge.lacuna_decisions_path(group, label).read_text(encoding="utf-8"))
+    off = {r["id"]: r for r in pols.with_raw(pols.lacuna_records(config.RESULTS_ROOT / group, label),
+                                              wt_median_off)}
+    removed = [r for r in lac["regions"] if r["verdict"] == "no" and r["deterministic"] == "lacuna"]
+    added = [r for r in lac["regions"] if r["verdict"] == "yes" and r["deterministic"] != "lacuna"]
+    kept_yes = [r for r in lac["regions"] if r["verdict"] == "yes" and r["deterministic"] == "lacuna"]
+    row.update({
+        "lacunae judge off": sum(1 for r in lac["regions"] if r["deterministic"] == "lacuna")
+        + sum(1 for r in lac["not_numbered_keep_the_deterministic_decision"] if r["deterministic"] == "lacuna"),
+        "numbered": len(lac["regions"]),
+        "yes": lac["verdicts"]["yes"], "no": lac["verdicts"]["no"], "unsure": lac["verdicts"]["unsure"],
+        "unjudged": lac["verdicts"]["unjudged"],
+        "not offered (excluded region)": len(lac.get("in_excluded_region_not_offered", [])),
+        "removed": len(removed),
+        **{f"removed, {k}": sum(1 for r in removed if r.get("reason") == k) for k in JUDGE_LACUNA_REASONS},
+        "added": len(added),
+        "added, dim candidates": sum(1 for r in added if r["kind"] == "dim"),
+        **{f"added, {k}": sum(1 for r in added if r.get("reason") == k) for k in JUDGE_ADD_REASONS},
+        **{f"kept lacunae called {k}": sum(1 for r in kept_yes if r.get("reason") == k) for k in JUDGE_ADD_REASONS},
+    })
+    # Enlarged lacunae and clusters the judge removed: by the judge-off
+    # quantification of the same lacuna (its id there is the lacuna_id of the
+    # candidate), measured lacunae only.
+    gone = [off[int(r["lacuna_id"])] for r in removed if r.get("lacuna_id") is not None
+            and int(r["lacuna_id"]) in off]
+    row["removed enlarged (above 2 x WT median)"] = sum(
+        1 for r in gone if not r["flag"] and r["_ratio"] is not None and r["_ratio"] > pols.POL_RATIO_LINE)
+    row["removed clusters"] = sum(1 for r in gone if not r["flag"] and r["cluster"] == "yes")
+    thread = ai_judge.decisions_path(label)
+    t = json.loads(thread.read_text(encoding="utf-8"))["totals"] if thread.is_file() else {}
+    row.update({"images the canaliculi judge finished": int(thread.is_file()),
+                "canaliculi cases": t.get("cases", 0), "canaliculi cases unjudged": t.get("cases_unjudged", 0),
+                "segments offered": t.get("segments", 0), "segments real": t.get("segments_real", 0),
+                "segments artifact": t.get("segments_artifact", 0),
+                "segments unjudged": t.get("segments_unjudged", 0),
+                "owner moved by a verdict": t.get("owner_moved_by_a_verdict", 0)})
+    return row
+
+
+# The group contrasts whose direction the report checks: the Hyp effect on the
+# regular diet, the diet effect in WT, the diet effect in Hyp and the genotype
+# by diet interaction, each from the pooled group values.
+JUDGE_CONTRASTS = (
+    ("Hyp_RD minus WT", (("Hyp_RD", 1), ("WT", -1))),
+    ("WT_HP minus WT", (("WT_HP", 1), ("WT", -1))),
+    ("Hyp_HP minus Hyp_RD", (("Hyp_HP", 1), ("Hyp_RD", -1))),
+    ("interaction (Hyp_HP - Hyp_RD) - (WT_HP - WT)", (("Hyp_HP", 1), ("Hyp_RD", -1), ("WT_HP", -1), ("WT", 1))),
+)
+JUDGE_CANALICULI_MEASURES = ("roots_per_lacuna", "ring_length_30_um", "field_length_density_um_per_um2",
+                             "width_median_um")
+
+
+def _judge_round(value):
+    return None if value is None else round(float(value), 4)
+
+
+def _judge_sign(value) -> str:
+    if value is None:
+        return ""
+    return "up" if value > 0 else "down" if value < 0 else "none"
+
+
+def cmd_judge_compare(args) -> int:
+    import key_results
+    import pols
+
+    if config.HOLDOUT_MODE != "DEV":
+        print("Refused: judge-compare reads the development images only; run it in DEV mode (the default).")
+        return 2
+    values = {name: _judge_group_values(set_name) for name, set_name in JUDGE_COMPARE_SETS}
+    # The WT median each set's shares are against (development WT images of
+    # that set), which the pooled rows do not carry.
+    for name, set_name in JUDGE_COMPARE_SETS:
+        if config.REFERENCE_GROUP in values[name]:
+            wt_median = pols.wt_median_um2(set_name)
+            for row in values[name].values():
+                row["WT_median_area_um2"] = wt_median
+    missing = [g for g in config.GROUPS if g not in values["both judges on"]]
+    if missing:
+        print(f"both judges on: no complete set for {missing}; their canaliculi measures are compared with "
+              f"the lacuna judge on instead, and so is every contrast of a canaliculi measure")
+    rows, contrast_rows, flips = [], [], []
+
+    def judge_on(key, by_set) -> tuple:
+        """(the judge-on value, the set it is from): both judges for a
+        canaliculi measure where that set is complete, else the lacuna judge."""
+        if key in JUDGE_CANALICULI_MEASURES and by_set.get("both judges on") is not None:
+            return by_set["both judges on"], "both judges on"
+        return by_set.get("lacuna judge on"), "lacuna judge on"
+
+    for group in config.GROUPS:
+        for key, what in JUDGE_COMPARE_MEASURES:
+            got = {name: values[name].get(group, {}).get(key) for name, _s in JUDGE_COMPARE_SETS}
+            on, source = judge_on(key, got)
+            rows.append({"group": group, "measure": key, "what it is": what,
+                         **{name: _judge_round(v) for name, v in got.items()},
+                         "judge on minus off": _judge_round(None if got["judge off"] is None or on is None
+                                                            else on - got["judge off"]),
+                         "judge on from": source})
+    for key, what in JUDGE_COMPARE_MEASURES:
+        if key in ("n_images", "WT_median_area_um2"):
+            continue
+        for name, terms in JUDGE_CONTRASTS:
+            got = {}
+            for column, _s in JUDGE_COMPARE_SETS:
+                parts = [values[column].get(g, {}).get(key) for g, _w in terms]
+                got[column] = None if any(p is None for p in parts) else sum(
+                    w * p for (_g, w), p in zip(terms, parts))
+            on, source = judge_on(key, got)
+            flipped = got["judge off"] is not None and on is not None and got["judge off"] * on < 0
+            contrast_rows.append({"group": name, "measure": key, "what it is": what,
+                                  **{column: _judge_round(v) for column, v in got.items()},
+                                  "judge on minus off": _judge_round(None if got["judge off"] is None or on is None
+                                                                     else on - got["judge off"]),
+                                  "judge on from": source,
+                                  "direction off": _judge_sign(got["judge off"]), "direction on": _judge_sign(on),
+                                  "direction changes": "YES" if flipped else ""})
+            if flipped:
+                flips.append((name, key))
+
+    wt_off = pols.wt_median_um2()
+    changes = []
+    for group in config.GROUPS:
+        for image_path in pols.image_files(group):
+            changes.append(_judge_changes(group, image_path, wt_off))
+    count_keys = [k for k in changes[0] if k not in ("group", "image")] if changes else []
+    totals = []
+    for group in config.GROUPS:
+        mine = [c for c in changes if c["group"] == group]
+        totals.append({"group": group, "image": f"all {len(mine)} development images",
+                       **{k: sum(c.get(k, 0) for c in mine) for k in count_keys}})
+
+    JUDGE_DIR.mkdir(parents=True, exist_ok=True)
+    columns = ["group", "measure", "what it is", "judge off", "lacuna judge on", "both judges on",
+               "judge on minus off", "judge on from", "direction off", "direction on", "direction changes"]
+    write_rows_csv(JUDGE_DIR / "judge_on_vs_off.csv", columns,
+                   [{c: ("" if r.get(c) is None else r.get(c, "")) for c in columns} for r in rows + contrast_rows])
+    write_rows_csv(JUDGE_DIR / "judge_changes.csv", ["group", "image"] + count_keys, changes + totals)
+    (JUDGE_DIR / "JUDGE_ON_VS_OFF.md").write_text(
+        _judge_compare_markdown(rows, contrast_rows, totals, flips), encoding="utf-8")
+    key_results.add_judge_sheet()
+    print(f"-> {JUDGE_DIR / 'judge_on_vs_off.csv'}, judge_changes.csv, JUDGE_ON_VS_OFF.md")
+    print(f"group contrasts whose direction changes with the judge on: {flips or 'none'}")
+    return 0
+
+
+def _judge_compare_markdown(rows: list, contrast_rows: list, totals: list, flips: list) -> str:
+    def fmt(v):
+        if v is None or v == "":
+            return ""
+        return f"{v:.4g}" if isinstance(v, float) else str(v)
+
+    lines = [
+        "# Judge on against judge off (development images, 2026-11-09)",
+        "",
+        "Pre-validation; no judge verdict is validated. Development images only (27 of 35): the held-out "
+        "images were judged in the full run but are not read here. Made by `python src/diagnostics.py "
+        "judge-compare` (DEV mode) from the saved results of three sets: judge off (the method, tag "
+        "method-freeze-v2), lacuna judge on (`<section>/ai_judge/`) and both judges on "
+        "(`<section>/ai_judge_canaliculi/`, the canaliculi judge on the accepted lacunae). Group values are "
+        "computed as in `results/SUMMARY.xlsx` (every measured lacuna of the group pooled); each set's share "
+        "above 2 x the WT median is against the WT median of its own development images. Judge on is the "
+        "lacuna judge for the lacuna measures (both judge-on sets have the same lacunae) and both judges for "
+        "the canaliculi measures where that set is complete for the group; where it is not, the canaliculi "
+        "measures are those of the lacuna judge set, whose threads are traced deterministically on the "
+        "accepted lacunae, and the last column says so. A blank both judges on column means that set is "
+        "incomplete for the group.",
+        "",
+    ]
+    for group in config.GROUPS:
+        lines += [f"## {group}", "",
+                  "| measure | judge off | lacuna judge on | both judges on | judge on minus off | judge on from |",
+                  "| - | - | - | - | - | - |"]
+        for r in rows:
+            if r["group"] == group:
+                lines.append(f"| {r['what it is']} | {fmt(r['judge off'])} | {fmt(r['lacuna judge on'])} | "
+                             f"{fmt(r['both judges on'])} | {fmt(r['judge on minus off'])} | "
+                             f"{r['judge on from']} |")
+        lines.append("")
+    lines += ["## Group contrasts: does any direction change?", "",
+              "Differences of the pooled group values, no statistics. A change of direction is a change of "
+              "sign between judge off and judge on.", "",
+              "| contrast | measure | judge off | judge on | direction changes |", "| - | - | - | - | - |"]
+    for r in contrast_rows:
+        on = r["both judges on"] if r["judge on from"] == "both judges on" else r["lacuna judge on"]
+        lines.append(f"| {r['group']} | {r['measure']} | {fmt(r['judge off'])} | {fmt(on)} | "
+                     f"{r['direction changes']} |")
+    lines += ["", "Contrasts whose direction changes: "
+              + ("; ".join(f"{a}, {b}" for a, b in flips) if flips else "none") + ".", "",
+              "## What the judges changed (development images, per group)", ""]
+    keys = [k for k in totals[0] if k not in ("group", "image")] if totals else []
+    lines += ["| | " + " | ".join(t["group"] for t in totals) + " |", "| - |" + " - |" * len(totals)]
+    for k in keys:
+        lines.append(f"| {k} | " + " | ".join(str(t.get(k, "")) for t in totals) + " |")
+    lines += ["",
+              "Removed: a lacuna the filters kept that the lacuna judge called no, by the reason it gave. "
+              "Added: a region the filters rejected, or a dim candidate, that it called yes. Enlarged: above "
+              "2 x the judge-off WT median in the judge-off quantification; clusters: flagged cluster there. "
+              "Per image in `judge_changes.csv`.", ""]
+    return "\n".join(lines)
 
 
 # pol-look
@@ -10478,6 +10746,12 @@ def main() -> None:
                        help="The cost of the AI judge rerun from its dry run in results/archive/judge/dry_run/: "
                             "results/archive/judge/COST.md and cost.json. No call is made.")
     p.set_defaults(func=cmd_judge_cost)
+
+    p = sub.add_parser("judge-compare",
+                       help="Judge off against judge on, development images only (DEV mode): "
+                            "results/archive/judge/judge_on_vs_off.csv and .md, judge_changes.csv, and the "
+                            "sheet Judge on vs off of results/SUMMARY.xlsx.")
+    p.set_defaults(func=cmd_judge_compare)
 
     p = sub.add_parser("group-overview",
                        help="One table over every group, one row per image: results/summary/group_overview.csv "
