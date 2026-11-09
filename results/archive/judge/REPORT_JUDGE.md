@@ -93,3 +93,50 @@ pieces that the deterministic rules kept. Those pieces are 90% (Hyp_RD) and
    of why the WT share rises.
 6. **Validation.** Nothing here is checked against manual counts. Which
    method the study reports is still open.
+
+## The POL judge (added 2026-11-09, budget $10)
+
+**What it does.** It acts on the lacunae the lacuna judge accepted (METHODS
+30). Candidates are every lacuna above 76.6 um2, every flagged cluster, and
+both lacunae of every pair closer than 3 um. The judge sees each case in a
+crop and says, per lacuna: enlarged lacuna (POL), cluster, piece of a split
+body (to merge), ordinary lacuna, not a lacuna, or unsure. Merges are the
+union of the pieces' own pixels.
+
+**Cost and checks.** 35 images, 80 cases, 81 calls, **$0.51** ($0.60 with its
+dry run). The replay is identical on all 35 images, and the rest of
+`results/` is byte-identical. **Everything together, both tasks: $9.47.**
+
+**What it changed (development images):**
+
+| | WT | WT_HP | Hyp_RD | Hyp_HP |
+| - | - | - | - | - |
+| cases | 5 | 8 | 26 | 25 |
+| called POL | 4 | 7 | 10 | 12 |
+| merged: groups (pieces) | 1 (2) | 1 (2) | 9 (18) | 5 (11) |
+| flagged as clusters (newly flagged) | 0 | 0 | 3 (2) | 0 |
+| removed: tissue / border / band | 0 | 0 | 2 / 2 / 0 | 2 / 5 / 1 |
+| lacunae after the lacuna judge, then the POL judge | 73 to 72 | 78 to 77 | 115 to 102 | 107 to 93 |
+| median area, um2 | 38.3 to 38.3 | 32.3 to 32.2 | 40.5 to 47.3 | 24.0 to 24.5 |
+| POL area per analysed area | 2.7% to 2.7% | 2.5% to 2.5% | 4.8% to 4.4% | 3.4% to 3.0% |
+
+**Direction.** With the POL judge, six group differences change sign against
+judge off: the four above, plus WT_HP minus WT and the genotype by diet
+interaction, both for the 90th percentile (interaction +13.6 to -2.7 um2).
+With seven images per group the 90th percentile is fragile: one merge in
+WT_HP moves it by 5.7 um2. The interaction keeps its sign for the share above
+2 x the WT median (-1.4 to -5.7 points) and for the POL area per analysed
+area (-0.2 to -1.2 points).
+
+**What looks wrong:**
+
+- **Removals of large objects.** The POL judge removed 5 objects above
+  76.6 um2 (92 to 201 um2) as border or tissue, which the lacuna judge had
+  kept. The two judges disagree on them, and nobody has checked which is
+  right.
+- **Merging can enlarge a lacuna.** A merge turns two neighbours into one
+  larger lacuna, so it can raise the size measures by itself (the Hyp_RD
+  median rises by 6.8 um2). Merges are joined only where the judge saw one
+  body, but none of this is checked by hand.
+- **The both judges set keeps the lacunae from before the POL judge,**
+  because its canaliculi verdicts were made for those lacunae.

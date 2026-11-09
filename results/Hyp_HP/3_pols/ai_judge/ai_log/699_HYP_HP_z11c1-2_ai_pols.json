@@ -1,0 +1,240 @@
+{
+  "schema": "lcn-ai-pol-judge-decisions-1",
+  "status": "EXPERIMENT, pre-validation, not validated. Which lacunae are POLs, clusters, pieces of one body or no lacunae was decided by an AI judge; every boundary is the lacuna stage's own. Applied only when config.AI_POL_JUDGE_ENABLED is True.",
+  "written_at": "2026-11-09T21:10:20Z",
+  "mode": "live",
+  "image_label": "699_HYP_HP_z11c1-2",
+  "group": "Hyp_HP",
+  "image_code": "img_f3a94933",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "prompt_sha256": "61014035dd35f6c5b2552793e18c3028a85ba9d7d7d276299189052953be019f",
+  "examples_sha256": "31567609240f0e4ffcf3e55bd973a3cd31d739bcc8d23c98d894eb0fe0ba058c",
+  "candidate_rule": {
+    "min_area_um2": 76.6,
+    "pair_gap_um": 3.0,
+    "pair_gap_px": 23.077
+  },
+  "candidate_counts": {
+    "lacunae": 16,
+    "cases": 1,
+    "numbered": 6,
+    "large": 0,
+    "cluster_rule": 0,
+    "close_pairs": 6
+  },
+  "geometry_sha256": "ba0ee7c211b0442342919fe0ff2d98fc7dd5423f70dbc1e071be9c38f9d53050",
+  "totals": {
+    "cases": 1,
+    "cases_valid": 1,
+    "calls": 1,
+    "attempts": 1,
+    "invalid_attempts": 0,
+    "call_errors": 0,
+    "refusals": 0,
+    "input_tokens": 2454,
+    "output_tokens": 359,
+    "cost_usd": 0.008498,
+    "replay_request_mismatches": 0,
+    "replay_picture_mismatches": 0,
+    "stopped_on_cost": false
+  },
+  "verdicts": {
+    "pol": 0,
+    "cluster": 0,
+    "split": 5,
+    "lacuna": 0,
+    "not_lacuna": 1,
+    "unsure": 0,
+    "unjudged": 0
+  },
+  "cases": [
+    {
+      "case_id": "case_001",
+      "members": [
+        {
+          "lacuna_id": 7,
+          "area_um2": 20.2,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            542,
+            733,
+            581,
+            783
+          ],
+          "centroid_xy": [
+            755.8,
+            562.1
+          ],
+          "n": 1,
+          "why_candidate": [
+            "close to 3"
+          ]
+        },
+        {
+          "lacuna_id": 6,
+          "area_um2": 32.85,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            533,
+            624,
+            596,
+            698
+          ],
+          "centroid_xy": [
+            659.1,
+            562.5
+          ],
+          "n": 2,
+          "why_candidate": [
+            "close to 3, 4"
+          ]
+        },
+        {
+          "lacuna_id": 14,
+          "area_um2": null,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            556,
+            703,
+            579,
+            735
+          ],
+          "centroid_xy": [
+            720.3,
+            566.0
+          ],
+          "n": 3,
+          "why_candidate": [
+            "close to 1, 2"
+          ]
+        },
+        {
+          "lacuna_id": 15,
+          "area_um2": null,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            586,
+            582,
+            635,
+            642
+          ],
+          "centroid_xy": [
+            620.1,
+            614.6
+          ],
+          "n": 4,
+          "why_candidate": [
+            "close to 2, 5, 6"
+          ]
+        },
+        {
+          "lacuna_id": 9,
+          "area_um2": 10.71,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            621,
+            530,
+            653,
+            583
+          ],
+          "centroid_xy": [
+            551.3,
+            631.2
+          ],
+          "n": 5,
+          "why_candidate": [
+            "close to 4, 6"
+          ]
+        },
+        {
+          "lacuna_id": 10,
+          "area_um2": 22.46,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            627,
+            571,
+            662,
+            639
+          ],
+          "centroid_xy": [
+            606.1,
+            643.5
+          ],
+          "n": 6,
+          "why_candidate": [
+            "close to 4, 5"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_HP/3_pols/ai_judge/ai_log/pictures/699_HYP_HP_z11c1-2_case_001.png",
+      "picture_sha256": "e81d3d57781b6ce956c850ebc2783388a4683d9f133fd07c79f79079a2929097",
+      "request_sha256": "f510e306a576f9a44a47c037d58ce4b8c211354aeb178ab3f8ccd663ae3160df",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.008498,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "split",
+          "reason": "",
+          "why": "right piece of one fragmented dye-filled body with 2 and 3, no bone between",
+          "lacuna_id": 7
+        },
+        {
+          "n": 2,
+          "verdict": "split",
+          "reason": "",
+          "why": "upper piece of same diffuse bright body, cut by thin gaps",
+          "lacuna_id": 6
+        },
+        {
+          "n": 3,
+          "verdict": "split",
+          "reason": "",
+          "why": "middle piece of same bright body, adjacent to 1 and 2",
+          "lacuna_id": 14
+        },
+        {
+          "n": 4,
+          "verdict": "not_lacuna",
+          "reason": "tissue",
+          "why": "thin connecting strand between bright regions, no body",
+          "lacuna_id": 15
+        },
+        {
+          "n": 5,
+          "verdict": "split",
+          "reason": "",
+          "why": "left fragment of the lacuna around 6, continuous dye-filled space",
+          "lacuna_id": 9
+        },
+        {
+          "n": 6,
+          "verdict": "split",
+          "reason": "",
+          "why": "main bright lacuna body; 5 is its cut-off left piece, one enlarged lacuna",
+          "lacuna_id": 10
+        }
+      ],
+      "merge": [
+        [
+          7,
+          6,
+          14
+        ],
+        [
+          9,
+          10
+        ]
+      ]
+    }
+  ]
+}

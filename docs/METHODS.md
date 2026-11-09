@@ -2491,3 +2491,20 @@ lacuna with a shape measure. The later stages (network, quantification,
 hash of the cases, as for the other judges. Self-test
 `python src/diagnostics.py ai-pol-judge -s` (16 checks, stub judge, on
 I534_z25c1-2); the log is in `results/<group>/3_pols/ai_judge/ai_log/`.
+
+**The run (2026-11-09).** Cost dry run on one development image per group:
+$0.09, estimate for 35 images $0.59, within the $10 budget
+(`results/archive/judge/COST_POL.md`). The dry run found one ambiguity: a
+large body was called `pol` and its piece `split`. The prompt was made
+explicit (every piece of a split body is `split`), and the parser reads the
+last complete json object of an answer. Full run, FINAL mode: 35 images, 80
+cases, 81 calls, $0.51; replay identical on all 35. The lacuna judge's set
+was rebuilt with the POL judge on (`ai-lacuna-run --with-pol-judge`, the rest
+of `results/` byte identical), and so was `3_pols/ai_judge/` (check PASS,
+pictures 35 of 35).
+
+On the development images it merged 1, 1, 9 and 5 groups of pieces, flagged
+0, 0, 3 and 0 clusters (2 of them new) and removed 0, 0, 4 and 8 lacunae (WT,
+WT_HP, Hyp_RD, Hyp_HP). The table before it is kept as
+`judge_on_vs_off_before_pol_judge.csv`. Report:
+`results/archive/judge/REPORT_JUDGE.md`.

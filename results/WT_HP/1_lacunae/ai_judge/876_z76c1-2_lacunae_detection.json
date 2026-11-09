@@ -48,7 +48,7 @@
     9
   ],
   "provenance": {
-    "git_commit": "6b5d55714205b1aaaf97150e00fa99bd712a8fd2",
+    "git_commit": "0af146ebae8baf4ffa98194f822296faa7adc581",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -59,7 +59,7 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "8f1553a83cdf8f52",
+    "config_hash": "ff34b8b8f915d275",
     "config_hash_covers": [
       "AI_CANALICULI_SUBFOLDER",
       "AI_CANDIDATE_CUT_FRACTION",
@@ -93,6 +93,13 @@
       "AI_MODELS_ACCEPTING_TEMPERATURE",
       "AI_OUTPUT_TOKENS_FIXED",
       "AI_OUTPUT_TOKENS_PER_SEGMENT",
+      "AI_POL_CROP_MARGIN_PX",
+      "AI_POL_CROP_MIN_PX",
+      "AI_POL_CROP_RENDER_PX",
+      "AI_POL_JUDGE_ENABLED",
+      "AI_POL_MAX_COST_USD",
+      "AI_POL_MIN_AREA_UM2",
+      "AI_POL_PAIR_GAP_UM",
       "AI_PRICE_INPUT_USD_PER_MTOK",
       "AI_PRICE_OUTPUT_USD_PER_MTOK",
       "AI_REFERENCE_BAND_PX",
@@ -243,5 +250,34 @@
       60
     ],
     "removed_numbers": []
+  },
+  "ai_pol_judge": {
+    "status": "EXPERIMENT, pre-validation, not validated. Which lacunae are POLs, clusters, pieces of one body or no lacunae was decided by an AI judge; every boundary is the lacuna stage's own.",
+    "decision_file": "results/WT_HP/3_pols/ai_judge/ai_log/876_z76c1-2_ai_pols.json",
+    "model": "claude-sonnet-5-5",
+    "decisions_written_at": "2026-11-09T21:08:16Z",
+    "prompt_sha256": "61014035dd35f6c5b2552793e18c3028a85ba9d7d7d276299189052953be019f",
+    "examples_sha256": "31567609240f0e4ffcf3e55bd973a3cd31d739bcc8d23c98d894eb0fe0ba058c",
+    "geometry_sha256": "2e6b7900e492b1e00dd06ea14da3d296708ec11526028d92dbdd194c22fe3e62",
+    "counts": {
+      "pol": 0,
+      "cluster": 0,
+      "split": 0,
+      "lacuna": 0,
+      "not_lacuna": 0,
+      "unsure": 0,
+      "unjudged": 0,
+      "cases": 0,
+      "removed": 0,
+      "merge_groups": 0,
+      "pieces_merged": 0,
+      "cluster_flags_set": 0,
+      "cluster_flags_cleared": 0,
+      "lacunae_before": 9,
+      "lacunae_after": 9
+    },
+    "removed_ids_before": [],
+    "merge_groups_ids_before": [],
+    "cluster_override": {}
   }
 }

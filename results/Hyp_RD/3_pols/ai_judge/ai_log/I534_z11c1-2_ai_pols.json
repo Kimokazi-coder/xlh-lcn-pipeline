@@ -1,0 +1,494 @@
+{
+  "schema": "lcn-ai-pol-judge-decisions-1",
+  "status": "EXPERIMENT, pre-validation, not validated. Which lacunae are POLs, clusters, pieces of one body or no lacunae was decided by an AI judge; every boundary is the lacuna stage's own. Applied only when config.AI_POL_JUDGE_ENABLED is True.",
+  "written_at": "2026-11-09T21:09:28Z",
+  "mode": "live",
+  "image_label": "I534_z11c1-2",
+  "group": "Hyp_RD",
+  "image_code": "img_981d8b06",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "prompt_sha256": "61014035dd35f6c5b2552793e18c3028a85ba9d7d7d276299189052953be019f",
+  "examples_sha256": "31567609240f0e4ffcf3e55bd973a3cd31d739bcc8d23c98d894eb0fe0ba058c",
+  "candidate_rule": {
+    "min_area_um2": 76.6,
+    "pair_gap_um": 3.0,
+    "pair_gap_px": 23.077
+  },
+  "candidate_counts": {
+    "lacunae": 26,
+    "cases": 7,
+    "numbered": 12,
+    "large": 6,
+    "cluster_rule": 0,
+    "close_pairs": 5
+  },
+  "geometry_sha256": "e47bc16f7e2c154de3df55b5ab79a0cd8e2e493f0ac282965083b6f288b39d4a",
+  "totals": {
+    "cases": 7,
+    "cases_valid": 7,
+    "calls": 7,
+    "attempts": 7,
+    "invalid_attempts": 0,
+    "call_errors": 0,
+    "refusals": 0,
+    "input_tokens": 17590,
+    "output_tokens": 823,
+    "cost_usd": 0.04341,
+    "replay_request_mismatches": 0,
+    "replay_picture_mismatches": 0,
+    "stopped_on_cost": false
+  },
+  "verdicts": {
+    "pol": 5,
+    "cluster": 0,
+    "split": 4,
+    "lacuna": 1,
+    "not_lacuna": 1,
+    "unsure": 1,
+    "unjudged": 0
+  },
+  "cases": [
+    {
+      "case_id": "case_001",
+      "members": [
+        {
+          "lacuna_id": 1,
+          "area_um2": 84.8,
+          "large": true,
+          "cluster_rule": false,
+          "bbox_rc": [
+            0,
+            190,
+            74,
+            319
+          ],
+          "centroid_xy": [
+            243.7,
+            33.4
+          ],
+          "n": 1,
+          "why_candidate": [
+            "large",
+            "close to 2"
+          ]
+        },
+        {
+          "lacuna_id": 2,
+          "area_um2": 24.15,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            19,
+            120,
+            77,
+            198
+          ],
+          "centroid_xy": [
+            162.3,
+            47.7
+          ],
+          "n": 2,
+          "why_candidate": [
+            "close to 1, 3"
+          ]
+        },
+        {
+          "lacuna_id": 4,
+          "area_um2": 33.82,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            79,
+            120,
+            134,
+            190
+          ],
+          "centroid_xy": [
+            153.4,
+            101.7
+          ],
+          "n": 3,
+          "why_candidate": [
+            "close to 2"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_RD/3_pols/ai_judge/ai_log/pictures/I534_z11c1-2_case_001.png",
+      "picture_sha256": "c831fa4df673aa26be8c7d6a7135d40ec148cc8841a7c91d41a8f055a6091396",
+      "request_sha256": "8a54374c444a84ee330d3221575fb46c29324964b7fdb01e2be23d63f8013082",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.006534,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "pol",
+          "reason": "",
+          "why": "Large irregular saturated dye-filled body, about twice normal area, single space.",
+          "lacuna_id": 1
+        },
+        {
+          "n": 2,
+          "verdict": "unsure",
+          "reason": "",
+          "why": "Small ragged protrusion beside body 1; unclear if separate lacuna or fragment.",
+          "lacuna_id": 2
+        },
+        {
+          "n": 3,
+          "verdict": "lacuna",
+          "reason": "",
+          "why": "Separate compact body near normal size, distinct from body 1.",
+          "lacuna_id": 4
+        }
+      ],
+      "merge": []
+    },
+    {
+      "case_id": "case_002",
+      "members": [
+        {
+          "lacuna_id": 5,
+          "area_um2": 77.6,
+          "large": true,
+          "cluster_rule": false,
+          "bbox_rc": [
+            103,
+            724,
+            183,
+            818
+          ],
+          "centroid_xy": [
+            765.1,
+            137.6
+          ],
+          "n": 1,
+          "why_candidate": [
+            "large"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_RD/3_pols/ai_judge/ai_log/pictures/I534_z11c1-2_case_002.png",
+      "picture_sha256": "665eddbc882a251f110e8361c6f72ccdde87db2c7d8e1b29b481a899088b0bfd",
+      "request_sha256": "0ac0e0e19e8f40340294a3d5796e30fb918e338e927c5c053875feca815f1f9d",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.005626,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "pol",
+          "reason": "",
+          "why": "single large irregular dye-filled lacunar body, about twice normal area, with canaliculi",
+          "lacuna_id": 5
+        }
+      ],
+      "merge": []
+    },
+    {
+      "case_id": "case_003",
+      "members": [
+        {
+          "lacuna_id": 8,
+          "area_um2": 200.89,
+          "large": true,
+          "cluster_rule": false,
+          "bbox_rc": [
+            227,
+            588,
+            336,
+            759
+          ],
+          "centroid_xy": [
+            681.2,
+            286.8
+          ],
+          "n": 1,
+          "why_candidate": [
+            "large"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_RD/3_pols/ai_judge/ai_log/pictures/I534_z11c1-2_case_003.png",
+      "picture_sha256": "55196bf95faa426b57e1f97c190618908d419e439c2cfa5456c29218c8a3b49a",
+      "request_sha256": "094c7518b5d74f70ea859b4fa6983e0fa80dd09686680338a63ece1dcffc8076",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.006322,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "not_lacuna",
+          "reason": "border",
+          "why": "solid saturated white area, no canaliculi or lacunar structure, about five times normal size",
+          "lacuna_id": 8
+        }
+      ],
+      "merge": []
+    },
+    {
+      "case_id": "case_004",
+      "members": [
+        {
+          "lacuna_id": 15,
+          "area_um2": 91.55,
+          "large": true,
+          "cluster_rule": false,
+          "bbox_rc": [
+            478,
+            0,
+            575,
+            112
+          ],
+          "centroid_xy": [
+            55.7,
+            527.3
+          ],
+          "n": 1,
+          "why_candidate": [
+            "large"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_RD/3_pols/ai_judge/ai_log/pictures/I534_z11c1-2_case_004.png",
+      "picture_sha256": "4f57f81d3ef672539ead0b3dfc66f1ad81236232f4836dfc2ae3ec0ae0cd7258",
+      "request_sha256": "336bd37cb7bcd914e87ad25340726e9de64404e706b1d43eda8768dd5c341302",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.005844,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "pol",
+          "reason": "",
+          "why": "single large irregular saturated dye-filled space with ragged edges and processes, about 2.4x normal area",
+          "lacuna_id": 15
+        }
+      ],
+      "merge": []
+    },
+    {
+      "case_id": "case_005",
+      "members": [
+        {
+          "lacuna_id": 18,
+          "area_um2": 39.5,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            568,
+            610,
+            634,
+            699
+          ],
+          "centroid_xy": [
+            651.4,
+            607.7
+          ],
+          "n": 1,
+          "why_candidate": [
+            "close to 2"
+          ]
+        },
+        {
+          "lacuna_id": 19,
+          "area_um2": 28.38,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            608,
+            665,
+            665,
+            730
+          ],
+          "centroid_xy": [
+            701.8,
+            634.9
+          ],
+          "n": 2,
+          "why_candidate": [
+            "close to 1"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_RD/3_pols/ai_judge/ai_log/pictures/I534_z11c1-2_case_005.png",
+      "picture_sha256": "27358db00063c741c9c4277a93adb773786bea367f11fb0e13764372f5a06d64",
+      "request_sha256": "75ef862a3504c0816439e31891ac831c3a2bd90b3eef5a69896ede3d4623f4c6",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.006532,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "split",
+          "reason": "",
+          "why": "left and right pieces form one continuous saturated dye-filled space, no bone between",
+          "lacuna_id": 18
+        },
+        {
+          "n": 2,
+          "verdict": "split",
+          "reason": "",
+          "why": "right lobe joined to left body by open dye-filled neck; one irregular enlarged lacuna",
+          "lacuna_id": 19
+        }
+      ],
+      "merge": [
+        [
+          18,
+          19
+        ]
+      ]
+    },
+    {
+      "case_id": "case_006",
+      "members": [
+        {
+          "lacuna_id": 20,
+          "area_um2": 128.29,
+          "large": true,
+          "cluster_rule": false,
+          "bbox_rc": [
+            605,
+            7,
+            749,
+            138
+          ],
+          "centroid_xy": [
+            82.2,
+            683.5
+          ],
+          "n": 1,
+          "why_candidate": [
+            "large"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_RD/3_pols/ai_judge/ai_log/pictures/I534_z11c1-2_case_006.png",
+      "picture_sha256": "ba95748fb97fd6fe57f7b081c1454abd7bf6185bedc47e7aa4659cf4d4d1150a",
+      "request_sha256": "922bda467cec0c2356bd3ee9fe7caddb263e5465a684b48c9889e54afe98342f",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.005956,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "pol",
+          "reason": "",
+          "why": "single large irregular saturated dye-filled space with processes, about three times normal area",
+          "lacuna_id": 20
+        }
+      ],
+      "merge": []
+    },
+    {
+      "case_id": "case_007",
+      "members": [
+        {
+          "lacuna_id": 23,
+          "area_um2": 10.82,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            770,
+            345,
+            819,
+            376
+          ],
+          "centroid_xy": [
+            358.3,
+            793.9
+          ],
+          "n": 1,
+          "why_candidate": [
+            "close to 2"
+          ]
+        },
+        {
+          "lacuna_id": 25,
+          "area_um2": 22.51,
+          "large": false,
+          "cluster_rule": false,
+          "bbox_rc": [
+            806,
+            354,
+            849,
+            422
+          ],
+          "centroid_xy": [
+            388.6,
+            829.1
+          ],
+          "n": 2,
+          "why_candidate": [
+            "close to 1, 3"
+          ]
+        },
+        {
+          "lacuna_id": 26,
+          "area_um2": 105.46,
+          "large": true,
+          "cluster_rule": false,
+          "bbox_rc": [
+            840,
+            214,
+            924,
+            333
+          ],
+          "centroid_xy": [
+            274.3,
+            881.9
+          ],
+          "n": 3,
+          "why_candidate": [
+            "large",
+            "close to 2"
+          ]
+        }
+      ],
+      "picture": "results/Hyp_RD/3_pols/ai_judge/ai_log/pictures/I534_z11c1-2_case_007.png",
+      "picture_sha256": "1346b7aa336d4a0673ee2a16e301fce0f7d98297ae31fad6d34c4964f8ef734a",
+      "request_sha256": "2191f2cdcc4fdef7f62c2bd2037c2c5a1d85d7e4b3fdee82ffff9628b82dac1c",
+      "answer_valid": true,
+      "attempts": 1,
+      "cost_usd": 0.006596,
+      "invalid_reasons": [],
+      "verdicts": [
+        {
+          "n": 1,
+          "verdict": "split",
+          "reason": "",
+          "why": "small bright piece directly above 2, same dye-filled body with only a narrow gap",
+          "lacuna_id": 23
+        },
+        {
+          "n": 2,
+          "verdict": "split",
+          "reason": "",
+          "why": "irregular bright body continuous with 1, one lacuna cut in pieces",
+          "lacuna_id": 25
+        },
+        {
+          "n": 3,
+          "verdict": "pol",
+          "reason": "",
+          "why": "large irregular dye-filled space, about 3x normal area, single body",
+          "lacuna_id": 26
+        }
+      ],
+      "merge": [
+        [
+          23,
+          25
+        ]
+      ]
+    }
+  ]
+}

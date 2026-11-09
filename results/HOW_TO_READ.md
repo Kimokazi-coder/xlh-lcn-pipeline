@@ -53,8 +53,13 @@ development images, per group: in plain words, the judge removes many more
 outlines in the Hyp groups (32 and 39 fewer lacunae there, 5 in WT_HP, 2
 more in WT), mostly band, tissue and saturated border pieces and fragments,
 so the POL area per analysed area falls most in Hyp; the canaliculi judge
-adds a little canalicular length around every lacuna. Some group differences
-are small enough that the judge changes their direction (see
-`results/archive/judge/REPORT_JUDGE.md`). The judge is not validated: read it
-as a check on how much the result depends on which outlines count, not as
-the result.
+adds a little canalicular length around every lacuna. A third, the POL
+judge, then looked closely at every large lacuna, every cluster and every
+pair of lacunae closer than 3 um: it joined lacunae that are pieces of one
+body, flagged clusters, and removed a few more pieces that are no lacuna,
+almost all in the Hyp groups. In the sheet its column is "lacuna and POL
+judges on", beside "lacuna judge alone". Some group differences are small
+enough that the judges change their direction (see
+`results/archive/judge/REPORT_JUDGE.md`). The judges are not validated: read
+them as a check on how much the result depends on which outlines count, not
+as the result.
