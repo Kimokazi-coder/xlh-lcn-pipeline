@@ -4,9 +4,9 @@
   "image": "872  wt hp_z06.tif",
   "image_label": "872_wt_hp_z06",
   "note": "Pre-validation: not checked against manual counts. Pixel units. Headline measures: roots_count, ring_length_r30_px, the per-field canalicular_length_density_per_px, and the canalicular width (width_median_px per image, ring_width_mean_r30_px per lacuna). owned_length_px, edge_count and mean_edge_length_px depend on which cell owns which thread, which is unbounded in distance; they are network descriptors, and edge_count is not canaliculi per cell. The width is quantised by the pixel grid (threads are about 2 to 6 px wide) and moves with the threshold. Summary statistics cover interior lacunae only.",
-  "lacuna_count": 12,
+  "lacuna_count": 11,
   "border_lacuna_count": 1,
-  "interior_lacuna_count": 11,
+  "interior_lacuna_count": 10,
   "headline_measures": [
     "roots_count",
     "ring_length_r30_px",
@@ -50,191 +50,193 @@
     "ring_width_mean_r30_px"
   ],
   "lacuna_shape_summary": {
-    "interior_lacuna_count": 11,
+    "interior_lacuna_count": 10,
     "units": "px",
     "area_px2": {
-      "mean": 1536.0909,
-      "median": 1363.0,
-      "sd": 742.9849
+      "mean": 1562.4,
+      "median": 1410.5,
+      "sd": 777.7551
     },
     "major_axis_length_px": {
-      "mean": 75.8641,
-      "median": 80.3055,
-      "sd": 22.6571
+      "mean": 75.3604,
+      "median": 74.0553,
+      "sd": 23.8177
     },
     "minor_axis_length_px": {
-      "mean": 26.5145,
-      "median": 22.6988,
-      "sd": 7.8713
+      "mean": 26.8961,
+      "median": 23.3362,
+      "sd": 8.1892
     },
     "aspect_ratio": {
-      "mean": 2.9504,
-      "median": 3.0775,
-      "sd": 0.7901
+      "mean": 2.889,
+      "median": 2.8577,
+      "sd": 0.8048
     },
     "eccentricity": {
-      "mean": 0.9176,
-      "median": 0.9457,
-      "sd": 0.0765
+      "mean": 0.9134,
+      "median": 0.9355,
+      "sd": 0.0793
     },
     "solidity": {
-      "mean": 0.8516,
-      "median": 0.8855,
-      "sd": 0.0739
+      "mean": 0.8681,
+      "median": 0.8856,
+      "sd": 0.0523
     }
   },
   "summary": {
-    "interior_lacuna_count": 11,
+    "interior_lacuna_count": 10,
     "units": "px",
     "roots_count": {
-      "mean": 10.7273,
-      "median": 10.0,
-      "sd": 5.1593
+      "mean": 10.9,
+      "median": 11.0,
+      "sd": 5.4047
     },
     "ring_length_r30_px": {
-      "mean": 463.8182,
-      "median": 465.0,
-      "sd": 129.9075
+      "mean": 476.8,
+      "median": 470.5,
+      "sd": 129.1948
     },
     "ring_length_r60_px": {
-      "mean": 1197.8182,
-      "median": 1051.0,
-      "sd": 304.0029
+      "mean": 1222.5,
+      "median": 1125.5,
+      "sd": 308.2464
     },
     "owned_length_px": {
-      "mean": 3057.0488,
-      "median": 3061.8317,
-      "sd": 1166.6583
+      "mean": 3172.133,
+      "median": 3032.8734,
+      "sd": 1087.85
     },
     "edge_count": {
-      "mean": 190.8182,
-      "median": 192.0,
-      "sd": 83.4803
+      "mean": 198.8,
+      "median": 184.0,
+      "sd": 79.6392
     },
     "mean_edge_length_px": {
-      "mean": 16.4087,
-      "median": 15.9412,
-      "sd": 1.2798
+      "mean": 16.2619,
+      "median": 16.0041,
+      "sd": 1.2043
     },
     "perimeter_px": {
-      "mean": 201.5161,
-      "median": 212.4092,
-      "sd": 59.5161
+      "mean": 199.9298,
+      "median": 204.2168,
+      "sd": 62.4899
     },
     "ring_area_r30_px2": {
-      "mean": 8159.5455,
-      "median": 8564.0,
-      "sd": 1316.5407
+      "mean": 8113.0,
+      "median": 8476.0,
+      "sd": 1378.1825
     },
     "ring_area_r60_px2": {
-      "mean": 21087.0,
-      "median": 22238.0,
-      "sd": 2804.2918
+      "mean": 20923.1,
+      "median": 22211.0,
+      "sd": 2899.9152
     },
     "in_frame_fraction_r30": {
-      "mean": 0.9903,
+      "mean": 0.9893,
       "median": 1.0,
-      "sd": 0.0323
+      "sd": 0.0338
     },
     "in_frame_fraction_r60": {
-      "mean": 0.9827,
+      "mean": 0.981,
       "median": 1.0,
-      "sd": 0.0574
+      "sd": 0.0602
     },
     "ring_density_r30": {
-      "mean": 0.05696443,
-      "median": 0.05674773,
-      "sd": 0.01268176
+      "mean": 0.05878841,
+      "median": 0.0578184,
+      "sd": 0.01174881
     },
     "ring_density_r60": {
-      "mean": 0.05761938,
-      "median": 0.05686707,
-      "sd": 0.01514866
+      "mean": 0.05919644,
+      "median": 0.05729289,
+      "sd": 0.01497037
     },
     "roots_per_100px_perimeter": {
-      "mean": 5.2797,
-      "median": 5.8974,
-      "sd": 2.0167
+      "mean": 5.3937,
+      "median": 5.9369,
+      "sd": 2.0881
     },
     "ring_attached_length_r30_px": {
-      "mean": 432.7273,
-      "median": 436.0,
-      "sd": 132.6168
+      "mean": 444.6,
+      "median": 446.0,
+      "sd": 133.4859
     },
     "ring_attached_length_r60_px": {
-      "mean": 1039.4545,
-      "median": 849.0,
-      "sd": 387.0228
+      "mean": 1057.3,
+      "median": 859.5,
+      "sd": 403.265
     },
     "ring_length_w_r30_px": {
-      "mean": 526.0405,
-      "median": 528.262,
-      "sd": 152.0283
+      "mean": 541.471,
+      "median": 536.1112,
+      "sd": 150.8991
     },
     "ring_length_w_r60_px": {
-      "mean": 1362.0309,
-      "median": 1219.3717,
-      "sd": 350.704
+      "mean": 1392.3159,
+      "median": 1288.4722,
+      "sd": 353.7119
     },
     "sholl_crossings_r10": {
-      "mean": 10.1818,
+      "mean": 10.5,
       "median": 10.0,
-      "sd": 3.6005
+      "sd": 3.6286
     },
     "sholl_crossings_r20": {
-      "mean": 13.0,
-      "median": 12.0,
-      "sd": 4.4497
+      "mean": 13.4,
+      "median": 12.5,
+      "sd": 4.4771
     },
     "sholl_crossings_r30": {
-      "mean": 15.2727,
+      "mean": 15.7,
       "median": 16.0,
-      "sd": 3.952
+      "sd": 3.8887
     },
     "loop_count": {
-      "mean": 26.5455,
+      "mean": 28.4,
       "median": 23.0,
-      "sd": 17.3284
+      "sd": 16.926
     },
     "loop_edge_share": {
-      "mean": 0.4922,
-      "median": 0.4625,
-      "sd": 0.1201
+      "mean": 0.5152,
+      "median": 0.5157,
+      "sd": 0.1185
     },
     "ring_width_mean_r30_px": {
-      "mean": 7.3259,
-      "median": 7.3404,
-      "sd": 0.5845
+      "mean": 7.3093,
+      "median": 7.2939,
+      "sd": 0.6134
     }
   },
   "field": {
-    "analysed_area_px2": 1031010.0,
-    "total_skeleton_length_px": 39292.0,
-    "canalicular_length_density_per_px": 0.0381102,
-    "junction_count": 1318,
-    "junction_density_per_px2": 0.00127836,
-    "lacuna_count": 12,
-    "lacunae_per_px2": 1.164e-05,
-    "skeleton_component_count": 153,
-    "mean_component_length_px": 256.8105,
-    "median_component_length_px": 17.0,
-    "field_length_density_w_per_px": 0.04321848,
-    "field_density_without_flagged_per_px": 0.04948377,
+    "analysed_area_px2": 780579.0,
+    "total_skeleton_length_px": 38251.0,
+    "canalicular_length_density_per_px": 0.04900337,
+    "junction_count": 1269,
+    "junction_density_per_px2": 0.00162572,
+    "lacuna_count": 11,
+    "lacunae_per_px2": 1.409e-05,
+    "skeleton_component_count": 159,
+    "mean_component_length_px": 240.5723,
+    "median_component_length_px": 18.0,
+    "field_length_density_w_per_px": 0.05561603,
+    "field_density_without_flagged_per_px": 0.03813769,
     "field_density_in_roi_per_px": null,
     "unattached_length_px": 10.0,
     "unattached_component_count": 1,
-    "canalicular_length_density_attached_per_px": 0.0381102,
-    "field_length_density_with_unattached_per_px": 0.0381199,
-    "loop_count": 391,
-    "loop_edge_share": 0.5501,
-    "edge_count": 2623
+    "canalicular_length_density_attached_per_px": 0.04900337,
+    "field_length_density_with_unattached_per_px": 0.04901618,
+    "excluded_area_px2": 251704.0,
+    "analysed_field_area_px2": 796872.0,
+    "loop_count": 400,
+    "loop_edge_share": 0.5455,
+    "edge_count": 2706
   },
   "width": {
-    "width_mean_px": 7.6256,
+    "width_mean_px": 7.5724,
     "width_median_px": 8.0,
     "width_p10_px": 4.0,
-    "width_p90_px": 10.7703,
-    "width_pixels_used": 37753
+    "width_p90_px": 10.198,
+    "width_pixels_used": 39065
   },
   "biological_limits": {
     "status": "report only, nothing is pruned or filtered by this block",
@@ -253,19 +255,19 @@
         24.96,
         50.05
       ],
-      "n_threads": 847,
-      "median_um": 16.597,
-      "p10_um": 2.9008,
-      "p90_um": 33.9304,
-      "max_um": 50.0286,
-      "fraction_in_range": 0.2338,
-      "fraction_below_range": 0.7662,
+      "n_threads": 788,
+      "median_um": 17.1735,
+      "p10_um": 3.5889,
+      "p90_um": 33.1717,
+      "max_um": 45.7386,
+      "fraction_in_range": 0.2576,
+      "fraction_below_range": 0.7424,
       "fraction_above_range": 0.0
     },
     "roots_per_lacuna": {
       "definition": "threads leaving the lacuna surface, interior lacunae only",
-      "n_lacunae": 11,
-      "median": 10.0,
+      "n_lacunae": 10,
+      "median": 11.0,
       "min": 3,
       "max": 20
     },
@@ -275,20 +277,20 @@
       "why": "it includes the optical blur, which widens a thread beyond its true size, and no point spread function is subtracted: the numerical aperture, the emission wavelength and the pinhole are unknown. It is an apparent width in the image, not a canalicular diameter.",
       "median_um": 1.04,
       "p10_um": 0.52,
-      "p90_um": 1.4001
+      "p90_um": 1.3257
     }
   },
   "network_shape": {
     "status": "report only, nothing here filters or prunes",
-    "skeleton_px": 39292,
+    "skeleton_px": 40832,
     "straight_run_min_px": 8,
-    "straight_run_px": 11765,
-    "straight_run_fraction": 0.2994,
+    "straight_run_px": 12257,
+    "straight_run_fraction": 0.3002,
     "rectangle_count": 2,
     "rectangle_tolerance_px": 1,
-    "loop_count": 391,
-    "loop_edge_share": 0.550133,
-    "edge_count_real": 2623
+    "loop_count": 400,
+    "loop_edge_share": 0.545455,
+    "edge_count_real": 2706
   },
   "lacunae": [
     {
@@ -306,6 +308,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 10,
       "ring_length_r30_px": 465,
       "ring_length_r60_px": 967,
@@ -346,6 +349,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 12,
       "ring_length_r30_px": 356,
       "ring_length_r60_px": 827,
@@ -386,6 +390,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 20,
       "ring_length_r30_px": 568,
       "ring_length_r60_px": 1572,
@@ -426,6 +431,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 13,
       "ring_length_r30_px": 578,
       "ring_length_r60_px": 1524,
@@ -466,6 +472,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 18,
       "ring_length_r30_px": 741,
       "ring_length_r60_px": 1762,
@@ -506,6 +513,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 8,
       "ring_length_r30_px": 370,
       "ring_length_r60_px": 1051,
@@ -546,6 +554,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 4,
       "ring_length_r30_px": 309,
       "ring_length_r60_px": 986,
@@ -586,29 +595,30 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 12,
       "ring_length_r30_px": 476,
-      "ring_length_r60_px": 1204,
-      "owned_length_px": 2866.1871,
-      "edge_count": 157,
-      "mean_edge_length_px": 18.256,
+      "ring_length_r60_px": 1200,
+      "owned_length_px": 2614.6063,
+      "edge_count": 142,
+      "mean_edge_length_px": 18.4127,
       "perimeter_px": 196.0244,
       "ring_area_r30_px2": 8388,
       "ring_area_r60_px2": 22420,
       "in_frame_fraction_r30": 1.0,
       "in_frame_fraction_r60": 1.0,
       "ring_density_r30": 0.05674773,
-      "ring_density_r60": 0.05370205,
+      "ring_density_r60": 0.05352364,
       "roots_per_100px_perimeter": 6.1217,
       "ring_attached_length_r30_px": 436,
-      "ring_attached_length_r60_px": 849,
+      "ring_attached_length_r60_px": 817,
       "ring_length_w_r30_px": 543.9605,
-      "ring_length_w_r60_px": 1362.5727,
+      "ring_length_w_r60_px": 1357.5727,
       "sholl_crossings_r10": 11,
       "sholl_crossings_r20": 15,
       "sholl_crossings_r30": 19,
       "loop_count": 19,
-      "loop_edge_share": 0.4459,
+      "loop_edge_share": 0.493,
       "ring_width_mean_r30_px": 6.958
     },
     {
@@ -626,6 +636,7 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 8,
       "ring_length_r30_px": 353,
       "ring_length_r60_px": 919,
@@ -666,12 +677,13 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 3,
       "ring_length_r30_px": 396,
       "ring_length_r60_px": 1031,
-      "owned_length_px": 1189.7199,
-      "edge_count": 65,
-      "mean_edge_length_px": 18.3034,
+      "owned_length_px": 2506.4693,
+      "edge_count": 156,
+      "mean_edge_length_px": 16.0671,
       "perimeter_px": 167.5391,
       "ring_area_r30_px2": 7464,
       "ring_area_r60_px2": 18130,
@@ -687,8 +699,8 @@
       "sholl_crossings_r10": 8,
       "sholl_crossings_r20": 10,
       "sholl_crossings_r30": 12,
-      "loop_count": 5,
-      "loop_edge_share": 0.3692,
+      "loop_count": 21,
+      "loop_edge_share": 0.5385,
       "ring_width_mean_r30_px": 6.5111
     },
     {
@@ -706,12 +718,13 @@
       "lacuna_class": "ordinary",
       "out_of_focus": false,
       "dim": false,
+      "cluster": false,
       "roots_count": 9,
       "ring_length_r30_px": 509,
       "ring_length_r60_px": 1305,
-      "owned_length_px": 4099.4268,
-      "edge_count": 266,
-      "mean_edge_length_px": 15.4114,
+      "owned_length_px": 4189.8826,
+      "edge_count": 275,
+      "mean_edge_length_px": 15.2359,
       "perimeter_px": 152.6102,
       "ring_area_r30_px2": 6844,
       "ring_area_r60_px2": 16739,
@@ -727,49 +740,9 @@
       "sholl_crossings_r10": 10,
       "sholl_crossings_r20": 13,
       "sholl_crossings_r30": 16,
-      "loop_count": 49,
-      "loop_edge_share": 0.6805,
+      "loop_count": 50,
+      "loop_edge_share": 0.6873,
       "ring_width_mean_r30_px": 8.1131
-    },
-    {
-      "lacuna_id": 12,
-      "area_px2": 1273.0,
-      "major_axis_length_px": 80.9015,
-      "minor_axis_length_px": 22.6988,
-      "aspect_ratio": 3.5641,
-      "eccentricity": 0.9598,
-      "solidity": 0.6866,
-      "orientation_rad": -1.5697,
-      "centroid_row_px": 768.2168,
-      "centroid_col_px": 476.0518,
-      "on_border": false,
-      "lacuna_class": "ordinary",
-      "out_of_focus": false,
-      "dim": false,
-      "roots_count": 9,
-      "ring_length_r30_px": 334,
-      "ring_length_r60_px": 947,
-      "owned_length_px": 3061.8317,
-      "edge_count": 196,
-      "mean_edge_length_px": 15.6216,
-      "perimeter_px": 217.3797,
-      "ring_area_r30_px2": 8625,
-      "ring_area_r60_px2": 22726,
-      "in_frame_fraction_r30": 1.0,
-      "in_frame_fraction_r60": 1.0,
-      "ring_density_r30": 0.03872464,
-      "ring_density_r60": 0.04167033,
-      "roots_per_100px_perimeter": 4.1402,
-      "ring_attached_length_r30_px": 314,
-      "ring_attached_length_r60_px": 829,
-      "ring_length_w_r30_px": 371.7351,
-      "ring_length_w_r60_px": 1054.1808,
-      "sholl_crossings_r10": 7,
-      "sholl_crossings_r20": 9,
-      "sholl_crossings_r30": 11,
-      "loop_count": 25,
-      "loop_edge_share": 0.4847,
-      "ring_width_mean_r30_px": 7.4919
     }
   ],
   "parameters": {
@@ -791,6 +764,10 @@
       "fill_enclosed_holes_max_px2": 0,
       "band_filter_min_opening_share": null,
       "fast_lacuna_stage": false,
+      "lacuna_rescue_rules": false,
+      "fragment_rule": true,
+      "band_blob_rule": false,
+      "structure_rule": true,
       "computed_threshold_t_hi": 0.710125612745098
     },
     "canaliculi": {
@@ -823,7 +800,7 @@
       "dim_thread_cut_fraction": 0.5,
       "dim_thread_reach_um": 0.65,
       "dim_thread_reach_px": 5,
-      "dim_pass_added_px": 43321,
+      "dim_pass_added_px": 41520,
       "lacuna_attach_reach_um": 2.6,
       "lacuna_attach_reach_px": 20,
       "lacuna_attach_min_signal_fraction": 0.7,
@@ -845,20 +822,20 @@
       "hole_new_min_length_um": 10.0,
       "hole_new_min_length_px": 77,
       "hole_new_min_aspect": 3.0,
-      "hole_zone_px": 55003,
+      "hole_zone_px": 49702,
       "hole_zone_added_px": 2615,
       "hole_gain_step_um": 0.26,
       "hole_gain_smooth_annuli": 3,
       "hole_zone_gains": {
-        "lacunae": 12,
+        "lacunae": 11,
         "at_the_body_edge": {
           "min": 1.0,
-          "median": 1.5602,
+          "median": 1.598,
           "max": 3.0
         },
         "at_the_outer_end": {
           "min": 1.0,
-          "median": 1.0141,
+          "median": 1.0281,
           "max": 1.9025
         },
         "at_the_cap": 1
@@ -877,33 +854,33 @@
       ],
       "max_canaliculus_length_um": 50.0,
       "max_canaliculus_length_px": 385,
-      "length_prune_removed_px": 1574,
-      "length_prune_rounds": 1,
+      "length_prune_removed_px": 0,
+      "length_prune_rounds": 0,
       "canaliculus_length_range_um": [
         25.0,
         50.0
       ],
       "ai_lacuna_judge": {
         "counts": {
-          "numbered": 35,
+          "numbered": 25,
           "not_numbered_over_the_cap": 0,
-          "yes": 8,
-          "no": 23,
-          "unsure": 4,
+          "yes": 9,
+          "no": 14,
+          "unsure": 2,
           "unjudged": 0,
           "added": 0,
           "removed": 3,
           "added_regions": 0,
           "added_dim_candidates": 0,
-          "yes_kept_by_the_filters": 8,
-          "no_rejected_by_the_filters": 20,
-          "lacunae_before": 15,
-          "lacunae_after": 12
+          "yes_kept_by_the_filters": 9,
+          "no_rejected_by_the_filters": 11,
+          "lacunae_before": 14,
+          "lacunae_after": 11
         },
-        "geometry_sha256": "9d8aee5805c9d4b13752dfce9df1c5e9245b62cadca26b3dbbb29410ce3c8850",
+        "geometry_sha256": "5e10c83b07db6eb488c47574e76029ba85bc98c795f81c4c70a3d1e948302657",
         "model": "claude-sonnet-5-5",
-        "decisions_written_at": "2026-10-27T16:31:11Z",
-        "decision_file": "results_ai_lacunae/WT_HP/ai_log/872_wt_hp_z06/872_wt_hp_z06_ai_lacunae.json"
+        "decisions_written_at": "2026-11-09T18:27:10Z",
+        "decision_file": "results/WT_HP/1_lacunae/ai_judge/ai_log/872_wt_hp_z06_ai_lacunae.json"
       }
     },
     "quantification": {
@@ -925,7 +902,7 @@
     }
   },
   "provenance": {
-    "git_commit": "f5be49ad315376f07c14b85e1562909a6a36f4e8",
+    "git_commit": "6b5d55714205b1aaaf97150e00fa99bd712a8fd2",
     "git_dirty": true,
     "versions": {
       "python": "3.9.10",
@@ -936,8 +913,9 @@
       "networkx": "3.2.1",
       "pandas": "2.3.3"
     },
-    "config_hash": "ecb9d2fba8ab2efc",
+    "config_hash": "8f1553a83cdf8f52",
     "config_hash_covers": [
+      "AI_CANALICULI_SUBFOLDER",
       "AI_CANDIDATE_CUT_FRACTION",
       "AI_CONTRAST_RATIO_MAX",
       "AI_CROP_PX",
@@ -959,6 +937,7 @@
       "AI_LACUNA_MIN_CANDIDATE_AREA_PX2",
       "AI_LACUNA_PRIORITY_REJECTED_MIN_AREA_PX2",
       "AI_LACUNA_REVIEW_DIR",
+      "AI_LACUNA_SUBFOLDER",
       "AI_LOG_DIR",
       "AI_MAX_SEARCH_PX",
       "AI_MAX_SEGMENTS_PER_CASE",
@@ -973,16 +952,17 @@
       "AI_REFERENCE_BAND_PX",
       "AI_SECTORS",
       "AI_TOKENS_PER_CHAR",
-      "ALL_IMAGES_ARCHIVE_DIR",
-      "ALL_IMAGES_DIR",
-      "ALL_IMAGES_FIGURES_DIR",
-      "ALL_IMAGES_QUANT_DIR",
+      "ARCHIVE_AI_JUDGE_DIR",
+      "BAND_BLOB_MAX_AREA_UM2",
+      "BAND_BLOB_RULE",
       "BAND_FILTER_MIN_OPENING_SHARE",
       "BORDER_AREA_FRACTION",
       "BORDER_MIN_SOLIDITY",
       "CANALICULUS_LENGTH_RANGE_UM",
       "CHANNEL",
       "CHANNEL_AXIS",
+      "CLUSTER_CORE_MIN_UM2",
+      "CLUSTER_NECK_MAX_UM",
       "CONTACT_EVERY_TOUCHING_BODY",
       "CONTACT_REACH_PX",
       "CSV_FLOAT_PRECISION",
@@ -992,9 +972,19 @@
       "DIM_THREAD_CUT_FRACTION",
       "DIM_THREAD_REACH_UM",
       "DISPLAY_WINDOW_FILE",
+      "EXCLUDED_OBJECT_MAX_SHARE",
+      "EXCLUSION_MARGIN_UM",
       "FAILED_IMAGES_NAME",
       "FAST_LACUNA_STAGE",
       "FILL_ENCLOSED_HOLES_MAX_PX2",
+      "FRAGMENT_CRUMB_MAX_AREA_UM2",
+      "FRAGMENT_CRUMB_MIN_SOLIDITY",
+      "FRAGMENT_RULE",
+      "FRAGMENT_SATELLITE_AREA_RATIO",
+      "FRAGMENT_SATELLITE_GAP_UM",
+      "FRAGMENT_SATELLITE_MAX_AREA_UM2",
+      "FRAGMENT_SPECK_MAX_AREA_UM2",
+      "FRAGMENT_SPECK_MAX_WIDTH_UM",
       "GLOW_PROFILE_FRACTION",
       "GLOW_TRIM_WIDTH_FRACTION",
       "GLOW_ZONE_CUT_FRACTION",
@@ -1020,8 +1010,11 @@
       "IMPORT_SOURCE_PATH_PARTS",
       "IMPORT_TIFF_SUFFIXES",
       "INVERT_SIGNAL",
+      "LACUNAE_CONTACT_SHEET",
       "LACUNA_ATTACH_MIN_SIGNAL_FRACTION",
       "LACUNA_ATTACH_REACH_UM",
+      "LACUNA_RESCUE_RULES",
+      "LARGE_STRUCTURE_MIN_AREA_UM2",
       "MAX_CANALICULUS_LENGTH_UM",
       "MAX_COST_USD",
       "MERGE_MIN_DIP_FRACTION",
@@ -1036,11 +1029,19 @@
       "QUANT_SUMMARY_NAME",
       "RANDOM_SEED",
       "REFERENCE_GROUP",
-      "SECTION_ARCHIVE",
+      "RESULT_SET_MARK",
+      "SATURATED_BORDER_MIN_AREA_UM2",
+      "SATURATED_CLOSING_UM",
+      "SECTIONS",
       "SECTION_CANALICULI",
       "SECTION_FIGURES",
+      "SECTION_GROUP_FIGURES",
+      "SECTION_KEY_RESULTS",
       "SECTION_LACUNAE",
+      "SECTION_NETWORK_FIGURES",
+      "SECTION_POLS",
       "SECTION_QUANTIFICATION",
+      "STRUCTURE_RULE",
       "SUFFIX_CANALICULI_DETECTION",
       "SUFFIX_CANALICULI_GRAPH",
       "SUFFIX_CANALICULI_MASK",
@@ -1048,6 +1049,8 @@
       "SUFFIX_CANALICULI_UNATTACHED",
       "SUFFIX_CANALICULI_VASCULAR",
       "SUFFIX_CANALICULI_VERIFICATION",
+      "SUFFIX_EXCLUDED_MASK",
+      "SUFFIX_EXCLUDED_PICTURE",
       "SUFFIX_FIGURE_GALLERY",
       "SUFFIX_FIGURE_GALLERY_CHECKS",
       "SUFFIX_FIGURE_INSET",
@@ -1058,15 +1061,11 @@
       "SUFFIX_LACUNAE_OUTLINES",
       "SUFFIX_LACUNA_LABELS",
       "SUFFIX_QUANTIFICATION",
-      "SUFFIX_VARIANT",
-      "SUMMARY_NAME",
       "THICK_PROCESS_MIN_AREA_UM2",
       "THICK_PROCESS_MIN_CONTRAST",
       "THICK_PROCESS_MIN_SOLIDITY",
       "UNATTACHED_MIN_ASPECT",
-      "UNATTACHED_MIN_LENGTH_UM",
-      "VARIANTS_DIR",
-      "VARIANT_WINDOW_FILE"
+      "UNATTACHED_MIN_LENGTH_UM"
     ]
   }
 }

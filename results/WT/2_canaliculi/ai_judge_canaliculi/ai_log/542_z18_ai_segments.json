@@ -1,7 +1,7 @@
 {
   "schema": "lcn-ai-judge-decisions-1",
   "status": "EXPERIMENT. Verdicts by an AI judge, not by the pipeline. Applied only when config.AI_JUDGE_ENABLED is True.",
-  "written_at": "2026-10-19T16:02:14Z",
+  "written_at": "2026-11-09T18:48:19Z",
   "mode": "live",
   "image_label": "542_z18",
   "provider": "anthropic",
@@ -13,8 +13,8 @@
     "low_cut": 0.02559416,
     "candidate_floor": 0.01279708,
     "cut_fraction": 0.5,
-    "zone_px": 136149,
-    "added_px": 10963,
+    "zone_px": 135124,
+    "added_px": 10716,
     "min_segment_px": 10,
     "max_segments_per_case": 40,
     "crop_sizes_px": [
@@ -22,31 +22,31 @@
       512
     ]
   },
-  "geometry_sha256": "4f63de56729d6d1c600782aea7095a9f199b197cf080454521e02f784fcdde14",
+  "geometry_sha256": "beeea5589c21eaf455ccde2f27a6eb894d9f7cd1dbcec83d8779677dc0d33ceb",
   "totals": {
-    "calls": 19,
-    "input_tokens": 71493,
-    "output_tokens": 6588,
-    "cost_usd": 0.208866,
-    "cases": 19,
-    "cases_valid": 19,
+    "calls": 18,
+    "input_tokens": 67799,
+    "output_tokens": 6224,
+    "cost_usd": 0.197838,
+    "cases": 18,
+    "cases_valid": 18,
     "cases_unjudged": 0,
-    "attempts": 19,
+    "attempts": 18,
     "invalid_attempts": 0,
     "call_errors": 0,
     "refusals": 0,
     "replay_request_mismatches": 0,
     "replay_picture_mismatches": 0,
-    "segments": 118,
-    "segments_real": 105,
+    "segments": 114,
+    "segments_real": 101,
     "segments_artifact": 13,
     "segments_unjudged": 0,
-    "segments_given_an_owner": 64,
-    "segments_given_no_owner": 54,
-    "segments_asked_an_owner_only": 72,
-    "segments_asked_real_and_owner": 46,
-    "owner_moved_by_a_verdict": 63,
-    "owner_left_where_it_was": 1,
+    "segments_given_an_owner": 68,
+    "segments_given_no_owner": 46,
+    "segments_asked_an_owner_only": 69,
+    "segments_asked_real_and_owner": 45,
+    "owner_moved_by_a_verdict": 65,
+    "owner_left_where_it_was": 3,
     "verdicts_sent_where_none_was_asked": 0,
     "stopped_on_cost": false,
     "stopped_early": null
@@ -69,7 +69,7 @@
       "segments_offered": 3,
       "segments_not_offered": 0,
       "context_segments": 112,
-      "picture": "results/ai_log/542_z18/pictures/case_0001.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0001.png",
       "colours": {
         "yellow": 1,
         "cyan": 4
@@ -86,9 +86,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3623,
-        "output_tokens": 199
+        "output_tokens": 185
       },
-      "cost_usd": 0.009236,
+      "cost_usd": 0.009096,
       "segments": [
         {
           "n": 1,
@@ -111,7 +111,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short white thread at top right, nowhere near the yellow body and not joined to yellow tracing; no visible link to yellow.",
+          "why": "Short white piece at top right, no visible link to the yellow body or its threads; looks isolated.",
           "verdict_in_the_answer": null
         },
         {
@@ -137,7 +137,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Tiny red fragment in the bright glow beside the yellow body; short, in the haze, not a line.",
+          "why": "Short red fragment in the bright glow beside the yellow body, not a line and touching nothing.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -163,7 +163,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 1,
-          "why": "Red piece lies along the yellow body's lower edge and continues the yellow threads running downward from it.",
+          "why": "Red segment lies along the yellow body's lower edge and continues the yellow thread running down from it.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -186,7 +186,7 @@
       "segments_offered": 2,
       "segments_not_offered": 0,
       "context_segments": 95,
-      "picture": "results/ai_log/542_z18/pictures/case_0002.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0002.png",
       "colours": {
         "yellow": 2
       },
@@ -202,9 +202,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3552,
-        "output_tokens": 115
+        "output_tokens": 123
       },
-      "cost_usd": 0.008254,
+      "cost_usd": 0.008334,
       "segments": [
         {
           "n": 1,
@@ -225,9 +225,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Isolated white thread near top, runs away from yellow body and touches neither it nor its yellow threads.",
+          "owner": "yellow",
+          "owner_lacuna_id": 2,
+          "why": "Thread at top runs toward the yellow body's upper process region and continues its network; plausibly leaves yellow.",
           "verdict_in_the_answer": null
         },
         {
@@ -251,7 +251,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short faint fragment left of the body, not touching the outline or continuing any yellow thread.",
+          "why": "Short isolated faint piece left of the body, touches no body outline and continues no clear yellow thread.",
           "verdict_in_the_answer": null
         }
       ],
@@ -274,7 +274,7 @@
       "segments_offered": 10,
       "segments_not_offered": 0,
       "context_segments": 83,
-      "picture": "results/ai_log/542_z18/pictures/case_0003.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0003.png",
       "colours": {
         "yellow": 3
       },
@@ -290,9 +290,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3920,
-        "output_tokens": 553
+        "output_tokens": 536
       },
-      "cost_usd": 0.01337,
+      "cost_usd": 0.0132,
       "segments": [
         {
           "n": 1,
@@ -315,7 +315,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Thin thread at top running up out of frame, not touching the yellow body; continues the network above.",
+          "why": "Thread at top runs away from the body, joins upper-left white network; no contact with yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -337,9 +337,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "yellow",
-          "owner_lacuna_id": 3,
-          "why": "Runs down from the top and points toward the top of the yellow body, nearly reaching it.",
+          "owner": "none",
+          "owner_lacuna_id": null,
+          "why": "Continues thread 1 downward but ends well short of the yellow body, no visible touch.",
           "verdict_in_the_answer": null
         },
         {
@@ -363,7 +363,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Isolated short horizontal thread in the left field, touches no body and joins no yellow thread.",
+          "why": "Isolated horizontal thread left of body, does not reach the outline or continue yellow threads.",
           "verdict_in_the_answer": null
         },
         {
@@ -387,7 +387,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short thread in the left field, floating, not touching the yellow body or its threads.",
+          "why": "Short horizontal piece in the left field, not touching yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -411,7 +411,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short near-vertical thread in the left field, not touching the yellow body; belongs to the left network.",
+          "why": "Short line in the left field with no contact to the body; red piece 7 links only weakly.",
           "verdict_in_the_answer": null
         },
         {
@@ -435,7 +435,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 3,
-          "why": "Horizontal thread near the yellow body's left edge, in line with yellow threads reaching the body here.",
+          "why": "Horizontal thread at lower left runs toward yellow thread near the body and continues its spacing.",
           "verdict_in_the_answer": null
         },
         {
@@ -459,7 +459,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Faint extension of the thread 5/7 line, a linear continuation that does not reach the yellow body.",
+          "why": "Faint linear extension of piece 5 toward the body, but does not clearly reach the outline.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -483,7 +483,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 3,
-          "why": "Short link running down from the yellow thread at the body's right side, in the same direction.",
+          "why": "Short faint line connecting yellow threads along the body's right edge, continuing their direction.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -507,7 +507,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 3,
-          "why": "Linear segment joining yellow threads next to the body's right edge, continuing 8.",
+          "why": "Line continuing from 8 along the body's right side, linking yellow threads.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -531,7 +531,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 3,
-          "why": "Short line from the yellow thread's bottom end to the body's lower tip, touching the body.",
+          "why": "Thread leaving the bottom right of the yellow body, linked to yellow network.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -554,7 +554,7 @@
       "segments_offered": 7,
       "segments_not_offered": 0,
       "context_segments": 118,
-      "picture": "results/ai_log/542_z18/pictures/case_0004.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0004.png",
       "colours": {
         "yellow": 4
       },
@@ -570,9 +570,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3817,
-        "output_tokens": 439
+        "output_tokens": 405
       },
-      "cost_usd": 0.012024,
+      "cost_usd": 0.011684,
       "segments": [
         {
           "n": 1,
@@ -595,7 +595,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "White thread runs toward the yellow body near its lower left edge, continuing the yellow threads' direction and spacing.",
+          "why": "White thread runs left from the yellow body's lower-left edge, in line with the neighbouring yellow threads.",
           "verdict_in_the_answer": null
         },
         {
@@ -619,7 +619,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Short white piece below the body, continuing the yellow network just beneath it and pointing toward the body.",
+          "why": "Short white thread below the body, continuing the yellow network running down from the body's tip.",
           "verdict_in_the_answer": null
         },
         {
@@ -643,7 +643,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Short red segment lies at the end of a yellow thread near the left body edge, continuing its line toward the body.",
+          "why": "Short line near the upper-left of the body, joining yellow threads that leave the body edge.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -667,7 +667,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short red fragment in the glow right of the body, not clearly a line and touching nothing.",
+          "why": "Short wavy fragment in the glow right of the body, touching nothing and not forming a clear line.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -691,7 +691,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Red piece extends downward from the yellow thread at the right edge of the body, a faint line within the glow.",
+          "why": "Short line just right of the body next to yellow threads, running out from the body edge.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -717,7 +717,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Red piece runs from the lower body tip downward, touching the yellow outline and joining the lower threads.",
+          "why": "Short line touching the lower-left edge of the yellow body and continuing downward.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -741,7 +741,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Red piece bridges between yellow threads below the body, in line with the network that leaves the body tip.",
+          "why": "Short horizontal link below the body joining yellow threads near the body's tip.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -764,7 +764,7 @@
       "segments_offered": 9,
       "segments_not_offered": 0,
       "context_segments": 91,
-      "picture": "results/ai_log/542_z18/pictures/case_0005.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0005.png",
       "colours": {
         "yellow": 5
       },
@@ -780,9 +780,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3867,
-        "output_tokens": 465
+        "output_tokens": 458
       },
-      "cost_usd": 0.012384,
+      "cost_usd": 0.012314,
       "segments": [
         {
           "n": 1,
@@ -805,7 +805,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Isolated thread far left of the body, touches nothing and not continuous with yellow tracing.",
+          "why": "Isolated white thread far left of the body, not touching it or continuing yellow threads.",
           "verdict_in_the_answer": null
         },
         {
@@ -829,7 +829,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short isolated curl left of the body, not touching the outline; no clear link to yellow.",
+          "why": "Short isolated curl left of the body, no visible contact with the yellow outline.",
           "verdict_in_the_answer": null
         },
         {
@@ -853,7 +853,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Thread at far left edge running from outside the field, does not reach the yellow body.",
+          "why": "Thread at far left edge, separate from the yellow body and its network.",
           "verdict_in_the_answer": null
         },
         {
@@ -877,7 +877,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short piece below-right of the body, separate from the outline and from yellow threads.",
+          "why": "Short arc below right of the body, not touching the outline and part of grey network.",
           "verdict_in_the_answer": null
         },
         {
@@ -901,7 +901,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short piece next to 4, not touching the body, in a patch of faint texture.",
+          "why": "Short arc next to 4, no visible connection to the yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -925,7 +925,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Curved pieces at the bottom, disconnected from the yellow body and its network.",
+          "why": "Curved threads below the body, separate from the yellow lower tail and untouched by the outline.",
           "verdict_in_the_answer": null
         },
         {
@@ -951,7 +951,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 5,
-          "why": "Red piece starts at the yellow body edge and extends toward the yellow branch near 8.",
+          "why": "Red segment starts at the right edge of the yellow body and continues into the yellow thread network.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -975,7 +975,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 5,
-          "why": "Continues from 7 as a line down-right from the yellow body edge.",
+          "why": "Continues from 7 along the yellow branch near the body, a line-like extension.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -996,11 +996,11 @@
           "length_um": 1.43,
           "owner_lacuna_id_before": 0,
           "touches": [],
-          "verdict": "artifact",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Tiny red stub at the body base, in the glow, with no clear line direction.",
-          "verdict_in_the_answer": "artifact"
+          "verdict": "real",
+          "owner": "yellow",
+          "owner_lacuna_id": 5,
+          "why": "Short red line touching the lower-left edge of the yellow body, directed outward like a process.",
+          "verdict_in_the_answer": "real"
         }
       ],
       "segments_not_drawn": 0
@@ -1022,7 +1022,7 @@
       "segments_offered": 4,
       "segments_not_offered": 0,
       "context_segments": 87,
-      "picture": "results/ai_log/542_z18/pictures/case_0006.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0006.png",
       "colours": {
         "yellow": 6
       },
@@ -1038,9 +1038,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3630,
-        "output_tokens": 206
+        "output_tokens": 213
       },
-      "cost_usd": 0.00932,
+      "cost_usd": 0.00939,
       "segments": [
         {
           "n": 1,
@@ -1061,9 +1061,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Short thread in open field left of the body; no visible contact with the yellow outline or its threads.",
+          "owner": "yellow",
+          "owner_lacuna_id": 6,
+          "why": "Short thread in left field, aligned with the yellow branches radiating from the body; plausible continuation.",
           "verdict_in_the_answer": null
         },
         {
@@ -1085,9 +1085,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Continues piece 1 as a faint line running toward the body but fading out before reaching it.",
+          "owner": "yellow",
+          "owner_lacuna_id": 6,
+          "why": "Continues piece 1 in line toward the yellow body, so it belongs to yellow.",
           "verdict_in_the_answer": null
         },
         {
@@ -1109,9 +1109,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Faint line starting at left, far from the yellow body, joining no yellow thread.",
+          "owner": "yellow",
+          "owner_lacuna_id": 6,
+          "why": "Thread running toward the yellow body, parallel to other yellow threads on the left.",
           "verdict_in_the_answer": null
         },
         {
@@ -1133,9 +1133,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Continues piece 3 toward the body but stops short of the outline and any yellow thread.",
+          "owner": "yellow",
+          "owner_lacuna_id": 6,
+          "why": "Continues piece 3 in the same direction and trends toward the yellow body.",
           "verdict_in_the_answer": null
         }
       ],
@@ -1158,7 +1158,7 @@
       "segments_offered": 11,
       "segments_not_offered": 0,
       "context_segments": 109,
-      "picture": "results/ai_log/542_z18/pictures/case_0007.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0007.png",
       "colours": {
         "yellow": 7,
         "cyan": 8
@@ -1175,9 +1175,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3991,
-        "output_tokens": 578
+        "output_tokens": 581
       },
-      "cost_usd": 0.013762,
+      "cost_usd": 0.013792,
       "segments": [
         {
           "n": 1,
@@ -1200,7 +1200,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Short arc just below the yellow body's top, running down from the yellow threads near the body.",
+          "why": "Short white thread just above the yellow body's top, continuing the yellow threads near the upper edge.",
           "verdict_in_the_answer": null
         },
         {
@@ -1226,7 +1226,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Sits near the upper left of the yellow body and continues its upward threads.",
+          "why": "Starts near the top of the yellow body's upper-left corner and runs left, in line with the yellow network.",
           "verdict_in_the_answer": null
         },
         {
@@ -1252,7 +1252,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Starts close to the yellow body's upper left edge and extends right of the body, in line with yellow threads.",
+          "why": "Short piece right next to the yellow body's top, curving away from it.",
           "verdict_in_the_answer": null
         },
         {
@@ -1278,7 +1278,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Close to the yellow body and continuous with the yellow-side network.",
+          "why": "Runs beside the yellow body's upper-left edge, continuing the yellow thread direction.",
           "verdict_in_the_answer": null
         },
         {
@@ -1304,7 +1304,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Isolated white curve between the bodies, touching neither; cyan reaches it only by a long route.",
+          "why": "Isolated loop in the gap between the bodies, touching neither body; no clear connection to either.",
           "verdict_in_the_answer": null
         },
         {
@@ -1330,7 +1330,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Faint curve in the middle gap, touching neither body, not clearly continuing either network.",
+          "why": "Lower part of the loop, not touching either body and not clearly continuing either network.",
           "verdict_in_the_answer": null
         },
         {
@@ -1356,7 +1356,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Bright thread at the lower left of the yellow body, continuing from the body junction.",
+          "why": "Bright thread at the bottom-left of the yellow body, running down from it.",
           "verdict_in_the_answer": null
         },
         {
@@ -1382,7 +1382,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Short segment below the junction, continuing the yellow thread running down from the body.",
+          "why": "Continues the bright thread below the yellow body's base and branches off it.",
           "verdict_in_the_answer": null
         },
         {
@@ -1406,7 +1406,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Short red link touching the yellow body's left edge, joining yellow threads.",
+          "why": "Short bridge touching the yellow body's left edge and linking to yellow threads.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -1427,11 +1427,11 @@
           "length_um": 1.95,
           "owner_lacuna_id_before": 0,
           "touches": [],
-          "verdict": "real",
-          "owner": "yellow",
-          "owner_lacuna_id": 7,
-          "why": "Short red line at the yellow body's lower right, extending along an existing yellow thread.",
-          "verdict_in_the_answer": "real"
+          "verdict": "artifact",
+          "owner": "none",
+          "owner_lacuna_id": null,
+          "why": "Short horizontal fragment in the glow at the body's lower right, with no clear line.",
+          "verdict_in_the_answer": "artifact"
         },
         {
           "n": 11,
@@ -1454,7 +1454,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 7,
-          "why": "Red piece just below the yellow body's bottom edge, connecting to the yellow thread below.",
+          "why": "Small piece at the yellow body's bottom edge, joining the bright thread beneath.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -1477,7 +1477,7 @@
       "segments_offered": 10,
       "segments_not_offered": 0,
       "context_segments": 92,
-      "picture": "results/ai_log/542_z18/pictures/case_0008.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0008.png",
       "colours": {
         "yellow": 8,
         "cyan": 7
@@ -1494,9 +1494,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3956,
-        "output_tokens": 541
+        "output_tokens": 528
       },
-      "cost_usd": 0.013322,
+      "cost_usd": 0.013192,
       "segments": [
         {
           "n": 1,
@@ -1519,7 +1519,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Long thread runs horizontally to the left yellow body edge, in line with yellow's threads.",
+          "why": "Long thread running toward the yellow body's left edge, continuing the yellow threads' direction.",
           "verdict_in_the_answer": null
         },
         {
@@ -1545,7 +1545,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Joins yellow network near the right of the body, continuing yellow threads; far from cyan.",
+          "why": "Joins yellow network on the right of the body, nearer yellow than the distant cyan cell.",
           "verdict_in_the_answer": null
         },
         {
@@ -1569,7 +1569,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Curved thread joined by red piece 7 which reaches the yellow body edge.",
+          "why": "Curved thread ending at the red piece 7, which reaches the yellow body edge.",
           "verdict_in_the_answer": null
         },
         {
@@ -1595,7 +1595,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Continues from red piece 8 at the yellow body's right edge and runs outward.",
+          "why": "Runs from the red piece 8 at the yellow body edge out to the right.",
           "verdict_in_the_answer": null
         },
         {
@@ -1621,7 +1621,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Lies among yellow threads below the body; no visible touch of cyan, links to yellow network.",
+          "why": "Thread near the yellow network below the body, well away from the cyan cell.",
           "verdict_in_the_answer": null
         },
         {
@@ -1647,7 +1647,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Short bright segment touching the top of the yellow body, continuing the thread above.",
+          "why": "Short piece at the top of the yellow body linking to the yellow thread going up.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -1673,7 +1673,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Connects thread 3 to the yellow body edge, a visible thread in the image.",
+          "why": "Extends curved thread 3 right to the yellow body outline.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -1699,7 +1699,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Short link from yellow body edge to thread 4, in line with it.",
+          "why": "Short bridge from the yellow body edge to thread 4.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -1725,7 +1725,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Tiny patch in the glow along the body edge, no line direction.",
+          "why": "Tiny wiggly piece in the bright glow along the body edge.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -1749,7 +1749,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 8,
-          "why": "Bridges the vertical yellow threads below the body, a short real crossing thread.",
+          "why": "Crosses between the vertical yellow threads below the body, connected to the yellow network.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -1772,7 +1772,7 @@
       "segments_offered": 12,
       "segments_not_offered": 0,
       "context_segments": 74,
-      "picture": "results/ai_log/542_z18/pictures/case_0009.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0009.png",
       "colours": {
         "yellow": 9
       },
@@ -1788,9 +1788,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 4082,
-        "output_tokens": 668
+        "output_tokens": 648
       },
-      "cost_usd": 0.014844,
+      "cost_usd": 0.014644,
       "segments": [
         {
           "n": 1,
@@ -1811,9 +1811,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "yellow",
-          "owner_lacuna_id": 9,
-          "why": "White thread links to the yellow network on the upper left and runs toward the yellow body.",
+          "owner": "none",
+          "owner_lacuna_id": null,
+          "why": "White arc in the dim region left of the body; it does not reach the yellow body, so no clear start.",
           "verdict_in_the_answer": null
         },
         {
@@ -1837,7 +1837,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short isolated white fragment, no visible contact with the yellow body or its threads.",
+          "why": "Short isolated white fragment left of the body, touching nothing.",
           "verdict_in_the_answer": null
         },
         {
@@ -1861,7 +1861,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Short red piece at top continues the bright process running up from the yellow body tip.",
+          "why": "Short red link at the top of the body connecting yellow threads near the apex.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -1885,7 +1885,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short faint patch, touches nothing, no clear line direction.",
+          "why": "Short faint red bit in glow, touching nothing and not in line with any thread.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -1909,7 +1909,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Lies along the bright process rising from the yellow body top, continuing its direction.",
+          "why": "Red segment at the apex continues the yellow thread running into the body tip.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -1933,7 +1933,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Bridges the traced yellow thread to the body outline across the glow, aligned with it.",
+          "why": "Red gap-filler connecting the yellow thread toward the body edge.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -1957,7 +1957,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short horizontal speckle in the glow, isolated, not a continuous line.",
+          "why": "Short horizontal red speck in the glow, isolated, no line structure.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -1983,7 +1983,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Short horizontal piece connecting the yellow thread to the body edge.",
+          "why": "Short horizontal red link joining the yellow vertical thread to the body edge.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -2007,7 +2007,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Continues the yellow thread down toward the body, linking the vertical thread to the lower body.",
+          "why": "Red piece continues the yellow vertical thread down toward the body.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -2033,7 +2033,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short blotchy piece in glow near the body, direction wanders, touches nothing.",
+          "why": "Short red fragment in the glow near the lower body, patchy and unconnected.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -2057,7 +2057,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Red piece runs along the yellow body edge at the lower right, hugging the outline.",
+          "why": "Red line runs along the body's lower right edge, touching the yellow outline.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -2081,7 +2081,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Connects the white thread at lower left to the yellow lower process, in line.",
+          "why": "Red link continues the lower-left thread toward the body's bottom tip.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -2104,7 +2104,7 @@
       "segments_offered": 7,
       "segments_not_offered": 0,
       "context_segments": 91,
-      "picture": "results/ai_log/542_z18/pictures/case_0010.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0010.png",
       "colours": {
         "yellow": 10
       },
@@ -2120,9 +2120,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3817,
-        "output_tokens": 423
+        "output_tokens": 408
       },
-      "cost_usd": 0.011864,
+      "cost_usd": 0.011714,
       "segments": [
         {
           "n": 1,
@@ -2145,7 +2145,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "White thread in upper right runs on toward the network edge, away from the yellow body; no visible link to it.",
+          "why": "White thread in upper right runs on to the network edge, with no visible link to the yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -2169,7 +2169,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 10,
-          "why": "Thread continues downward from the yellow threads below the body, in line with them, and points back at the body.",
+          "why": "White thread runs down from the yellow body's lower end, continuing the yellow threads below it.",
           "verdict_in_the_answer": null
         },
         {
@@ -2190,11 +2190,11 @@
           "length_um": 1.95,
           "owner_lacuna_id_before": 0,
           "touches": [],
-          "verdict": "artifact",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Short red tick between two yellow threads, a bridging fragment with no clear line of its own.",
-          "verdict_in_the_answer": "artifact"
+          "verdict": "real",
+          "owner": "yellow",
+          "owner_lacuna_id": 10,
+          "why": "Short red link joining two yellow threads above the body, in line with the yellow network.",
+          "verdict_in_the_answer": "real"
         },
         {
           "n": 4,
@@ -2217,7 +2217,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 10,
-          "why": "Short red segment links the yellow thread to the white thread, continuing the yellow network's line near the body.",
+          "why": "Short red bridge connecting a yellow thread to white thread 1, in the yellow network area.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -2243,7 +2243,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 10,
-          "why": "Red piece sits at the top of the yellow body, touching its outline and joining the yellow threads.",
+          "why": "Short red branch right at the top of the yellow body, continuing the upward yellow thread.",
           "verdict_in_the_answer": "real"
         },
         {
@@ -2267,7 +2267,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Tiny red fragment in the thread-dense region, short and wandering, with no line of its own.",
+          "why": "Tiny wandering red fragment between yellow threads, touching nothing, looks like glow texture.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -2291,7 +2291,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 10,
-          "why": "Short red piece next to the lower end of the yellow body, joining the yellow threads below it.",
+          "why": "Short red segment near the yellow body's bottom, linking the yellow threads there.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -2314,7 +2314,7 @@
       "segments_offered": 16,
       "segments_not_offered": 0,
       "context_segments": 56,
-      "picture": "results/ai_log/542_z18/pictures/case_0011.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0011.png",
       "colours": {
         "yellow": 11
       },
@@ -2330,9 +2330,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 4168,
-        "output_tokens": 803
+        "output_tokens": 755
       },
-      "cost_usd": 0.016366,
+      "cost_usd": 0.015886,
       "segments": [
         {
           "n": 1,
@@ -2355,7 +2355,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short white thread in the upper right, far from the yellow body and not touching it.",
+          "why": "Short white piece in the upper-right patch, not touching the yellow body or continuing its threads.",
           "verdict_in_the_answer": null
         },
         {
@@ -2379,7 +2379,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short thread near the top of the cluster, not touching yellow; part of a separate network.",
+          "why": "Short arc above the body, far from the outline, no visible link to yellow.",
           "verdict_in_the_answer": null
         },
         {
@@ -2403,7 +2403,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Small piece beside the cluster, not touching the body or any yellow thread.",
+          "why": "Tiny fragment in the dim region right of the body, touches nothing.",
           "verdict_in_the_answer": null
         },
         {
@@ -2427,7 +2427,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short piece above the body, not touching it, with no clear link to yellow threads.",
+          "why": "Short wandering piece, does not reach the yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -2451,7 +2451,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short segment lying right of the body, not touching it or a yellow thread.",
+          "why": "Short fragment in a patch, no connection to the yellow outline.",
           "verdict_in_the_answer": null
         },
         {
@@ -2475,7 +2475,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Isolated wavy thread on the left, not connected to the yellow body or its threads.",
+          "why": "Isolated thread in the left network, away from yellow body and its threads.",
           "verdict_in_the_answer": null
         },
         {
@@ -2499,7 +2499,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Curved piece right of the body top, not touching the outline; ambiguous, so none.",
+          "why": "Short curved piece near the body but not touching the outline.",
           "verdict_in_the_answer": null
         },
         {
@@ -2523,7 +2523,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Faint thread in the lower left, separate from the yellow threads and not touching the body.",
+          "why": "Thread in the lower-left network, does not reach the yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -2547,7 +2547,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Thread at the lower left, not touching the body and unrelated to yellow's branches.",
+          "why": "Lower-left thread running across the field, not touching the yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -2571,7 +2571,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 11,
-          "why": "Sits at the bottom of the body, adjacent to the outline, starting from yellow.",
+          "why": "Located right at the lower end of the yellow body, adjoining its outline.",
           "verdict_in_the_answer": null
         },
         {
@@ -2595,7 +2595,7 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Bottom-right thread, separate from the yellow branches and not touching the body.",
+          "why": "Thread at the bottom right, far from yellow body, no visible link.",
           "verdict_in_the_answer": null
         },
         {
@@ -2619,7 +2619,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Red arc in the glow above the body, wandering and not a clean line.",
+          "why": "Red faint arc in the glow above the body, grainy and not a clear line.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -2643,7 +2643,7 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short red curve in the glow patch above the body, touching nothing.",
+          "why": "Red short fragment in the glow haze near the top of the body, patchy.",
           "verdict_in_the_answer": "artifact"
         },
         {
@@ -2667,12 +2667,12 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short red arc in the glow near the top of the body, with no clear line.",
+          "why": "Short red arc in the glow with no clear line or direction.",
           "verdict_in_the_answer": "artifact"
         },
         {
           "n": 15,
-          "segment_id": "n00316",
+          "segment_id": "n00314",
           "kind": "new",
           "classes": [
             "b"
@@ -2691,12 +2691,12 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 11,
-          "why": "Red piece at the lower right corner of the body, touching it and continuing the bottom threads.",
+          "why": "Red piece leaving the lower body outline, short thread continuing the yellow processes.",
           "verdict_in_the_answer": "real"
         },
         {
           "n": 16,
-          "segment_id": "n00321",
+          "segment_id": "n00320",
           "kind": "new",
           "classes": [
             "b"
@@ -2715,7 +2715,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 11,
-          "why": "Red piece at the bottom of the body, touching the outline and pointing away from it.",
+          "why": "Red piece at the bottom touching the yellow body, forming a short process.",
           "verdict_in_the_answer": "real"
         }
       ],
@@ -2735,18 +2735,17 @@
         768,
         1024
       ],
-      "segments_offered": 8,
+      "segments_offered": 7,
       "segments_not_offered": 0,
-      "context_segments": 77,
-      "picture": "results/ai_log/542_z18/pictures/case_0012.png",
+      "context_segments": 76,
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0012.png",
       "colours": {
-        "yellow": 12,
-        "cyan": 13
+        "yellow": 12
       },
       "bodies_with_no_colour": [],
       "kinds_drawn": {
         "new": 3,
-        "unowned": 5,
+        "unowned": 4,
         "owned": 0,
         "other": 0
       },
@@ -2754,10 +2753,10 @@
       "attempts": 1,
       "invalid_reasons": [],
       "usage": {
-        "input_tokens": 3862,
-        "output_tokens": 430
+        "input_tokens": 3789,
+        "output_tokens": 393
       },
-      "cost_usd": 0.012024,
+      "cost_usd": 0.011508,
       "segments": [
         {
           "n": 1,
@@ -2773,14 +2772,14 @@
           "candidate_colours": [
             "yellow"
           ],
-          "px": 16,
-          "length_um": 2.08,
+          "px": 17,
+          "length_um": 2.21,
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "yellow",
-          "owner_lacuna_id": 12,
-          "why": "Short branch hanging off the yellow network just below a junction, running in line with yellow threads.",
+          "owner": "none",
+          "owner_lacuna_id": null,
+          "why": "Short isolated white piece near the yellow branches, does not touch the body or clearly continue a yellow thread.",
           "verdict_in_the_answer": null
         },
         {
@@ -2797,19 +2796,19 @@
           "candidate_colours": [
             "yellow"
           ],
-          "px": 23,
-          "length_um": 2.99,
+          "px": 25,
+          "length_um": 3.25,
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "yellow",
-          "owner_lacuna_id": 12,
-          "why": "Short curved piece next to the yellow trunk on the right, appears to branch from it.",
+          "owner": "none",
+          "owner_lacuna_id": null,
+          "why": "Short curved piece on the right of the yellow network, touches no body and is not clearly a continuation.",
           "verdict_in_the_answer": null
         },
         {
           "n": 3,
-          "segment_id": "t02303",
+          "segment_id": "t02357",
           "kind": "unowned",
           "classes": [
             "a"
@@ -2821,44 +2820,18 @@
           "candidate_colours": [
             "yellow"
           ],
-          "px": 27,
-          "length_um": 3.51,
+          "px": 19,
+          "length_um": 2.47,
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Isolated piece far right across the vertical band, touches no yellow thread or body.",
+          "why": "Isolated thread in the far-right haze, far from the yellow body, no visible connection.",
           "verdict_in_the_answer": null
         },
         {
           "n": 4,
-          "segment_id": "t02357",
-          "kind": "unowned",
-          "classes": [
-            "a"
-          ],
-          "question": "owner",
-          "candidates": [
-            12,
-            13
-          ],
-          "candidate_colours": [
-            "yellow",
-            "cyan"
-          ],
-          "px": 20,
-          "length_um": 2.6,
-          "owner_lacuna_id_before": 0,
-          "touches": [],
-          "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Lies on the broad vertical band to the right, isolated and not clearly joined to either body.",
-          "verdict_in_the_answer": null
-        },
-        {
-          "n": 5,
           "segment_id": "t02368",
           "kind": "unowned",
           "classes": [
@@ -2866,12 +2839,10 @@
           ],
           "question": "owner",
           "candidates": [
-            12,
-            13
+            12
           ],
           "candidate_colours": [
-            "yellow",
-            "cyan"
+            "yellow"
           ],
           "px": 28,
           "length_um": 3.64,
@@ -2880,50 +2851,22 @@
           "verdict": "real",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Far right near the image edge, no visible link to yellow or cyan.",
+          "why": "Thread at the right edge, disconnected from yellow, likely from a cell outside the field.",
           "verdict_in_the_answer": null
         },
         {
-          "n": 6,
-          "segment_id": "n00293",
+          "n": 5,
+          "segment_id": "n00296",
           "kind": "new",
           "classes": [
             "b"
           ],
           "question": "real and owner",
           "candidates": [
-            12,
-            13
+            12
           ],
           "candidate_colours": [
-            "yellow",
-            "cyan"
-          ],
-          "px": 12,
-          "length_um": 1.56,
-          "owner_lacuna_id_before": 0,
-          "touches": [],
-          "verdict": "real",
-          "owner": "yellow",
-          "owner_lacuna_id": 12,
-          "why": "Faint line continuing from the yellow network's lower-left branch, line-like in direction.",
-          "verdict_in_the_answer": "real"
-        },
-        {
-          "n": 7,
-          "segment_id": "n00297",
-          "kind": "new",
-          "classes": [
-            "b"
-          ],
-          "question": "real and owner",
-          "candidates": [
-            12,
-            13
-          ],
-          "candidate_colours": [
-            "yellow",
-            "cyan"
+            "yellow"
           ],
           "px": 11,
           "length_um": 1.43,
@@ -2932,24 +2875,22 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 12,
-          "why": "Short thread leaving the yellow body top and joining the yellow trunk.",
+          "why": "Red piece touches the top of the yellow body and continues the yellow thread above it.",
           "verdict_in_the_answer": "real"
         },
         {
-          "n": 8,
-          "segment_id": "n00311",
+          "n": 6,
+          "segment_id": "n00309",
           "kind": "new",
           "classes": [
             "b"
           ],
           "question": "real and owner",
           "candidates": [
-            12,
-            13
+            12
           ],
           "candidate_colours": [
-            "yellow",
-            "cyan"
+            "yellow"
           ],
           "px": 10,
           "length_um": 1.3,
@@ -2958,132 +2899,39 @@
           "verdict": "artifact",
           "owner": "none",
           "owner_lacuna_id": null,
-          "why": "Short wiggly piece in dim region below yellow threads, touching nothing, looks like speckle.",
+          "why": "Short faint curved fragment in the glow near the body, touches nothing, no clear direction.",
           "verdict_in_the_answer": "artifact"
-        }
-      ],
-      "segments_not_drawn": 0
-    },
-    {
-      "lacuna_id": 13,
-      "case_id": "case_0013",
-      "case_kind": "lacuna",
-      "centroid_xy": [
-        933.9,
-        1015.1
-      ],
-      "window": [
-        768,
-        1024,
-        768,
-        1024
-      ],
-      "segments_offered": 3,
-      "segments_not_offered": 0,
-      "context_segments": 82,
-      "picture": "results/ai_log/542_z18/pictures/case_0013.png",
-      "colours": {
-        "yellow": 13,
-        "cyan": 12
-      },
-      "bodies_with_no_colour": [],
-      "kinds_drawn": {
-        "new": 1,
-        "unowned": 2,
-        "owned": 0,
-        "other": 0
-      },
-      "answer_valid": true,
-      "attempts": 1,
-      "invalid_reasons": [],
-      "usage": {
-        "input_tokens": 3621,
-        "output_tokens": 191
-      },
-      "cost_usd": 0.009152,
-      "segments": [
-        {
-          "n": 1,
-          "segment_id": "t02403",
-          "kind": "unowned",
-          "classes": [
-            "a"
-          ],
-          "question": "owner",
-          "candidates": [
-            13
-          ],
-          "candidate_colours": [
-            "yellow"
-          ],
-          "px": 23,
-          "length_um": 2.99,
-          "owner_lacuna_id_before": 0,
-          "touches": [],
-          "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Short white curve at far right edge, far from the yellow body and touching nothing; no visible link to yellow.",
-          "verdict_in_the_answer": null
         },
         {
-          "n": 2,
-          "segment_id": "t02412",
-          "kind": "unowned",
-          "classes": [
-            "a"
-          ],
-          "question": "owner",
-          "candidates": [
-            13,
-            12
-          ],
-          "candidate_colours": [
-            "yellow",
-            "cyan"
-          ],
-          "px": 10,
-          "length_um": 1.3,
-          "owner_lacuna_id_before": 0,
-          "touches": [],
-          "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Faint arc at bottom right, isolated and not connected to either body or continuing cyan or yellow threads.",
-          "verdict_in_the_answer": null
-        },
-        {
-          "n": 3,
-          "segment_id": "n00319",
+          "n": 7,
+          "segment_id": "n00317",
           "kind": "new",
           "classes": [
             "b"
           ],
           "question": "real and owner",
           "candidates": [
-            13,
             12
           ],
           "candidate_colours": [
-            "yellow",
-            "cyan"
+            "yellow"
           ],
-          "px": 28,
-          "length_um": 3.64,
+          "px": 13,
+          "length_um": 1.69,
           "owner_lacuna_id_before": 0,
           "touches": [],
-          "verdict": "real",
-          "owner": "cyan",
-          "owner_lacuna_id": 12,
-          "why": "Curved red thread near the cyan horizontal threads at bottom, continuing their direction and lying near the cyan network.",
-          "verdict_in_the_answer": "real"
+          "verdict": "artifact",
+          "owner": "none",
+          "owner_lacuna_id": null,
+          "why": "Short faint arc below the yellow thread, patchy, not a line leaving the body.",
+          "verdict_in_the_answer": "artifact"
         }
       ],
       "segments_not_drawn": 0
     },
     {
       "lacuna_id": 2,
-      "case_id": "case_0014",
+      "case_id": "case_0013",
       "case_kind": "left over",
       "centroid_xy": [
         624.0,
@@ -3098,7 +2946,7 @@
       "segments_offered": 1,
       "segments_not_offered": 0,
       "context_segments": 375,
-      "picture": "results/ai_log/542_z18/pictures/case_0014.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0013.png",
       "colours": {
         "yellow": 2,
         "cyan": 3,
@@ -3142,7 +2990,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 2,
-          "why": "White thread runs down from the yellow body's lower end, continuing its trunk and in line with the yellow threads.",
+          "why": "White thread runs vertically just below the yellow body's lower end, in line with its yellow threads and continuing downward from it.",
           "verdict_in_the_answer": null
         }
       ],
@@ -3150,7 +2998,7 @@
     },
     {
       "lacuna_id": 10,
-      "case_id": "case_0015",
+      "case_id": "case_0014",
       "case_kind": "left over",
       "centroid_xy": [
         788.0,
@@ -3165,7 +3013,7 @@
       "segments_offered": 1,
       "segments_not_offered": 0,
       "context_segments": 110,
-      "picture": "results/ai_log/542_z18/pictures/case_0015.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0014.png",
       "colours": {
         "yellow": 10
       },
@@ -3181,9 +3029,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3513,
-        "output_tokens": 76
+        "output_tokens": 77
       },
-      "cost_usd": 0.007786,
+      "cost_usd": 0.007796,
       "segments": [
         {
           "n": 1,
@@ -3204,9 +3052,9 @@
           "owner_lacuna_id_before": 0,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "White thread runs along the upper right, linking to a separate network of grey/white threads; it does not touch or visibly continue from the yellow body.",
+          "owner": "yellow",
+          "owner_lacuna_id": 10,
+          "why": "White thread runs left to a junction with yellow-traced threads near the yellow body's upper right and continues that network; no other cell is in view.",
           "verdict_in_the_answer": null
         }
       ],
@@ -3214,7 +3062,7 @@
     },
     {
       "lacuna_id": 11,
-      "case_id": "case_0016",
+      "case_id": "case_0015",
       "case_kind": "left over",
       "centroid_xy": [
         323.0,
@@ -3229,7 +3077,7 @@
       "segments_offered": 4,
       "segments_not_offered": 0,
       "context_segments": 319,
-      "picture": "results/ai_log/542_z18/pictures/case_0016.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0015.png",
       "colours": {
         "yellow": 11,
         "cyan": 6,
@@ -3247,9 +3095,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3662,
-        "output_tokens": 234
+        "output_tokens": 243
       },
-      "cost_usd": 0.009664,
+      "cost_usd": 0.009754,
       "segments": [
         {
           "n": 1,
@@ -3272,9 +3120,9 @@
           "owner_lacuna_id_before": 9,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Short arc in the middle of the field, touches neither body and is not clearly continuous with yellow or magenta threads.",
+          "owner": "magenta",
+          "owner_lacuna_id": 9,
+          "why": "Arc sits right of the magenta body and lines up with magenta's nearby branches; it doesn't reach the yellow body.",
           "verdict_in_the_answer": null
         },
         {
@@ -3298,9 +3146,9 @@
           "owner_lacuna_id_before": 9,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Curved piece between 1 and 3, isolated and not reaching either body; no clear line back to yellow or magenta.",
+          "owner": "magenta",
+          "owner_lacuna_id": 9,
+          "why": "Continues the small cluster beside 1 and 3, drawn from the magenta side; no contact with yellow.",
           "verdict_in_the_answer": null
         },
         {
@@ -3324,9 +3172,9 @@
           "owner_lacuna_id_before": 9,
           "touches": [],
           "verdict": "real",
-          "owner": "none",
-          "owner_lacuna_id": null,
-          "why": "Short isolated thread left of centre, midway between magenta and yellow with no visible contact with either body.",
+          "owner": "magenta",
+          "owner_lacuna_id": 9,
+          "why": "Runs leftward toward magenta's lower network, pointing at the magenta body; not touching yellow.",
           "verdict_in_the_answer": null
         },
         {
@@ -3352,7 +3200,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 11,
-          "why": "Lower piece points down toward the yellow body and sits in line with the yellow threads running above it.",
+          "why": "Lies just above the yellow body, in line with yellow's upper threads; nearest the yellow body.",
           "verdict_in_the_answer": null
         }
       ],
@@ -3360,7 +3208,7 @@
     },
     {
       "lacuna_id": 6,
-      "case_id": "case_0017",
+      "case_id": "case_0016",
       "case_kind": "left over",
       "centroid_xy": [
         321.0,
@@ -3375,7 +3223,7 @@
       "segments_offered": 4,
       "segments_not_offered": 0,
       "context_segments": 339,
-      "picture": "results/ai_log/542_z18/pictures/case_0017.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0016.png",
       "colours": {
         "yellow": 6,
         "cyan": 5,
@@ -3394,9 +3242,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3665,
-        "output_tokens": 235
+        "output_tokens": 237
       },
-      "cost_usd": 0.00968,
+      "cost_usd": 0.0097,
       "segments": [
         {
           "n": 1,
@@ -3421,7 +3269,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 6,
-          "why": "Sits just below the yellow body's lower tip, in line with the yellow threads fanning down from it.",
+          "why": "Sits just below the yellow body's lower tip, in line with yellow's downward-running threads; yellow body is much nearer.",
           "verdict_in_the_answer": null
         },
         {
@@ -3447,7 +3295,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 6,
-          "why": "Continues the yellow processes running down from the body's lower end, nearer to yellow than magenta.",
+          "why": "Continues the thread run descending from the yellow body's lower end; closer to yellow than to magenta's upper tip.",
           "verdict_in_the_answer": null
         },
         {
@@ -3473,7 +3321,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 6,
-          "why": "Lowest of the cluster, still in line with yellow's downward threads, pointing back at the yellow body.",
+          "why": "Lower end of the same descending thread group from the yellow body, pointing back at yellow.",
           "verdict_in_the_answer": null
         },
         {
@@ -3499,7 +3347,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 6,
-          "why": "Short piece in the yellow tip's thread bundle; direction leads back to the yellow body, not magenta.",
+          "why": "Short piece in the cluster below the yellow tip, continuing yellow's thread direction.",
           "verdict_in_the_answer": null
         }
       ],
@@ -3507,7 +3355,7 @@
     },
     {
       "lacuna_id": 4,
-      "case_id": "case_0018",
+      "case_id": "case_0017",
       "case_kind": "left over",
       "centroid_xy": [
         752.5,
@@ -3522,7 +3370,7 @@
       "segments_offered": 5,
       "segments_not_offered": 0,
       "context_segments": 396,
-      "picture": "results/ai_log/542_z18/pictures/case_0018.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0017.png",
       "colours": {
         "yellow": 4,
         "cyan": 1,
@@ -3541,9 +3389,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3710,
-        "output_tokens": 286
+        "output_tokens": 279
       },
-      "cost_usd": 0.01028,
+      "cost_usd": 0.01021,
       "segments": [
         {
           "n": 1,
@@ -3568,7 +3416,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Runs down toward the yellow body near its top and sits in line with yellow's upward threads; cyan's network is further up-right.",
+          "why": "Near the yellow body's upper end; continues the yellow threads running up from the body toward it.",
           "verdict_in_the_answer": null
         },
         {
@@ -3594,7 +3442,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Lies on the upper-left side of the yellow body, in line with yellow threads running up and left toward it.",
+          "why": "Lies close to the yellow body and its network; no visible link to cyan, whose body is far at the top.",
           "verdict_in_the_answer": null
         },
         {
@@ -3620,7 +3468,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Sits at the yellow body's upper-left edge, adjacent to the outline, and continues yellow's threads.",
+          "why": "Sits right beside the yellow body's upper edge and continues its yellow threads.",
           "verdict_in_the_answer": null
         },
         {
@@ -3644,9 +3492,9 @@
           "owner_lacuna_id_before": 2,
           "touches": [],
           "verdict": "real",
-          "owner": "magenta",
-          "owner_lacuna_id": 2,
-          "why": "Continues the left-side magenta horizontal threads running toward it from the magenta body.",
+          "owner": "yellow",
+          "owner_lacuna_id": 4,
+          "why": "Lies in the same cluster as 3, close to the yellow body and in line with its threads; magenta is farther.",
           "verdict_in_the_answer": null
         },
         {
@@ -3672,7 +3520,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 4,
-          "why": "Next to the yellow body outline and in line with yellow's leftward threads.",
+          "why": "Adjacent to the yellow outline and in line with yellow threads; the magenta body is far across.",
           "verdict_in_the_answer": null
         }
       ],
@@ -3680,7 +3528,7 @@
     },
     {
       "lacuna_id": 9,
-      "case_id": "case_0019",
+      "case_id": "case_0018",
       "case_kind": "left over",
       "centroid_xy": [
         236.0,
@@ -3695,7 +3543,7 @@
       "segments_offered": 1,
       "segments_not_offered": 0,
       "context_segments": 88,
-      "picture": "results/ai_log/542_z18/pictures/case_0019.png",
+      "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/542_z18_case_0018.png",
       "colours": {
         "yellow": 9
       },
@@ -3711,9 +3559,9 @@
       "invalid_reasons": [],
       "usage": {
         "input_tokens": 3513,
-        "output_tokens": 77
+        "output_tokens": 86
       },
-      "cost_usd": 0.007796,
+      "cost_usd": 0.007886,
       "segments": [
         {
           "n": 1,
@@ -3736,7 +3584,7 @@
           "verdict": "real",
           "owner": "yellow",
           "owner_lacuna_id": 9,
-          "why": "Numbered piece sits at the lower end of the yellow network, continuing yellow threads that run toward the yellow body's lower tip.",
+          "why": "Sits at the bottom near a bright body fragment, adjoining the yellow network's thread (yellow threads continue right up to it); no other cell is a candidate.",
           "verdict_in_the_answer": null
         }
       ],

@@ -1,18 +1,18 @@
 {
   "schema": "lcn-ai-lacuna-judge-decisions-1",
   "status": "EXPERIMENT, pre-validation, not validated. Which regions are lacunae was decided by an AI judge; every boundary is the lacuna stage's own. Applied only when config.AI_LACUNA_JUDGE_ENABLED is True.",
-  "written_at": "2026-10-27T16:31:59Z",
+  "written_at": "2026-11-09T18:28:19Z",
   "mode": "live",
   "image_label": "877_wt_z081c1-2",
   "group": "WT_HP",
   "image_code": "img_d5472ff8",
   "provider": "anthropic",
   "model": "claude-sonnet-5-5",
-  "prompt_sha256": "5a639cf96a54670ecc69090fad4befd585b2b2c72a9474123bd737ff4751a20c",
-  "examples_sha256": "46ec9b817506a78e49034ad203f7c4e69d950a9ae38853b5342a28fec3e7ec89",
+  "prompt_sha256": "e99cf784716529f7f2e33fac94b9b71c7eb96f17e02b0174f6942fb29c190d8c",
+  "examples_sha256": "85c238d191afc4ebc85d155062347fa1092f49660e119123350f1499b0f6450d",
   "examples_present": true,
-  "request_sha256": "d73a1ea0004031af1efde7cf85abd0cd4e1aa6ce46b84a6bd727fc3d02e3ef51",
-  "picture": "results_ai_lacunae/WT_HP/ai_log/877_wt_z081c1-2/877_wt_z081c1-2_picture.png",
+  "request_sha256": "3ed71b591776105af637fd2ab7a4ffb1ce2f9cdee1a6eb769d1233b51a585e7d",
+  "picture": "results/WT_HP/1_lacunae/ai_judge/ai_log/877_wt_z081c1-2_picture.png",
   "picture_sha256": "be0146f6e8060c8d1aa1174d4dd6aca9a3221913e8087444a819145258a5d8b7",
   "candidate_rule": {
     "lacuna_cut_t_hi": 0.4681296,
@@ -26,7 +26,9 @@
       "the dim candidates",
       "the regions they rejected under that area"
     ],
-    "priority_rejected_min_area_px2": 300
+    "priority_rejected_min_area_px2": 300,
+    "not_offered_above_excluded_share": 0.5,
+    "area_cap": null
   },
   "candidate_counts": {
     "candidates_found": 50,
@@ -39,33 +41,38 @@
     "dim_not_numbered_over_the_cap": 0,
     "regions": 17,
     "dim": 33,
-    "numbered_kept_by_the_filters": 14,
-    "numbered_rejected_by_the_filters": 3,
-    "deterministic_lacunae": 14,
-    "kept_lacunae_that_are_no_candidate": 0
+    "numbered_kept_by_the_filters": 12,
+    "numbered_rejected_by_the_filters": 5,
+    "deterministic_lacunae": 12,
+    "kept_lacunae_that_are_no_candidate": 0,
+    "in_excluded_region": 0,
+    "in_excluded_region_dim": 0
   },
-  "geometry_sha256": "390b1e9d96e69bbd8a9bf850650c924c748b2e1bdcfc6727b24f17bd5cc8a630",
-  "answer_valid": true,
-  "invalid_reasons": [],
+  "geometry_sha256": "43e0766546c4c07304a33bb547552750f899c5faa36e5ae5fed8b4eceaab388f",
+  "answer_valid": false,
+  "invalid_reasons": [
+    "attempt 1: no answer for region(s) [12]",
+    "attempt 2: no answer for region(s) [12]"
+  ],
   "replay_checks": [],
   "totals": {
-    "calls": 1,
-    "attempts": 1,
-    "invalid_attempts": 0,
+    "calls": 2,
+    "attempts": 2,
+    "invalid_attempts": 2,
     "call_errors": 0,
     "refusals": 0,
-    "input_tokens": 4228,
-    "output_tokens": 1379,
-    "cost_usd": 0.022246,
+    "input_tokens": 10490,
+    "output_tokens": 3530,
+    "cost_usd": 0.05628,
     "replay_request_mismatches": 0,
     "replay_picture_mismatches": 0,
     "stopped_on_cost": false
   },
   "verdicts": {
-    "yes": 7,
-    "no": 39,
-    "unsure": 4,
-    "unjudged": 0
+    "yes": 0,
+    "no": 0,
+    "unsure": 0,
+    "unjudged": 50
   },
   "regions": [
     {
@@ -88,8 +95,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small canalicular fragment at top edge"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 2,
@@ -111,8 +120,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 5,
-      "verdict": "unsure",
-      "why": "bright body cut by top edge, partial"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 3,
@@ -134,8 +145,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small thin fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 4,
@@ -157,8 +170,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 5,
@@ -180,8 +195,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin canalicular strand"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 6,
@@ -203,8 +220,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small fragment in canaliculi network"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 7,
@@ -226,8 +245,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 8,
@@ -249,8 +270,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 9,
@@ -272,8 +295,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 6,
-      "verdict": "yes",
-      "why": "bright compact osteocyte body with tail at top edge"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 10,
@@ -295,8 +320,10 @@
       "lacuna_class": null,
       "rejected_by": "area",
       "source_label": 26,
-      "verdict": "no",
-      "why": "small fragment of process"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 11,
@@ -318,8 +345,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin curved process"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 12,
@@ -341,8 +370,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "not present"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 13,
@@ -364,8 +395,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin sliver"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 14,
@@ -387,8 +420,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 15,
@@ -410,8 +445,10 @@
       "lacuna_class": null,
       "rejected_by": "area",
       "source_label": 35,
-      "verdict": "no",
-      "why": "small fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 16,
@@ -433,8 +470,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 17,
@@ -456,8 +495,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "branching canaliculus"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 18,
@@ -479,8 +520,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 19,
@@ -502,8 +545,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 20,
@@ -525,8 +570,10 @@
       "lacuna_class": null,
       "rejected_by": "area",
       "source_label": 45,
-      "verdict": "no",
-      "why": "small fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 21,
@@ -548,8 +595,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 22,
@@ -571,8 +620,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 23,
@@ -594,8 +645,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin streak"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 24,
@@ -617,8 +670,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 25,
@@ -640,8 +695,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin process strand"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 26,
@@ -663,8 +720,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 27,
@@ -681,13 +740,15 @@
         725
       ],
       "on_border": false,
-      "deterministic": "lacuna",
-      "lacuna_id": 13,
-      "lacuna_class": "dim",
-      "rejected_by": null,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "area",
       "source_label": 58,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 28,
@@ -709,8 +770,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "small fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 29,
@@ -732,8 +795,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 67,
-      "verdict": "no",
-      "why": "small dim patch"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 30,
@@ -755,8 +820,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 31,
@@ -778,8 +845,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 54,
-      "verdict": "yes",
-      "why": "large bright osteocyte body with radiating processes"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 32,
@@ -801,8 +870,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 33,
@@ -824,8 +895,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 34,
@@ -847,8 +920,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 35,
@@ -870,8 +945,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 36,
@@ -893,8 +970,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 37,
@@ -916,8 +995,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 38,
@@ -939,8 +1020,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "thin fragment"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 39,
@@ -962,8 +1045,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 40,
@@ -985,8 +1070,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 90,
-      "verdict": "yes",
-      "why": "bright osteocyte body at left edge"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 41,
@@ -1008,8 +1095,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 92,
-      "verdict": "yes",
-      "why": "bright elongated osteocyte body with processes"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 42,
@@ -1031,8 +1120,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 95,
-      "verdict": "unsure",
-      "why": "part of ring-shaped body split between outlines"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 43,
@@ -1054,8 +1145,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 97,
-      "verdict": "yes",
-      "why": "bright compact body with radiating processes"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 44,
@@ -1077,8 +1170,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 96,
-      "verdict": "unsure",
-      "why": "part of ring-shaped body split between outlines"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 45,
@@ -1100,8 +1195,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 98,
-      "verdict": "yes",
-      "why": "bright body at left edge"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 46,
@@ -1123,8 +1220,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 99,
-      "verdict": "yes",
-      "why": "bright osteocyte body with processes"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 47,
@@ -1146,8 +1245,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 101,
-      "verdict": "no",
-      "why": "outlines only a small piece of dim larger body"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 48,
@@ -1164,13 +1265,15 @@
         715
       ],
       "on_border": false,
-      "deterministic": "lacuna",
-      "lacuna_id": 14,
-      "lacuna_class": "dim",
-      "rejected_by": null,
+      "deterministic": "not a lacuna",
+      "lacuna_id": null,
+      "lacuna_class": null,
+      "rejected_by": "area",
       "source_label": 102,
-      "verdict": "no",
-      "why": "small piece of larger body below"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 49,
@@ -1192,8 +1295,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "no",
-      "why": "tiny speck"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     },
     {
       "n": 50,
@@ -1215,9 +1320,12 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
-      "verdict": "unsure",
-      "why": "body cut by bottom edge"
+      "excluded_share": 0.0,
+      "verdict": "unjudged",
+      "reason": "",
+      "why": ""
     }
   ],
-  "not_numbered_keep_the_deterministic_decision": []
+  "not_numbered_keep_the_deterministic_decision": [],
+  "in_excluded_region_not_offered": []
 }

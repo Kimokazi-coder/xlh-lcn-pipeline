@@ -1,5 +1,7 @@
 # The AI lacuna judge, archived
 
+**Rerun on 2026-11-09 (method-freeze-v2).** The run records `ai_lacuna_judge_run.json` (the calls), `ai_lacuna_run.json` (the judge-on set) and `ai_lacuna_replay.json` (the offline replay) in this folder are now those of the rerun on all 35 images, with the prompt of the working POL definition (docs/METHODS.md section 29); the set is in `results/<group>/<section>/ai_judge/` and the log in `results/<group>/1_lacunae/ai_judge/ai_log/`. `dry_run/` and `review/` are still those of the run of 2026-10-27, and the text below describes that run. The rerun's own records: `results/archive/judge/`.
+
 **Archived on 2026-11-04.** Until then this was the folder `results_ai_lacunae/`.
 What belongs to no one group (the run records, `dry_run/`, `review/`) is here in
 `results/archive/ai_judge/`; what belongs to one group is in that group's

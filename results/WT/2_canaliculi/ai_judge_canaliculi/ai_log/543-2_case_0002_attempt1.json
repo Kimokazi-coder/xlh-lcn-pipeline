@@ -1,12 +1,12 @@
 {
   "schema": "lcn-ai-judge-log-1",
-  "written_at": "2026-10-19T16:02:33Z",
+  "written_at": "2026-11-09T18:48:34Z",
   "mode": "live",
   "image_label": "543-2",
   "lacuna_id": 2,
   "case_id": "case_0002",
   "attempt": 1,
-  "picture": "results/ai_log/543-2/pictures/case_0002.png",
+  "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/543-2_case_0002.png",
   "picture_sha256": "d90290552c7b9c0c6782a561d4ba9208ab6c275d3563b122379ebf1cc46def42",
   "prompt_sha256": "3d48d88ec823640a6557709f7cda262e94d2bc547fb0506802a31effee6ccf37",
   "examples_sha256": "393055e5c350e89be96bcb011582f5bee45c99fb5d6676992ce59765aeb446a0",
@@ -27,8 +27,8 @@
     }
   },
   "response": {
-    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"Short vertical piece between yellow-traced threads in the network above the body; a link in the yellow network, no other cell to claim it.\"},\n  {\"n\": 2, \"owner\": \"yellow\", \"why\": \"Line running from the yellow vertical thread toward the body, continuing the yellow network's direction and spacing.\"},\n  {\"n\": 3, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Short faint line leaving the body's upper-left edge, in line with nearby yellow threads.\"},\n  {\"n\": 4, \"verdict\": \"artifact\", \"owner\": \"none\", \"why\": \"Tiny hooked wiggle in the bright glow at the body edge, wandering direction, not a line.\"},\n  {\"n\": 5, \"verdict\": \"artifact\", \"owner\": \"none\", \"why\": \"Short stubby fragment in the glow below the notch, no clear direction or continuation.\"}\n]}",
-    "id": "msg_011CgBsqqx7F7odGkUgHg1Kj",
+    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"Short vertical piece between yellow-traced threads in the network above the body; it joins the yellow network rather than running from elsewhere.\"},\n  {\"n\": 2, \"owner\": \"yellow\", \"why\": \"Line running between yellow-traced threads and continuing their direction toward the yellow body; no sign of another origin.\"},\n  {\"n\": 3, \"verdict\": \"artifact\", \"owner\": \"none\", \"why\": \"Tiny red fragment in the glow near the body edge, touching nothing and not forming a line.\"},\n  {\"n\": 4, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Small red stub right at the yellow body outline, in the dim ring, apparently touching the body.\"},\n  {\"n\": 5, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Short branching thread descending from the yellow body edge, continuing the yellow threads below.\"}\n]}",
+    "id": "msg_011CgsrVMtPDJxA25Q9oczDZ",
     "model": "claude-sonnet-5-5",
     "stop_reason": "end_turn",
     "thinking_fallback": false,
@@ -46,7 +46,7 @@
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 2,
-      "why": "Short vertical piece between yellow-traced threads in the network above the body; a link in the yellow network, no other cell to claim it.",
+      "why": "Short vertical piece between yellow-traced threads in the network above the body; it joins the yellow network rather than running from elsewhere.",
       "verdict_asked_for": false,
       "verdict_in_the_answer": null
     },
@@ -55,36 +55,36 @@
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 2,
-      "why": "Line running from the yellow vertical thread toward the body, continuing the yellow network's direction and spacing.",
+      "why": "Line running between yellow-traced threads and continuing their direction toward the yellow body; no sign of another origin.",
       "verdict_asked_for": false,
       "verdict_in_the_answer": null
     },
     {
       "n": 3,
+      "verdict": "artifact",
+      "owner": "none",
+      "owner_lacuna_id": null,
+      "why": "Tiny red fragment in the glow near the body edge, touching nothing and not forming a line.",
+      "verdict_asked_for": true,
+      "verdict_in_the_answer": "artifact"
+    },
+    {
+      "n": 4,
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 2,
-      "why": "Short faint line leaving the body's upper-left edge, in line with nearby yellow threads.",
+      "why": "Small red stub right at the yellow body outline, in the dim ring, apparently touching the body.",
       "verdict_asked_for": true,
       "verdict_in_the_answer": "real"
     },
     {
-      "n": 4,
-      "verdict": "artifact",
-      "owner": "none",
-      "owner_lacuna_id": null,
-      "why": "Tiny hooked wiggle in the bright glow at the body edge, wandering direction, not a line.",
-      "verdict_asked_for": true,
-      "verdict_in_the_answer": "artifact"
-    },
-    {
       "n": 5,
-      "verdict": "artifact",
-      "owner": "none",
-      "owner_lacuna_id": null,
-      "why": "Short stubby fragment in the glow below the notch, no clear direction or continuation.",
+      "verdict": "real",
+      "owner": "yellow",
+      "owner_lacuna_id": 2,
+      "why": "Short branching thread descending from the yellow body edge, continuing the yellow threads below.",
       "verdict_asked_for": true,
-      "verdict_in_the_answer": "artifact"
+      "verdict_in_the_answer": "real"
     }
   ]
 }

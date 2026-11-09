@@ -1,18 +1,18 @@
 {
   "status": "EXPERIMENT, pre-validation, not validated. Which regions are lacunae was decided by an AI judge; every boundary is the lacuna stage's own.",
-  "written_at": "2026-10-27T16:35:15Z",
+  "written_at": "2026-11-09T18:32:08Z",
   "model": "claude-sonnet-5-5",
   "estimate": {
     "calls": 35,
-    "estimated_input_tokens": 133455,
-    "estimated_output_tokens": 66570,
-    "estimated_cost_usd": 0.9326,
-    "estimated_cost_usd_if_every_call_is_retried_once": 1.8652,
-    "estimated_cost_usd_at_the_thread_judge_overrun": 1.2539,
+    "estimated_input_tokens": 157535,
+    "estimated_output_tokens": 65555,
+    "estimated_cost_usd": 0.9706,
+    "estimated_cost_usd_if_every_call_is_retried_once": 1.9412,
+    "estimated_cost_usd_at_the_thread_judge_overrun": 1.305,
     "max_cost_usd": 3.0,
     "within_max_cost_usd": true
   },
-  "spent_usd": 0.825286,
+  "spent_usd": 1.075206,
   "stopped": null,
   "images_run": 35,
   "images": 35,
@@ -22,9 +22,9 @@
       "image": "542_z06",
       "answer_valid": true,
       "verdicts": {
-        "yes": 15,
-        "no": 42,
-        "unsure": 3,
+        "yes": 17,
+        "no": 43,
+        "unsure": 0,
         "unjudged": 0
       },
       "totals": {
@@ -33,9 +33,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1605,
-        "cost_usd": 0.024506,
+        "input_tokens": 5245,
+        "output_tokens": 2082,
+        "cost_usd": 0.03131,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -46,9 +46,9 @@
       "image": "542_z18",
       "answer_valid": true,
       "verdicts": {
-        "yes": 10,
-        "no": 47,
-        "unsure": 3,
+        "yes": 11,
+        "no": 48,
+        "unsure": 1,
         "unjudged": 0
       },
       "totals": {
@@ -57,9 +57,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4230,
-        "output_tokens": 1633,
-        "cost_usd": 0.02479,
+        "input_tokens": 5247,
+        "output_tokens": 2122,
+        "cost_usd": 0.031714,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -68,25 +68,13 @@
     {
       "group": "WT",
       "image": "543-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 12,
-        "no": 15,
-        "unsure": 0,
-        "unjudged": 0
-      },
+      "held_out": true,
       "totals": {
         "calls": 1,
         "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4229,
-        "output_tokens": 848,
-        "cost_usd": 0.016938,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
+        "input_tokens": 5246,
+        "output_tokens": 1037,
+        "cost_usd": 0.020862
       }
     },
     {
@@ -94,9 +82,9 @@
       "image": "543_3",
       "answer_valid": true,
       "verdicts": {
-        "yes": 10,
-        "no": 23,
-        "unsure": 4,
+        "yes": 11,
+        "no": 24,
+        "unsure": 2,
         "unjudged": 0
       },
       "totals": {
@@ -105,9 +93,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1094,
-        "cost_usd": 0.019396,
+        "input_tokens": 5245,
+        "output_tokens": 1426,
+        "cost_usd": 0.02475,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -129,9 +117,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 895,
-        "cost_usd": 0.017404,
+        "input_tokens": 5244,
+        "output_tokens": 1163,
+        "cost_usd": 0.022118,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -142,8 +130,8 @@
       "image": "682_z08",
       "answer_valid": true,
       "verdicts": {
-        "yes": 8,
-        "no": 36,
+        "yes": 9,
+        "no": 35,
         "unsure": 3,
         "unjudged": 0
       },
@@ -153,9 +141,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1359,
-        "cost_usd": 0.022044,
+        "input_tokens": 5244,
+        "output_tokens": 1750,
+        "cost_usd": 0.027988,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -164,25 +152,13 @@
     {
       "group": "WT",
       "image": "682_z23",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 12,
-        "no": 44,
-        "unsure": 2,
-        "unjudged": 0
-      },
+      "held_out": true,
       "totals": {
         "calls": 1,
         "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1542,
-        "cost_usd": 0.023876,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
+        "input_tokens": 5245,
+        "output_tokens": 2045,
+        "cost_usd": 0.03094
       }
     },
     {
@@ -190,9 +166,9 @@
       "image": "682_z29",
       "answer_valid": true,
       "verdicts": {
-        "yes": 10,
+        "yes": 13,
         "no": 46,
-        "unsure": 4,
+        "unsure": 1,
         "unjudged": 0
       },
       "totals": {
@@ -201,9 +177,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1612,
-        "cost_usd": 0.024576,
+        "input_tokens": 5245,
+        "output_tokens": 2146,
+        "cost_usd": 0.03195,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -215,7 +191,7 @@
       "answer_valid": true,
       "verdicts": {
         "yes": 11,
-        "no": 13,
+        "no": 6,
         "unsure": 1,
         "unjudged": 0
       },
@@ -225,9 +201,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4229,
-        "output_tokens": 867,
-        "cost_usd": 0.017128,
+        "input_tokens": 5246,
+        "output_tokens": 774,
+        "cost_usd": 0.018232,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -239,8 +215,8 @@
       "answer_valid": true,
       "verdicts": {
         "yes": 13,
-        "no": 47,
-        "unsure": 0,
+        "no": 46,
+        "unsure": 1,
         "unjudged": 0
       },
       "totals": {
@@ -249,9 +225,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4226,
-        "output_tokens": 1668,
-        "cost_usd": 0.025132,
+        "input_tokens": 5243,
+        "output_tokens": 2182,
+        "cost_usd": 0.032306,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -262,9 +238,9 @@
       "image": "872_wt_hp_z06",
       "answer_valid": true,
       "verdicts": {
-        "yes": 8,
-        "no": 23,
-        "unsure": 4,
+        "yes": 9,
+        "no": 14,
+        "unsure": 2,
         "unjudged": 0
       },
       "totals": {
@@ -273,9 +249,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1063,
-        "cost_usd": 0.019086,
+        "input_tokens": 5245,
+        "output_tokens": 1137,
+        "cost_usd": 0.02186,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -284,54 +260,6 @@
     {
       "group": "WT_HP",
       "image": "876_z76c1-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 7,
-        "no": 50,
-        "unsure": 3,
-        "unjudged": 0
-      },
-      "totals": {
-        "calls": 1,
-        "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1641,
-        "cost_usd": 0.024866,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
-      }
-    },
-    {
-      "group": "WT_HP",
-      "image": "876_z82c1-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 8,
-        "no": 49,
-        "unsure": 3,
-        "unjudged": 0
-      },
-      "totals": {
-        "calls": 1,
-        "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1570,
-        "cost_usd": 0.024156,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
-      }
-    },
-    {
-      "group": "WT_HP",
-      "image": "876_z89c1-2",
       "answer_valid": true,
       "verdicts": {
         "yes": 9,
@@ -345,9 +273,45 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1786,
-        "cost_usd": 0.026314,
+        "input_tokens": 5245,
+        "output_tokens": 2121,
+        "cost_usd": 0.0317,
+        "replay_request_mismatches": 0,
+        "replay_picture_mismatches": 0,
+        "stopped_on_cost": false
+      }
+    },
+    {
+      "group": "WT_HP",
+      "image": "876_z82c1-2",
+      "held_out": true,
+      "totals": {
+        "calls": 1,
+        "attempts": 1,
+        "input_tokens": 5245,
+        "output_tokens": 2171,
+        "cost_usd": 0.0322
+      }
+    },
+    {
+      "group": "WT_HP",
+      "image": "876_z89c1-2",
+      "answer_valid": true,
+      "verdicts": {
+        "yes": 10,
+        "no": 48,
+        "unsure": 2,
+        "unjudged": 0
+      },
+      "totals": {
+        "calls": 1,
+        "attempts": 1,
+        "invalid_attempts": 0,
+        "call_errors": 0,
+        "refusals": 0,
+        "input_tokens": 5244,
+        "output_tokens": 2103,
+        "cost_usd": 0.031518,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -369,9 +333,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4230,
-        "output_tokens": 1616,
-        "cost_usd": 0.02462,
+        "input_tokens": 5247,
+        "output_tokens": 2112,
+        "cost_usd": 0.031614,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -380,25 +344,13 @@
     {
       "group": "WT_HP",
       "image": "877_wt_z081c1-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 7,
-        "no": 39,
-        "unsure": 4,
-        "unjudged": 0
-      },
+      "held_out": true,
       "totals": {
-        "calls": 1,
-        "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1379,
-        "cost_usd": 0.022246,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
+        "calls": 2,
+        "attempts": 2,
+        "input_tokens": 10490,
+        "output_tokens": 3530,
+        "cost_usd": 0.05628
       }
     },
     {
@@ -406,9 +358,9 @@
       "image": "877_wt_z087c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 9,
+        "yes": 12,
         "no": 32,
-        "unsure": 4,
+        "unsure": 1,
         "unjudged": 0
       },
       "totals": {
@@ -417,9 +369,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4229,
-        "output_tokens": 1385,
-        "cost_usd": 0.022308,
+        "input_tokens": 5246,
+        "output_tokens": 1591,
+        "cost_usd": 0.026402,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -430,8 +382,8 @@
       "image": "535_z13c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 8,
-        "no": 45,
+        "yes": 9,
+        "no": 44,
         "unsure": 7,
         "unjudged": 0
       },
@@ -441,9 +393,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1620,
-        "cost_usd": 0.024656,
+        "input_tokens": 5245,
+        "output_tokens": 2217,
+        "cost_usd": 0.03266,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -452,25 +404,13 @@
     {
       "group": "Hyp_RD",
       "image": "535_z20c1-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 11,
-        "no": 40,
-        "unsure": 9,
-        "unjudged": 0
-      },
+      "held_out": true,
       "totals": {
         "calls": 1,
         "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4226,
-        "output_tokens": 1707,
-        "cost_usd": 0.025522,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
+        "input_tokens": 5243,
+        "output_tokens": 2208,
+        "cost_usd": 0.032566
       }
     },
     {
@@ -478,9 +418,9 @@
       "image": "535_z27c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 10,
-        "no": 44,
-        "unsure": 6,
+        "yes": 15,
+        "no": 40,
+        "unsure": 5,
         "unjudged": 0
       },
       "totals": {
@@ -489,9 +429,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1667,
-        "cost_usd": 0.025126,
+        "input_tokens": 5245,
+        "output_tokens": 2167,
+        "cost_usd": 0.03216,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -502,9 +442,9 @@
       "image": "536-63x_Hyp_RD_z03c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 11,
-        "no": 45,
-        "unsure": 1,
+        "yes": 12,
+        "no": 43,
+        "unsure": 0,
         "unjudged": 0
       },
       "totals": {
@@ -513,9 +453,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1623,
-        "cost_usd": 0.024684,
+        "input_tokens": 5244,
+        "output_tokens": 2061,
+        "cost_usd": 0.031098,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -526,8 +466,8 @@
       "image": "536-63x_Hyp_RD_z08c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 13,
-        "no": 42,
+        "yes": 15,
+        "no": 40,
         "unsure": 5,
         "unjudged": 0
       },
@@ -537,9 +477,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1603,
-        "cost_usd": 0.024486,
+        "input_tokens": 5245,
+        "output_tokens": 2163,
+        "cost_usd": 0.03212,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -550,9 +490,9 @@
       "image": "536-63x_Hyp_RD_z15c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 9,
-        "no": 36,
-        "unsure": 4,
+        "yes": 10,
+        "no": 33,
+        "unsure": 5,
         "unjudged": 0
       },
       "totals": {
@@ -561,9 +501,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4229,
-        "output_tokens": 1401,
-        "cost_usd": 0.022468,
+        "input_tokens": 5246,
+        "output_tokens": 1786,
+        "cost_usd": 0.028352,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -574,9 +514,9 @@
       "image": "I534_z11c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 11,
-        "no": 39,
-        "unsure": 10,
+        "yes": 21,
+        "no": 33,
+        "unsure": 6,
         "unjudged": 0
       },
       "totals": {
@@ -585,9 +525,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1641,
-        "cost_usd": 0.024864,
+        "input_tokens": 5244,
+        "output_tokens": 2200,
+        "cost_usd": 0.032488,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -596,25 +536,13 @@
     {
       "group": "Hyp_RD",
       "image": "I534_z19c1-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 12,
-        "no": 43,
-        "unsure": 5,
-        "unjudged": 0
-      },
+      "held_out": true,
       "totals": {
         "calls": 1,
         "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4228,
-        "output_tokens": 1675,
-        "cost_usd": 0.025206,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
+        "input_tokens": 5245,
+        "output_tokens": 2159,
+        "cost_usd": 0.03208
       }
     },
     {
@@ -623,8 +551,8 @@
       "answer_valid": true,
       "verdicts": {
         "yes": 13,
-        "no": 46,
-        "unsure": 1,
+        "no": 43,
+        "unsure": 4,
         "unjudged": 0
       },
       "totals": {
@@ -633,9 +561,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1726,
-        "cost_usd": 0.025714,
+        "input_tokens": 5244,
+        "output_tokens": 2136,
+        "cost_usd": 0.031848,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -646,9 +574,9 @@
       "image": "548_hyp_HP_z08c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 8,
-        "no": 44,
-        "unsure": 8,
+        "yes": 14,
+        "no": 40,
+        "unsure": 6,
         "unjudged": 0
       },
       "totals": {
@@ -657,9 +585,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4226,
-        "output_tokens": 1675,
-        "cost_usd": 0.025202,
+        "input_tokens": 5243,
+        "output_tokens": 2168,
+        "cost_usd": 0.032166,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -670,9 +598,9 @@
       "image": "548_hyp_HP_z14c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 8,
-        "no": 38,
-        "unsure": 14,
+        "yes": 15,
+        "no": 35,
+        "unsure": 10,
         "unjudged": 0
       },
       "totals": {
@@ -681,9 +609,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4229,
-        "output_tokens": 1674,
-        "cost_usd": 0.025198,
+        "input_tokens": 5246,
+        "output_tokens": 2176,
+        "cost_usd": 0.032252,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -694,9 +622,9 @@
       "image": "548_hyp_HP_z20c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 8,
-        "no": 42,
-        "unsure": 10,
+        "yes": 13,
+        "no": 41,
+        "unsure": 6,
         "unjudged": 0
       },
       "totals": {
@@ -705,9 +633,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4226,
-        "output_tokens": 1619,
-        "cost_usd": 0.024642,
+        "input_tokens": 5243,
+        "output_tokens": 2156,
+        "cost_usd": 0.032046,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -718,9 +646,9 @@
       "image": "699_HYP_HP_z11c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 4,
-        "no": 51,
-        "unsure": 5,
+        "yes": 13,
+        "no": 43,
+        "unsure": 4,
         "unjudged": 0
       },
       "totals": {
@@ -729,9 +657,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1745,
-        "cost_usd": 0.025904,
+        "input_tokens": 5244,
+        "output_tokens": 2376,
+        "cost_usd": 0.034248,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -742,9 +670,9 @@
       "image": "699_HYP_HP_z20c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 7,
-        "no": 47,
-        "unsure": 6,
+        "yes": 12,
+        "no": 41,
+        "unsure": 1,
         "unjudged": 0
       },
       "totals": {
@@ -753,9 +681,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1664,
-        "cost_usd": 0.025094,
+        "input_tokens": 5244,
+        "output_tokens": 1976,
+        "cost_usd": 0.030248,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -766,9 +694,9 @@
       "image": "699_HYP_HP_z25c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 3,
-        "no": 40,
-        "unsure": 2,
+        "yes": 5,
+        "no": 34,
+        "unsure": 3,
         "unjudged": 0
       },
       "totals": {
@@ -777,9 +705,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1421,
-        "cost_usd": 0.022664,
+        "input_tokens": 5244,
+        "output_tokens": 1599,
+        "cost_usd": 0.026478,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -788,25 +716,13 @@
     {
       "group": "Hyp_HP",
       "image": "701_z19c1-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 0,
-        "no": 49,
-        "unsure": 11,
-        "unjudged": 0
-      },
+      "held_out": true,
       "totals": {
         "calls": 1,
         "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1664,
-        "cost_usd": 0.025094,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
+        "input_tokens": 5244,
+        "output_tokens": 2291,
+        "cost_usd": 0.033398
       }
     },
     {
@@ -814,9 +730,9 @@
       "image": "701_z26c1-2",
       "answer_valid": true,
       "verdicts": {
-        "yes": 1,
-        "no": 50,
-        "unsure": 9,
+        "yes": 5,
+        "no": 43,
+        "unsure": 12,
         "unjudged": 0
       },
       "totals": {
@@ -825,9 +741,9 @@
         "invalid_attempts": 0,
         "call_errors": 0,
         "refusals": 0,
-        "input_tokens": 4227,
-        "output_tokens": 1638,
-        "cost_usd": 0.024834,
+        "input_tokens": 5244,
+        "output_tokens": 2211,
+        "cost_usd": 0.032598,
         "replay_request_mismatches": 0,
         "replay_picture_mismatches": 0,
         "stopped_on_cost": false
@@ -836,25 +752,13 @@
     {
       "group": "Hyp_HP",
       "image": "701_z36c1-2",
-      "answer_valid": true,
-      "verdicts": {
-        "yes": 1,
-        "no": 49,
-        "unsure": 10,
-        "unjudged": 0
-      },
+      "held_out": true,
       "totals": {
         "calls": 1,
         "attempts": 1,
-        "invalid_attempts": 0,
-        "call_errors": 0,
-        "refusals": 0,
-        "input_tokens": 4226,
-        "output_tokens": 1609,
-        "cost_usd": 0.024542,
-        "replay_request_mismatches": 0,
-        "replay_picture_mismatches": 0,
-        "stopped_on_cost": false
+        "input_tokens": 5243,
+        "output_tokens": 2217,
+        "cost_usd": 0.032656
       }
     }
   ]

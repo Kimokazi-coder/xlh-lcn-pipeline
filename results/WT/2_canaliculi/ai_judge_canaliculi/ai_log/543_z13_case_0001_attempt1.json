@@ -1,12 +1,12 @@
 {
   "schema": "lcn-ai-judge-log-1",
-  "written_at": "2026-10-19T16:05:43Z",
+  "written_at": "2026-11-09T18:50:47Z",
   "mode": "live",
   "image_label": "543_z13",
   "lacuna_id": 1,
   "case_id": "case_0001",
   "attempt": 1,
-  "picture": "results/ai_log/543_z13/pictures/case_0001.png",
+  "picture": "results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/pictures/543_z13_case_0001.png",
   "picture_sha256": "5317b094afe939b734038c67e11c36a655789e05e6370a4e2556bd02b7be139c",
   "prompt_sha256": "3d48d88ec823640a6557709f7cda262e94d2bc547fb0506802a31effee6ccf37",
   "examples_sha256": "393055e5c350e89be96bcb011582f5bee45c99fb5d6676992ce59765aeb446a0",
@@ -27,17 +27,17 @@
     }
   },
   "response": {
-    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"White thread just left of the body, in line with the red stubs 5 and 6 that run toward the yellow body.\"},\n  {\"n\": 2, \"owner\": \"yellow\", \"why\": \"White thread runs up-right toward the lower-left of the yellow body, ending at the glow edge near red 6.\"},\n  {\"n\": 3, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Red branching line leaves the top of the yellow body and continues upward into the yellow thread network.\"},\n  {\"n\": 4, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Short red line touches the upper-right edge of the yellow body and joins the yellow thread beyond.\"},\n  {\"n\": 5, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Red piece near the left of the body joins the yellow-owned thread and points at the yellow body.\"},\n  {\"n\": 6, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Red short line touches the lower-left edge of the yellow body and links to white thread 2.\"}\n]}",
-    "id": "msg_011CgBt5uyM1uzRDd2LBcm2a",
+    "text": "{\"segments\": [\n  {\"n\": 1, \"owner\": \"yellow\", \"why\": \"White thread running down-left from the yellow body's left side, in line with the neighbouring red stubs at the body edge.\"},\n  {\"n\": 2, \"owner\": \"yellow\", \"why\": \"White thread near the lower-left corner of the yellow body, running down-left away from it like the yellow threads.\"},\n  {\"n\": 3, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Red branching line leaves the top-left of the yellow body and continues up toward the white threads.\"},\n  {\"n\": 4, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Short red line on the right edge of the body, touching it and joining the yellow thread there.\"},\n  {\"n\": 5, \"verdict\": \"artifact\", \"owner\": \"none\", \"why\": \"Short curly piece in the glow on the left, not touching the body, with a wandering direction.\"},\n  {\"n\": 6, \"verdict\": \"real\", \"owner\": \"yellow\", \"why\": \"Red stub at the lower-left body edge, touching the outline and continuing into the thread beside it.\"}\n]}",
+    "id": "msg_011CgsrfDD1njRNf4JVEY7t8",
     "model": "claude-sonnet-5-5",
     "stop_reason": "end_turn",
     "thinking_fallback": false,
     "usage": {
       "input_tokens": 3768,
-      "output_tokens": 370
+      "output_tokens": 365
     }
   },
-  "cost_usd": 0.011236,
+  "cost_usd": 0.011186,
   "valid": true,
   "invalid_reason": null,
   "parsed": [
@@ -46,7 +46,7 @@
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 1,
-      "why": "White thread just left of the body, in line with the red stubs 5 and 6 that run toward the yellow body.",
+      "why": "White thread running down-left from the yellow body's left side, in line with the neighbouring red stubs at the body edge.",
       "verdict_asked_for": false,
       "verdict_in_the_answer": null
     },
@@ -55,7 +55,7 @@
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 1,
-      "why": "White thread runs up-right toward the lower-left of the yellow body, ending at the glow edge near red 6.",
+      "why": "White thread near the lower-left corner of the yellow body, running down-left away from it like the yellow threads.",
       "verdict_asked_for": false,
       "verdict_in_the_answer": null
     },
@@ -64,7 +64,7 @@
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 1,
-      "why": "Red branching line leaves the top of the yellow body and continues upward into the yellow thread network.",
+      "why": "Red branching line leaves the top-left of the yellow body and continues up toward the white threads.",
       "verdict_asked_for": true,
       "verdict_in_the_answer": "real"
     },
@@ -73,25 +73,25 @@
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 1,
-      "why": "Short red line touches the upper-right edge of the yellow body and joins the yellow thread beyond.",
+      "why": "Short red line on the right edge of the body, touching it and joining the yellow thread there.",
       "verdict_asked_for": true,
       "verdict_in_the_answer": "real"
     },
     {
       "n": 5,
-      "verdict": "real",
-      "owner": "yellow",
-      "owner_lacuna_id": 1,
-      "why": "Red piece near the left of the body joins the yellow-owned thread and points at the yellow body.",
+      "verdict": "artifact",
+      "owner": "none",
+      "owner_lacuna_id": null,
+      "why": "Short curly piece in the glow on the left, not touching the body, with a wandering direction.",
       "verdict_asked_for": true,
-      "verdict_in_the_answer": "real"
+      "verdict_in_the_answer": "artifact"
     },
     {
       "n": 6,
       "verdict": "real",
       "owner": "yellow",
       "owner_lacuna_id": 1,
-      "why": "Red short line touches the lower-left edge of the yellow body and links to white thread 2.",
+      "why": "Red stub at the lower-left body edge, touching the outline and continuing into the thread beside it.",
       "verdict_asked_for": true,
       "verdict_in_the_answer": "real"
     }

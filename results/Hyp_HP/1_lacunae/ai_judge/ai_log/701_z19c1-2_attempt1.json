@@ -1,17 +1,17 @@
 {
   "schema": "lcn-ai-lacuna-judge-log-1",
-  "written_at": "2026-10-27T16:34:44Z",
+  "written_at": "2026-11-09T18:31:29Z",
   "mode": "live",
   "image_label": "701_z19c1-2",
   "group": "Hyp_HP",
   "image_code": "img_c8338be9",
   "attempt": 1,
-  "picture": "results_ai_lacunae/Hyp_HP/ai_log/701_z19c1-2/701_z19c1-2_picture.png",
-  "picture_sha256": "2c4c7902c3b91739a0e88cd97b3bda4c90eb6605b2c6c77f18c9581a1d74a79a",
-  "prompt_sha256": "5a639cf96a54670ecc69090fad4befd585b2b2c72a9474123bd737ff4751a20c",
-  "examples_sha256": "46ec9b817506a78e49034ad203f7c4e69d950a9ae38853b5342a28fec3e7ec89",
-  "geometry_sha256": "bd8abfb9482e10d20dd977c18e92e8776ae6fd2742356c94594593773e42c477",
-  "request_sha256": "ff4fa1d2cbed662a83dcad37a9752b18dfadfabe16423b7e2d418a39cd4c6a01",
+  "picture": "results/Hyp_HP/1_lacunae/ai_judge/ai_log/701_z19c1-2_picture.png",
+  "picture_sha256": "7db56a4b85b36bf9d469b723fc4f2f121a7d83fc868296a0200f41140260a51b",
+  "prompt_sha256": "e99cf784716529f7f2e33fac94b9b71c7eb96f17e02b0174f6942fb29c190d8c",
+  "examples_sha256": "85c238d191afc4ebc85d155062347fa1092f49660e119123350f1499b0f6450d",
+  "geometry_sha256": "47afc652b719d0548e7345916428f622c0cbb443882aa67ffba27e58e1162824",
+  "request_sha256": "ec9d79e9bc61e6c06662d032c65ca6e5bcac5c03f8320227c24db3d9f21052e8",
   "request": {
     "model": "claude-sonnet-5-5",
     "max_tokens": 8000,
@@ -19,328 +19,388 @@
     "thinking": {
       "type": "between_tools"
     },
-    "system_sha256": "030357bf4209ab568bb8714ca918058d3b19a62c6dec2a0230a92b83e0c387d2",
-    "user_text": "Image img_c8338be9. The picture is two panels of the same field, 1024 x 1024 px each, at the image's own pixels: LEFT the image with nothing drawn on it, RIGHT the same image with 60 candidate regions outlined in yellow and numbered 1 to 60.\n\nFor every number from 1 to 60, say whether the region inside that outline is an osteocyte lacuna: \"yes\", \"no\" or \"unsure\". Answer in one json object.",
+    "system_sha256": "4b246d99d93e5a1bbd0fc038fbed48896d20115a1e0e64509e2fa11a2f9f2d03",
+    "user_text": "Image img_c8338be9. The picture is two panels of the same field, 1024 x 1024 px each, at the image's own pixels: LEFT the image with nothing drawn on it, RIGHT the same image with 60 candidate regions outlined in yellow and numbered 1 to 60.\n\nFor every number from 1 to 60, say whether the region inside that outline is an osteocyte lacuna: \"yes\", \"no\" or \"unsure\", with the reason code that goes with it. Answer in one json object.",
     "image": {
       "media_type": "image/png",
-      "sha256": "2c4c7902c3b91739a0e88cd97b3bda4c90eb6605b2c6c77f18c9581a1d74a79a",
-      "bytes": 1073640
+      "sha256": "7db56a4b85b36bf9d469b723fc4f2f121a7d83fc868296a0200f41140260a51b",
+      "bytes": 1034905
     }
   },
   "response": {
-    "text": "{\"regions\": [\n{\"n\":1,\"verdict\":\"no\",\"why\":\"edge fragment at top, no clear body\"},\n{\"n\":2,\"verdict\":\"no\",\"why\":\"large bright tissue patch at edge\"},\n{\"n\":3,\"verdict\":\"no\",\"why\":\"large bright soft tissue patch\"},\n{\"n\":4,\"verdict\":\"no\",\"why\":\"small thin fragment\"},\n{\"n\":5,\"verdict\":\"no\",\"why\":\"large bright tissue sheet\"},\n{\"n\":6,\"verdict\":\"unsure\",\"why\":\"bright ringed structure, possibly vessel or cell cluster\"},\n{\"n\":7,\"verdict\":\"no\",\"why\":\"tiny speck\"},\n{\"n\":8,\"verdict\":\"no\",\"why\":\"edge tissue patch\"},\n{\"n\":9,\"verdict\":\"no\",\"why\":\"tiny speck\"},\n{\"n\":10,\"verdict\":\"no\",\"why\":\"large tissue patch at edge\"},\n{\"n\":11,\"verdict\":\"unsure\",\"why\":\"part of ringed bright structure\"},\n{\"n\":12,\"verdict\":\"no\",\"why\":\"elongated band fragment\"},\n{\"n\":13,\"verdict\":\"no\",\"why\":\"small elongated fragment split from neighbor\"},\n{\"n\":14,\"verdict\":\"no\",\"why\":\"piece split off from neighbor\"},\n{\"n\":15,\"verdict\":\"no\",\"why\":\"large tissue patch\"},\n{\"n\":16,\"verdict\":\"no\",\"why\":\"small fragment\"},\n{\"n\":17,\"verdict\":\"unsure\",\"why\":\"small compact body, dim\"},\n{\"n\":18,\"verdict\":\"no\",\"why\":\"thin fragment\"},\n{\"n\":19,\"verdict\":\"unsure\",\"why\":\"small bright body, possibly lacuna\"},\n{\"n\":20,\"verdict\":\"no\",\"why\":\"small thin fragment\"},\n{\"n\":21,\"verdict\":\"no\",\"why\":\"large bright tissue mass with internal structure\"},\n{\"n\":22,\"verdict\":\"no\",\"why\":\"thin fragment\"},\n{\"n\":23,\"verdict\":\"no\",\"why\":\"thin streak\"},\n{\"n\":24,\"verdict\":\"unsure\",\"why\":\"elongated dim body\"},\n{\"n\":25,\"verdict\":\"no\",\"why\":\"band-like bright sheet\"},\n{\"n\":26,\"verdict\":\"no\",\"why\":\"bright band at edge\"},\n{\"n\":27,\"verdict\":\"no\",\"why\":\"large sheet along bone surface\"},\n{\"n\":28,\"verdict\":\"no\",\"why\":\"edge fragment of large mass\"},\n{\"n\":29,\"verdict\":\"unsure\",\"why\":\"small dim body\"},\n{\"n\":30,\"verdict\":\"unsure\",\"why\":\"small compact body\"},\n{\"n\":31,\"verdict\":\"no\",\"why\":\"tiny speck\"},\n{\"n\":32,\"verdict\":\"no\",\"why\":\"small fragment\"},\n{\"n\":33,\"verdict\":\"no\",\"why\":\"tiny speck\"},\n{\"n\":34,\"verdict\":\"no\",\"why\":\"thin streak\"},\n{\"n\":35,\"verdict\":\"no\",\"why\":\"part of large sheet\"},\n{\"n\":36,\"verdict\":\"no\",\"why\":\"tiny fragment\"},\n{\"n\":37,\"verdict\":\"no\",\"why\":\"large tissue patch\"},\n{\"n\":38,\"verdict\":\"unsure\",\"why\":\"moderate dim body with extensions\"},\n{\"n\":39,\"verdict\":\"no\",\"why\":\"thin fragment\"},\n{\"n\":40,\"verdict\":\"no\",\"why\":\"edge fragment\"},\n{\"n\":41,\"verdict\":\"no\",\"why\":\"small fragment\"},\n{\"n\":42,\"verdict\":\"no\",\"why\":\"small fragment\"},\n{\"n\":43,\"verdict\":\"unsure\",\"why\":\"small elongated bright body\"},\n{\"n\":44,\"verdict\":\"no\",\"why\":\"irregular fragment\"},\n{\"n\":45,\"verdict\":\"unsure\",\"why\":\"dim compact patch\"},\n{\"n\":46,\"verdict\":\"no\",\"why\":\"edge fragment\"},\n{\"n\":47,\"verdict\":\"no\",\"why\":\"small piece of larger region\"},\n{\"n\":48,\"verdict\":\"no\",\"why\":\"piece of larger body\"},\n{\"n\":49,\"verdict\":\"no\",\"why\":\"thin streak\"},\n{\"n\":50,\"verdict\":\"no\",\"why\":\"large irregular tissue patch\"},\n{\"n\":51,\"verdict\":\"no\",\"why\":\"fragment adjacent to larger region\"},\n{\"n\":52,\"verdict\":\"no\",\"why\":\"irregular thin fragment\"},\n{\"n\":53,\"verdict\":\"no\",\"why\":\"dim irregular fragment\"},\n{\"n\":54,\"verdict\":\"no\",\"why\":\"dim ragged fragment\"},\n{\"n\":55,\"verdict\":\"no\",\"why\":\"dim fragment\"},\n{\"n\":56,\"verdict\":\"unsure\",\"why\":\"bright irregular body with processes\"},\n{\"n\":57,\"verdict\":\"no\",\"why\":\"edge fragment\"},\n{\"n\":58,\"verdict\":\"no\",\"why\":\"large tissue patch\"},\n{\"n\":59,\"verdict\":\"no\",\"why\":\"large patch at bottom edge\"},\n{\"n\":60,\"verdict\":\"no\",\"why\":\"ragged tissue patch\"}\n]}",
-    "id": "msg_011CgT4mcZRNLTVfdxVQnui3",
+    "text": "{\"regions\": [\n{\"n\":1,\"verdict\":\"no\",\"reason\":\"saturated_border\",\"why\":\"bright piece cut by top edge of picture, no body shape\"},\n{\"n\":2,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"part of large diffuse bright tissue patch at top right\"},\n{\"n\":3,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small thin sliver at top edge\"},\n{\"n\":4,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small dim speck\"},\n{\"n\":5,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"tiny speck\"},\n{\"n\":6,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small thin crumb\"},\n{\"n\":7,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"part of diffuse bright patch with ring structure\"},\n{\"n\":8,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"piece of large bright tissue area at right edge\"},\n{\"n\":9,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"diffuse bright patch at left edge, no distinct body\"},\n{\"n\":10,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"part of diffuse bright patch around ring structure\"},\n{\"n\":11,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"elongated diffuse bright patch, part of tissue\"},\n{\"n\":12,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"small dim elongated body, split with 13\"},\n{\"n\":13,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small piece split from adjacent outline\"},\n{\"n\":14,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"large diffuse bright patch, not a cell body\"},\n{\"n\":15,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"compact small bright body\"},\n{\"n\":16,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"small dim elongated body\"},\n{\"n\":17,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"small dim body near tissue patch\"},\n{\"n\":18,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"small dim body, could be lacuna\"},\n{\"n\":19,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"small elongated bright body\"},\n{\"n\":20,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small thin dim crumb\"},\n{\"n\":21,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"irregular bright body with ragged edge\"},\n{\"n\":22,\"verdict\":\"no\",\"reason\":\"band\",\"why\":\"part of bright band at right edge\"},\n{\"n\":23,\"verdict\":\"no\",\"reason\":\"band\",\"why\":\"part of bright band running off right edge\"},\n{\"n\":24,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small dim sliver\"},\n{\"n\":25,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"compact irregular body with processes\"},\n{\"n\":26,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"small irregular body with processes\"},\n{\"n\":27,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"tiny speck on surface\"},\n{\"n\":28,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small piece next to large body\"},\n{\"n\":29,\"verdict\":\"no\",\"reason\":\"band\",\"why\":\"thin streak along fibre direction\"},\n{\"n\":30,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small piece split off large body\"},\n{\"n\":31,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"small compact bright body\"},\n{\"n\":32,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small speck\"},\n{\"n\":33,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"compact bright body with processes\"},\n{\"n\":34,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"small elongated dim body\"},\n{\"n\":35,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small dim sliver\"},\n{\"n\":36,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"piece cut by right edge\"},\n{\"n\":37,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small piece of elongated bright area\"},\n{\"n\":38,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"elongated bright body near surface band\"},\n{\"n\":39,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"elongated irregular body\"},\n{\"n\":40,\"verdict\":\"yes\",\"reason\":\"enlarged\",\"why\":\"large irregular dye-filled body\"},\n{\"n\":41,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"piece at right edge\"},\n{\"n\":42,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"tiny speck\"},\n{\"n\":43,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small crumb\"},\n{\"n\":44,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"thin elongated sliver\"},\n{\"n\":45,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small dim speck\"},\n{\"n\":46,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"elongated irregular body\"},\n{\"n\":47,\"verdict\":\"yes\",\"reason\":\"enlarged\",\"why\":\"large irregular dye-filled body with internal gap\"},\n{\"n\":48,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"ragged piece next to large body\"},\n{\"n\":49,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"elongated irregular bright shape\"},\n{\"n\":50,\"verdict\":\"yes\",\"reason\":\"lacuna\",\"why\":\"irregular bright body\"},\n{\"n\":51,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"ragged dim body\"},\n{\"n\":52,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small dim crumb\"},\n{\"n\":53,\"verdict\":\"unsure\",\"reason\":\"unsure\",\"why\":\"dim irregular body\"},\n{\"n\":54,\"verdict\":\"yes\",\"reason\":\"enlarged\",\"why\":\"large irregular dye-filled body with processes\"},\n{\"n\":55,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"piece at right edge\"},\n{\"n\":56,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"large diffuse bright patch at bottom\"},\n{\"n\":57,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"diffuse bright patch at bottom edge\"},\n{\"n\":58,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small piece at bottom edge\"},\n{\"n\":59,\"verdict\":\"no\",\"reason\":\"tissue\",\"why\":\"diffuse bright patch at bottom right\"},\n{\"n\":60,\"verdict\":\"no\",\"reason\":\"fragment\",\"why\":\"small piece cut by bottom edge\"}\n]}",
+    "id": "msg_011CgsqBsyWoCriLFErs7FRn",
     "model": "claude-sonnet-5-5",
     "stop_reason": "end_turn",
     "thinking_fallback": false,
     "usage": {
-      "input_tokens": 4227,
-      "output_tokens": 1664
+      "input_tokens": 5244,
+      "output_tokens": 2291
     }
   },
-  "cost_usd": 0.025094,
+  "cost_usd": 0.033398,
   "valid": true,
   "invalid_reason": null,
   "parsed": [
     {
       "n": 1,
       "verdict": "no",
-      "why": "edge fragment at top, no clear body"
+      "reason": "saturated_border",
+      "why": "bright piece cut by top edge of picture, no body shape"
     },
     {
       "n": 2,
       "verdict": "no",
-      "why": "large bright tissue patch at edge"
+      "reason": "tissue",
+      "why": "part of large diffuse bright tissue patch at top right"
     },
     {
       "n": 3,
       "verdict": "no",
-      "why": "large bright soft tissue patch"
+      "reason": "fragment",
+      "why": "small thin sliver at top edge"
     },
     {
       "n": 4,
       "verdict": "no",
-      "why": "small thin fragment"
+      "reason": "fragment",
+      "why": "small dim speck"
     },
     {
       "n": 5,
       "verdict": "no",
-      "why": "large bright tissue sheet"
+      "reason": "fragment",
+      "why": "tiny speck"
     },
     {
       "n": 6,
-      "verdict": "unsure",
-      "why": "bright ringed structure, possibly vessel or cell cluster"
+      "verdict": "no",
+      "reason": "fragment",
+      "why": "small thin crumb"
     },
     {
       "n": 7,
       "verdict": "no",
-      "why": "tiny speck"
+      "reason": "tissue",
+      "why": "part of diffuse bright patch with ring structure"
     },
     {
       "n": 8,
       "verdict": "no",
-      "why": "edge tissue patch"
+      "reason": "tissue",
+      "why": "piece of large bright tissue area at right edge"
     },
     {
       "n": 9,
       "verdict": "no",
-      "why": "tiny speck"
+      "reason": "tissue",
+      "why": "diffuse bright patch at left edge, no distinct body"
     },
     {
       "n": 10,
       "verdict": "no",
-      "why": "large tissue patch at edge"
+      "reason": "tissue",
+      "why": "part of diffuse bright patch around ring structure"
     },
     {
       "n": 11,
-      "verdict": "unsure",
-      "why": "part of ringed bright structure"
+      "verdict": "no",
+      "reason": "tissue",
+      "why": "elongated diffuse bright patch, part of tissue"
     },
     {
       "n": 12,
-      "verdict": "no",
-      "why": "elongated band fragment"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "small dim elongated body, split with 13"
     },
     {
       "n": 13,
       "verdict": "no",
-      "why": "small elongated fragment split from neighbor"
+      "reason": "fragment",
+      "why": "small piece split from adjacent outline"
     },
     {
       "n": 14,
       "verdict": "no",
-      "why": "piece split off from neighbor"
+      "reason": "tissue",
+      "why": "large diffuse bright patch, not a cell body"
     },
     {
       "n": 15,
-      "verdict": "no",
-      "why": "large tissue patch"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "compact small bright body"
     },
     {
       "n": 16,
-      "verdict": "no",
-      "why": "small fragment"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "small dim elongated body"
     },
     {
       "n": 17,
       "verdict": "unsure",
-      "why": "small compact body, dim"
+      "reason": "unsure",
+      "why": "small dim body near tissue patch"
     },
     {
       "n": 18,
-      "verdict": "no",
-      "why": "thin fragment"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "small dim body, could be lacuna"
     },
     {
       "n": 19,
-      "verdict": "unsure",
-      "why": "small bright body, possibly lacuna"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "small elongated bright body"
     },
     {
       "n": 20,
       "verdict": "no",
-      "why": "small thin fragment"
+      "reason": "fragment",
+      "why": "small thin dim crumb"
     },
     {
       "n": 21,
-      "verdict": "no",
-      "why": "large bright tissue mass with internal structure"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "irregular bright body with ragged edge"
     },
     {
       "n": 22,
       "verdict": "no",
-      "why": "thin fragment"
+      "reason": "band",
+      "why": "part of bright band at right edge"
     },
     {
       "n": 23,
       "verdict": "no",
-      "why": "thin streak"
+      "reason": "band",
+      "why": "part of bright band running off right edge"
     },
     {
       "n": 24,
-      "verdict": "unsure",
-      "why": "elongated dim body"
+      "verdict": "no",
+      "reason": "fragment",
+      "why": "small dim sliver"
     },
     {
       "n": 25,
-      "verdict": "no",
-      "why": "band-like bright sheet"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "compact irregular body with processes"
     },
     {
       "n": 26,
-      "verdict": "no",
-      "why": "bright band at edge"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "small irregular body with processes"
     },
     {
       "n": 27,
       "verdict": "no",
-      "why": "large sheet along bone surface"
+      "reason": "fragment",
+      "why": "tiny speck on surface"
     },
     {
       "n": 28,
       "verdict": "no",
-      "why": "edge fragment of large mass"
+      "reason": "fragment",
+      "why": "small piece next to large body"
     },
     {
       "n": 29,
-      "verdict": "unsure",
-      "why": "small dim body"
+      "verdict": "no",
+      "reason": "band",
+      "why": "thin streak along fibre direction"
     },
     {
       "n": 30,
-      "verdict": "unsure",
-      "why": "small compact body"
+      "verdict": "no",
+      "reason": "fragment",
+      "why": "small piece split off large body"
     },
     {
       "n": 31,
-      "verdict": "no",
-      "why": "tiny speck"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "small compact bright body"
     },
     {
       "n": 32,
       "verdict": "no",
-      "why": "small fragment"
+      "reason": "fragment",
+      "why": "small speck"
     },
     {
       "n": 33,
-      "verdict": "no",
-      "why": "tiny speck"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "compact bright body with processes"
     },
     {
       "n": 34,
-      "verdict": "no",
-      "why": "thin streak"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "small elongated dim body"
     },
     {
       "n": 35,
       "verdict": "no",
-      "why": "part of large sheet"
+      "reason": "fragment",
+      "why": "small dim sliver"
     },
     {
       "n": 36,
       "verdict": "no",
-      "why": "tiny fragment"
+      "reason": "fragment",
+      "why": "piece cut by right edge"
     },
     {
       "n": 37,
       "verdict": "no",
-      "why": "large tissue patch"
+      "reason": "fragment",
+      "why": "small piece of elongated bright area"
     },
     {
       "n": 38,
       "verdict": "unsure",
-      "why": "moderate dim body with extensions"
+      "reason": "unsure",
+      "why": "elongated bright body near surface band"
     },
     {
       "n": 39,
-      "verdict": "no",
-      "why": "thin fragment"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "elongated irregular body"
     },
     {
       "n": 40,
-      "verdict": "no",
-      "why": "edge fragment"
+      "verdict": "yes",
+      "reason": "enlarged",
+      "why": "large irregular dye-filled body"
     },
     {
       "n": 41,
       "verdict": "no",
-      "why": "small fragment"
+      "reason": "fragment",
+      "why": "piece at right edge"
     },
     {
       "n": 42,
       "verdict": "no",
-      "why": "small fragment"
+      "reason": "fragment",
+      "why": "tiny speck"
     },
     {
       "n": 43,
-      "verdict": "unsure",
-      "why": "small elongated bright body"
+      "verdict": "no",
+      "reason": "fragment",
+      "why": "small crumb"
     },
     {
       "n": 44,
       "verdict": "no",
-      "why": "irregular fragment"
+      "reason": "fragment",
+      "why": "thin elongated sliver"
     },
     {
       "n": 45,
-      "verdict": "unsure",
-      "why": "dim compact patch"
+      "verdict": "no",
+      "reason": "fragment",
+      "why": "small dim speck"
     },
     {
       "n": 46,
-      "verdict": "no",
-      "why": "edge fragment"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "elongated irregular body"
     },
     {
       "n": 47,
-      "verdict": "no",
-      "why": "small piece of larger region"
+      "verdict": "yes",
+      "reason": "enlarged",
+      "why": "large irregular dye-filled body with internal gap"
     },
     {
       "n": 48,
       "verdict": "no",
-      "why": "piece of larger body"
+      "reason": "fragment",
+      "why": "ragged piece next to large body"
     },
     {
       "n": 49,
-      "verdict": "no",
-      "why": "thin streak"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "elongated irregular bright shape"
     },
     {
       "n": 50,
-      "verdict": "no",
-      "why": "large irregular tissue patch"
+      "verdict": "yes",
+      "reason": "lacuna",
+      "why": "irregular bright body"
     },
     {
       "n": 51,
-      "verdict": "no",
-      "why": "fragment adjacent to larger region"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "ragged dim body"
     },
     {
       "n": 52,
       "verdict": "no",
-      "why": "irregular thin fragment"
+      "reason": "fragment",
+      "why": "small dim crumb"
     },
     {
       "n": 53,
-      "verdict": "no",
-      "why": "dim irregular fragment"
+      "verdict": "unsure",
+      "reason": "unsure",
+      "why": "dim irregular body"
     },
     {
       "n": 54,
-      "verdict": "no",
-      "why": "dim ragged fragment"
+      "verdict": "yes",
+      "reason": "enlarged",
+      "why": "large irregular dye-filled body with processes"
     },
     {
       "n": 55,
       "verdict": "no",
-      "why": "dim fragment"
+      "reason": "fragment",
+      "why": "piece at right edge"
     },
     {
       "n": 56,
-      "verdict": "unsure",
-      "why": "bright irregular body with processes"
+      "verdict": "no",
+      "reason": "tissue",
+      "why": "large diffuse bright patch at bottom"
     },
     {
       "n": 57,
       "verdict": "no",
-      "why": "edge fragment"
+      "reason": "tissue",
+      "why": "diffuse bright patch at bottom edge"
     },
     {
       "n": 58,
       "verdict": "no",
-      "why": "large tissue patch"
+      "reason": "fragment",
+      "why": "small piece at bottom edge"
     },
     {
       "n": 59,
       "verdict": "no",
-      "why": "large patch at bottom edge"
+      "reason": "tissue",
+      "why": "diffuse bright patch at bottom right"
     },
     {
       "n": 60,
       "verdict": "no",
-      "why": "ragged tissue patch"
+      "reason": "fragment",
+      "why": "small piece cut by bottom edge"
     }
   ]
 }

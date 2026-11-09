@@ -1,5 +1,7 @@
 # The AI thread judge (canaliculi judge), archived
 
+**Rerun on 2026-11-09 (method-freeze-v2).** The canaliculi judge now runs on every group, on the lacunae the lacuna judge accepted: its set is in `results/<group>/<section>/ai_judge_canaliculi/`, its log in `results/<group>/2_canaliculi/ai_judge_canaliculi/ai_log/`, its records in `results/archive/judge/` (docs/METHODS.md section 29). The text below describes the WT run of 2026-10-19 and the folders as they were then.
+
 **Archived on 2026-11-04.** Its files are in
 [`results/WT/5_archive/ai_judge/canaliculi_judge/`](../../WT/5_archive/ai_judge/canaliculi_judge/);
 until then they were the folder `results_ai_judge/`, the second of two labelled

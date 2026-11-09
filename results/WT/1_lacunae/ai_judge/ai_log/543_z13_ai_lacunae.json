@@ -1,18 +1,18 @@
 {
   "schema": "lcn-ai-lacuna-judge-decisions-1",
   "status": "EXPERIMENT, pre-validation, not validated. Which regions are lacunae was decided by an AI judge; every boundary is the lacuna stage's own. Applied only when config.AI_LACUNA_JUDGE_ENABLED is True.",
-  "written_at": "2026-10-27T16:30:18Z",
+  "written_at": "2026-11-09T18:26:10Z",
   "mode": "live",
   "image_label": "543_z13",
   "group": "WT",
   "image_code": "img_8aba8947",
   "provider": "anthropic",
   "model": "claude-sonnet-5-5",
-  "prompt_sha256": "5a639cf96a54670ecc69090fad4befd585b2b2c72a9474123bd737ff4751a20c",
-  "examples_sha256": "46ec9b817506a78e49034ad203f7c4e69d950a9ae38853b5342a28fec3e7ec89",
+  "prompt_sha256": "e99cf784716529f7f2e33fac94b9b71c7eb96f17e02b0174f6942fb29c190d8c",
+  "examples_sha256": "85c238d191afc4ebc85d155062347fa1092f49660e119123350f1499b0f6450d",
   "examples_present": true,
-  "request_sha256": "1e7aa56e9e7e7640e0f62f0a8f8307b85b3e28f12df7ec29369aecb067e83a54",
-  "picture": "results_ai_lacunae/WT/ai_log/543_z13/543_z13_picture.png",
+  "request_sha256": "fe8f0fee9f4a932fe9142e309b14d6e976178f0a06ffe82e953193e84d1c22bb",
+  "picture": "results/WT/1_lacunae/ai_judge/ai_log/543_z13_picture.png",
   "picture_sha256": "618895ea677442685dacc943f225ffedecd4b188d376e1e85717241adb835b12",
   "candidate_rule": {
     "lacuna_cut_t_hi": 0.60330882,
@@ -26,7 +26,9 @@
       "the dim candidates",
       "the regions they rejected under that area"
     ],
-    "priority_rejected_min_area_px2": 300
+    "priority_rejected_min_area_px2": 300,
+    "not_offered_above_excluded_share": 0.5,
+    "area_cap": null
   },
   "candidate_counts": {
     "candidates_found": 27,
@@ -42,7 +44,9 @@
     "numbered_kept_by_the_filters": 11,
     "numbered_rejected_by_the_filters": 1,
     "deterministic_lacunae": 11,
-    "kept_lacunae_that_are_no_candidate": 0
+    "kept_lacunae_that_are_no_candidate": 0,
+    "in_excluded_region": 0,
+    "in_excluded_region_dim": 0
   },
   "geometry_sha256": "21a3423f9e176724eebade84d27e29c6c795bf0df8973aeefcb02b890451c871",
   "answer_valid": true,
@@ -54,9 +58,9 @@
     "invalid_attempts": 0,
     "call_errors": 0,
     "refusals": 0,
-    "input_tokens": 4227,
-    "output_tokens": 895,
-    "cost_usd": 0.017404,
+    "input_tokens": 5244,
+    "output_tokens": 1163,
+    "cost_usd": 0.022118,
     "replay_request_mismatches": 0,
     "replay_picture_mismatches": 0,
     "stopped_on_cost": false
@@ -88,8 +92,10 @@
       "lacuna_class": null,
       "rejected_by": "area",
       "source_label": 2,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "small dim fragment on a process, not a compact body"
+      "reason": "fragment",
+      "why": "small dim speck on a canalicular thread, no body"
     },
     {
       "n": 2,
@@ -111,8 +117,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 1,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "large bright elongated osteocyte body with process"
+      "reason": "lacuna",
+      "why": "bright elongated dye-filled body with processes"
     },
     {
       "n": 3,
@@ -134,8 +142,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "tiny speck along canaliculi"
+      "reason": "fragment",
+      "why": "tiny speck among canaliculi"
     },
     {
       "n": 4,
@@ -157,7 +167,9 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 3,
+      "excluded_share": 0.0,
       "verdict": "yes",
+      "reason": "lacuna",
       "why": "bright compact elongated body"
     },
     {
@@ -180,8 +192,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "tiny fragment"
+      "reason": "fragment",
+      "why": "tiny speck"
     },
     {
       "n": 6,
@@ -203,8 +217,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 5,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "bright irregular body with processes"
+      "reason": "lacuna",
+      "why": "bright irregular body with halo of processes"
     },
     {
       "n": 7,
@@ -226,7 +242,9 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 6,
+      "excluded_share": 0.0,
       "verdict": "yes",
+      "reason": "lacuna",
       "why": "compact bright body with processes"
     },
     {
@@ -249,7 +267,9 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
+      "reason": "fragment",
       "why": "tiny speck"
     },
     {
@@ -272,8 +292,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "thin segment of canaliculus"
+      "reason": "fragment",
+      "why": "small thread segment, no body"
     },
     {
       "n": 10,
@@ -295,8 +317,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "dim ragged patch, no clear body"
+      "reason": "tissue",
+      "why": "dim ragged diffuse patch, no clear body"
     },
     {
       "n": 11,
@@ -318,8 +342,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "small streak at image edge"
+      "reason": "fragment",
+      "why": "small sliver at edge"
     },
     {
       "n": 12,
@@ -341,8 +367,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "tiny thin fragment"
+      "reason": "fragment",
+      "why": "small thread piece"
     },
     {
       "n": 13,
@@ -364,7 +392,9 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
+      "reason": "fragment",
       "why": "tiny speck"
     },
     {
@@ -387,8 +417,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "unsure",
-      "why": "dim diffuse patch, possibly out-of-focus lacuna"
+      "reason": "unsure",
+      "why": "dim out-of-focus blob, possibly a deeper lacuna"
     },
     {
       "n": 15,
@@ -410,8 +442,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 18,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "bright compact elongated osteocyte body"
+      "reason": "lacuna",
+      "why": "bright elongated dye-filled body"
     },
     {
       "n": 16,
@@ -433,8 +467,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 20,
+      "excluded_share": 0.0,
       "verdict": "unsure",
-      "why": "dim hazy body, possibly out-of-focus lacuna"
+      "reason": "unsure",
+      "why": "dim diffuse body with radiating processes, possibly out of focus lacuna"
     },
     {
       "n": 17,
@@ -456,7 +492,9 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
+      "reason": "fragment",
       "why": "tiny speck"
     },
     {
@@ -479,8 +517,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "thin streak at edge"
+      "reason": "fragment",
+      "why": "thin sliver at edge"
     },
     {
       "n": 19,
@@ -502,8 +542,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 21,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "bright elongated osteocyte body"
+      "reason": "lacuna",
+      "why": "bright elongated dye-filled body"
     },
     {
       "n": 20,
@@ -525,7 +567,9 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
+      "reason": "fragment",
       "why": "small speck"
     },
     {
@@ -548,8 +592,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 25,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "large bright osteocyte body"
+      "reason": "lacuna",
+      "why": "large bright elongated body with processes"
     },
     {
       "n": 22,
@@ -571,7 +617,9 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
+      "reason": "fragment",
       "why": "tiny speck"
     },
     {
@@ -594,8 +642,10 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "tiny speck"
+      "reason": "fragment",
+      "why": "tiny speck at edge"
     },
     {
       "n": 24,
@@ -617,8 +667,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 32,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "bright compact body with process"
+      "reason": "lacuna",
+      "why": "compact bright elongated body"
     },
     {
       "n": 25,
@@ -640,8 +692,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 36,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "bright elongated body"
+      "reason": "lacuna",
+      "why": "compact bright elongated body"
     },
     {
       "n": 26,
@@ -663,8 +717,10 @@
       "lacuna_class": "ordinary",
       "rejected_by": null,
       "source_label": 38,
+      "excluded_share": 0.0,
       "verdict": "yes",
-      "why": "large bright body with processes"
+      "reason": "enlarged",
+      "why": "large bright irregular dye-filled body"
     },
     {
       "n": 27,
@@ -686,9 +742,12 @@
       "lacuna_class": null,
       "rejected_by": "under the lacuna cut",
       "source_label": null,
+      "excluded_share": 0.0,
       "verdict": "no",
-      "why": "thin fragment along canaliculus"
+      "reason": "fragment",
+      "why": "thin sliver, no body"
     }
   ],
-  "not_numbered_keep_the_deterministic_decision": []
+  "not_numbered_keep_the_deterministic_decision": [],
+  "in_excluded_region_not_offered": []
 }
