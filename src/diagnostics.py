@@ -8986,6 +8986,17 @@ def _ai_lacuna_self_test(images: list, v2_image: Path) -> int:
               f"{v['unjudged']} unjudged; {t['invalid_attempts']} of {t['attempts']} attempts "
               f"were bad json")
         checks.append(("the stub answered and the answer validated", run["answer_valid"]))
+        # The reason codes (prompt of 2026-11-09): each must go with its verdict,
+        # and the prompt must name every code the parser accepts.
+        ok_answer, _ = ai_judge.parse_lacuna_answer(json.dumps({"regions": [
+            {"n": 1, "verdict": "yes", "reason": "enlarged", "why": "x"}]}), [1])
+        bad_answer, bad_why = ai_judge.parse_lacuna_answer(json.dumps({"regions": [
+            {"n": 1, "verdict": "no", "reason": "enlarged", "why": "x"}]}), [1])
+        codes = [c for cs in ai_judge.LACUNA_REASONS.values() for c in cs]
+        checks.append(("a reason that does not go with its verdict is refused, and the prompt names every "
+                       "reason code", ok_answer is not None and ok_answer[0]["reason"] == "enlarged"
+                       and bad_answer is None and "reason" in bad_why
+                       and all(f'"{c}"' in prompt["system"] for c in codes)))
         checks.append(("a bad answer was retried once", t["attempts"] == 2
                        and t["invalid_attempts"] == 1))
         logged = [json.loads(ai_judge.lacuna_attempt_path(group, label, a).read_text(
@@ -9271,6 +9282,7 @@ def _ai_lacuna_review_image(path_str: str) -> dict:
                         "area_px2": e["area_px2"], "centroid_x": e["centroid_xy"][0],
                         "centroid_y": e["centroid_xy"][1], "deterministic": e["deterministic"],
                         "rejected_by": e["rejected_by"], "verdict": verdict,
+                        "reason": (item or {}).get("reason", ""),
                         "why": item["why"] if item else "",
                         "result": ("lacuna" if verdict == "yes" else "not a lacuna"
                                    if verdict == "no" else e["deterministic"])})

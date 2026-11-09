@@ -578,6 +578,12 @@ number is `main`'s: `regression` PASS over 6,800 numbers at tolerance 0 in both 
 `reference-check` PASS at 161.00 / 21.63 / 8.50, on 2026-10-27. METHODS section 23 is the short
 version, with every decision taken where the brief left a choice open.
 
+**Rerun at method-freeze-v2 (2026-11-09).** What follows describes the first version and its run of
+2026-10-27. Since 2026-11-09 the prompt follows the working POL definition (enlarged lacunae and
+clusters are kept; only fragments, band, tissue and saturated border pieces are rejected), every
+answer carries a reason code, a region mostly in the excluded region is not offered, and both judges
+were run again on all four groups: METHODS section 29 and `results/archive/judge/`.
+
 External API use approved on 2026-10-15, approver: Karim
 
 ## What it is for, and what it does and does not do

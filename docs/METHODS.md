@@ -2300,3 +2300,69 @@ pipeline switch, its replay and self tests read the logs, and its rerun is
 still to come), the reports, audits and review records that the frozen rules
 rest on, and the format test of the input TIFFs.
 
+
+## 29. The AI judge rerun at method-freeze-v2 (2026-11-09)
+
+**Status: pre-validation, NOT VALIDATED.** The AI judges (sections 20 and 23)
+were run again on all 35 images at tag `method-freeze-v2`, with the lacuna
+judge updated to the working POL definition (24.0). The deterministic method
+and its results are unchanged: every switch of the judges is on only inside
+the commands that make the judge-on sets. Progress and the report:
+`results/archive/judge/PROGRESS_JUDGE.md` and `REPORT_JUDGE.md`.
+
+### 29.1 The lacuna judge under the working POL definition
+
+The prompt (`src/judge_prompt_lacunae.md`) and the rules in words
+(`docs/judge_examples_lacunae.md`) now say, before anything else, that an
+enlarged, irregular, dye-filled lacuna is what a POL looks like and must be
+kept, and that an outline holding two or more merged lacunae (a cluster) is a
+lacuna. Only four kinds of region are rejected: fragments (specks, crumbs,
+small pieces split off a body), band pieces, tissue pieces (soft tissue,
+vessels, diffuse patches with no body) and saturated border pieces. Before,
+the prompt also rejected "vessels and large saturated areas" and "outlines
+that cut a body in pieces" in general, which could reject an enlarged lacuna.
+Every answer now carries a reason code that goes with its verdict: yes with
+`lacuna`, `enlarged` or `cluster`; no with `fragment`, `band`, `tissue` or
+`saturated_border`; unsure with `unsure`. An answer whose reason does not go
+with its verdict is refused like any malformed answer (one retry, then
+unjudged). The switch reads the verdict only: a reason never changes which
+regions are lacunae; it is there so the report can say why.
+
+Two rules of method-freeze-v2 now hold inside the judge as well:
+
+- **No area cap.** The judge layer has no size limit of its own (the 300 um2
+  band rule g8 is off), and an enlarged lacuna or a cluster is offered like any
+  other region.
+- **The excluded region decides first.** A candidate (rejected region or dim
+  candidate) with more than `config.EXCLUDED_OBJECT_MAX_SHARE` (0.5) of its
+  area in the excluded region (27.2) is not offered to the judge and keeps the
+  deterministic decision, not a lacuna. So no verdict can bring back an object
+  the structure rule dropped. Such regions are listed in each decision file
+  (`in_excluded_region_not_offered`). The lacuna stage cache
+  (`.cache/ai_lacuna_candidates/`, schema 2) holds the excluded region for this.
+- **Clusters stay flagged.** The cluster flag is computed by quantification
+  from each kept lacuna's outline, judge on or off, so a cluster the judge
+  keeps is flagged as before; a region the judge adds is the class `judged`
+  and has no shape measure, so it carries no cluster flag (as for `dim`).
+
+The self-test (`python src/diagnostics.py ai-lacuna-judge -s`) runs on 543_3
+(it ran on 543-2, a held-out image refused in DEV mode since 2026-11-05) and
+adds the method-freeze-v2 checks on I534_z25c1-2, a development image with an
+excluded region and two clusters: with every verdict yes, every numbered
+region is a lacuna whatever its size, no lacuna lies mostly in the excluded
+region, and every cluster the deterministic method flags is still flagged.
+The check over real images above the numbering cap now passes when no cached
+image is over the cap and fails only when one leaves a kept lacuna
+unnumbered (it failed as 26 of 27 because, with the cache keyed on the old
+settings, no image was found over the cap). It never reads a held-out image.
+
+### 29.3 The judge-on POL section
+
+`results/<group>/3_pols/ai_judge/` holds the POL section of the judge-on set:
+the same pictures, tables and POL metrics as `3_pols/`, made by the same code
+(`python src/pols.py all --set ai_judge`) from the lacunae the lacuna judge
+accepted (`4_quantification/ai_judge/`). The ratios are against the WT median
+of the judge-on set, so each method is measured against its own reference
+group; no summary across groups is written for the set. A region the judge
+added has no area (class `judged`), so it counts in `n_lacunae` and nowhere
+else.

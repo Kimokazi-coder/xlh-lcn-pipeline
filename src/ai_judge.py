@@ -2378,18 +2378,28 @@ def lacuna_user_text(candidates: dict, drawn: dict) -> str:
             f"{width} x {height} px each, at the image's own pixels: LEFT the image with nothing "
             f"drawn on it, RIGHT the same image with {n} candidate regions outlined in yellow and "
             f"numbered 1 to {n}.\n\nFor every number from 1 to {n}, say whether the region inside "
-            f"that outline is an osteocyte lacuna: \"yes\", \"no\" or \"unsure\". Answer in one "
-            f"json object.")
+            f"that outline is an osteocyte lacuna: \"yes\", \"no\" or \"unsure\", with the reason "
+            f"code that goes with it. Answer in one json object.")
 
 
 LACUNA_VERDICTS = ("yes", "no", "unsure")
+# The reason codes of the prompt of 2026-11-09 (src/judge_prompt_lacunae.md),
+# per verdict: what kind of lacuna a yes is, which of the four rejected kinds
+# a no is. Report only: the switch reads the verdict alone, so a reason never
+# changes which regions are lacunae.
+LACUNA_REASONS = {
+    "yes": ("lacuna", "enlarged", "cluster"),
+    "no": ("fragment", "band", "tissue", "saturated_border"),
+    "unsure": ("unsure",),
+}
 
 
 def parse_lacuna_answer(text: str, numbers: list) -> tuple:
     """(answer, why it was refused). Strict, as the thread judge's parser is:
-    every number in the picture exactly once, no other number, and a verdict
-    that is exactly one of LACUNA_VERDICTS. Anything else is refused whole,
-    because a half read answer is a judgement nobody made."""
+    every number in the picture exactly once, no other number, a verdict that
+    is exactly one of LACUNA_VERDICTS and a reason that is one of
+    LACUNA_REASONS for that verdict. Anything else is refused whole, because a
+    half read answer is a judgement nobody made."""
     if not text or not text.strip():
         return None, "the answer was empty"
     body = text.strip()
@@ -2420,7 +2430,10 @@ def parse_lacuna_answer(text: str, numbers: list) -> tuple:
         verdict = str(item.get("verdict", "")).strip().lower()
         if verdict not in LACUNA_VERDICTS:
             return None, f"region {number} has verdict {item.get('verdict')!r}"
-        seen[number] = {"n": number, "verdict": verdict,
+        reason = str(item.get("reason", "")).strip().lower()
+        if reason not in LACUNA_REASONS[verdict]:
+            return None, f"region {number} has reason {item.get('reason')!r} with verdict {verdict!r}"
+        seen[number] = {"n": number, "verdict": verdict, "reason": reason,
                         "why": str(item.get("why", "")).strip()[:300]}
     missing = [n for n in numbers if n not in seen]
     if missing:
@@ -2750,6 +2763,7 @@ def judge_lacuna_image(prepared: dict, mode: str, out_path: Path | None = None,
     for entry in prepared["candidates"]:
         item = by_number.get(entry["n"])
         regions.append(dict(entry, verdict=item["verdict"] if item else "unjudged",
+                            reason=item["reason"] if item else "",
                             why=item["why"] if item else ""))
     verdict_counts = {v: sum(1 for r in regions if r["verdict"] == v)
                       for v in LACUNA_VERDICTS + ("unjudged",)}
@@ -2819,7 +2833,7 @@ def stub_lacuna_answerer(break_first: bool = True, every: str | None = None):
             body = "I looked at the picture and here is what I think, in prose."
         else:
             body = json.dumps({"regions": [
-                {"n": n, "verdict": verdict_of(n),
+                {"n": n, "verdict": verdict_of(n), "reason": LACUNA_REASONS[verdict_of(n)][0],
                  "why": "self-test, no judgement was made"} for n in range(1, count + 1)]})
         return {"text": body, "id": f"self-test-{tries[text]}",
                 "model": f"{config.AI_JUDGE_MODEL} (NOT CALLED: self-test stub)",

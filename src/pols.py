@@ -112,6 +112,27 @@ FILL_ALPHA = 0.7
 SCALE_BAR_UM = 10.0
 
 
+# The judge-on set (2026-11-09): the same section, made the same way from the
+# lacunae the AI lacuna judge accepted, in results/<group>/3_pols/ai_judge/. It
+# reads that set's quantification and label image (results/<group>/<section>/
+# ai_judge/), and its ratios are against the WT median of the same set, so
+# each method is measured against its own reference group.
+JUDGE_SET = config.AI_LACUNA_SUBFOLDER
+SETS = (JUDGE_SET,)
+JUDGE_PICTURE_CHECK_TABLE = config.ARCHIVE_ROOT / "judge" / "POL_PICTURE_CHECK_ai_judge.csv"
+
+
+def set_root(group: str, set_name: str | None = None) -> Path:
+    """The results root of a group, or of one of its result sets."""
+    group_root = config.RESULTS_ROOT / group
+    return config.result_set_root(group_root, set_name) if set_name else group_root
+
+
+def set_note(set_name: str | None) -> str:
+    """What a picture title adds for a result set; nothing for the method itself."""
+    return " AI lacuna judge on." if set_name == JUDGE_SET else ""
+
+
 # Numbers
 
 def _round(value):
@@ -159,13 +180,15 @@ def field_areas_um2(results_root: Path, label: str) -> tuple[float, float]:
     return w * h * UM2_PER_PX2, 0.0
 
 
-def wt_median_um2() -> float:
-    """Median area of every measured WT lacuna, pooled over the WT images."""
+def wt_median_um2(set_name: str | None = None) -> float:
+    """Median area of every measured WT lacuna, pooled over the WT images, of
+    the method itself or of one of its result sets."""
+    root = set_root(config.REFERENCE_GROUP, set_name)
     areas = [r["area_px2"] * UM2_PER_PX2
              for p in image_files(config.REFERENCE_GROUP)
-             for r in lacuna_records(config.RESULTS_DIR, lacunae.image_label(p)) if not r["flag"]]
+             for r in lacuna_records(root, lacunae.image_label(p)) if not r["flag"]]
     if not areas:
-        raise FileNotFoundError("no measured WT lacuna in results/WT/4_quantification/")
+        raise FileNotFoundError(f"no measured WT lacuna in {root}")
     return float(np.median(areas))
 
 
@@ -388,8 +411,8 @@ def render_picture(display: np.ndarray, labels: np.ndarray, rows: list[dict], wt
     return out, boxes
 
 
-def picture_title(group: str, label: str) -> str:
-    return f"{group} {label}: {LABEL}. Pre-validation, not a lesion call."
+def picture_title(group: str, label: str, set_name: str | None = None) -> str:
+    return f"{group} {label}: {LABEL}.{set_note(set_name)} Pre-validation, not a lesion call."
 
 
 # The POL outline picture (finishing brief, phase 4): every POL footprint, the
@@ -525,33 +548,35 @@ def read_excluded(results_root: Path, label: str, shape: tuple) -> np.ndarray:
 
 
 def save_outlines(image_path: Path, labels: np.ndarray, table: Path, excluded: np.ndarray, wt_median: float,
-                  metrics: dict, path: Path) -> None:
+                  metrics: dict, path: Path, set_name: str | None = None) -> None:
     """Draw the POL outline picture of one image from its table as written."""
     from PIL import Image  # noqa: PLC0415
 
     display, _channel = lacunae.load_channel(image_path)
     label = lacunae.image_label(image_path)
     picture = render_outlines(display, labels, read_table(table), excluded, wt_median,
-                              f"{image_path.parent.name} {label}: POL footprints. Pre-validation, "
-                              "not a lesion call.", metrics)
+                              f"{image_path.parent.name} {label}: POL footprints.{set_note(set_name)} "
+                              "Pre-validation, not a lesion call.", metrics)
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(picture).save(path)
     del display, picture
 
 
-def save_picture(image_path: Path, labels: np.ndarray, table: Path, wt_median: float, path: Path) -> None:
+def save_picture(image_path: Path, labels: np.ndarray, table: Path, wt_median: float, path: Path,
+                 set_name: str | None = None) -> None:
     """Draw the picture of one image from its table as written to disk."""
     from PIL import Image  # noqa: PLC0415
 
     display, _channel = lacunae.load_channel(image_path)
     picture, _boxes = render_picture(display, labels, read_table(table), wt_median,
-                                     picture_title(image_path.parent.name, lacunae.image_label(image_path)))
+                                     picture_title(image_path.parent.name, lacunae.image_label(image_path),
+                                                   set_name))
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(picture).save(path)
     del display, picture
 
 
-def check_picture(image_path: Path, results_root: Path, wt_median: float) -> dict:
+def check_picture(image_path: Path, results_root: Path, wt_median: float, set_name: str | None = None) -> dict:
     """The automatic check of one picture: it equals the picture drawn again
     from its table; outside the label and scale bar boxes, every changed pixel
     lies inside a lacuna mask; every measured lacuna is filled with its own
@@ -571,7 +596,7 @@ def check_picture(image_path: Path, results_root: Path, wt_median: float) -> dic
     with Image.open(picture_path) as im:
         saved = np.asarray(im.convert("RGB")).copy()
     again, boxes = render_picture(display, labels, rows, wt_median,
-                                  picture_title(image_path.parent.name, label))
+                                  picture_title(image_path.parent.name, label, set_name))
     h, w = labels.shape
     region = saved[TITLE_H:TITLE_H + h, :w]
     in_box = np.zeros((h, w), dtype=bool)
@@ -644,20 +669,56 @@ history (tag `method-freeze-v2`).
 """
 
 
-def write_readme(results_root: Path, group: str) -> Path:
+JUDGE_README = """# 3_pols/ai_judge: {group}
+
+{label_cap}, **with the AI lacuna judge on**. Pre-validation: no lesion is
+called here, and no verdict of the judge is validated.
+
+The same section as `3_pols/` beside this folder, made by the same code from
+the lacunae the AI lacuna judge accepted (`1_lacunae/ai_judge/`,
+`4_quantification/ai_judge/`): the judge was shown every candidate region of
+the lacuna stage and said which are lacunae, keeping enlarged lacunae and
+clusters under the working POL definition (docs/METHODS.md 24.0 and 29). It
+never draws a boundary, so every footprint is the lacuna stage's own outline.
+A region the judge added that the filters had rejected is the class `judged`
+and has no area (flag `no_area`), like the `dim` class.
+
+- `<image>_pols_outlines.png`: the POL footprints, as in `3_pols/`.
+- `<image>_pols_lacunar_size.png` and `.csv`: lacunar size per lacuna.
+- `pols_all_images.csv` and `.xlsx`: per image, the size statistics and the
+  POL metrics.
+- `contact_sheet.png`, `contact_sheet_outlines.png`: every picture, small.
+
+The ratios here are against the WT median of the judge-on set
+({wt_median:.2f} um2), so each method is measured against its own reference
+group. Made with the method at tag `method-freeze-v2` and the judge rerun of
+2026-11-09 by `python src/pols.py all --set ai_judge`. The judge off against
+judge on comparison is in `results/archive/judge/` and in the sheet "Judge on
+vs off" of `results/SUMMARY.xlsx`.
+"""
+
+
+def write_readme(results_root: Path, group: str, set_name: str | None = None,
+                 wt_median: float | None = None) -> Path:
     path = lacunae.group_path(results_root, config.SECTION_POLS, "README.md")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(README.format(group=group, label_cap=LABEL[0].upper() + LABEL[1:]), encoding="utf-8")
+    text = README if set_name is None else JUDGE_README
+    path.write_text(text.format(group=group, label_cap=LABEL[0].upper() + LABEL[1:], wt_median=wt_median or 0.0),
+                    encoding="utf-8")
     return path
 
 
-def measure_group(group: str, results_root: Path | None = None, wt_median: float | None = None) -> list[dict]:
+def measure_group(group: str, results_root: Path | None = None, wt_median: float | None = None,
+                  set_name: str | None = None) -> list[dict]:
     """Every image of one group: picture and table per image, the group table
-    and the contact sheet. Returns the image rows."""
+    and the contact sheet. Returns the image rows. With `set_name`, of that
+    result set of the group (JUDGE_SET: the AI lacuna judge on). A held-out
+    image is written in FINAL mode but its numbers are not printed."""
     from skimage.io import imread  # noqa: PLC0415
 
-    results_root = Path(results_root or config.RESULTS_ROOT / group)
-    wt_median = wt_median_um2() if wt_median is None else wt_median
+    results_root = Path(results_root or set_root(group, set_name))
+    wt_median = wt_median_um2(set_name) if wt_median is None else wt_median
+    held_out = lacunae.held_out_labels()
     image_rows, tiles, outline_tiles = [], [], []
     for image_path in image_files(group):
         label = lacunae.image_label(image_path)
@@ -670,29 +731,36 @@ def measure_group(group: str, results_root: Path | None = None, wt_median: float
         table = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_TABLE)
         write_csv(table, LACUNA_COLUMNS, rows)
         picture = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_PICTURE)
-        save_picture(image_path, labels, table, wt_median, picture)
+        save_picture(image_path, labels, table, wt_median, picture, set_name)
         analysed, excluded_um2 = field_areas_um2(results_root, label)
         image_rows.append({"status": LABEL, "group": group, "image": label, **stats(rows),
                            "WT_median_area_um2": _round(wt_median), **pol_metrics(rows, analysed, excluded_um2)})
         outlines = lacunae.result_path(results_root, label, config.SECTION_POLS, SUFFIX_OUTLINES)
         save_outlines(image_path, labels, table, read_excluded(results_root, label, labels.shape), wt_median,
-                      image_rows[-1], outlines)
+                      image_rows[-1], outlines, set_name)
         del labels
         gc.collect()
         tiles.append((label, picture))
         outline_tiles.append((label, outlines))
-        print(f"{group}/{label}: {image_rows[-1]['n']} measured, {image_rows[-1]['n_flagged']} flagged, "
-              f"median {image_rows[-1]['area_um2_median']} um2, POL area per analysed area "
-              f"{image_rows[-1]['pol_area_per_analysed_area']}")
+        if label in held_out:
+            print(f"{group}/{label}: written (held out, numbers not shown)")
+        else:
+            print(f"{group}/{label}: {image_rows[-1]['n']} measured, {image_rows[-1]['n_flagged']} flagged, "
+                  f"median {image_rows[-1]['area_um2_median']} um2, POL area per analysed area "
+                  f"{image_rows[-1]['pol_area_per_analysed_area']}")
     group_table = lacunae.group_path(results_root, config.SECTION_POLS, GROUP_TABLE)
     write_csv(group_table.with_suffix(".csv"), IMAGE_COLUMNS, image_rows)
-    write_xlsx(group_table.with_suffix(".xlsx"), IMAGE_COLUMNS, image_rows, notes(wt_median))
-    lacunae.save_contact_sheet(tiles, f"{group}: {LABEL}. Full size: 3_pols/<image>_{SUFFIX_PICTURE}.",
+    note = [] if set_name is None else [f"AI LACUNA JUDGE ON (result set {set_name}): the lacunae the judge "
+                                        "accepted; ratios against the WT median of this set."]
+    write_xlsx(group_table.with_suffix(".xlsx"), IMAGE_COLUMNS, image_rows, note + notes(wt_median))
+    where = "3_pols" if set_name is None else f"3_pols/{set_name}"
+    lacunae.save_contact_sheet(tiles, f"{group}: {LABEL}.{set_note(set_name)} Full size: {where}/<image>_"
+                                      f"{SUFFIX_PICTURE}.",
                                lacunae.group_path(results_root, config.SECTION_POLS, CONTACT_SHEET))
-    lacunae.save_contact_sheet(outline_tiles, f"{group}: POL footprints. Full size: 3_pols/<image>_"
-                                              f"{SUFFIX_OUTLINES}.",
+    lacunae.save_contact_sheet(outline_tiles, f"{group}: POL footprints.{set_note(set_name)} Full size: "
+                                              f"{where}/<image>_{SUFFIX_OUTLINES}.",
                                lacunae.group_path(results_root, config.SECTION_POLS, OUTLINES_CONTACT_SHEET))
-    write_readme(results_root, group)
+    write_readme(results_root, group, set_name, wt_median)
     return image_rows
 
 
@@ -744,13 +812,14 @@ def animal_summary(groups=config.GROUPS, wt_median: float | None = None) -> list
     return out
 
 
-def check(groups=config.GROUPS) -> int:
+def check(groups=config.GROUPS, set_name: str | None = None) -> int:
     """Every file of every group: present, and each per-lacuna table equal to
-    the json areas times 0.0169 and to the WT median ratio."""
-    wt_median = wt_median_um2()
+    the json areas times 0.0169 and to the WT median ratio. With `set_name`,
+    of that result set (which has no summary tables across groups)."""
+    wt_median = wt_median_um2(set_name)
     failed = 0
     for group in groups:
-        root = config.RESULTS_ROOT / group
+        root = set_root(group, set_name)
         for p in image_files(group):
             label = lacunae.image_label(p)
             want = lacuna_rows(lacuna_records(root, label), wt_median)
@@ -772,11 +841,12 @@ def check(groups=config.GROUPS) -> int:
             if not lacunae.group_path(root, config.SECTION_POLS, name).is_file():
                 print(f"{group:<7} {name:<26} missing file")
                 failed += 1
-    for table in (SUMMARY_TABLE, ANIMAL_TABLE):
+    for table in (SUMMARY_TABLE, ANIMAL_TABLE) if set_name is None else ():
         if not table.is_file():
             print(f"{table} missing")
             failed += 1
-    print(f"\n{'FAIL' if failed else 'PASS'}: lacunar size check, {failed} problem(s).")
+    print(f"\n{'FAIL' if failed else 'PASS'}: lacunar size check{f' ({set_name})' if set_name else ''}, "
+          f"{failed} problem(s).")
     return 1 if failed else 0
 
 
@@ -786,13 +856,14 @@ PICTURE_CHECK_COLUMNS = ["group", "image", "rows", "measured_rows", "filled", "f
                          "wrong_fill_ids", "flagged_filled_ids", "mask_area_differs_ids", "pass"]
 
 
-def check_pictures(groups=config.GROUPS) -> int:
-    """check_picture on every image of every group, one image at a time."""
-    wt_median = wt_median_um2()
+def check_pictures(groups=config.GROUPS, set_name: str | None = None) -> int:
+    """check_picture on every image of every group, one image at a time; with
+    `set_name`, of that result set, into JUDGE_PICTURE_CHECK_TABLE."""
+    wt_median = wt_median_um2(set_name)
     rows = []
     for group in groups:
         for image_path in image_files(group):
-            r = check_picture(image_path, config.RESULTS_ROOT / group, wt_median)
+            r = check_picture(image_path, set_root(group, set_name), wt_median, set_name)
             r["group"] = group
             for k in ("wrong_fill_ids", "flagged_filled_ids", "mask_area_differs_ids"):
                 r[k] = " ".join(str(i) for i in r[k])
@@ -800,9 +871,10 @@ def check_pictures(groups=config.GROUPS) -> int:
             print(f"{group:<7} {r['image']:<26} filled {r['filled']:>3} of {r['measured_rows']:>3} measured  "
                   f"{'PASS' if r['pass'] else 'FAIL'}", flush=True)
             gc.collect()
-    write_csv(PICTURE_CHECK_TABLE, PICTURE_CHECK_COLUMNS, rows)
+    table = PICTURE_CHECK_TABLE if set_name is None else JUDGE_PICTURE_CHECK_TABLE
+    write_csv(table, PICTURE_CHECK_COLUMNS, rows)
     failed = sum(not r["pass"] for r in rows)
-    print(f"\n{'FAIL' if failed else 'PASS'}: {len(rows) - failed} of {len(rows)} pictures. -> {PICTURE_CHECK_TABLE}")
+    print(f"\n{'FAIL' if failed else 'PASS'}: {len(rows) - failed} of {len(rows)} pictures. -> {table}")
     return 1 if failed else 0
 
 
@@ -828,6 +900,13 @@ def selftest() -> int:
     checks.append(("n counts the measured lacunae only", s["n"] == 2 and s["n_flagged"] == 2))
     checks.append(("mean and median of 16.9 and 33.8", s["area_um2_mean"] == 25.35 and s["area_um2_median"] == 25.35))
     checks.append(("90th percentile of the ratio", s["ratio_p90"] == 1.9))
+    checks.append(("the method's own titles are unchanged by the result set option",
+                   picture_title("WT", "x") == f"WT x: {LABEL}. Pre-validation, not a lesion call."
+                   and picture_title("WT", "x", JUDGE_SET) != picture_title("WT", "x")))
+    judged_path = lacunae.result_path(set_root("WT", JUDGE_SET), "x", config.SECTION_POLS, SUFFIX_TABLE)
+    checks.append(("the judge-on set lives in results/<group>/3_pols/ai_judge/",
+                   judged_path == config.RESULTS_ROOT / "WT" / config.SECTION_POLS / JUDGE_SET / f"x_{SUFFIX_TABLE}"
+                   and set_root("WT") == config.RESULTS_ROOT / "WT"))
     image = next(iter(image_files(config.REFERENCE_GROUP)), None)
     if image is not None:
         labels = np.zeros(lacunae.load_channel(image)[1].shape, dtype=np.int32)
@@ -897,31 +976,41 @@ def selftest() -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description=f"The POL section: {LABEL}.")
     sub = parser.add_subparsers(dest="command", required=True)
+    set_help = (f"A result set instead of the method itself: {JUDGE_SET} is the AI lacuna judge on, "
+                f"results/<group>/3_pols/{JUDGE_SET}/ (no summary tables across groups).")
     p = sub.add_parser("measure", help="One group: results/<group>/3_pols/.")
     p.add_argument("-d", "--dir", type=Path, required=True, help="A group folder of .tif images, e.g. data/WT_HP.")
     p.add_argument("-r", "--results", type=Path, default=None,
                    help="The group's results folder (default: results/<name of the input folder>).")
-    sub.add_parser("all", help="Every group, then results/summary/pols_lacunar_size_by_group.csv and "
-                               "pols_by_animal.csv.")
+    p.add_argument("--set", dest="set_name", choices=SETS, default=None, help=set_help)
+    p = sub.add_parser("all", help="Every group, then results/summary/pols_lacunar_size_by_group.csv and "
+                                   "pols_by_animal.csv.")
+    p.add_argument("--set", dest="set_name", choices=SETS, default=None, help=set_help)
     sub.add_parser("summary", help="Only results/summary/pols_lacunar_size_by_group.csv and pols_by_animal.csv.")
-    sub.add_parser("check", help="Every 3_pols file against the quantification jsons.")
+    p = sub.add_parser("check", help="Every 3_pols file against the quantification jsons.")
+    p.add_argument("--set", dest="set_name", choices=SETS, default=None, help=set_help)
     sub.add_parser("selftest", help="Checks on synthetic records.")
-    sub.add_parser("check-pictures", help="Every 3_pols picture, one image at a time: drawn from its table, "
-                                          "colour only inside the masks (results/archive/POL_PICTURE_CHECK.csv).")
+    p = sub.add_parser("check-pictures", help="Every 3_pols picture, one image at a time: drawn from its table, "
+                                              "colour only inside the masks (results/archive/POL_PICTURE_CHECK.csv).")
+    p.add_argument("--set", dest="set_name", choices=SETS, default=None, help=set_help)
     args = parser.parse_args()
+    set_name = getattr(args, "set_name", None)
     if args.command == "selftest":
         sys.exit(selftest())
     if args.command == "check-pictures":
-        sys.exit(check_pictures())
+        sys.exit(check_pictures(set_name=set_name))
     if args.command == "check":
-        sys.exit(check())
+        sys.exit(check(set_name=set_name))
     if args.command == "measure":
         group = Path(args.dir).resolve().name
-        measure_group(group, args.results)
+        measure_group(group, args.results, set_name=set_name)
     elif args.command == "all":
-        wt_median = wt_median_um2()
+        wt_median = wt_median_um2(set_name)
         for group in config.GROUPS:
-            measure_group(group, wt_median=wt_median)
+            measure_group(group, wt_median=wt_median, set_name=set_name)
+    if set_name is not None:
+        print(f"result set {set_name}: no summary tables across groups are written.")
+        return
     rows = group_summary()
     print(f"-> {SUMMARY_TABLE}")
     for r in rows:
