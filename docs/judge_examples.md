@@ -1,5 +1,5 @@
 <!--
-Worked rules and examples for the AI judge (branch exp-ai-layer,
+Worked rules and examples for the AI judge (the AI judge experiment (now in main),
 docs/EXPERIMENT_AI.md).
 
 src/ai_judge.py loads whatever is OUTSIDE these html comments into the fixed

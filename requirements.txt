@@ -1,7 +1,6 @@
 # Python 3.9.10 (tested). Pinned to the versions installed in the project venv on 2026-10-02.
 # src/ imports numpy, scipy, scikit-image, networkx, skan and openpyxl, and pillow for the QC overlay
-# of src/pols.py; scikit-image reads the TIFFs through imageio and tifffile; figures/ uses matplotlib
-# and pillow; experiments/ uses pandas.
+# of src/pols.py; scikit-image reads the TIFFs through imageio and tifffile.
 numpy==2.0.2
 scipy==1.13.1
 scikit-image==0.24.0
@@ -17,7 +16,7 @@ pandas==2.3.3
 statsmodels==0.14.4
 patsy==1.0.3
 
-# The AI judge experiment (branch exp-ai-layer, docs/EXPERIMENT_AI.md) needs the
+# The AI judge experiment (docs/EXPERIMENT_AI.md) needs the
 # official Anthropic SDK for a REAL call, and for nothing else: the candidates,
 # the pictures, the dry run, the replay and the self-test all work without it.
 # It is deliberately not pinned here, because no pipeline number depends on it

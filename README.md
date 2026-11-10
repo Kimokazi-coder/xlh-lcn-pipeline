@@ -82,7 +82,6 @@ and a `summary/`; every file keeps its image's label in its name
 | `results/G/<image>/ai_judges/` | the same four feature folders with the AI lacuna and POL judges on, their logs in `1_lacunae/ai_log/` and `3_pols/ai_log/`, made from the logs offline | `python src/diagnostics.py ai-lacuna-run --with-pol-judge`, `python src/pols.py all --set ai_judges`; `docs/EXPERIMENT_AI.md` |
 | `results/G/<image>/comparison/` | the two runs side by side for the lacunae, the canaliculi and the POLs, each with a panel of only what the AI changed, and the key numbers of both runs | `LCN_HOLDOUT_MODE=FINAL python src/key_results.py samples` |
 | `results/summary/` | every group side by side: `group_overview.csv` and `.xlsx`, `group_qc.csv`, `pols_lacunar_size_by_group.csv` | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc`, `python src/pols.py all` |
-| `results/archive/` | deleted on 2026-11-10 at the user's request (`docs/METHODS.md` section 31). It held the records of no one group: the final report (`REPORT_FINAL.md`), the look that the POL definition rests on (`pols/FINDINGS.md`, `pols/phase0_look/`), the format test (`format_test/`), the AI judges' run records, costs and reports (`ai_judge/`, `judge/`), `MOVE_MAP.csv`, the review loop (`REVIEW_LOOP.md`, `REPORT_LOOP.md`) and the bias audit (`audit/`). All of it is in git at commit `2933666` | `git restore -s 2933666 results/archive` brings it back |
 | `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (lacunar size), `make_figures.py` (the figures), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
 | `config.py` | paths, the layout, the biological limits, shared settings and the switches (all off by default) | |
 | `data/` | one folder per group: `WT/` with the 8 input images, and `WT_HP/`, `Hyp_RD/` and `Hyp_HP/` with 9 each, decoded from JPEG into lossless TIFF; `image_inventory.csv` lists every source file, what was done with it and the checksum of its pixels | `python src/diagnostics.py import-group -g GROUP -s SOURCE_FOLDER` |
@@ -174,7 +173,8 @@ python src/lacunae.py -d data/Hyp_HP; python src/canaliculi.py -d data/Hyp_HP; p
 ```
 
 A run with no `-o` writes to `results/<name of the input folder>/`, so each
-line writes its group's 1_lacunae, 2_canaliculi and 4_quantification. An image
+line writes each image's folder, `results/<group>/<image>/non_ai_run/`, with its 1_lacunae, 2_canaliculi and
+4_quantification, and the group's own files in `results/<group>/<section>/`. An image
 that fails is listed in the stage's section as
 `failed_images_<stage>.csv` and skipped, and the
 others carry on; a folder with no image writes nothing. Run time: the lacuna
@@ -305,27 +305,6 @@ networkx 3.2.1, skan 0.13.1, openpyxl 3.1.5, tifffile 2024.8.30). Run every
 command from the repository root, in this order. `-w N` runs the images of
 `src/lacunae.py` and `src/canaliculi.py` N at a time (the same files).
 
-**If `venv\Scripts\python.exe` hangs at start.** Twice, every start of the
-venv's launcher took exactly 300 s while the base interpreter started in 1 s:
-on 2026-11-05 from about 14:00, and on 2026-11-06 from about 10:45 (between
-the two it started in 2 s). Both times the system log shows a removal of USB
-storage: on 2026-11-05 a second USB drive (E:) dropping off and back on the
-bus from 14:16 to 15:30 (NTFS events 140, "failed to flush data to the
-transaction log", and 98) and an eject at 15:14; on 2026-11-06 an eject at
-10:44; each eject refused by the programs running from the drives (Kernel-PnP
-event 225). The repository and the venv launcher are on the USB drive F: (WD
-easystore), the base interpreter on C:, so after such an event a program
-started from F: stalls and one started from C: does not; the venv itself is
-not broken. To avoid it: do not eject or unplug the USB drives during a run,
-or move the venv to C: (a new venv, packages installed again from
-requirements.txt). If it happens, run the base interpreter as the venv, which
-is how Python starts venv worker processes anyway (Git Bash):
-
-```
-export __PYVENV_LAUNCHER__='F:\lcn-quant\venv\Scripts\python.exe'
-"/c/Program Files/Carl Zeiss/ZeissPython/Py22042.2/env/python.exe" src/lacunae.py -d data/WT
-```
-
 ```
 python src/lacunae.py -d data/WT            # feature 1: find and label the lacunae
 python src/canaliculi.py -d data/WT         # feature 2: trace the network
@@ -336,11 +315,13 @@ python src/pols.py measure -d data/WT       # 3_pols, lacunar size
 
 Detection draws and labels; quantification measures what detection saved, and
 every measured number is written only by it. Detection writes
-`results/WT/1_lacunae/` and `results/WT/2_canaliculi/`, every file named after its image: the overlay, the mask, the
+`results/WT/<image>/non_ai_run/1_lacunae/` and `results/WT/<image>/non_ai_run/2_canaliculi/`, every file named after its image: the overlay, the mask, the
 skeleton, the verification picture, the lacuna label image, the vascular mask,
 the graph with its ownership, and a record of what it did. Quantification reads
-those and writes every number into `results/WT/4_quantification/` and, for a
-folder run, `results/WT/4_quantification/quantification_all_images.xlsx`,
+those and writes every number of an image into
+`results/WT/<image>/non_ai_run/4_quantification/` (`<image>_quantification.xlsx`, `.json` and `.pdf`, one
+row per lacuna) and, for a folder run, the group table
+`results/WT/4_quantification/quantification_all_images.xlsx`,
 `.csv` and `.pdf`. `-o` picks another output folder for all three commands;
 without it a run writes to `results/<name of the input folder>/`, so
 `-d data/WT` writes `results/WT/`.
@@ -370,14 +351,14 @@ python src/diagnostics.py compare-methods -d data/WT     # both sets side by sid
 ```
 
 The AI lacuna judge, kept in each image's `results/<group>/<image>/ai_judges/`
-(its run records go to `results/archive/ai_judge/`), offline from its log (all four groups unless
+offline from its log (all four groups unless
 `-d` or `-i` names fewer):
 
 ```
 python src/diagnostics.py ai-lacuna-judge -w 20            # dry run: the pictures and the cost, sends nothing
 python src/diagnostics.py ai-lacuna-judge -s               # self-test with a stub judge: 27 checks
 python src/diagnostics.py ai-lacuna-judge -r -w 20   # the log replays to the same verdicts
-python src/diagnostics.py ai-lacuna-review -w 20           # contact sheets and the table, results/archive/ai_judge/review/
+python src/diagnostics.py ai-lacuna-review -w 20           # contact sheets and the table
 python src/diagnostics.py ai-lacuna-run --with-pol-judge -w 20   # the pipeline with both judges' verdicts, every image's ai_judges/
 ```
 
@@ -420,35 +401,14 @@ cell".
 
 ## Results
 
-`results/<group>/4_quantification/quantification_all_images.xlsx` (and `.csv`
-and `.pdf`) has one row per image of the group. Per-lacuna numbers are in
-`results/<group>/4_quantification/<image>_quantification.xlsx` (and `.json`, and
-`.pdf` to read), one row per lacuna with its shape and its network measures
-together. The table below is WT, the reference group.
-
-| image | lacunae (interior) | roots per cell, deterministic | AI judge | ring 30 px per cell (px), deterministic | AI judge | field density px⁻¹, deterministic | AI judge |
-|-|-|-|-|-|-|-|-|
-| 542_z06 | 19 (15) | 15.13 | 15.80 | 485.5 | 514.4 | 0.0399 | 0.0411 |
-| 542_z18 | 13 (11) | 11.82 | 12.45 | 478.1 | 517.9 | 0.0389 | 0.0396 |
-| 543-2 | 12 (12) | 8.50 | 9.00 | 369.6 | 410.2 | 0.0431 | 0.0437 |
-| 543_3 | 13 (12) | 7.00 | 8.17 | 325.6 | 411.4 | 0.0403 | 0.0436 |
-| 543_z13 | 11 (11) | 9.27 | 9.55 | 377.2 | 419.2 | 0.0430 | 0.0430 |
-| 682_z08 | 11 (9) | 12.33 | 13.67 | 463.1 | 492.8 | 0.0364 | 0.0367 |
-| 682_z23 | 14 (11) | 9.73 | 10.36 | 384.1 | 423.1 | 0.0392 | 0.0404 |
-| 682_z29 | 15 (13) | 7.85 | 8.23 | 312.9 | 343.7 | 0.0368 | 0.0374 |
-
-Interior means per cell; field density is skeleton px over analysed px. Both
-sets side by side, per lacuna and with the cell pairs whose tracing changed
-hands, were in `results/WT/2_canaliculi/ai_judge_canaliculi/compare/compare_methods.xlsx` (git history, commit `e915329`). With the judge
-on, roots per cell are counted only from the pipeline's own attachments; a
-verdict's attachment splits the network but is not a root (`docs/METHODS.md`
-section 20).
+Numbers are in results/SUMMARY.xlsx and results/summary/. Guide: results/HOW_TO_READ.md.
 
 The figures of every group are tracked: the network figure of each image in
-`results/<group>/2_canaliculi/`, the overview and cell gallery of each image and
-the group figures Fig01 to Fig04, S01 and S02 in `results/<group>/4_quantification/`;
+`results/<group>/<image>/non_ai_run/2_canaliculi/`, the overview and cell gallery of each image in
+`results/<group>/<image>/non_ai_run/4_quantification/`, and the group figures Fig01 to Fig04, S01 and S02 in
+`results/<group>/4_quantification/`;
 `python -u src/make_figures.py -g <group> all` redraws any that is missing. The
-pipeline's own stage pictures under `1_lacunae/` and `2_canaliculi/` are
+pipeline's own stage pictures under each image's `non_ai_run/1_lacunae/` and `non_ai_run/2_canaliculi/` are
 tracked too: the skeleton png is an input to `diagnostics.py validate-network`.
 There are no publication figures for the AI judge set, because its method has
 not been chosen.
@@ -473,13 +433,9 @@ not been chosen.
    filters kept over the four groups, including both objects of item 4, and
    some of the regions it removes look like lacunae on its contact sheets. None
    of its verdicts has been checked against a manual count.
-7. **POLs.** The images show no separate lesion zone
-   (`results/archive/pols/FINDINGS.md`), and the ring proxy that measured the
-   surround of each body is retired: it measured the dye glow, the same width in
-   WT. The POL section (`3_pols/` of every group) now shows a candidate measure,
-   lacunar size against the WT median, **pending definition**: what makes a
-   lacuna a POL, and whether size is the measure, are open (`src/pols.py`,
-   `docs/METHODS.md` section 24).
+7. **POLs.** POLs are measured with a working definition (docs/METHODS.md section 24,
+   results/summary/POL_SUMMARY.md). The definition is pending confirmation by
+   Dr. Murshed.
 
 Method, every parameter and its origin, limitations and decisions:
 [docs/METHODS.md](docs/METHODS.md). New here:

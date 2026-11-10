@@ -12,12 +12,11 @@ inspection of the WT images. No parameter may be tuned on the other groups.
 **Two methods, and the choice is pending.** Sections 1 to 19 describe the
 **deterministic method**, the pipeline as `config.py` ships it, whose output is
 `results/`, one folder per group. Section 20 describes the **AI judge method**, the same pipeline
-with `config.AI_JUDGE_ENABLED` on, whose output is `results/WT/<section>/ai_judge_canaliculi/`. Which
+with `config.AI_JUDGE_ENABLED` on, whose output is no longer in `results/` (in git history, commit `e915329`). Which
 the study uses has not been decided, and **neither has been validated against a
 manual trace**. Section 23 describes an experiment beside them, the **AI lacuna
 judge**, which decides which candidate regions are lacunae on all four groups,
-behind `config.AI_LACUNA_JUDGE_ENABLED` (off), into `results/archive/ai_judge/`; it is
-not validated either.
+behind `config.AI_LACUNA_JUDGE_ENABLED` (off); it is not validated either.
 
 **Units.** The pixel size is 0.13 um/px, from the confocal acquisition record,
 confirmed for all 8 images and rounded to two decimals. The pipeline reports
@@ -25,15 +24,14 @@ px and px² all the same: `PIXEL_SIZE_UM` is deliberately `None`, because it is
 recorded in every result's parameters block and switches every scale bar to
 micrometres, so setting it would change the recorded values and a fresh run
 would no longer equal `results/WT/` at tolerance 0. Convert with 0.13 um/px where
-a physical length is wanted; the experimental ridge method (section 7) works in
+a physical length is wanted; the ridge method works in
 micrometres throughout.
 
 **Data: four groups** (section 21): 8 wild-type (WT) confocal optical sections,
 the reference group (`data/WT/`, red channel, 1024 x 1024 px), and WT_HP,
 Hyp_RD and Hyp_HP with 9 sections each. **The pixels of all four groups are
-JPEG-decoded** (sections 21 and 22). No Hyp;Enpp1 image has been processed, and
-periosteocytic lesions (POLs) are not measured: these images show no separate
-lesion zone, and section 24 describes the proxy measured instead.
+JPEG-decoded** (sections 21 and 22). POLs are measured with a working
+definition (section 24). No Hyp;Enpp1 image is in the data yet.
 
 ## 1. Pipeline steps
 
@@ -58,6 +56,8 @@ computed in two places.
 
 It writes the outlines picture and the lacuna label image (0 outside a kept
 lacuna, its 1..N id inside), which is what the measures are taken from.
+Since 2026-11-05 the rescue rules are off and a fragment rule and a band rule
+apply (section 25).
 
 ### Feature 2: canalicular network, detection (`src/canaliculi.py`)
 
@@ -1037,6 +1037,14 @@ The tolerance was 2 px = 0.26 um, because a hand line and a skeleton of the
 same thread never agree pixel for pixel and a thread is about 6 px wide; the
 lacuna tolerance was 25 px = 3.25 um, well under the spacing between neighbours.
 
+Protocol, fixed on 2026-11-10 before any manual trace. Images: the 8 held-out
+images of data/holdout.json, traced by hand from the TIFFs in data/ without seeing
+the pipeline's output for them. Measure compared: roots per cell. Skeleton match
+tolerance 2 px (0.26 um); lacuna match tolerance 25 px (3.25 um). Reported:
+skeleton precision, recall and f1, and lacunae matched, missed and extra. The
+pipeline is frozen at the tag method-final-2026-11-10; no rule or value is changed
+after the comparison.
+
 ## 16. History
 
 Earlier experiments, reports and analyses are preserved at the git tag
@@ -1694,7 +1702,7 @@ from 1,045 to 1,482 over the 8 images; with the fix they are 1,113. With the
 switch off no edge is marked and every number is the deterministic method's.
 
 **What it does to the numbers**, over the 8 images
-(`results/WT/2_canaliculi/ai_judge_canaliculi/compare/compare_methods.xlsx`):
+(`results/WT/2_canaliculi/ai_judge_canaliculi/compare/compare_methods.xlsx` (git history, commit e915329)):
 
 | measure | deterministic | AI judge |
 | - | - | - |
@@ -1713,7 +1721,7 @@ pairs, as whole connected networks; no single cell takes over an image.
 **Reproducibility, cost and approval.** The model is pinned
 (`claude-sonnet-5-5`), no temperature is sent (the model rejects one) and
 thinking is off. Every request and answer is logged with its hash in
-`results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/`, with the case pictures that were actually sent, and
+`results/WT/2_canaliculi/ai_judge_canaliculi/ai_log/` (git history, commit e915329), with the case pictures that were actually sent, and
 the replay reruns the whole log offline to identical verdicts on all 8 images.
 The real run was made once, on 2026-10-19: **143 calls, $1.60**, against a dry
 run estimate of $1.19 and a ceiling of `config.MAX_COST_USD` = $5; one answer in
@@ -1733,7 +1741,7 @@ diet and HP high phosphorus. Each has its own folder in `data/` and in
 `results/`, with the same five sections inside (0_key_results, 1_lacunae,
 2_canaliculi, 3_pols, 4_quantification since 28; `results/README.md`), every file named
 after its image; the AI judge set holds WT only, archived in
-`results/WT/<section>/ai_judge_canaliculi/`.
+`results/WT/<section>/ai_judge_canaliculi/` (git history, commit e915329).
 
 **WT is the reference, and nothing is tuned on the others.** Every rule and value
 in sections 1 to 19 was chosen by visual inspection of the 8 WT images. The other
@@ -1864,7 +1872,7 @@ count, and nothing is recommended.
 
 **Status: EXPERIMENT, pre-validation, NOT VALIDATED.** No verdict has been
 checked against a manual count. Behind `config.AI_LACUNA_JUDGE_ENABLED`, off by
-default, so `results/` and `results/WT/<section>/ai_judge_canaliculi/` are untouched by it; its output is
+default, so `results/` and `results/WT/<section>/ai_judge_canaliculi/` (git history, commit e915329) are untouched by it; its output is
 `results/archive/ai_judge/`. The full write-up is in
 [docs/EXPERIMENT_AI.md](EXPERIMENT_AI.md), "The lacuna judge".
 
@@ -2129,7 +2137,7 @@ Every count is an AI reviewer's single look at a crop. Not validated.
 
 Also on 2026-11-06: `reference-check` moved to 543_3 (section 13), and the AI
 judges' results moved from `5_archive/` into the sections of their group,
-`<section>/ai_judge/` and, for the thread judge, `<section>/ai_judge_canaliculi/`
+`<section>/ai_judge/` and, for the thread judge, `<section>/ai_judge_canaliculi/` (git history, commit e915329)
 (`results/archive/MOVE_MAP.csv`); `config.result_set_root` and
 `lacunae.section_folder` let the judge runs read and write there.
 
@@ -2361,7 +2369,7 @@ settings, no image was found over the cap). It never reads a held-out image.
 The canaliculi (thread) judge of section 20 ran on WT only. Since 2026-11-09
 it runs on every group, unchanged (same prompt, `src/judge_prompt.md`, same
 candidates, pictures and assembly), with its log per group in
-`results/<group>/2_canaliculi/ai_judge_canaliculi/ai_log/` (the group of an
+`results/<group>/2_canaliculi/ai_judge_canaliculi/ai_log/` (git history, commit e915329) (the group of an
 image is the data folder that holds it). It is run **on the lacunae the lacuna
 judge accepted** (`ai-judge --with-lacuna-judge`): the lacuna judge's switch is
 on in that process, so the cases and pictures are built around the judged
@@ -2371,7 +2379,7 @@ switches on. So the judge-on result is the whole judge layer:
 | set | lacunae | threads |
 | - | - | - |
 | `<section>/ai_judge/` | lacuna judge | deterministic, traced on the accepted lacunae |
-| `<section>/ai_judge_canaliculi/` | lacuna judge (the same lacunae) | canaliculi judge |
+| `<section>/ai_judge_canaliculi/` (git history, commit e915329) | lacuna judge (the same lacunae) | canaliculi judge |
 
 The cost ceiling of a canaliculi judge run is now over the whole run, not per
 image (`--max-cost`, default `config.MAX_COST_USD` = $5): an image whose
@@ -2409,7 +2417,7 @@ was stopped once by the API's billing error ("credit balance too low"),
 partway through two images. After the user topped up the credit, the four
 unfinished images were run (about $0.36 paid twice). Both judges replay
 offline to identical verdicts on all 35 images. Judge-on sets:
-`<section>/ai_judge/` (lacuna judge) and `<section>/ai_judge_canaliculi/`
+`<section>/ai_judge/` (lacuna judge) and `<section>/ai_judge_canaliculi/` (git history, commit e915329)
 (both judges), in every group, and `3_pols/ai_judge/`.
 
 On the 27 development images (`python src/diagnostics.py judge-compare`,
@@ -2434,7 +2442,7 @@ Not validated. Report: `results/archive/judge/REPORT_JUDGE.md`.
 **Status: pre-validation, NOT VALIDATED.** A third judge, added at the
 user's request after the rerun of section 29. It acts only on the lacuna
 judge's set (`<section>/ai_judge/`): the deterministic method, and the both
-judges set (`<section>/ai_judge_canaliculi/`), are not changed by it. Switch
+judges set (`<section>/ai_judge_canaliculi/` (git history, commit e915329)), are not changed by it. Switch
 `config.AI_POL_JUDGE_ENABLED`, off by default; it needs the lacuna judge's
 switch on as well. Prompt `src/judge_prompt_pols.md`, rules in words
 `docs/judge_examples_pols.md`, both built on the working POL definition (24.0).

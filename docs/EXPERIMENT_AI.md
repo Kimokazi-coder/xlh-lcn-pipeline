@@ -17,7 +17,7 @@ lacuna and POL judges' set is in `results/<group>/<image>/ai_judges/<section>/`,
 set and log are no longer in `results/` (in git history at commit `e915329`); a new run of that
 judge would write to `results/<group>/<image>/ai_judge_canaliculi/`.
 
-**Status: EXPERIMENT. Branch `exp-ai-layer` only. Not merged, not validated, not used for any
+**Status: EXPERIMENT. The AI judge experiment (now in main), off by default. Not validated, not used for any
 result. NOTHING IN THIS FILE IS VALIDATED.** No verdict here has been checked against a manual
 trace, no number here has been compared with ground truth, and no result in `results/` was made with
 any of it. What is established is that the machinery does what it says, not that what it says is
