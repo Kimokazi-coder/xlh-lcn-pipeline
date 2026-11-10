@@ -96,16 +96,15 @@ The repository holds `README.md`, `config.py`, `requirements.txt`,
 | `docs/` | this page, `METHODS.md`, `EXPERIMENT_AI.md`, the judges' examples, and `docs/figures/` (captions, review notes, inset overrides) |
 
 **Where things are in `results/`.** Each group, WT, WT_HP, Hyp_RD and Hyp_HP,
-has one folder, `results/<group>/`, with the same five sections, every file in
-it named after its image:
+has one folder, `results/<group>/`, and in it one folder per image (since
+2026-11-10), every file named after its image:
 
-| section | holds |
+| folder | holds |
 |-|-|
-| `1_lacunae/` | the lacunae of each image (outlines, label image, record) and a contact sheet of the group |
-| `2_canaliculi/` | the network of each image (mask, skeleton, verification picture, vascular mask, graph, record) and its network figure |
-| `3_pols/` | candidate POL measure: lacunar size, pending definition (a picture and a table per image, a group table, a contact sheet) |
-| `4_quantification/` | every measured number per image, the group table, the overview and cell gallery figures, and the group figures Fig01 to Fig04, S01, S02 |
-| `<section>/ai_judge/` | the AI lacuna judge's set in each section it writes (its log in `1_lacunae/ai_judge/ai_log/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/`. Made before `method-freeze-v1`, so they do not match the current results until rerun (a README in each) |
+| `<image>/non_ai_run/` | the method itself: `1_lacunae/` (outlines, label image, excluded region, record), `2_canaliculi/` (mask, skeleton, verification picture, vascular mask, graph, record, network figure), `3_pols/` (the POL footprints and lacunar size), `4_quantification/` (every measured number, the overview and cell gallery), `summary/` (the key pictures and numbers) |
+| `<image>/ai_judges/` | the same folders with the AI lacuna and POL judges on, their logs in `1_lacunae/ai_log/` and `3_pols/ai_log/` |
+| `<image>/comparison/` | the two runs side by side, with a panel of only what the AI changed, and the key numbers of both |
+| `0_key_results/`, `1_lacunae/`, `3_pols/`, `4_quantification/` | what belongs to the whole group: the key pictures of every image, contact sheets, the group tables (the AI run's in `ai_judges/`), the group figures Fig01 to Fig04, S01, S02 |
 
 Beside them, `results/summary/` holds the tables that set the groups side by
 side. `results/archive/`, the old material of no one group (the review loop of

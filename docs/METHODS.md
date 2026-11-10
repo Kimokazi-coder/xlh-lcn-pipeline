@@ -2547,3 +2547,71 @@ was deleted:
 - `python src/key_results.py all` writes the sheet "Judge on vs off" from
   `judge/judge_on_vs_off.csv`, so a rebuilt `SUMMARY.xlsx` has no such sheet
   until `judge-compare` has run again. The committed `SUMMARY.xlsx` keeps it.
+
+
+## 32. One folder per image (2026-11-10)
+
+At the user's request the results were reorganized; no measure, rule,
+default or result of the method changed.
+
+**The layout.** Every image has a folder of its own,
+`results/<group>/<image>/`, with `non_ai_run/` (the method), `ai_judges/`
+(the same pipeline with the AI lacuna and POL judges on: the set of section
+30, called `ai_judge` until now) and `comparison/`. Each run holds the four
+feature folders, `1_lacunae/` to `4_quantification/`, and `summary/`. Every
+file keeps its image's label in its name. What belongs to the whole group
+stays in `results/<group>/<section>/` (the AI run's in
+`<section>/ai_judges/`), with `0_key_results/`. The judges' logs are per
+image: `<image>/ai_judges/1_lacunae/ai_log/` and `3_pols/ai_log/`.
+
+**The move.** `python src/diagnostics.py sample-layout --apply`, with git mv
+so every file keeps its history (1,943 files). In the 175 moved judge logs
+the file paths they name were rewritten to the new places; nothing else in
+them changed. The AI run's records, which name the judges' decision files,
+were rebuilt from the logs offline (`ai-lacuna-run --with-pol-judge` and
+`pols.py all --set ai_judges`, FINAL mode, no call): only those paths and the
+provenance block (commit, config hash, the names of the new config entries)
+changed, the rest of `results/` stayed byte identical, and both judges replay
+to identical verdicts on all 35 images. The status text of the method's
+detection records still says "the group's 4_quantification folder" (now the
+image's); it was left as it is so the method's files stay byte identical.
+
+**Left out.** The canaliculi judge's set (`ai_judge_canaliculi/`, 1,729
+files with its log) was made on the lacunae before the POL judge (29.2), so
+it fits neither run; it is in git history at commit `e915329`. The judge
+itself is unchanged and would write a new set to
+`<image>/ai_judge_canaliculi/`. The group folders `1_lacunae/ai_judge/` and
+`2_canaliculi/ai_judge/`, which held only a README, were removed; that text
+is here and in `results/README.md`. The sheet "Judge on vs off" of
+`SUMMARY.xlsx` is as it was, its column "both judges on" from that set.
+
+**The new pictures**, display only, drawn from the saved results by
+`LCN_HOLDOUT_MODE=FINAL python src/key_results.py samples` (FINAL mode, so
+every run is measured against the same WT median as the POL pictures and
+`SUMMARY.xlsx`):
+
+- in each run's `summary/`: the lacunae outlines and the canaliculi
+  verification picture (copies), the key numbers (`.png` and `.csv`, columns
+  of the sheet Per image) and the POL outlines with a panel of plain text
+  beside them (what we are looking for, how to read the picture);
+- in `comparison/`: for the lacunae, the canaliculi and the POLs, the two
+  runs and a third panel with only what the AI changed, and the key numbers of
+  both runs with the difference.
+
+Two outlines of the two runs are the same lacuna when they share at least 10%
+of either one's pixels (a display choice). Red is a non-AI lacuna with no AI
+counterpart, blue an AI lacuna with none in the non-AI run, yellow an AI
+lacuna made of two or more non-AI lacunae or whose cluster flag differs. For
+the canaliculi, red and blue are skeleton pixels traced in one run only. The
+held-out images are drawn like any other and were not opened.
+
+**Code.** `lacunae.sample_folder` and `result_path` build every per-image
+path; `config` gains `NON_AI_RUN`, `FEATURE_SECTIONS`, `SECTION_SUMMARY` and
+`SAMPLE_COMPARISON`, and `AI_LACUNA_SUBFOLDER` is now `ai_judges`; the judges'
+log folders are per image (`config.ai_lacuna_log_dir`, `ai_pol_log_dir`,
+`ai_canaliculi_log_dir`); `layout-check` checks the new layout.
+`ai-lacuna-run` still writes its run record to `results/archive/ai_judge/`
+(its default), which was deleted after the run. Checks: regression PASS,
+reference-check 3/3, layout-check 4/4, key pictures 105/105, pols selftest
+19/19, ai-lacuna-judge -s 31/31 (its check of the thread judge's prompt has
+no log to read now), ai-pol-judge -s 17/17, ai-judge -s 15/15.

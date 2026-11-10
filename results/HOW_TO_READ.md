@@ -4,24 +4,38 @@
 animal mapping is not confirmed, and the POL definition is a working one, to
 be confirmed by Dr. Murshed.
 
-**The pictures.** Each group (WT, WT_HP, Hyp_RD, Hyp_HP) has a folder
-`results/<group>/0_key_results/` with three pictures per image, sorted by
-image:
+**The pictures.** Each group (WT, WT_HP, Hyp_RD, Hyp_HP) has one folder per
+image, `results/<group>/<image>/`, with three folders:
 
-1. `<image>_1_lacunae_outlines.png`: every lacuna the pipeline found,
+- `non_ai_run/`: the method itself.
+- `ai_judges/`: the same pipeline with the AI judges on (below).
+- `comparison/`: the two side by side.
+
+Each run has one folder per feature (`1_lacunae/`, `2_canaliculi/`,
+`3_pols/`, `4_quantification/`, with every file of that feature) and a
+`summary/` folder with the four things to look at first:
+
+1. `<image>_lacunae_outlines.png`: every lacuna the pipeline found,
    outlined in green on the original image.
-2. `<image>_2_canaliculi_verification.png`: the canaliculi it traced, each
+2. `<image>_canaliculi_verification.png`: the canaliculi it traced, each
    lacuna's threads in their own colour.
-3. `<image>_3_pols_outlines.png`: the POL footprints, each lacuna as
-   outlined, with its id and area in um2. Colours: **green** normal size,
-   **yellow** larger than 2 times the WT median lacuna (an enlarged lacuna, a
-   candidate POL), **cyan** a cluster of merged lacunae, **grey** touching the
-   frame (area cut, not measured). Areas shaded **grey** are excluded: a
-   saturated band at a tissue border or a very large bright structure, not
-   analysed. The bar is 10 um.
+3. `<image>_key_numbers.png` (and `.csv`): the main numbers of the image.
+4. `<image>_pols_explained.png`: the POL footprints, each lacuna as
+   outlined, with its id and area in um2, and beside it in plain words what
+   we are looking for. Colours: **green** normal size, **yellow** larger than
+   2 times the WT median lacuna (an enlarged lacuna, a candidate POL),
+   **cyan** a cluster of merged lacunae, **grey** touching the frame (area
+   cut, not measured). Areas shaded **grey** are excluded: a saturated band at
+   a tissue border or a very large bright structure, not analysed. The bar is
+   10 um.
 
-They are copies; the originals stay in the sections `1_lacunae/`,
-`2_canaliculi/` and `3_pols/` beside them.
+In `comparison/`, each picture shows the non-AI run, the AI run and a third
+panel with only what the AI changed (**red** removed, **blue** added,
+**yellow** merged or cluster flag changed), for the lacunae, the canaliculi
+and the POLs, and `<image>_compare_numbers.png` puts the key numbers of both
+runs side by side with the difference. `results/<group>/0_key_results/` still
+holds the three key pictures of every image of the group in one place (non-AI
+run).
 
 **The numbers.** One file, `results/SUMMARY.xlsx`. Its sheet **Read me**
 says in one line what every column means. **Per group**, **Per animal** and
@@ -41,25 +55,23 @@ genotype by diet models. The numbers that matter most:
 
 The full statistics are in `results/summary/STATISTICS.md`.
 
-**The AI judge (a second, optional reading).** Everything above is the
-method itself. Beside it, in subfolders named `ai_judge` (and
-`ai_judge_canaliculi`) inside the sections, is the same pipeline with an AI
-judge on: an AI model looked at every outline the pipeline drew and said
-which are real lacunae (keeping enlarged lacunae and clusters, rejecting
-fragments, bands, tissue and saturated border pieces), and then which
-threads are real canaliculi. It never draws an outline itself. The sheet
-**Judge on vs off** of `SUMMARY.xlsx` puts the two side by side for the
-development images, per group: in plain words, the judge removes many more
-outlines in the Hyp groups (32 and 39 fewer lacunae there, 5 in WT_HP, 2
-more in WT), mostly band, tissue and saturated border pieces and fragments,
-so the POL area per analysed area falls most in Hyp; the canaliculi judge
-adds a little canalicular length around every lacuna. A third, the POL
-judge, then looked closely at every large lacuna, every cluster and every
-pair of lacunae closer than 3 um: it joined lacunae that are pieces of one
-body, flagged clusters, and removed a few more pieces that are no lacuna,
-almost all in the Hyp groups. In the sheet its column is "lacuna and POL
-judges on", beside "lacuna judge alone". Some group differences are small
-enough that the judges change their direction (see `docs/METHODS.md`
-sections 29.4 and 30). The judges are not validated: read
+**The AI judges (a second, optional reading).** The `non_ai_run/` folders
+are the method itself. The `ai_judges/` folders are the same pipeline with
+two AI judges on: an AI model looked at every outline the pipeline drew and
+said which are real lacunae (keeping enlarged lacunae and clusters, rejecting
+fragments, bands, tissue and saturated border pieces), and then, the POL
+judge, looked closely at every large lacuna, every cluster and every pair of
+lacunae closer than 3 um: it joined lacunae that are pieces of one body,
+flagged clusters, and removed a few more pieces that are no lacuna. Neither
+draws an outline itself, and the canaliculi are traced by the normal method
+around the lacunae they kept. The sheet **Judge on vs off** of
+`SUMMARY.xlsx` puts the runs side by side for the development images, per
+group (column "lacuna and POL judges on"): in plain words, the judges remove
+many more outlines in the Hyp groups, mostly band, tissue and saturated
+border pieces and fragments, so the POL area per analysed area falls most in
+Hyp. Its column "both judges on" is a third judge, of the canaliculi, whose
+results are no longer in these folders (`docs/METHODS.md` 32). Some group
+differences are small enough that the judges change their direction (see
+`docs/METHODS.md` sections 29.4 and 30). The judges are not validated: read
 them as a check on how much the result depends on which outlines count, not
 as the result.

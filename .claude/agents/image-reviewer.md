@@ -23,9 +23,9 @@ rules, thresholds or fixes, and you do not edit anything.
 ## What you are given
 
 For each development image, two pictures of the same field:
-- `results/<group>/1_lacunae/<label>_lacunae_outlines.png`: the original
+- `results/<group>/<label>/non_ai_run/1_lacunae/<label>_lacunae_outlines.png`: the original
   image with every kept lacuna outlined in thin green. No ids.
-- `results/<group>/3_pols/<label>_pols_lacunar_size.png`: the same field;
+- `results/<group>/<label>/non_ai_run/3_pols/<label>_pols_lacunar_size.png`: the same field;
   each measured lacuna filled with a colour, and its id and area in um2 written
   beside it as `id: area`; lacunae with no area or touching the frame are
   outlined grey and labelled `id: no area` or `id: area (edge)`. Use this

@@ -216,9 +216,10 @@ def without_held_out(paths) -> list:
 
 
 def section_folder(out_root: Path, section: str) -> Path:
-    """The folder of one section of a results root: <out_root>/<section>, or, for
-    a result set kept inside a group's sections (config.result_set_root, a root
-    ending in @<subfolder>), <group folder>/<section>/<subfolder>."""
+    """The folder of one section of a results root, for what belongs to the
+    whole group: <out_root>/<section>, or, for a result set
+    (config.result_set_root, a root ending in @<subfolder>), <group
+    folder>/<section>/<subfolder>."""
     out_root = Path(out_root)
     mark = config.RESULT_SET_MARK
     if out_root.name.startswith(mark):
@@ -226,15 +227,31 @@ def section_folder(out_root: Path, section: str) -> Path:
     return out_root / section
 
 
+def sample_folder(out_root: Path, label: str) -> Path:
+    """The folder of one image's run (layout of 2026-11-10): <out_root>/<label>/
+    non_ai_run/, or, for a result set, <group folder>/<label>/<subfolder>/."""
+    out_root = Path(out_root)
+    mark = config.RESULT_SET_MARK
+    if out_root.name.startswith(mark):
+        return out_root.parent / label / out_root.name[len(mark):]
+    return out_root / label / config.NON_AI_RUN
+
+
 def result_path(out_root: Path, label: str, section: str, suffix: str, subfolder: str | None = None) -> Path:
-    """Path of one result file of one image: <out_root>/<section>/[<subfolder>/]
-    <label>_<suffix> (see section_folder). There is no folder per image: the
-    files of every image of a group sit side by side in each section, told
-    apart by their label."""
-    folder = section_folder(out_root, section)
+    """Path of one result file of one image: <sample folder>/<section>/
+    [<subfolder>/]<label>_<suffix> (see sample_folder). Each image has a folder
+    of its own, and its files keep the label in their names."""
+    folder = sample_folder(out_root, label) / section
     if subfolder:
         folder = folder / subfolder
     return folder / f"{label}_{suffix}"
+
+
+def written_folders(out_root: Path, labels, sections) -> list:
+    """Every folder a run over these images writes for these sections: each
+    image's section folder and the group's (for a set, their set folders)."""
+    return ([sample_folder(out_root, label) / section for label in labels for section in sections]
+            + [section_folder(out_root, section) for section in sections])
 
 
 def group_path(out_root: Path, section: str, name: str, subfolder: str | None = None) -> Path:

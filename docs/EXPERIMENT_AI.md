@@ -11,6 +11,12 @@ on 2026-11-10: the files this text names there are in git at commit `2933666` (M
 Both sets were made with
 the detector before `method-freeze-v1` and do not match the current results until rerun.
 
+**Moved again, 2026-11-10** (METHODS section 32). Every image now has a folder of its own: the
+lacuna and POL judges' set is in `results/<group>/<image>/ai_judges/<section>/`, with the logs in
+`<image>/ai_judges/1_lacunae/ai_log/` and `<image>/ai_judges/3_pols/ai_log/`. The canaliculi judge's
+set and log are no longer in `results/` (in git history at commit `e915329`); a new run of that
+judge would write to `results/<group>/<image>/ai_judge_canaliculi/`.
+
 **Status: EXPERIMENT. Branch `exp-ai-layer` only. Not merged, not validated, not used for any
 result. NOTHING IN THIS FILE IS VALIDATED.** No verdict here has been checked against a manual
 trace, no number here has been compared with ground truth, and no result in `results/` was made with

@@ -31,8 +31,8 @@ definition is a working one, to be confirmed by Dr. Murshed.
   picture and says which osteocyte the thread starts from, and for a faint
   piece the pipeline did not trace, whether it is a thread at all; the verdict
   becomes a zero weight attachment that the existing shortest path step uses to
-  split the network (`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). Its output is
-  kept in `results/WT/<section>/ai_judge_canaliculi/`, for the WT group only. The switch is **off by default**, and with it off every
+  split the network (`docs/EXPERIMENT_AI.md`, `src/ai_judge.py`). Its output was
+  kept in `ai_judge_canaliculi/` folders; since 2026-11-10 it is in git history only (commit `e915329`, `docs/METHODS.md` 32). The switch is **off by default**, and with it off every
   output is the deterministic method's.
 
 **Which method the study uses has not been decided, and neither has been
@@ -53,8 +53,8 @@ on 2026-10-27, on all 35 images: 35 calls to the pinned `claude-sonnet-5-5`,
 **$0.83** (estimate $0.93, ceiling $3), every answer valid; the replay gives
 identical verdicts offline. It said no to 352 of the 793 lacunae the filters
 kept and added 7 regions. **Not validated: no verdict has been checked against
-a manual count**, and its output, archived in each group's
-`results/<group>/<section>/ai_judge/`, is not a result of the study. External API use approved on 2026-10-15, approver: Karim.
+a manual count**, and its output, with the AI POL judge's, in each image's
+`results/<group>/<image>/ai_judges/`, is not a result of the study. External API use approved on 2026-10-15, approver: Karim.
 
 ## What each folder is
 
@@ -63,17 +63,24 @@ The repository holds `README.md`, `config.py`, `requirements.txt`,
 `data/` (the input images) and `results/` (every result).
 
 Every group, WT, WT_HP, Hyp_RD and Hyp_HP, has one results folder,
-`results/<group>/`, with the same five sections; inside a section each file is
-named after its image (`<image>_...`), with no folder per image. The guide to
-every file is [`results/README.md`](results/README.md).
+`results/<group>/`, and in it one folder per image (since 2026-11-10,
+`docs/METHODS.md` 32): `results/<group>/<image>/non_ai_run/` (the method),
+`ai_judges/` (the same with the AI lacuna and POL judges on) and
+`comparison/` (the two side by side). Each run holds one folder per feature
+and a `summary/`; every file keeps its image's label in its name
+(`<image>_...`). What belongs to the whole group stays in
+`results/<group>/<section>/`. The guide to every file is
+[`results/README.md`](results/README.md).
 
 | where | what it is | the command that makes it, for group G |
 |-|-|-|
-| `results/G/1_lacunae/` | the lacunae of every image: outlines picture, label image, detection record; and a contact sheet of the group | `python src/lacunae.py -d data/G` |
-| `results/G/2_canaliculi/` | the network of every image: mask, skeleton, verification picture, vascular mask, unattached threads, graph, detection record; and the network figure of each image | `python src/canaliculi.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
-| `results/G/3_pols/` | **candidate POL measure: lacunar size, pending definition**: per image a picture of each lacuna's area against the WT median and a table, per group a table and a contact sheet | `python src/pols.py measure -d data/G` (all groups: `python src/pols.py all`) |
-| `results/G/4_quantification/` | every measured number of each image (json, xlsx, pdf), the group table `quantification_all_images`, the overview and cell gallery of each image, and the group figures Fig01 to Fig04, S01, S02 | `python src/quantification.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
-| `results/G/<section>/ai_judge/` | the AI lacuna judge's set of the group, in each section it writes (`1_lacunae/ai_judge/` with its log in `ai_log/`, `2_canaliculi/ai_judge/`, `4_quantification/ai_judge/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/` (log, `compare/` and run records in `2_canaliculi/ai_judge_canaliculi/`). Made with the detector before `method-freeze-v1`: a README in each folder says they do not match the current results until rerun | `python src/diagnostics.py ai-lacuna-run`, `ai-run`; `docs/EXPERIMENT_AI.md` |
+| `results/G/<image>/non_ai_run/1_lacunae/` | the lacunae of the image: outlines picture, label image, excluded region, detection record (the group's contact sheet in `results/G/1_lacunae/`) | `python src/lacunae.py -d data/G` |
+| `results/G/<image>/non_ai_run/2_canaliculi/` | the network of the image: mask, skeleton, verification picture, vascular mask, unattached threads, graph, detection record, and its network figure | `python src/canaliculi.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
+| `results/G/<image>/non_ai_run/3_pols/` | the POL footprints of the working definition: the outlines picture, lacunar size against the WT median, a table (the group's tables and contact sheets in `results/G/3_pols/`) | `python src/pols.py measure -d data/G` (all groups: `python src/pols.py all`) |
+| `results/G/<image>/non_ai_run/4_quantification/` | every measured number of the image (json, xlsx, pdf), its overview and cell gallery (the group table and the group figures Fig01 to Fig04, S01, S02 in `results/G/4_quantification/`) | `python src/quantification.py -d data/G`; the figures with `python -u src/make_figures.py -g G all` |
+| `results/G/<image>/<run>/summary/` | the key pictures and numbers of one run: lacunae outlines, canaliculi verification, key numbers, the POL picture explained in plain words | `LCN_HOLDOUT_MODE=FINAL python src/key_results.py samples` |
+| `results/G/<image>/ai_judges/` | the same four feature folders with the AI lacuna and POL judges on, their logs in `1_lacunae/ai_log/` and `3_pols/ai_log/`, made from the logs offline | `python src/diagnostics.py ai-lacuna-run --with-pol-judge`, `python src/pols.py all --set ai_judges`; `docs/EXPERIMENT_AI.md` |
+| `results/G/<image>/comparison/` | the two runs side by side for the lacunae, the canaliculi and the POLs, each with a panel of only what the AI changed, and the key numbers of both runs | `LCN_HOLDOUT_MODE=FINAL python src/key_results.py samples` |
 | `results/summary/` | every group side by side: `group_overview.csv` and `.xlsx`, `group_qc.csv`, `pols_lacunar_size_by_group.csv` | `python src/diagnostics.py group-overview`, `python src/diagnostics.py group-qc`, `python src/pols.py all` |
 | `results/archive/` | deleted on 2026-11-10 at the user's request (`docs/METHODS.md` section 31). It held the records of no one group: the final report (`REPORT_FINAL.md`), the look that the POL definition rests on (`pols/FINDINGS.md`, `pols/phase0_look/`), the format test (`format_test/`), the AI judges' run records, costs and reports (`ai_judge/`, `judge/`), `MOVE_MAP.csv`, the review loop (`REVIEW_LOOP.md`, `REPORT_LOOP.md`) and the bias audit (`audit/`). All of it is in git at commit `2933666` | `git restore -s 2933666 results/archive` brings it back |
 | `src/` | `lacunae.py` (feature 1, detection), `canaliculi.py` (feature 2, detection), `quantification.py` (every measure), `pols.py` (lacunar size), `make_figures.py` (the figures), `ai_judge.py` (both judges), `diagnostics.py` (every check, as subcommands) | |
@@ -351,8 +358,9 @@ python src/diagnostics.py survey -d data/WT -o .cache/survey        # what it do
 python src/diagnostics.py shape-picture -d data/WT -o .cache/network_shape   # not tracked
 ```
 
-The AI judge method, kept in `results/WT/<section>/ai_judge_canaliculi/`,
-offline from the decision files already in the repository:
+The AI thread judge's commands. Its decision files are no longer in `results/`
+(git history at commit `e915329`, in the layout of that day), so these need a
+new run of the judge first:
 
 ```
 python src/diagnostics.py ai-run -d data/WT              # the judged pipeline, into the archive folder
@@ -361,8 +369,8 @@ python src/diagnostics.py ai-compare -d data/WT          # judge off against jud
 python src/diagnostics.py compare-methods -d data/WT     # both sets side by side, csv and xlsx
 ```
 
-The AI lacuna judge, kept in `results/<group>/<section>/ai_judge/`
-and `results/archive/ai_judge/`, offline from its log (all four groups unless
+The AI lacuna judge, kept in each image's `results/<group>/<image>/ai_judges/`
+(its run records go to `results/archive/ai_judge/`), offline from its log (all four groups unless
 `-d` or `-i` names fewer):
 
 ```
@@ -370,7 +378,7 @@ python src/diagnostics.py ai-lacuna-judge -w 20            # dry run: the pictur
 python src/diagnostics.py ai-lacuna-judge -s               # self-test with a stub judge: 27 checks
 python src/diagnostics.py ai-lacuna-judge -r -w 20   # the log replays to the same verdicts
 python src/diagnostics.py ai-lacuna-review -w 20           # contact sheets and the table, results/archive/ai_judge/review/
-python src/diagnostics.py ai-lacuna-run -w 20              # the pipeline with its verdicts, each group's <section>/ai_judge/
+python src/diagnostics.py ai-lacuna-run --with-pol-judge -w 20   # the pipeline with both judges' verdicts, every image's ai_judges/
 ```
 
 The lacuna stage these need is cached in `.cache/ai_lacuna_candidates/` once per
@@ -431,7 +439,7 @@ together. The table below is WT, the reference group.
 
 Interior means per cell; field density is skeleton px over analysed px. Both
 sets side by side, per lacuna and with the cell pairs whose tracing changed
-hands, are in `results/WT/2_canaliculi/ai_judge_canaliculi/compare/compare_methods.xlsx`. With the judge
+hands, were in `results/WT/2_canaliculi/ai_judge_canaliculi/compare/compare_methods.xlsx` (git history, commit `e915329`). With the judge
 on, roots per cell are counted only from the pipeline's own attachments; a
 verdict's attachment splits the network but is not a root (`docs/METHODS.md`
 section 20).

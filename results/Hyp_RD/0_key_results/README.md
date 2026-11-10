@@ -1,8 +1,11 @@
 # 0_key_results: Hyp_RD
 
 Pre-validation. The three most important pictures of every image of this
-group, copied from the sections beside this folder (the originals are not
-changed), named so they sort by image:
+group in the non-AI run, copied from each image's folder (the originals, in
+`<image>/non_ai_run/`, are not changed), named so they sort by image. Each
+image's folder also holds the same pictures with the AI judges on
+(`<image>/ai_judges/`), a summary of each run (`summary/`) and the two runs
+side by side (`<image>/comparison/`).
 
 - `<image>_1_lacunae_outlines.png`: the lacunae the pipeline found, each
   outlined in green on the original image (from `1_lacunae/`).

@@ -1,28 +1,30 @@
 # 3_pols: Hyp_HP
 
-Candidate POL measure: lacunar size, pending definition. Pre-validation: no lesion is called here.
+Candidate POL measure: lacunar size, pending definition, the non-AI run. Pre-validation: no lesion is called here.
 
-POLs (periosteocytic lesions) are enlarged lacunae, and there is no agreed
-definition of one in these images yet. This section shows the one candidate
-that needs no new detection: the area of each lacuna the pipeline measured, in
-um2 at 0.13 um/px, and its ratio to the WT median lacunar area (every measured
-WT lacuna pooled).
+The working POL definition (docs/METHODS.md 24.0, to be confirmed by Dr.
+Murshed): a periosteocytic lesion is the enlarged, dye-filled lacunar space,
+and its footprint is the lacuna as the lacuna stage outlined it. Each image's
+own POL files are in its folder, `<image>/non_ai_run/3_pols/`:
 
-- `<image>_pols_lacunar_size.png`: the original image, each measured lacuna
-  filled with the colour of its ratio to the WT median (one scale for every
-  group, the colour bar in um2), its id and area beside it; flagged lacunae
-  (touching the frame, or of a class with no area) outlined grey, not filled;
-  10 um scale bar.
-- `<image>_pols_lacunar_size.csv`: id, area_um2, ratio_to_WT_median, flag.
-- `pols_all_images.csv` and `.xlsx`: per image, n measured, and the mean,
-  median and 90th percentile of area and of ratio.
-- `contact_sheet.png`: every picture of the group, small.
+- `<image>_pols_outlines.png`: every lacuna outlined on the original image
+  with its id and area in um2: green normal size, yellow above 2 x the WT
+  median lacunar area (enlarged), cyan a cluster, grey touching the frame
+  (not measured); excluded regions shaded grey.
+- `<image>_pols_lacunar_size.png`: each measured lacuna filled with the colour
+  of its ratio to the WT median.
+- `<image>_pols_lacunar_size.csv`: id, area_um2, ratio_to_WT_median, flag,
+  cluster.
 
-Across groups: `results/summary/pols_lacunar_size_by_group.csv`.
-Made by `python src/pols.py all` (every group) or
-`python src/pols.py measure -d data/Hyp_HP` (this group only).
+The same picture with a plain explanation beside it is
+`<image>/non_ai_run/summary/<image>_pols_explained.png`. Here, for the whole
+group:
 
-The ring proxy this folder held before is retired, because it measured the dye
-glow around every lacuna, the same width in WT, and not lesions. Its files were
-in `../5_archive/pol_ring_proxy/`, deleted on 2026-11-09; they are in git
-history (tag `method-freeze-v2`).
+- `pols_all_images.csv` and `.xlsx`: per image, the size statistics and the
+  POL metrics.
+- `contact_sheet.png`, `contact_sheet_outlines.png`: every picture, small.
+
+The ratios are against the WT median lacunar area (36.79 um2, every
+measured WT lacuna pooled). Across groups:
+`results/summary/pols_lacunar_size_by_group.csv`. Made by
+`python src/pols.py all`.

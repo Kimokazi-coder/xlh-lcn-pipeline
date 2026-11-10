@@ -275,10 +275,9 @@ def numbers_from_results(root: Path, label: str) -> dict:
 
 def result_labels(folder: Path) -> list[str]:
     """The labels of every image with a quantification json in a results
-    folder: <folder>/4_quantification/<label>_quantification.json."""
-    tail = "_" + config.SUFFIX_QUANTIFICATION + ".json"
-    section = lacunae.section_folder(folder, config.SECTION_QUANTIFICATION)
-    return sorted(p.name[:-len(tail)] for p in section.glob("*" + tail)) if section.is_dir() else []
+    folder: <folder>/<label>/non_ai_run/4_quantification/<label>_quantification.json."""
+    subs = sorted(p for p in Path(folder).iterdir() if p.is_dir()) if Path(folder).is_dir() else []
+    return [p.name for p in subs if quantification.quant_path(folder, p.name, ".json").is_file()]
 
 
 def load_numbers(folder: Path) -> dict:
@@ -6269,8 +6268,10 @@ def cmd_ai_run(args) -> int:
 
     record = Path(args.record) if args.record else (
         config.ARCHIVE_ROOT / "judge" / "ai_canaliculi_run.json" if len(groups) > 1 else out / "ai_run.json")
-    written = [lacunae.section_folder(root_of(g), s) for g in groups for s in
-               (config.SECTION_LACUNAE, config.SECTION_CANALICULI, config.SECTION_QUANTIFICATION)] + [out]
+    labels_of = {g: [lacunae.image_label(p) for p in images if p.parent.name == g] for g in groups}
+    written = [f for g in groups for f in lacunae.written_folders(
+        root_of(g), labels_of[g], (config.SECTION_LACUNAE, config.SECTION_CANALICULI,
+                                   config.SECTION_QUANTIFICATION))] + [out]
     for image_path in images:
         label, group = lacunae.image_label(image_path), image_path.parent.name
         if not ai_judge.decisions_path(label).is_file():
@@ -6286,7 +6287,7 @@ def cmd_ai_run(args) -> int:
           + f", for this process only, into {', '.join(str(root_of(g)) for g in groups)}")
     print("Reads the judges' decision files only. No call is made and no key is read.")
     before = _tree_manifest(results_root, written)
-    log_roots = {g: ai_judge.log_root(g) for g in groups}
+    log_roots = {label: ai_judge.log_dir(label) for g in groups for label in labels_of[g]}
     log_before = {g: _tree_manifest(r, r / "__nothing_excluded__") for g, r in log_roots.items()}
     print(f"results/ before: {len(before)} files hashed; judge logs: "
           f"{sum(len(v) for v in log_before.values())} files hashed")
@@ -6354,7 +6355,7 @@ def cmd_ai_run(args) -> int:
         "judge_logs": {g: {"folder": log_roots[g].relative_to(config.PROJECT_ROOT).as_posix()
                            if log_roots[g].is_absolute() else str(log_roots[g]),
                            "files_hashed": len(log_before[g]),
-                           "byte_identical_afterwards": log_after[g] == log_before[g]} for g in groups},
+                           "byte_identical_afterwards": log_after[g] == log_before[g]} for g in log_roots},
     }
     record.parent.mkdir(parents=True, exist_ok=True)
     record.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -9296,7 +9297,7 @@ def _ai_lacuna_self_test(images: list, v2_image: Path) -> int:
         # held-out one's (docs/HOLDOUT.md).
         thread = ai_judge.load_prompt()
         logged_thread = next(
-            (p for p in sorted((config.AI_RESULTS_DIR / config.AI_LOG_DIR).glob("*_case_0001_attempt1.json"))
+            (p for p in sorted(config.RESULTS_DIR.glob(f"*/{config.AI_CANALICULI_SUBFOLDER}/{config.SECTION_CANALICULI}/{config.AI_LOG_DIR}/*_case_0001_attempt1.json"))
              if p.name.split("_case_")[0] not in lacunae.held_out_labels()), None)
         if logged_thread is not None:
             entry = json.loads(logged_thread.read_text(encoding="utf-8"))
@@ -9566,24 +9567,31 @@ def _lacuna_run_dir(out_root: Path, group: str) -> Path:
     return Path(out_root) / group
 
 
+def _group_labels(group: str) -> list:
+    """The label of every image of a group, held out or not (names only)."""
+    return sorted(lacunae.image_label(p) for p in (config.DATA_DIR / group).glob("*.tif"))
+
+
 def _lacuna_run_written(out_root: Path) -> list:
-    """The section folders ai-lacuna-run writes, every group."""
+    """The section folders ai-lacuna-run writes, every image of every group."""
     sections = (config.SECTION_LACUNAE, config.SECTION_CANALICULI, config.SECTION_QUANTIFICATION)
-    return [lacunae.section_folder(_lacuna_run_dir(out_root, g), s) for g in config.GROUPS for s in sections]
+    return [f for g in config.GROUPS
+            for f in lacunae.written_folders(_lacuna_run_dir(out_root, g), _group_labels(g), sections)]
 
 
 def _protected_manifests(out_root: Path) -> dict:
     """{name: manifest} of everything the switched run must leave as it was: all
-    of results/ but the section folders the run writes (which includes the
-    canaliculi judge's archive), and this judge's own logs."""
+    of results/ but the section folders the run writes, and this judge's own
+    logs (which lie inside them)."""
     import ai_judge
 
     written = _lacuna_run_written(out_root)
     found = {"results": _tree_manifest(config.RESULTS_ROOT, written)}
     for group in config.GROUPS:
-        log = ai_judge.lacuna_log_dir(group)
-        if log.is_dir():
-            found[f"lacuna judge log {group}"] = _tree_manifest(log, log / "__nothing_excluded__")
+        for label in _group_labels(group):
+            log = ai_judge.lacuna_log_dir(group, label)
+            if log.is_dir():
+                found[f"lacuna judge log {group}/{label}"] = _tree_manifest(log, log / "__nothing_excluded__")
     return found
 
 
@@ -9941,7 +9949,7 @@ def _ai_pol_self_test(image_path: Path) -> int:
         run = ai_judge.judge_pol_image(prepared, "self-test", answerer=ai_judge.stub_pol_answerer())
         print(f"  stub verdicts: {run['verdicts']}")
         logged = [json.loads(p.read_text(encoding="utf-8")) for p in
-                  sorted(ai_judge.pol_log_dir(group).glob(f"{label}_case_*_attempt1.json"))]
+                  sorted(ai_judge.pol_log_dir(group, label).glob(f"{label}_case_*_attempt1.json"))]
         checks.append(("every case was answered and logged with its hash, no key and no image bytes in the log",
                        run["totals"]["cases_valid"] == len(prepared["cases"]) == len(logged)
                        and all(r.get("request_sha256") and "ANTHROPIC_API_KEY" not in json.dumps(r)
@@ -10839,36 +10847,166 @@ def _write_rows(path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
+# sample-layout
+# The move of 2026-11-10 into one folder per image (the user's layout, config.py
+# "Outputs"), with git mv so every file keeps its history. Per group, from the
+# tracked files: <section>/<label>_* to <label>/non_ai_run/<section>/; the lacuna
+# and POL judges' set, <section>/ai_judge/..., to <label>/ai_judges/<section>/...
+# for an image's file and to <section>/ai_judges/ for a group file; the
+# canaliculi judge's set, <section>/ai_judge_canaliculi/, removed (made on the
+# lacunae before the POL judge, so it fits neither run; in git history at
+# e915329). 0_key_results and the group files stay. In the moved judge logs the
+# paths they name are rewritten to where the files now are; nothing else in
+# them changes. A dry run by default; --apply moves.
+
+OLD_JUDGE_SET, OLD_CANALICULI_SET = "ai_judge", "ai_judge_canaliculi"
+
+
+def _label_of(name: str, labels: list) -> str | None:
+    """The image a file belongs to: the longest label it starts with."""
+    found = [label for label in labels if name.startswith(label + "_")]
+    return max(found, key=len) if found else None
+
+
+def sample_layout_plan(group: str) -> tuple[list, list]:
+    """([(old, new)], [removed]) for the tracked files of one group, paths
+    relative to the repository."""
+    import subprocess
+
+    labels = _group_labels(group)
+    base = f"results/{group}/"
+    tracked = subprocess.run(["git", "ls-files", "-z", base], cwd=config.PROJECT_ROOT, capture_output=True,
+                             check=True).stdout.decode("utf-8").split("\0")
+    moves, removed = [], []
+    for path in filter(None, tracked):
+        parts = path[len(base):].split("/")
+        section = parts[0]
+        if section not in config.FEATURE_SECTIONS:
+            continue
+        label = _label_of(parts[-1], labels)
+        if len(parts) == 2:
+            if label:
+                moves.append((path, f"{base}{label}/{config.NON_AI_RUN}/{section}/{parts[1]}"))
+        elif parts[1] == OLD_CANALICULI_SET:
+            removed.append(path)
+        elif parts[1] == OLD_JUDGE_SET:
+            rest = "/".join(parts[2:])
+            moves.append((path, f"{base}{label}/{config.AI_LACUNA_SUBFOLDER}/{section}/{rest}" if label
+                          else f"{base}{section}/{config.AI_LACUNA_SUBFOLDER}/{rest}"))
+    return moves, removed
+
+
+def _rewrite_log_paths(path: Path, group: str, labels: list) -> bool:
+    """The paths a moved judge log names, rewritten to the new layout."""
+    import re
+
+    alternatives = "|".join(re.escape(label) for label in sorted(labels, key=len, reverse=True))
+    pattern = re.compile(rf"results/{re.escape(group)}/([1-4]_[a-z]+)/{OLD_JUDGE_SET}/{config.AI_LOG_DIR}/"
+                         rf"((?:pictures/)?)({alternatives})_")
+    text = path.read_bytes().decode("utf-8")
+    new = pattern.sub(lambda m: f"results/{group}/{m.group(3)}/{config.AI_LACUNA_SUBFOLDER}/{m.group(1)}/"
+                                f"{config.AI_LOG_DIR}/{m.group(2)}{m.group(3)}_", text)
+    if new != text:
+        path.write_bytes(new.encode("utf-8"))
+    return new != text
+
+
+def cmd_sample_layout(args) -> int:
+    import subprocess
+
+    total_moves, total_removed, rewritten = 0, 0, 0
+    for group in config.GROUPS:
+        moves, removed = sample_layout_plan(group)
+        clash = len({new for _old, new in moves}) != len(moves)
+        images = len({new.split("/")[2] for _old, new in moves if new.split("/")[2] in _group_labels(group)})
+        print(f"{group}: {len(moves)} files to move ({images} image folders), {len(removed)} to remove"
+              + (", CLASH: two files would land on one path" if clash else ""))
+        if clash:
+            return 1
+        total_moves += len(moves)
+        total_removed += len(removed)
+        if not args.apply:
+            continue
+        by_folder: dict = {}
+        for old, new in moves:
+            by_folder.setdefault(str(Path(new).parent.as_posix()), []).append(old)
+        for folder, olds in sorted(by_folder.items()):
+            (config.PROJECT_ROOT / folder).mkdir(parents=True, exist_ok=True)
+            for k in range(0, len(olds), 100):
+                subprocess.run(["git", "mv", *olds[k:k + 100], folder + "/"], cwd=config.PROJECT_ROOT, check=True)
+        for k in range(0, len(removed), 200):
+            subprocess.run(["git", "rm", "-q", *removed[k:k + 200]], cwd=config.PROJECT_ROOT, check=True)
+        labels = _group_labels(group)
+        for _old, new in moves:
+            if f"/{config.AI_LOG_DIR}/" in new and new.endswith(".json"):
+                rewritten += _rewrite_log_paths(config.PROJECT_ROOT / new, group, labels)
+    print(f"all: {total_moves} to move, {total_removed} to remove"
+          + (f"; moved, removed, and the paths rewritten in {rewritten} judge logs" if args.apply
+             else "; dry run, nothing moved (--apply moves)"))
+    return 0
+
+
 # layout-check
-# The results layout of every group: results/<group>/ holds the five section
-# folders and nothing else, no folder inside a section is named after an image,
-# and every section holds files. One row per group: the images in data/<group>/
-# and the files in each section, counted on disk.
+# The results layout of every group (2026-11-10): results/<group>/ holds one
+# folder per image and the group's section folders, nothing else. Each image
+# folder holds non_ai_run/, ai_judges/ and comparison/, and each run the four
+# feature folders and summary/, all with files. No file of one image lies in a
+# group section (0_key_results, which holds copies, aside). One row per group,
+# files counted on disk; names only, nothing is opened.
+
+def _files(folder: Path) -> list:
+    return [f for f in folder.rglob("*") if f.is_file() and f.name != ".DS_Store"] if folder.is_dir() else []
+
 
 def cmd_layout_check(args) -> int:
-    header = ["group", "images"] + list(config.SECTIONS) + ["problems"]
+    runs = (config.NON_AI_RUN, config.AI_LACUNA_SUBFOLDER)
+    parts = config.FEATURE_SECTIONS + (config.SECTION_SUMMARY,)
+    header = ["group", "images", "image folders", "non-AI files", "AI files", "comparison files",
+              "group files", "problems"]
     rows, failed = [], 0
     for group in config.GROUPS:
         root = config.RESULTS_ROOT / group
-        labels = {lacunae.image_label(p) for p in (config.DATA_DIR / group).glob("*.tif")}
-        problems = []
-        extra = sorted(p.name for p in root.iterdir() if p.name not in config.SECTIONS
-                       and p.name != ".DS_Store") if root.is_dir() else ["no folder"]
+        labels = set(_group_labels(group))
+        problems, per_image, counts = [], [], {"non": 0, "ai": 0, "cmp": 0, "group": 0}
+        names = sorted(p.name for p in root.iterdir() if p.name != ".DS_Store") if root.is_dir() else []
+        extra = [n for n in names if n not in labels and n not in config.SECTIONS]
+        if not root.is_dir():
+            problems.append("no folder")
         if extra:
-            problems.append("not a section: " + ", ".join(extra))
-        counts = []
+            problems.append("neither an image nor a section: " + ", ".join(extra[:3]))
+        missing = sorted(labels - set(names))
+        if missing:
+            problems.append(f"{len(missing)} images have no folder")
+        for label in sorted(labels & set(names)):
+            sample = root / label
+            odd = sorted(p.name for p in sample.iterdir() if p.name not in runs + (config.SAMPLE_COMPARISON,))
+            if odd:
+                per_image.append(f"image folder holds {', '.join(odd[:3])}")
+            for run, key in zip(runs, ("non", "ai")):
+                counts[key] += len(_files(sample / run))
+                if (sample / run).is_dir():
+                    odd = sorted(p.name for p in (sample / run).iterdir() if p.name not in parts)
+                    if odd:
+                        per_image.append(f"{run} holds {', '.join(odd[:3])}")
+                empty = [p for p in parts if not _files(sample / run / p)]
+                if empty:
+                    per_image.append(f"{run}: no files in {', '.join(empty)}")
+            counts["cmp"] += len(_files(sample / config.SAMPLE_COMPARISON))
+            if not _files(sample / config.SAMPLE_COMPARISON):
+                per_image.append("no comparison")
         for section in config.SECTIONS:
-            folder = root / section
-            files = [f for f in folder.rglob("*") if f.is_file() and f.name != ".DS_Store"] if folder.is_dir() else []
-            counts.append(len(files))
-            if not files:
-                problems.append(f"{section} empty")
-            per_image = sorted({d.name for d in folder.rglob("*") if d.is_dir() and d.name in labels})
-            if per_image:
-                problems.append(f"{section} has image folders: {', '.join(per_image[:3])}")
+            files = _files(root / section)
+            counts["group"] += len(files)
+            if section != config.SECTION_KEY_RESULTS:
+                leaked = [f.name for f in files if any(f.name.startswith(label + "_") for label in labels)]
+                if leaked:
+                    problems.append(f"{section} holds image files: {', '.join(leaked[:2])}")
+        # A problem of the image folders is said once, with how many images have it.
+        problems += [f"{kind} ({per_image.count(kind)} images)" for kind in sorted(set(per_image))]
         failed += bool(problems)
-        rows.append([group, len(labels)] + counts + ["; ".join(problems) or "none"])
-    print_table(header, rows, title="Results layout, files per section (on disk)\n")
+        rows.append([group, len(labels), len(labels & set(names)), counts["non"], counts["ai"], counts["cmp"],
+                     counts["group"], "; ".join(problems) or "none"])
+    print_table(header, rows, title="Results layout, one folder per image (on disk)\n")
     print(f"\n{'PASS' if not failed else 'FAIL'}: {len(rows) - failed} of {len(rows)} groups complete.")
     return 1 if failed else 0
 
@@ -11338,8 +11476,13 @@ def main() -> None:
     p.set_defaults(func=cmd_format_test)
 
     p = sub.add_parser("layout-check",
-                       help="Every group's results folder: the five sections, files per section, no image folders.")
+                       help="Every group's results folder: one folder per image with its two runs and comparison, and the group sections.")
     p.set_defaults(func=cmd_layout_check)
+
+    p = sub.add_parser("sample-layout",
+                       help="The move of 2026-11-10 into one folder per image (git mv). A dry run unless --apply.")
+    p.add_argument("--apply", action="store_true", help="Move the files (git mv) and remove the canaliculi judge's set.")
+    p.set_defaults(func=cmd_sample_layout)
 
     p = sub.add_parser("pol-look",
                        help="The phase 0 look of the POL section: contact sheets, 4x crop sheets with "

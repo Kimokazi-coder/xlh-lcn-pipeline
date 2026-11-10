@@ -112,11 +112,12 @@ FILL_ALPHA = 0.7
 SCALE_BAR_UM = 10.0
 
 
-# The judge-on set (2026-11-09): the same section, made the same way from the
-# lacunae the AI lacuna judge accepted, in results/<group>/3_pols/ai_judge/. It
-# reads that set's quantification and label image (results/<group>/<section>/
-# ai_judge/), and its ratios are against the WT median of the same set, so
-# each method is measured against its own reference group.
+# The judge-on set (2026-11-09), each image's ai_judges/ run since 2026-11-10:
+# the same section, made the same way from the lacunae the AI lacuna and POL
+# judges accepted, in results/<group>/<image>/ai_judges/3_pols/ (its group
+# files in results/<group>/3_pols/ai_judges/). It reads that run's
+# quantification and label image, and its ratios are against the WT median of
+# the same run, so each method is measured against its own reference group.
 JUDGE_SET = config.AI_LACUNA_SUBFOLDER
 SETS = (JUDGE_SET,)
 JUDGE_PICTURE_CHECK_TABLE = config.ARCHIVE_ROOT / "judge" / "POL_PICTURE_CHECK_ai_judge.csv"
@@ -640,61 +641,61 @@ def check_picture(image_path: Path, results_root: Path, wt_median: float, set_na
 
 README = """# 3_pols: {group}
 
-{label_cap}. Pre-validation: no lesion is called here.
+{label_cap}, the non-AI run. Pre-validation: no lesion is called here.
 
-POLs (periosteocytic lesions) are enlarged lacunae, and there is no agreed
-definition of one in these images yet. This section shows the one candidate
-that needs no new detection: the area of each lacuna the pipeline measured, in
-um2 at 0.13 um/px, and its ratio to the WT median lacunar area (every measured
-WT lacuna pooled).
+The working POL definition (docs/METHODS.md 24.0, to be confirmed by Dr.
+Murshed): a periosteocytic lesion is the enlarged, dye-filled lacunar space,
+and its footprint is the lacuna as the lacuna stage outlined it. Each image's
+own POL files are in its folder, `<image>/non_ai_run/3_pols/`:
 
-- `<image>_pols_lacunar_size.png`: the original image, each measured lacuna
-  filled with the colour of its ratio to the WT median (one scale for every
-  group, the colour bar in um2), its id and area beside it; flagged lacunae
-  (touching the frame, or of a class with no area) outlined grey, not filled;
-  10 um scale bar.
-- `<image>_pols_lacunar_size.csv`: id, area_um2, ratio_to_WT_median, flag.
-- `pols_all_images.csv` and `.xlsx`: per image, n measured, and the mean,
-  median and 90th percentile of area and of ratio.
-- `contact_sheet.png`: every picture of the group, small.
+- `<image>_pols_outlines.png`: every lacuna outlined on the original image
+  with its id and area in um2: green normal size, yellow above 2 x the WT
+  median lacunar area (enlarged), cyan a cluster, grey touching the frame
+  (not measured); excluded regions shaded grey.
+- `<image>_pols_lacunar_size.png`: each measured lacuna filled with the colour
+  of its ratio to the WT median.
+- `<image>_pols_lacunar_size.csv`: id, area_um2, ratio_to_WT_median, flag,
+  cluster.
 
-Across groups: `results/summary/pols_lacunar_size_by_group.csv`.
-Made by `python src/pols.py all` (every group) or
-`python src/pols.py measure -d data/{group}` (this group only).
+The same picture with a plain explanation beside it is
+`<image>/non_ai_run/summary/<image>_pols_explained.png`. Here, for the whole
+group:
 
-The ring proxy this folder held before is retired, because it measured the dye
-glow around every lacuna, the same width in WT, and not lesions. Its files were
-in `../5_archive/pol_ring_proxy/`, deleted on 2026-11-09; they are in git
-history (tag `method-freeze-v2`).
-"""
-
-
-JUDGE_README = """# 3_pols/ai_judge: {group}
-
-{label_cap}, **with the AI lacuna judge on**. Pre-validation: no lesion is
-called here, and no verdict of the judge is validated.
-
-The same section as `3_pols/` beside this folder, made by the same code from
-the lacunae the AI lacuna judge accepted (`1_lacunae/ai_judge/`,
-`4_quantification/ai_judge/`): the judge was shown every candidate region of
-the lacuna stage and said which are lacunae, keeping enlarged lacunae and
-clusters under the working POL definition (docs/METHODS.md 24.0 and 29). It
-never draws a boundary, so every footprint is the lacuna stage's own outline.
-A region the judge added that the filters had rejected is the class `judged`
-and has no area (flag `no_area`), like the `dim` class.
-
-- `<image>_pols_outlines.png`: the POL footprints, as in `3_pols/`.
-- `<image>_pols_lacunar_size.png` and `.csv`: lacunar size per lacuna.
 - `pols_all_images.csv` and `.xlsx`: per image, the size statistics and the
   POL metrics.
 - `contact_sheet.png`, `contact_sheet_outlines.png`: every picture, small.
 
-The ratios here are against the WT median of the judge-on set
-({wt_median:.2f} um2), so each method is measured against its own reference
-group. Made with the method at tag `method-freeze-v2` and the judge rerun of
-2026-11-09 by `python src/pols.py all --set ai_judge`. The judge off against
-judge on comparison is in the sheet "Judge on vs off" of
-`results/SUMMARY.xlsx`.
+The ratios are against the WT median lacunar area ({wt_median:.2f} um2, every
+measured WT lacuna pooled). Across groups:
+`results/summary/pols_lacunar_size_by_group.csv`. Made by
+`python src/pols.py all`.
+"""
+
+
+JUDGE_README = """# 3_pols/ai_judges: {group}
+
+{label_cap}, the AI judges run (**AI lacuna and POL judges on**).
+Pre-validation: no lesion is called here, and no verdict of a judge is
+validated.
+
+The AI lacuna judge was shown every candidate region of the lacuna stage and
+said which are lacunae, keeping enlarged lacunae and clusters; the AI POL
+judge then looked at every lacuna above 76.6 um2, every cluster and every
+pair closer than 3 um, joined pieces of one body, set the cluster flag and
+removed what is no lacuna (docs/METHODS.md 29 and 30). Neither draws a
+boundary. Each image's own POL files are in its folder,
+`<image>/ai_judges/3_pols/`, the same files as in the non-AI run, with the
+POL judge's log in `ai_log/` there (what it was shown and what it said). The
+comparison with the non-AI run is in `<image>/comparison/`. Here, for the
+whole group:
+
+- `pols_all_images.csv` and `.xlsx`: per image, the size statistics and the
+  POL metrics.
+- `contact_sheet.png`, `contact_sheet_outlines.png`: every picture, small.
+
+The ratios are against the WT median of this run ({wt_median:.2f} um2), so
+each run is measured against its own reference group. Made by
+`python src/pols.py all --set ai_judges`.
 """
 
 
@@ -904,9 +905,11 @@ def selftest() -> int:
                    picture_title("WT", "x") == f"WT x: {LABEL}. Pre-validation, not a lesion call."
                    and picture_title("WT", "x", JUDGE_SET) != picture_title("WT", "x")))
     judged_path = lacunae.result_path(set_root("WT", JUDGE_SET), "x", config.SECTION_POLS, SUFFIX_TABLE)
-    checks.append(("the judge-on set lives in results/<group>/3_pols/ai_judge/",
-                   judged_path == config.RESULTS_ROOT / "WT" / config.SECTION_POLS / JUDGE_SET / f"x_{SUFFIX_TABLE}"
-                   and set_root("WT") == config.RESULTS_ROOT / "WT"))
+    plain_path = lacunae.result_path(set_root("WT"), "x", config.SECTION_POLS, SUFFIX_TABLE)
+    checks.append(("each image's two runs live in results/<group>/<image>/non_ai_run/ and ai_judges/",
+                   judged_path == config.RESULTS_ROOT / "WT" / "x" / JUDGE_SET / config.SECTION_POLS / f"x_{SUFFIX_TABLE}"
+                   and plain_path == config.RESULTS_ROOT / "WT" / "x" / config.NON_AI_RUN / config.SECTION_POLS
+                   / f"x_{SUFFIX_TABLE}"))
     image = next(iter(image_files(config.REFERENCE_GROUP)), None)
     if image is not None:
         labels = np.zeros(lacunae.load_channel(image)[1].shape, dtype=np.int32)

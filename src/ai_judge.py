@@ -1431,10 +1431,10 @@ def parse_answer(text: str, numbers: list, colours: dict, questions: dict) -> tu
 
 # The log, and the replay that reads it back
 
-# The log lives in config.ai_canaliculi_group_dir(group)/ai_log/
-# (results/<group>/2_canaliculi/ai_judge_canaliculi/ai_log/), one folder for every
-# image of the group, each file named after its image; the group is the data
-# folder that holds the image (label_group). LOG_ROOT replaces that with one
+# The log lives in config.ai_canaliculi_log_dir(group, label), one folder per
+# image (results/<group>/<label>/ai_judge_canaliculi/2_canaliculi/ai_log/), each
+# file named after its image; the group is the data folder that holds the image
+# (label_group). LOG_ROOT replaces that with one
 # folder for one process, the module-override idiom the sweep diagnostics use:
 # the self-test sets it so that a rehearsal with a stub judge can never leave
 # verdicts in results/ for the pipeline to pick up.
@@ -1452,16 +1452,12 @@ def label_group(label: str) -> str:
     return _LABEL_GROUPS.get(label, config.REFERENCE_GROUP)
 
 
-def log_root(group: str | None = None) -> Path:
+def log_dir(label: str) -> Path:
+    """The folder of one image's log (LOG_ROOT: one folder for every image,
+    told apart by their label prefix)."""
     if LOG_ROOT:
         return Path(LOG_ROOT)
-    return config.ai_canaliculi_group_dir(group or config.REFERENCE_GROUP) / config.AI_LOG_DIR
-
-
-def log_dir(label: str) -> Path:
-    """The folder of one image's log: the log folder of its group, shared by
-    every image of the group; the files are told apart by their label prefix."""
-    return log_root(label_group(label))
+    return config.ai_canaliculi_log_dir(label_group(label), label)
 
 
 def log_path(label: str, case_id: str, attempt: int) -> Path:
@@ -2461,7 +2457,8 @@ def parse_lacuna_answer(text: str, numbers: list) -> tuple:
     return [seen[n] for n in numbers], ""
 
 
-# The lacuna judge's log. It lives in config.ai_lacuna_group_dir(group)/ai_log/,
+# The lacuna judge's log. It lives in config.ai_lacuna_log_dir(group, label),
+# one folder per image (results/<group>/<label>/ai_judges/1_lacunae/ai_log/),
 # every file named after its image. LACUNA_LOG_ROOT replaces that with
 # LACUNA_LOG_ROOT/<group>/ai_log/ for one process, as LOG_ROOT does
 # for the thread judge: the self-test sets it so that a rehearsal with a stub
@@ -2469,11 +2466,11 @@ def parse_lacuna_answer(text: str, numbers: list) -> tuple:
 LACUNA_LOG_ROOT = None
 
 
-def lacuna_log_dir(group: str, label: str = "") -> Path:
-    """The lacuna judge's log folder of a group, shared by every image of it."""
+def lacuna_log_dir(group: str, label: str) -> Path:
+    """The lacuna judge's log folder of one image (LACUNA_LOG_ROOT: of its group)."""
     if LACUNA_LOG_ROOT:
         return Path(LACUNA_LOG_ROOT) / group / config.AI_LOG_DIR
-    return config.ai_lacuna_group_dir(group) / config.AI_LOG_DIR
+    return config.ai_lacuna_log_dir(group, label)
 
 
 def lacuna_attempt_path(group: str, label: str, attempt: int) -> Path:
@@ -2923,22 +2920,24 @@ def load_pol_prompt() -> dict:
     return load_prompt(*POL_PROMPT_FILES)
 
 
-def pol_log_dir(group: str) -> Path:
+def pol_log_dir(group: str, label: str) -> Path:
+    """The POL judge's log folder of one image (POL_LOG_ROOT: of its group),
+    results/<group>/<label>/ai_judges/3_pols/ai_log/."""
     if POL_LOG_ROOT:
         return Path(POL_LOG_ROOT) / group / config.AI_LOG_DIR
-    return config.ai_pol_group_dir(group) / config.AI_LOG_DIR
+    return config.ai_pol_log_dir(group, label)
 
 
 def pol_attempt_path(group: str, label: str, case_id: str, attempt: int) -> Path:
-    return pol_log_dir(group) / f"{label}_{case_id}_attempt{attempt}.json"
+    return pol_log_dir(group, label) / f"{label}_{case_id}_attempt{attempt}.json"
 
 
 def pol_picture_path(group: str, label: str, case_id: str) -> Path:
-    return pol_log_dir(group) / "pictures" / f"{label}_{case_id}.png"
+    return pol_log_dir(group, label) / "pictures" / f"{label}_{case_id}.png"
 
 
 def pol_decisions_path(group: str, label: str) -> Path:
-    return pol_log_dir(group) / f"{label}_ai_pols.json"
+    return pol_log_dir(group, label) / f"{label}_ai_pols.json"
 
 
 def pol_state(image_path: Path) -> dict:
