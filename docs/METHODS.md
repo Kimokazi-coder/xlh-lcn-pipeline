@@ -2506,5 +2506,44 @@ pictures 35 of 35).
 On the development images it merged 1, 1, 9 and 5 groups of pieces, flagged
 0, 0, 3 and 0 clusters (2 of them new) and removed 0, 0, 4 and 8 lacunae (WT,
 WT_HP, Hyp_RD, Hyp_HP). The table before it is kept as
-`judge_on_vs_off_before_pol_judge.csv`. Report:
+`judge_on_vs_off_before_pol_judge.csv`. With the POL judge, six group
+differences change sign against judge off: the four of 29.4, plus WT_HP minus
+WT and the genotype by diet interaction, both for the 90th percentile
+(interaction +13.6 to -2.7 um2). With seven images per group the 90th
+percentile is fragile: one merge in WT_HP moves it by 5.7 um2. Report:
 `results/archive/judge/REPORT_JUDGE.md`.
+
+
+## 31. Deleting results/archive/ (2026-11-10)
+
+At the user's request, `results/archive/` was deleted with everything in it
+(494 files, 73 MB), and this replaces what section 28 kept there: the final
+report of 2026-11-06 (`REPORT_FINAL.md`), the review loop (`REVIEW_LOOP.md`,
+`REPORT_LOOP.md`, `review_loop/`), the bias audit (`audit/`), the format test
+(`format_test/`), the POL look (`pols/FINDINGS.md`, `pols/phase0_look/`), the
+POL picture checks (`POL_PICTURE_CHECK.csv`, `POL_VISUAL_CHECK.md`), the map
+of the layout move (`MOVE_MAP.csv`), the lacuna judge's run records, dry run
+and contact sheets (`ai_judge/`), and the judge rerun's progress, costs, dry
+run logs, comparison and report (`judge/`).
+
+Every one of these files is in git at commit `2933666`, the last commit that
+holds them: `git show 2933666:results/archive/<path>` prints one, and
+`git restore -s 2933666 results/archive` brings them all back. Where this
+file or another document names a file in `results/archive/`, it is that file
+at that commit. The POL definition of 24.0 still rests on the look in
+`pols/FINDINGS.md`, read there.
+
+No code, measure, rule, default or result changed. The commands that write
+records of no one group still write to `results/archive/` and make it again
+when run: `ai-lacuna-judge`, `ai-lacuna-run`, `ai-lacuna-review`, `ai-run -a`,
+`ai-pol-judge`, `judge-cost`, `judge-compare`, `pol-look`, the audits,
+`review-tally`, `format-test` and `pols.py check-pictures`. Three read what
+was deleted:
+
+- `judge-cost` reads the dry run logs, so it does not run until they are
+  restored.
+- `judge-compare` reads the table from before the POL judge; without it, its
+  column "lacuna judge alone (before the POL judge)" stays empty.
+- `python src/key_results.py all` writes the sheet "Judge on vs off" from
+  `judge/judge_on_vs_off.csv`, so a rebuilt `SUMMARY.xlsx` has no such sheet
+  until `judge-compare` has run again. The committed `SUMMARY.xlsx` keeps it.

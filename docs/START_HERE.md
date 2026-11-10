@@ -108,9 +108,10 @@ it named after its image:
 | `<section>/ai_judge/` | the AI lacuna judge's set in each section it writes (its log in `1_lacunae/ai_judge/ai_log/`); for WT also the AI thread judge in `<section>/ai_judge_canaliculi/`. Made before `method-freeze-v1`, so they do not match the current results until rerun (a README in each) |
 
 Beside them, `results/summary/` holds the tables that set the groups side by
-side, and `results/archive/` the old material of no one group, with the review
-loop of 2026-11-05 (`REVIEW_LOOP.md`) and the bias audit of 2026-11-06
-(`audit/REPORT_AUDIT.md`).
+side. `results/archive/`, the old material of no one group (the review loop of
+2026-11-05, `REVIEW_LOOP.md`, the bias audit of 2026-11-06,
+`audit/REPORT_AUDIT.md`, and the AI judge reports), was deleted on 2026-11-10;
+it is in git at commit `2933666` (`docs/METHODS.md` section 31).
 
 **Held-out images.** 2 images per group are kept for the final validation
 (`docs/HOLDOUT.md`); in the default DEV mode no stage reads them.

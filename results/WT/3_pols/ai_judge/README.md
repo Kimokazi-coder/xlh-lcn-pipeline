@@ -22,5 +22,5 @@ The ratios here are against the WT median of the judge-on set
 (36.79 um2), so each method is measured against its own reference
 group. Made with the method at tag `method-freeze-v2` and the judge rerun of
 2026-11-09 by `python src/pols.py all --set ai_judge`. The judge off against
-judge on comparison is in `results/archive/judge/` and in the sheet "Judge on
-vs off" of `results/SUMMARY.xlsx`.
+judge on comparison is in the sheet "Judge on vs off" of
+`results/SUMMARY.xlsx`.

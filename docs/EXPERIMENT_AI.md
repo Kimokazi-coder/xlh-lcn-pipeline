@@ -6,7 +6,9 @@ not archive: what this file calls `results/WT/5_archive/ai_judge/canaliculi_judg
 `results/WT/2_canaliculi/ai_judge_canaliculi/`), and what it calls
 `results/<group>/5_archive/ai_judge/lacuna_judge/` is in `results/<group>/<section>/ai_judge/`
 (its log in `results/<group>/1_lacunae/ai_judge/ai_log/`); `results/archive/MOVE_MAP.csv` has
-every file. The text below keeps the paths of the day it describes. Both sets were made with
+every file. The text below keeps the paths of the day it describes. `results/archive/` was deleted
+on 2026-11-10: the files this text names there are in git at commit `2933666` (METHODS section 31).
+Both sets were made with
 the detector before `method-freeze-v1` and do not match the current results until rerun.
 
 **Status: EXPERIMENT. Branch `exp-ai-layer` only. Not merged, not validated, not used for any
@@ -582,7 +584,7 @@ version, with every decision taken where the brief left a choice open.
 2026-10-27. Since 2026-11-09 the prompt follows the working POL definition (enlarged lacunae and
 clusters are kept; only fragments, band, tissue and saturated border pieces are rejected), every
 answer carries a reason code, a region mostly in the excluded region is not offered, and both judges
-were run again on all four groups: METHODS section 29 and `results/archive/judge/`.
+were run again on all four groups: METHODS sections 29 and 30.
 
 External API use approved on 2026-10-15, approver: Karim
 

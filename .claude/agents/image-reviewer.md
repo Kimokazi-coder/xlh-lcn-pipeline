@@ -1,6 +1,6 @@
 ---
 name: image-reviewer
-description: Reviews the lacuna detection pictures of lcn-quant development images and returns one table row per detection problem it sees. Read only. Never opens held-out images. Use it for the review loop of results/archive/REVIEW_LOOP.md.
+description: Reviews the lacuna detection pictures of lcn-quant development images and returns one table row per detection problem it sees. Read only. Never opens held-out images. Use it for the review loop (docs/METHODS.md section 25).
 tools: Read, Glob, Grep
 model: sonnet
 ---

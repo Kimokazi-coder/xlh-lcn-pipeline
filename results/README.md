@@ -92,8 +92,9 @@ rhodamine confocal images the dye fills the lacuna and the unmineralized
 pericellular matrix around the osteocyte together, so a periosteocytic lesion
 shows as an enlarged, irregular, dye-filled lacunar space: that space is the
 POL footprint. No separate halo is visible around it (the look of 2026-10-29,
-`results/archive/pols/FINDINGS.md`), so the footprint is the lacuna as the
-lacuna stage outlines it, and the POL measures are measures of that outline:
+`results/archive/pols/FINDINGS.md`, in git at commit `2933666`), so the
+footprint is the lacuna as the lacuna stage outlines it, and the POL
+measures are measures of that outline:
 its area, against the WT median, and the share of the analysed area it covers.
 Status: working definition, not confirmed.
 
